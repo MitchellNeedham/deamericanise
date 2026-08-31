@@ -91,6 +91,70 @@ function withOriginal(ctx: RuleContext, body: string, original: string): string 
   return ctx.options.units.keepOriginal ? `${body} (${original})` : body;
 }
 
+
+/**
+ * A metric measurement as it appears inside a parenthetical, whether written in symbols,
+ * written out, or written the American way. Longer unit names are listed first so the
+ * end anchor cannot cut one short.
+ */
+const METRIC_INNER = new RegExp(
+  String.raw`^\s*[-−]?\d[\d,]*(?:\.\d+)?` +
+    String.raw`(?:\s*(?:-|–|—|to|x|×)\s*[-−]?\d[\d,]*(?:\.\d+)?)*\s*` +
+    String.raw`(?:degrees?\s+(?:Celsius|C)\b|°\s*C|` +
+    String.raw`kilometres?|kilometers?|centimetres?|centimeters?|millimetres?|millimeters?|` +
+    String.raw`millilitres?|milliliters?|kilograms?|hectares?|kilowatts?|kilojoules?|` +
+    String.raw`tonnes?|metres?|meters?|litres?|liters?|grams?|` +
+    String.raw`km/h|kPa|kW|kJ|N·m|Nm|km²|km2|m²|m2|ha|mm|cm|km|kg|mg|mL|ml|` +
+    String.raw`m|g|t|L|l)\s*$`,
+);
+
+/** The author wrote the metric side; only its spelling needs bringing across. */
+function metricSpelling(text: string): string {
+  return text.replace(
+    /\b((?:kilo|centi|milli|micro|nano|deci|deca|hecto)?)(met|lit)er(s?)\b/gi,
+    (_, prefix: string, stem: string, plural: string) => `${prefix}${stem}re${plural}`,
+  );
+}
+
+/**
+ * `30-60 feet (9-18 m)` already carries its own conversion, so converting the imperial
+ * half produces `9.1-18 metres (9-18 m)`. Swallow the parenthetical instead and keep the
+ * author's own figure, which is the one they rounded on purpose.
+ */
+function redundantMetric(ctx: RuleContext, end: number): { end: number; after: string } | null {
+  const match = /^[ \t]*\(([^()]{1,40})\)/.exec(ctx.text.slice(end));
+  if (!match || !METRIC_INNER.test(match[1]!)) return null;
+  return { end: end + match[0].length, after: metricSpelling(match[1]!.trim()) };
+}
+
+/** Records one converted measurement, collapsing a redundant parenthetical if there is one. */
+function pushMeasurement(
+  ctx: RuleContext,
+  changes: Change[],
+  start: number,
+  matched: string,
+  body: string,
+  ruleId: string,
+  priority: number,
+): void {
+  const redundant = redundantMetric(ctx, start + matched.length);
+  if (redundant) {
+    changes.push({
+      start,
+      end: redundant.end,
+      before: ctx.text.slice(start, redundant.end),
+      after: redundant.after,
+      ruleId,
+      category: 'units',
+      confidence: 'moderate',
+      priority: 55,
+      note: 'the text already gave the metric value, so the imperial half goes',
+    });
+    return;
+  }
+  changes.push(change(start, matched, withOriginal(ctx, body, matched), ruleId, priority));
+}
+
 /** `6 feet 2 inches`, `6'2"` and `5 ft 11 in` collapse into a single metric height. */
 function feetInchesRule(): Rule {
   const pattern = new RegExp(
@@ -119,9 +183,7 @@ function feetInchesRule(): Rule {
           ctx.options.units.maxDecimals,
         );
         const body = `${number} ${unitWord(target, Number(number))}`;
-        changes.push(
-          change(match.index, match[0], withOriginal(ctx, body, match[0]), 'units.length.feet-inches', 40),
-        );
+        pushMeasurement(ctx, changes, match.index, match[0], body, 'units.length.feet-inches', 40);
       }
       return changes;
     },
@@ -181,7 +243,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const unit = entry.isWord ? ` ${target.plural}` : ` ${target.symbol}`;
         const body = `${lowText}${separator}${highText}${unit}`;
 
-        changes.push(change(start, match[0], withOriginal(ctx, body, match[0]), entry.measure.id, 35));
+        pushMeasurement(ctx, changes, start, match[0], body, entry.measure.id, 35);
       }
       return changes;
     },
@@ -228,7 +290,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
             .map((v) => formatNumber(v * perSourceUnit, precision, figures, maxDecimals))
             .join(separator) + unit;
 
-        changes.push(change(start, match[0], withOriginal(ctx, body, match[0]), entry.measure.id, 38));
+        pushMeasurement(ctx, changes, start, match[0], body, entry.measure.id, 38);
       }
       return changes;
     },
@@ -260,9 +322,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
           : ` ${target.symbol}`;
 
-        changes.push(
-          change(start, match[0], withOriginal(ctx, `${number}${unit}`, match[0]), entry.measure.id, 30),
-        );
+        pushMeasurement(ctx, changes, start, match[0], `${number}${unit}`, entry.measure.id, 30);
       }
       return changes;
     },
@@ -299,14 +359,14 @@ function temperatureRule(): Rule {
         const suffix = spelled
           ? `${Number(number) === 1 || Number(number) === -1 ? ' degree' : ' degrees'} Celsius`
           : '°C';
-        changes.push(
-          change(
-            match.index,
-            match[0],
-            withOriginal(ctx, `${number}${suffix}`, match[0]),
-            'units.temperature.fahrenheit',
-            35,
-          ),
+        pushMeasurement(
+          ctx,
+          changes,
+          match.index,
+          match[0],
+          `${number}${suffix}`,
+          'units.temperature.fahrenheit',
+          35,
         );
       }
       return changes;

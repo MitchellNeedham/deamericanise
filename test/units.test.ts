@@ -230,3 +230,26 @@ describe('screen sizes survive an adjective or two', () => {
     expect(convert(input)).toBe(expected);
   });
 });
+
+describe('a text that already gives the metric value', () => {
+  it.each`
+    input                                            | expected                | why
+    ${'100 yards (91 m)'}                            | ${'91 m'}               | ${'the imperial half goes, the author figure stays'}
+    ${'30-60 feet (9-18 m)'}                         | ${'9-18 m'}             | ${'ranges too'}
+    ${'120 degrees Fahrenheit (49 degrees Celsius)'} | ${'49 degrees Celsius'} | ${'temperatures too'}
+    ${'100 yards (91 meters)'}                       | ${'91 metres'}          | ${'only the spelling is brought across'}
+    ${'6 feet (1.8 m) tall'}                         | ${'1.8 m tall'}         | ${'mid-sentence'}
+    ${'90 feet (30m)'}                               | ${'30m'}                | ${'the author spacing is kept'}
+    ${'10 miles (16 km) away'}                       | ${'16 km away'}         | ${'any unit'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                            | expected                            | why
+    ${'6 feet (about two paces)'}    | ${'1.8 metres (about two paces)'}   | ${'not a measurement, so it converts as normal'}
+    ${'6 feet (see the diagram)'}    | ${'1.8 metres (see the diagram)'}   | ${'the same'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});

@@ -1,5 +1,5 @@
 > Generated from [bear-safety.md](./bear-safety.md) by [deamericanise](https://www.npmjs.com/package/deamericanise).
-> Preset `read`, dialect `en-AU`, 17 changes. Every change is in **bold**.
+> Preset `read`, dialect `en-AU`, 16 changes. Every change is in **bold**.
 >
 > Distances and temperatures, in a document that already carries its own metric conversions.
 >
@@ -19,7 +19,7 @@ Pets are not allowed in thermal areas or on boardwalks, even if they're on a lea
 
 Toxic gases may accumulate to dangerous levels in some hydrothermal areas. If you begin to feel sick while exploring a geyser basin, leave the area immediately.
 
-The animals in Yellowstone are wild and dangerous, no matter how docile they may appear to be. The safest (and often best) view of wildlife is from inside a car. Always stay at least **91 metres** (91 m) away from bears, wolves, and cougars, and at least **23 metres** (23 m) away from all other animals, including bison and elk. If an animal moves closer to you, back away to maintain a safe distance. It's illegal to **wilfully** remain near or approach wildlife, including birds, within any distance that disturbs or displaces the animal. Binoculars and telephoto lenses always give you a better view than approaching the animal would. Lenses with focal lengths of 300mm or greater are recommended for adequate reach.
+The animals in Yellowstone are wild and dangerous, no matter how docile they may appear to be. The safest (and often best) view of wildlife is from inside a car. Always stay at least **91 m** away from bears, wolves, and cougars, and at least **23 m** away from all other animals, including bison and elk. If an animal moves closer to you, back away to maintain a safe distance. It's illegal to **wilfully** remain near or approach wildlife, including birds, within any distance that disturbs or displaces the animal. Binoculars and telephoto lenses always give you a better view than approaching the animal would. Lenses with focal lengths of 300mm or greater are recommended for adequate reach.
 
 Never feed wildlife, even birds and squirrels. Animals that become dependent on human food may become aggressive **towards** people and have to be killed. Animals also carry diseases that can be transmitted to people.
 
@@ -27,17 +27,17 @@ Don't leave packs, bags, or coolers containing food unattended, even for a few m
 
 If you're involved in a conflict with an animal, regardless of how minor, contact us or report it to a park ranger as soon as possible. If cell service is available, dial 911. The lives of other people, and the animal, may depend on it.
 
-Keep at least **91 metres** (91 **metres**) from bears at all times and never approach a bear to take a photo. Although surprise encounters do happen, it's your responsibility to maintain this distance.
+Keep at least **91 metres** from bears at all times and never approach a bear to take a photo. Although surprise encounters do happen, it's your responsibility to maintain this distance.
 
 Bear spray is a non-lethal tool specifically designed to deter bears as a last line of **defence**. It is proven to be highly successful at stopping aggressive **behaviour** in bears. The active ingredient will iritate a bear's nose, eyes, and lungs to cause significant, temporary pain. Unlike pepper spray intended to deter humans, bear spray reaches substantially further and comes out as a cloud instead of a stream. Using bear spray eliminates the need to have precise aim and effectively defuses situations without permanently harming or killing bears.
 
 - Each person in your group should carry one can of bear spray where it can be reached quickly, such as in a waist holster or chest holster. Do not carry it inside your pack or in other hard to reach areas. When **travelling** through thick vegetation or other areas of poor visibility, remove your bear spray from the holster and carry it in your hand.
 
-- If a bear charges: remove the safety clip, point the nozzle slightly down, adjust for crosswind, and spray when the bear is **9.1-18 metres** (9-18 m) away to create a wall between you and the bear. Bears can run up to **12 metres** (12 m) per second, so creating a cloud in front of you provides time for the spray to affect the bear before it reaches you. Keep spraying until the bear changes direction. Quickly leave the area, but do not run.
+- If a bear charges: remove the safety clip, point the nozzle slightly down, adjust for crosswind, and spray when the bear is **9-18 m** away to create a wall between you and the bear. Bears can run up to **12 m** per second, so creating a cloud in front of you provides time for the spray to affect the bear before it reaches you. Keep spraying until the bear changes direction. Quickly leave the area, but do not run.
 
 - Bear spray is a deterrent, not a repellent. Do not apply bear spray to your body or gear.
 
-- Bear spray can explode if it reaches **48.9 degrees Celsius** (49 degrees Celsius). Don't store it in the passenger compartment of vehicles or near any heat sources.
+- Bear spray can explode if it reaches **49 degrees Celsius**. Don't store it in the passenger compartment of vehicles or near any heat sources.
 
 - Bear spray cannot be taken on **aeroplanes** and may cause injury if thrown away in the trash.
 
@@ -55,19 +55,18 @@ not subject to copyright protection under 17 U.S.C. section 105.
 | Line | Before | After | Rule | Confidence |
 | --- | --- | --- | --- | --- |
 | 11 | `burned` | `burnt` | `spelling.contextual.irregular-past` | risky |
-| 15 | `100 yards` | `91 metres` | `units.length.yard` | moderate |
-| 15 | `25 yards` | `23 metres` | `units.length.yard` | moderate |
+| 15 | `100 yards (91 m)` | `91 m` | `units.length.yard` | moderate |
+| 15 | `25 yards (23 m)` | `23 m` | `units.length.yard` | moderate |
 | 15 | `willfully` | `wilfully` | `spelling.single-l` | safe |
 | 17 | `toward` | `towards` | `spelling.irregular-ambiguous` | moderate |
 | 19 | `learned` | `learnt` | `spelling.contextual.irregular-past` | risky |
-| 23 | `100 yards` | `91 metres` | `units.length.yard` | moderate |
-| 23 | `meters` | `metres` | `spelling.contextual.metre` | risky |
+| 23 | `100 yards (91 meters)` | `91 metres` | `units.length.yard` | moderate |
 | 25 | `defense` | `defence` | `spelling.ence` | safe |
 | 25 | `behavior` | `behaviour` | `spelling.our` | safe |
 | 27 | `traveling` | `travelling` | `spelling.double-l` | safe |
-| 29 | `30-60 feet` | `9.1-18 metres` | `units.length.foot` | moderate |
-| 29 | `40 feet` | `12 metres` | `units.length.foot` | moderate |
-| 33 | `120 degrees Fahrenheit` | `48.9 degrees Celsius` | `units.temperature.fahrenheit` | moderate |
+| 29 | `30-60 feet (9-18 m)` | `9-18 m` | `units.length.foot` | moderate |
+| 29 | `40 feet (12 m)` | `12 m` | `units.length.foot` | moderate |
+| 33 | `120 degrees Fahrenheit (49 degrees Celsius)` | `49 degrees Celsius` | `units.temperature.fahrenheit` | moderate |
 | 35 | `airplanes` | `aeroplanes` | `spelling.irregular` | safe |
 | 37 | `Center` | `Centre` | `spelling.re` | safe |
 | 37 | `Center` | `Centre` | `spelling.re` | safe |

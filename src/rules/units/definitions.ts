@@ -24,6 +24,11 @@ export interface Measure {
    * different things in different places, the document usually says which it means.
    */
   ambiguousWhen?: RegExp;
+  /**
+   * Left alone unless the rule is turned on by id. For measures that are not American at
+   * all, merely imperial-descended and used everywhere.
+   */
+  keptByDefault?: boolean;
 }
 
 const m = (value: number, symbol: string, singular: string, plural: string): MetricValue => ({
@@ -213,22 +218,30 @@ export const MEASURES: Measure[] = [
     convert: (v) => metricVolume(v * 473.176473),
   },
   {
+    // Cups are used in Australian and British kitchens too, so this is not a translation.
+    // Worth knowing: a US cup is 237 mL and an Australian one is 250 mL.
     id: 'units.volume.cup',
     keep: 'cup',
+    keptByDefault: true,
     words: ['cups', 'cup'],
     abbrevs: [],
     convert: (v) => metricVolume(v * 236.5882365),
   },
   {
+    // Universal in recipes. The trap is that an Australian tablespoon is 20 mL while
+    // everyone else's is 15 mL, but rewriting it as millilitres reads like a lab protocol.
     id: 'units.volume.tablespoon',
     keep: 'tablespoon',
+    keptByDefault: true,
     words: ['tablespoons', 'tablespoon'],
     abbrevs: ['tbsp', 'tbs'],
     convert: (v) => metricVolume(v * 14.78676478),
   },
   {
+    // Universal in recipes, and 5 mL almost everywhere.
     id: 'units.volume.teaspoon',
     keep: 'teaspoon',
+    keptByDefault: true,
     words: ['teaspoons', 'teaspoon'],
     abbrevs: ['tsp'],
     convert: (v) => metricVolume(v * 4.92892159),

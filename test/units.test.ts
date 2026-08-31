@@ -48,11 +48,8 @@ describe('mass and volume', () => {
     ${'1 ton'}           | ${'910 kilograms'}
     ${'1 gallon'}        | ${'3.8 litres'}
     ${'5 gallons'}       | ${'19 litres'}
-    ${'2 cups'}          | ${'470 millilitres'}
     ${'1 quart'}         | ${'950 millilitres'}
     ${'8 fluid ounces'}  | ${'240 millilitres'}
-    ${'1 tablespoon'}    | ${'15 millilitres'}
-    ${'2 teaspoons'}     | ${'9.9 millilitres'}
   `('$input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -92,7 +89,6 @@ describe('fractions and ranges', () => {
   it.each`
     input                  | expected
     ${'1/2 gallon'}        | ${'1.9 litres'}
-    ${'1 1/2 cups'}        | ${'350 millilitres'}
     ${'2½ inches'}         | ${'6.4 centimetres'}
     ${'5-10 feet'}         | ${'1.5-3 metres'}
     ${'5 to 10 miles'}     | ${'8 to 16 kilometres'}
@@ -293,6 +289,11 @@ describe('a singular unit modifying a noun stays singular', () => {
 });
 
 describe('numbers written out in words', () => {
+  // Cups are switched on here because they are the natural example of a written-out
+  // measure, not because they convert by default.
+  const spelled = (input: string) =>
+    convert(input, { rules: { 'units.volume.cup': true, 'units.volume.teaspoon': true } });
+
   it.each`
     input                              | expected
     ${'one cup of suet'}               | ${'240 millilitres of suet'}
@@ -304,7 +305,7 @@ describe('numbers written out in words', () => {
     ${'two thirds cup'}                | ${'160 millilitres'}
     ${'six feet tall'}                 | ${'1.8 metres tall'}
   `('$input -> $expected', ({ input, expected }) => {
-    expect(convert(input)).toBe(expected);
+    expect(spelled(input)).toBe(expected);
   });
 
   it.each`
@@ -334,5 +335,66 @@ describe('tons, when the document says which kind', () => {
     ${'Figures in tonnes. It moved 900 tons.'}                   | ${'Figures in tonnes. It moved 900 tons.'}                    | ${'same'}
   `('$why', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('Fahrenheit decades', () => {
+  it.each`
+    input                                          | expected
+    ${'on mild days in the 70s'}                   | ${'on mild days between 21 and 26°C'}
+    ${'highs in the mid 90s'}                      | ${'highs between 34 and 36°C'}
+    ${'temperatures in the low 40s overnight'}     | ${'temperatures between 4 and 6°C overnight'}
+    ${'the weather stayed in the upper 80s'}       | ${'the weather stayed between 31 and 32°C'}
+    ${'it was freezing, in the 20s.'}              | ${'it was freezing, between -7 and -2°C.'}
+    ${'temperatures in the 70s and 80s'}           | ${'temperatures between 21 and 32°C'}
+    ${'highs in the low-70s'}                      | ${'highs between 21 and 23°C'}
+    ${'warm, in the 70’s'}                         | ${'warm, between 21 and 26°C'}
+    ${'heat in the 110s'}                          | ${'heat between 43 and 48°C'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  // The decade of the calendar is the far commoner reading, so these must all survive.
+  it.each`
+    unchanged                                        | why
+    ${'Back in the 70s, the music was better.'}      | ${'back in the'}
+    ${'Songs from the 80s.'}                         | ${'no temperature anywhere'}
+    ${'He was born in the 60s.'}                     | ${'born'}
+    ${'Fashion of the 90s is back.'}                 | ${'fashion'}
+    ${'The band formed in the late 70s.'}            | ${'late, and a band'}
+    ${'Throughout the 80s the climate changed.'}     | ${'throughout, despite the word climate'}
+    ${'Warm weather back in the 70s.'}               | ${'back in the wins over warm'}
+    ${'During the 1970s it was warmer.'}             | ${'a four-digit year'}
+    ${'She was in her 70s and the weather was mild.'} | ${'her, not the'}
+    ${'Interest rates in the 80s hit records.'}      | ${'no temperature context'}
+    ${'a 1.70s delay in the forecast'}               | ${'part of a decimal'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('cooking measures are not Americanisms', () => {
+  it.each`
+    unchanged                     | why
+    ${'one cup of flour'}         | ${'Australian kitchens use cups too'}
+    ${'2 teaspoons of salt'}      | ${'universal'}
+    ${'1 tablespoon of butter'}   | ${'universal, and millilitres read like a lab protocol'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                            | expected                   | why
+    ${'1/2 gallon of milk'}          | ${'1.9 litres of milk'}    | ${'a gallon is American'}
+    ${'2 quarts of stock'}           | ${'1.9 litres of stock'}   | ${'so is a quart'}
+    ${'8 fluid ounces'}              | ${'240 millilitres'}       | ${'and the US fluid ounce'}
+    ${'one-quarter pound of citron'} | ${'110 grams of citron'}   | ${'weights convert'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('converts cups when asked to', () => {
+    expect(convert('one cup of flour', { rules: { 'units.volume.cup': true } }))
+      .toBe('240 millilitres of flour');
   });
 });

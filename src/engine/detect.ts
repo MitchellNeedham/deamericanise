@@ -13,7 +13,11 @@ const MARKERS: Array<[label: string, pattern: RegExp]> = [
   ['aluminum', /\baluminum\b/i],
   ['gray', /\bgray(?:s|er|est|ish|scale)?\b/i],
   ['Fahrenheit', /(?:°\s*F\b|\bFahrenheit\b)/i],
-  ['imperial units', /\b\d+\s*(?:miles?|feet|foot|inches|pounds?|ounces?|gallons?|mph|acres?)\b/i],
+  // The number may be written out, as older prose and most recipes do.
+  [
+    'imperial units',
+    /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|half|quarter|quarters)[\s-]*(?:miles?|feet|foot|inches?|pounds?|ounces?|gallons?|quarts?|pints?|mph|acres?)\b/i,
+  ],
   ['US vocabulary', /\b(?:sidewalk|gasoline|elevator|apartment|zip code|freeway|cell phone|diaper|faucet|drugstore|realtor|vacation|soccer|math)\b/i],
   ['MM/DD/YYYY literal', /\bMM[/\-.]DD[/\-.]YY(?:YY)?\b/i],
   ['abbreviations with stops', /\b(?:U\.S\.|U\.S\.A\.|Mr\.|Mrs\.|Ph\.D\.)/],

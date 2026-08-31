@@ -36,8 +36,10 @@ function buildIndex(
 ): { alternation: string; byAlias: Map<string, Alias> } {
   const byAlias = new Map<string, Alias>();
   for (const measure of MEASURES) {
-    // Turning the rule on by id overrides a dialect that would otherwise keep the unit.
-    if (skip.has(measure.keep) && forced[measure.id] !== true) continue;
+    // Turning the rule on by id overrides both a dialect that keeps the unit and a
+    // measure that is kept everywhere by default.
+    const kept = skip.has(measure.keep) || measure.keptByDefault === true;
+    if (kept && forced[measure.id] !== true) continue;
     for (const w of measure.words) {
       byAlias.set(w.toLowerCase(), { measure, isWord: true, isSingular: SINGULAR_WORDS.has(w) });
     }
@@ -392,6 +394,89 @@ function temperatureRule(): Rule {
   };
 }
 
+/**
+ * `on mild days in the 70s` is a Fahrenheit decade, and means nothing to a reader who
+ * thinks in Celsius. It cannot become `the 20s`, because 70-79F spans 21-26C and
+ * straddles the band, so it becomes an explicit range instead.
+ *
+ * The risk is that `the 70s` is far more often a decade of the calendar, so this needs
+ * temperature words nearby and refuses outright when the sentence is talking about time.
+ */
+function temperatureDecadeRule(): Rule {
+  // A decade, optionally banded (`low`, `mid`, `upper`), optionally paired with a second
+  // decade (`the 70s and 80s`). `70's` and `low-70s` are both written in the wild.
+  const DECADE = String.raw`(low|mid|middle|high|upper|lower)?[\s-]*(1[01]0|\d0)['\u2019]?s`;
+  const pattern = new RegExp(
+    String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
+      String.raw`(?:\s*(?:and|to|-|\u2013)\s*${DECADE})?(?!\w)`,
+    'gi',
+  );
+
+  const TEMPERATURE_NEARBY =
+    /\b(?:temperatures?|degrees?|weather|heat|humidity|forecasts?|highs?|lows?|warm|warmer|mild|cool|cooler|chilly|hot|hotter|cold|colder|freezing|thermometer|climate|Fahrenheit|outdoors?|outside)\b/i;
+
+  // Phrases that pin `the 70s` to the calendar rather than the thermometer.
+  const A_DECADE =
+    /\b(?:back|music|song|songs|band|bands|born|era|decade|decades|throughout|during|since|fashion|nostalgia|album|movie|movies|film|films|show|shows|style|revival|late|early|mid-)\s*$/i;
+
+  const SPREAD: Record<string, [number, number]> = {
+    low: [0, 3],
+    lower: [0, 3],
+    mid: [4, 6],
+    middle: [4, 6],
+    high: [7, 9],
+    upper: [7, 9],
+  };
+
+  const toCelsius = (f: number) => Math.round(((f - 32) * 5) / 9);
+
+  return {
+    id: 'units.temperature.decade',
+    category: 'units',
+    confidence: 'risky',
+    priority: 36,
+    find(ctx) {
+      const changes: Change[] = [];
+      pattern.lastIndex = 0;
+
+      for (const match of ctx.text.matchAll(pattern)) {
+        const start = match.index;
+        const end = start + match[0].length;
+        const before = ctx.text.slice(Math.max(0, start - 90), start);
+        const after = ctx.text.slice(end, end + 90);
+
+        if (A_DECADE.test(before)) continue;
+        if (!TEMPERATURE_NEARBY.test(before) && !TEMPERATURE_NEARBY.test(after)) continue;
+
+        const firstBand = SPREAD[(match[2] ?? '').toLowerCase()] ?? [0, 9];
+        // With a second decade the range runs from the bottom of the first to the top of
+        // the second: `the 70s and 80s` is 70 through 89.
+        const lastBand = match[5] === undefined ? firstBand : SPREAD[(match[4] ?? '').toLowerCase()] ?? [0, 9];
+        const low = toCelsius(Number(match[3]) + firstBand[0]);
+        const high = toCelsius(Number(match[5] ?? match[3]) + lastBand[1]);
+        if (low >= high) continue;
+
+        // `days in the 70s` has to become `days between 21 and 26C`, never `days in
+        // between`, so the preposition is swallowed rather than left dangling.
+        const body = match[1] ? `between ${low} and ${high}°C` : `${low} to ${high}°C`;
+
+        changes.push({
+          start,
+          end,
+          before: match[0],
+          after: body,
+          ruleId: 'units.temperature.decade',
+          category: 'units',
+          confidence: 'risky',
+          priority: 36,
+          note: 'a Fahrenheit decade, which has no single Celsius equivalent',
+        });
+      }
+      return changes;
+    },
+  };
+}
+
 function fuelEconomyRule(): Rule {
   const pattern = /(?<![\w.])(\d+(?:\.\d+)?)\s*(mpg|miles per gallon)(?![A-Za-z])/gi;
 
@@ -430,6 +515,7 @@ export function unitRules(options: ResolvedOptions, dialectKeep: string[]): Rule
   return [
     feetInchesRule(),
     temperatureRule(),
+    temperatureDecadeRule(),
     fuelEconomyRule(),
     ...measurementRules(skip, options.rules),
   ];

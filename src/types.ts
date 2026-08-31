@@ -41,11 +41,18 @@ export interface AmericanSignals {
   /** Spellings and words that only Americans use. */
   markers: string[];
   /**
-   * Dates that state their own order rather than leaving it to be guessed: a day
-   * component above 12, or a named month on one side of it.
+   * Numeric dates that state their own order, by carrying a day component above 12.
+   * These are the only reliable guide to how a document punches its other numeric dates.
    */
   unambiguousMonthFirstDates: number;
   unambiguousDayFirstDates: number;
+  /**
+   * Dates written with the month spelled out. Strong evidence that the prose is
+   * American, but no evidence at all about the numeric dates beside it: a US agency can
+   * publish `February 4, 2022` in its prose and `20/02/2026` in its data.
+   */
+  namedMonthFirstDates: number;
+  namedDayFirstDates: number;
 }
 
 export interface Result {

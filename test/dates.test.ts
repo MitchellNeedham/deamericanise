@@ -131,17 +131,31 @@ describe('a named month pins the order for the numeric dates around it', () => {
     expect(dates(input)).toContain(expected);
   });
 
+  // Numeric and named dates are counted apart, because a document can write its prose
+  // one way round and its data the other.
   it.each`
-    input                          | monthFirst | dayFirst
-    ${'due 3/14/2024'}             | ${1}       | ${0}
-    ${'due 25/12/2023'}            | ${0}       | ${1}
-    ${'Filed March 5, 2024'}       | ${1}       | ${0}
-    ${'Filed 5 March 2024'}        | ${0}       | ${1}
-    ${'March 5, 2024 and 25/12/2023'} | ${1}    | ${1}
-  `('counts $input as $monthFirst month-first, $dayFirst day-first', ({ input, monthFirst, dayFirst }) => {
-    const signals = analyse(input as string);
-    expect(signals.unambiguousMonthFirstDates).toBe(monthFirst);
-    expect(signals.unambiguousDayFirstDates).toBe(dayFirst);
+    input                             | numMonth | numDay | namedMonth | namedDay
+    ${'due 3/14/2024'}                | ${1}     | ${0}   | ${0}       | ${0}
+    ${'due 25/12/2023'}               | ${0}     | ${1}   | ${0}       | ${0}
+    ${'Filed March 5, 2024'}          | ${0}     | ${0}   | ${1}       | ${0}
+    ${'Filed 5 March 2024'}           | ${0}     | ${0}   | ${0}       | ${1}
+    ${'March 5, 2024 and 25/12/2023'} | ${0}     | ${1}   | ${1}       | ${0}
+  `('counts $input', ({ input, numMonth, numDay, namedMonth, namedDay }) => {
+    const s = analyse(input as string);
+    expect(s.unambiguousMonthFirstDates, 'numeric month-first').toBe(numMonth);
+    expect(s.unambiguousDayFirstDates, 'numeric day-first').toBe(numDay);
+    expect(s.namedMonthFirstDates, 'named month-first').toBe(namedMonth);
+    expect(s.namedDayFirstDates, 'named day-first').toBe(namedDay);
+  });
+
+  it('treats one unambiguous American date as near-conclusive on its own', () => {
+    expect(analyse('The form was filed 12/16/2026.').confidence).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it('lets a numeric day-first date veto month-first prose', () => {
+    // American prose, day-first data: exactly what a US agency API produces.
+    const text = 'Letters were mailed February 4, 2022. Report received 20/02/2026. Due 03/04/2024.';
+    expect(dates(text)).toContain('03/04/2024');
   });
 });
 
@@ -158,6 +172,6 @@ describe('a sibling date outranks the American-ness score', () => {
   it('records which evidence it used', () => {
     const { changes } = deamericanise('Filed March 5, 2024. Due 03/04/2024.');
     const ambiguous = changes.find((c) => c.before === '03/04/2024');
-    expect(ambiguous?.note).toContain('another date in this text is written month-first');
+    expect(ambiguous?.note).toContain('this text writes its named dates month-first');
   });
 });

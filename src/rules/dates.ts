@@ -42,16 +42,23 @@ function formatDate(
  * outranks the general American-ness score in both directions.
  */
 function readsMonthFirst(ctx: RuleContext): boolean {
-  const { unambiguousMonthFirstDates: monthFirst, unambiguousDayFirstDates: dayFirst } = ctx.signals;
-  if (monthFirst > 0 && dayFirst === 0) return true;
-  if (dayFirst > 0 && monthFirst === 0) return false;
+  const s = ctx.signals;
+  // A numeric sibling is the only direct evidence, so it outranks everything.
+  if (s.unambiguousMonthFirstDates > 0 && s.unambiguousDayFirstDates === 0) return true;
+  if (s.unambiguousDayFirstDates > 0 && s.unambiguousMonthFirstDates === 0) return false;
+  // Failing that, how the prose writes its named dates is a fair guide.
+  if (s.namedMonthFirstDates > 0 && s.namedDayFirstDates === 0) return true;
+  if (s.namedDayFirstDates > 0 && s.namedMonthFirstDates === 0) return false;
   return ctx.american;
 }
 
 function ambiguousNote(ctx: RuleContext): string {
-  const { unambiguousMonthFirstDates: monthFirst, unambiguousDayFirstDates: dayFirst } = ctx.signals;
-  if (monthFirst > 0 && dayFirst === 0) {
-    return 'read as month-first because another date in this text is written month-first';
+  const s = ctx.signals;
+  if (s.unambiguousMonthFirstDates > 0 && s.unambiguousDayFirstDates === 0) {
+    return 'read as month-first because another numeric date in this text is month-first';
+  }
+  if (s.namedMonthFirstDates > 0 && s.namedDayFirstDates === 0) {
+    return 'read as month-first because this text writes its named dates month-first';
   }
   return `read as month-first because the surrounding text looks American (confidence ${ctx.signals.confidence.toFixed(2)})`;
 }

@@ -27,10 +27,7 @@ const MARKERS: Array<[label: string, pattern: RegExp]> = [
 const MONTH_FIRST = /\b(0?[1-9]|1[0-2])[/\-.](1[3-9]|2\d|3[01])[/\-.](\d{2}|\d{4})\b/g;
 const DAY_FIRST = /\b(1[3-9]|2\d|3[01])[/\-.](0?[1-9]|1[0-2])[/\-.](\d{2}|\d{4})\b/g;
 
-/**
- * `March 5, 2024` states its own order as plainly as `3/14/2024` does, and is written
- * that way almost nowhere else, so it counts as the same kind of evidence.
- */
+/** `March 5, 2024`: month spelled out and written first, which is an American habit. */
 const MONTH_NAME_FIRST =
   /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?,\s*(?:19|20)\d\d\b/g;
 const DAY_NAME_FIRST =
@@ -42,17 +39,28 @@ function count(text: string, pattern: RegExp): number {
 
 export function detectAmerican(text: string): AmericanSignals {
   const markers = MARKERS.filter(([, pattern]) => pattern.test(text)).map(([label]) => label);
-  const monthFirst = count(text, MONTH_FIRST) + count(text, MONTH_NAME_FIRST);
-  const dayFirst = count(text, DAY_FIRST) + count(text, DAY_NAME_FIRST);
+  const monthFirst = count(text, MONTH_FIRST);
+  const dayFirst = count(text, DAY_FIRST);
+  const namedMonthFirst = count(text, MONTH_NAME_FIRST);
+  const namedDayFirst = count(text, DAY_NAME_FIRST);
 
   let confidence = Math.min(0.6, markers.length * 0.15);
-  if (monthFirst > 0 && dayFirst === 0) confidence += 0.4;
-  if (dayFirst > 0 && monthFirst === 0) confidence -= 0.5;
+
+  // `12/16/2026` is about as conclusive as evidence gets: no other country writes a date
+  // that way, so one of them settles the question on its own.
+  if (monthFirst > 0 && dayFirst === 0) confidence += 0.7;
+  if (dayFirst > 0 && monthFirst === 0) confidence -= 0.4;
+  // A named date is strong but not conclusive about the document's origin, and says
+  // nothing about the numeric dates beside it.
+  if (namedMonthFirst > 0 && namedDayFirst === 0) confidence += 0.45;
+  if (namedDayFirst > 0 && namedMonthFirst === 0) confidence -= 0.4;
 
   return {
     confidence: Math.max(0, Math.min(1, confidence)),
     markers,
     unambiguousMonthFirstDates: monthFirst,
     unambiguousDayFirstDates: dayFirst,
+    namedMonthFirstDates: namedMonthFirst,
+    namedDayFirstDates: namedDayFirst,
   };
 }

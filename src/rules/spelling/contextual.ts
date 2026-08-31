@@ -230,6 +230,25 @@ export const CONTEXTUAL: LexEntry[] = [
   // `kneeled` and `leaped` are genuinely American, and those two need no context, so they
   // live in the plain irregular wordlist instead.
 
+  // ----- `judgment` and `judgement` -----
+  // A court's decision keeps the spelling without the e outside America too. The faculty
+  // of judging does not, so the legal collocations are gated out.
+  ...(['judgment', 'judgments'] as const).map((from) =>
+    ctx({
+      from,
+      to: from === 'judgment' ? 'judgement' : 'judgements',
+      ruleId: 'spelling.contextual.judgement',
+      forbidBefore:
+        /\b(?:summary|default|declaratory|consent|interlocutory|deficiency|money|foreign|enter|enters|entered|entering|hand down|hands down|handed down|handing down|reserve|reserved|deliver|delivered|render|rendered|vacate|vacated|affirm|affirmed|appeal|appealed|against)\s+$/i,
+      forbidAfter: new RegExp(
+        String.raw`^\s*(?:(?:debts?|creditors?|debtor|lien|roll|sum|order|notice|proof|day)\b` +
+          String.raw`|was entered|is entered|in favou?r of` +
+          String.raw`|of the (?:court|supreme|high|district|federal|circuit|county|appeal|tribunal|magistrate|judge))`,
+        'i',
+      ),
+    }),
+  ),
+
   ctx({
     from: 'gotten',
     to: 'got',

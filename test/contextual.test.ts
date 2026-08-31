@@ -165,3 +165,31 @@ describe('risky rules can be switched off in one move', () => {
       .toBe('a flat tire on the curb');
   });
 });
+
+// A court hands down a `judgment`; a person exercises `judgement`. The distinction holds
+// in Australian and British usage, so the legal sense keeps the spelling without the e.
+describe('judgment / judgement', () => {
+  it.each`
+    input                        | expected              | why
+    ${'in my judgment'}          | ${'in my judgement'}  | ${'the faculty of judging'}
+    ${'a judgment call'}         | ${'a judgement call'} | ${'the same'}
+    ${'used poor judgment'}      | ${'used poor judgement'} | ${'the same'}
+    ${'judgments about quality'} | ${'judgements about quality'} | ${'plural'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                          | why
+    ${'summary judgment was granted'}                  | ${'a named legal instrument'}
+    ${'default judgment'}                              | ${'the same'}
+    ${'a judgment debt'}                               | ${'the same'}
+    ${'judgment creditor'}                             | ${'the same'}
+    ${'the court entered judgment'}                    | ${'entered, by a court'}
+    ${'judgment was entered in favour of the plaintiff'} | ${'the same'}
+    ${'the judgment of the Supreme Court'}             | ${'a court decision'}
+    ${'the judgment of the District Court'}            | ${'the same'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+});

@@ -321,8 +321,6 @@ export const IRREGULAR: Pair[] = [
   ['grayish', 'greyish'],
   ['grayscale', 'greyscale'],
   ['aging', 'ageing'],
-  ['judgment', 'judgement'],
-  ['judgments', 'judgements'],
   ['acknowledgment', 'acknowledgement'],
   ['acknowledgments', 'acknowledgements'],
   ['abridgment', 'abridgement'],

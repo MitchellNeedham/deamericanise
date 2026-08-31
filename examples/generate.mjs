@@ -51,6 +51,11 @@ const EXAMPLES = [
     note: 'American prose whose numeric dates are day-first, so the ambiguous ones are left alone.',
   },
   {
+    file: 'fuel-tips.md',
+    preset: 'localise',
+    note: 'Fuel advice, where gas means petrol, and every other sense of gas must survive.',
+  },
+  {
     file: 'cookbook.md',
     preset: 'localise',
     note: 'A recipe you would cook from, so the vocabulary moves as well as the measures.',

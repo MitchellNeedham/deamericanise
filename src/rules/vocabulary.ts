@@ -204,8 +204,14 @@ const CONTEXTUAL: LexEntry[] = [
     ruleId: 'vocabulary.contextual.petrol',
     category: 'vocabulary',
     confidence: 'risky',
-    requireBefore: /\b(?:pumping|pumped|buy|bought|buying|cheap|expensive|more|less|free|the price of|a tank of|full of|filled with)\s+$/i,
-    forbidAfter: /^\s+(?:giant|cloud|leak|leaks|line|lines|main|mains|chamber|law|laws|constant|molecule|phase|state)\b/i,
+    // Fuel, when something is being bought, burned or saved.
+    requireBefore:
+      /\b(?:pumping|pumped|pump|buy|bought|buying|cheap|cheaper|expensive|more|less|free|save|saves|saving|saved|waste|wastes|wasting|wasted|use|uses|using|used|conserve|burn|burns|burning|burned|burnt|the price of|the cost of|the amount of|a tank of|tank of|gallons of|litres of|liters of|full of|filled with|spend on|spent on|spending on|out of|on)\s+$/i,
+    // Not fuel: the state of matter, the utility, the weapon, the emission.
+    forbidBefore:
+      /\b(?:natural|propane|butane|liquefied|liquified|lp|lpg|cng|lng|shale|coal|noble|inert|ideal|greenhouse|toxic|poison|tear|nerve|mustard|exhaust|flue|blood|arterial|anaesthetic|anesthetic|laughing|sour|flare|landfill|swamp|marsh|town|producer|water|synthesis|syn)\s+$/i,
+    forbidAfter:
+      /^\s+(?:giant|giants|cloud|clouds|leak|leaks|leakage|line|lines|main|mains|pipeline|pipelines|chamber|chambers|law|laws|constant|molecule|molecules|phase|phases|state|states|turbine|turbines|well|wells|field|fields|reserves|deposit|deposits|flaring|emissions|stove|stoves|oven|ovens|cooktop|range|grill|heater|heaters|heating|furnace|boiler|appliance|appliances|fitter|fitters|works|holder|exchange|meter|meters|utility|bill|bills|supply|network|distribution|to heat|for heating)\b/i,
   },
   ...[
     // `last fall`, `this fall`: the determiner alone settles it.
@@ -292,9 +298,16 @@ const GRADES: LexEntry[] = Array.from({ length: 12 }, (_, i) => i + 1).flatMap((
   );
 });
 
+/** `natural gas prices` is not `natural petrol prices`. */
+const NOT_FUEL_BEFORE =
+  /\b(?:natural|propane|butane|liquefied|liquified|lp|lpg|cng|lng|shale|coal|landfill|town|producer)\s+$/i;
+
 export function baseVocabulary(): LexEntry[] {
   return [
-    ...set('vocabulary.motoring', 'moderate', MOTORING),
+    ...set('vocabulary.motoring', 'moderate', MOTORING).map((entry) =>
+      // Every `gas ...` phrase needs the same guard the bare word has.
+      entry.from.startsWith('gas ') ? { ...entry, forbidBefore: NOT_FUEL_BEFORE } : entry,
+    ),
     ...set('vocabulary.food', 'moderate', FOOD),
     ...set('vocabulary.household', 'moderate', HOUSEHOLD),
     ...set('vocabulary.clothing', 'moderate', CLOTHING),

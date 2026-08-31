@@ -12,6 +12,7 @@ the bottom naming the rule behind each one.
 | [apollo.md](./apollo.md) | `read` | Miles and altitudes, in a mission that stays American |
 | [fasteners.md](./fasteners.md) | `read` | Bolt sizes in inches, which are names and must not move |
 | [aluminum.md](./aluminum.md) | `read` | The metal, and tons the document says are already metric |
+| [fuel-tips.md](./fuel-tips.md) | `localise` | `gas` meaning petrol, without touching the other senses |
 | [cookbook.md](./cookbook.md) | `localise` | A 1919 recipe: cups and pounds, written out in words |
 | [storm-reports.md](./storm-reports.md) | `read` | An ambiguous date, resolved by how American the prose is |
 | [recalls.md](./recalls.md) | `read` | American prose whose numeric dates are day-first |

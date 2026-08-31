@@ -89,3 +89,43 @@ describe('vocabulary can be switched off on its own', () => {
     expect(deamericaniseText('the gasoline color')).toBe('the gasoline colour');
   });
 });
+
+// `gas` is the most heavily gated word in the package: it is fuel, a state of matter, a
+// utility and a weapon, and the wrong reading is nonsense rather than merely awkward.
+describe('gas as fuel', () => {
+  it.each`
+    input                                 | expected
+    ${'reduce the amount of gas you use'} | ${'reduce the amount of petrol you use'}
+    ${'this saves gas'}                   | ${'this saves petrol'}
+    ${'uses less gas'}                    | ${'uses less petrol'}
+    ${'the cost of gas'}                  | ${'the cost of petrol'}
+    ${'we ran out of gas'}                | ${'we ran out of petrol'}
+    ${'spend less on gas'}                | ${'spend less on petrol'}
+    ${'gas prices rose'}                  | ${'petrol prices rose'}
+    ${'the gas station'}                  | ${'the petrol station'}
+    ${'gas mileage'}                      | ${'fuel consumption'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
+describe('gas that is not fuel', () => {
+  it.each`
+    unchanged                          | why
+    ${'natural gas prices rose'}       | ${'the utility, not the fuel'}
+    ${'liquefied natural gas tank'}    | ${'the same'}
+    ${'a natural gas pipeline'}        | ${'the same'}
+    ${'shale gas production'}          | ${'the same'}
+    ${'a gas giant'}                   | ${'a planet'}
+    ${'the gas main'}                  | ${'the utility'}
+    ${'a gas leak'}                    | ${'the utility'}
+    ${'we use gas to heat the house'}  | ${'the utility'}
+    ${'a gas stove'}                   | ${'the utility'}
+    ${'gas turbine efficiency'}        | ${'machinery'}
+    ${'the noble gas argon'}           | ${'chemistry'}
+    ${'greenhouse gas emissions'}      | ${'emissions'}
+    ${'the gas meter reading'}         | ${'a device'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+});

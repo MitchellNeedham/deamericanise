@@ -12,6 +12,9 @@ const PROPER_NOUNS: RegExp[] = [
   /\b(?:One )?World Trade Cent(?:er|re)\b/g,
   /\b(?:Rockefeller|Lincoln|Kennedy|Barclays|Javits|Moscone) Center\b/g,
   /\bCenter for [A-Z]\w+/g,
+  // Two or more capitalised words before it make an institution's name rather than a
+  // common noun: the Storm Prediction Center keeps its spelling, a data centre does not.
+  /\b(?:[A-Z][a-z]+\s+){2,}Cent(?:er|re)s?\b/g,
   /\bCenters? for Disease Control\b/g,
   /\b(?:Department|Secretary|Office) of Defense\b/g,
   /\bDefense (?:Department|Intelligence|Advanced|Logistics)\b/g,

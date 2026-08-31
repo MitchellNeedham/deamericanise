@@ -99,3 +99,23 @@ describe('inline ignore directives', () => {
     expect(output).toContain('colour three');
   });
 });
+
+describe('institution names keep their spelling', () => {
+  it.each`
+    unchanged                        | why
+    ${'the Storm Prediction Center'} | ${'a NOAA office, named that'}
+    ${'the National Hurricane Center'} | ${'the same'}
+    ${'the Johnson Space Center'}    | ${'the same'}
+    ${'Rockefeller Center'}          | ${'on the explicit list'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                  | expected              | why
+    ${'the data center'}   | ${'the data centre'}  | ${'one capitalised word is not a name'}
+    ${'the center of town'} | ${'the centre of town'} | ${'a plain noun'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});

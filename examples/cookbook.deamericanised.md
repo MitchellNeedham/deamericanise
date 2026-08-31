@@ -15,7 +15,7 @@ Mix two cups of brown sugar, two cups of honey, six egg yolks and beat them thor
 
 ## Fruit Wheels
 
-Sift together two cups of flour, two teaspoons of baking-powder, one-half teaspoon of salt, one tablespoon of sugar. Rub in two large tablespoons of butter. Mix to soft dough with milk; roll out **1.3 centimetres** thick. Spread thickly with soft butter, dust with one teaspoon of flour, four tablespoons of granulated sugar, one teaspoon of cinnamon; sprinkle over one-half cup each of seeded and cut raisins, chopped citron, and cleaned currants. Roll up, cut in **2.5 centimetre** slices, put **2.5 centimetres** apart on greased, flat pans, and bake in hot oven. *PANCAKES, FRITTERS, Etc.*
+Sift together two cups of flour, two teaspoons of baking-powder, one-half teaspoon of salt, one tablespoon of sugar. Rub in two large tablespoons of butter. Mix to soft dough with milk; roll out **1.3 centimetres** thick. Spread thickly with soft butter, dust with one teaspoon of flour, four tablespoons of granulated sugar, one teaspoon of cinnamon; sprinkle over one-half cup each of seeded and cut raisins, chopped citron, and cleaned currants. Roll up, cut in **2.5 centimetres** slices, put **2.5 centimetres** apart on greased, flat pans, and bake in hot oven. *PANCAKES, FRITTERS, Etc.*
 
 ## Fruit Cake (Wedding Cake)
 
@@ -31,7 +31,7 @@ Stir one cup of boiling water gradually onto two tablespoons of cocoa, two table
 
 ## Mixed Pickles
 
-Wash **950 millilitres** of large cucumbers, cut in cubes, **950 millilitres** of small cucumbers left whole, **950 millilitre** small silver-skinned onions, **950 millilitre** small green tomatoes chopped coarse, two red peppers chopped fine, one large cauliflower broken in small pieces; pour over them a weak brine solution made of **950 millilitres** of water and a cup of salt. Let stand twenty-four hours; bring to a boil in same solution, drain and make the dressing. *Mixed Pickle Dressing.*--Mix six tablespoons of mustard, one tablespoon of turmeric, one cup of flour, two cups of sugar and **1.9 litres** of vinegar. These ingredients must be thoroughly mixed and then cooked until thick. Stir in the pickles; heat thoroughly; empty into glass jars and stand away until needed.
+Wash **950 millilitres** of large cucumbers, cut in cubes, **950 millilitres** of small cucumbers left whole, **950 millilitres** small silver-skinned onions, **950 millilitres** small green tomatoes chopped coarse, two red peppers chopped fine, one large cauliflower broken in small pieces; pour over them a weak brine solution made of **950 millilitres** of water and a cup of salt. Let stand twenty-four hours; bring to a boil in same solution, drain and make the dressing. *Mixed Pickle Dressing.*--Mix six tablespoons of mustard, one tablespoon of turmeric, one cup of flour, two cups of sugar and **1.9 litres** of vinegar. These ingredients must be thoroughly mixed and then cooked until thick. Stir in the pickles; heat thoroughly; empty into glass jars and stand away until needed.
 
 ---
 
@@ -52,7 +52,7 @@ published before 1929, and distributed by Project Gutenberg.
 | 9 | `one-half ounce` | `14 grams` | `units.mass.ounce` | moderate |
 | 9 | `one-half pound` | `230 grams` | `units.mass.pound` | moderate |
 | 13 | `one-half inch` | `1.3 centimetres` | `units.length.inch` | moderate |
-| 13 | `one-inch` | `2.5 centimetre` | `units.length.inch` | moderate |
+| 13 | `one-inch` | `2.5 centimetres` | `units.length.inch` | moderate |
 | 13 | `one inch` | `2.5 centimetres` | `units.length.inch` | moderate |
 | 17 | `one pound` | `450 grams` | `units.mass.pound` | moderate |
 | 17 | `one pound` | `450 grams` | `units.mass.pound` | moderate |
@@ -63,8 +63,8 @@ published before 1929, and distributed by Project Gutenberg.
 | 21 | `one-half inch` | `1.3 centimetres` | `units.length.inch` | moderate |
 | 29 | `one quart` | `950 millilitres` | `units.volume.quart` | moderate |
 | 29 | `one quart` | `950 millilitres` | `units.volume.quart` | moderate |
-| 29 | `one quart` | `950 millilitre` | `units.volume.quart` | moderate |
-| 29 | `one quart` | `950 millilitre` | `units.volume.quart` | moderate |
+| 29 | `one quart` | `950 millilitres` | `units.volume.quart` | moderate |
+| 29 | `one quart` | `950 millilitres` | `units.volume.quart` | moderate |
 | 29 | `one quart` | `950 millilitres` | `units.volume.quart` | moderate |
 | 29 | `two quarts` | `1.9 litres` | `units.volume.quart` | moderate |
 

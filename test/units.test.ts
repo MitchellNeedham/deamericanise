@@ -471,3 +471,18 @@ describe('American designations that only look like measurements', () => {
     expect(convert(input)).toBe(expected);
   });
 });
+
+describe('an attributive singular needs a determiner', () => {
+  const quarts = (input: string) => convert(input, { rules: { 'units.volume.quart': true } });
+
+  it.each`
+    input                            | expected                          | why
+    ${'a 6 foot fence'}              | ${'a 1.8 metre fence'}            | ${'a determiner opens the phrase'}
+    ${'a 9 inch dish'}               | ${'a 23 centimetre dish'}         | ${'the same'}
+    ${'a 147 pound bag of cement'}   | ${'a 66.7 kilogram bag of cement'} | ${'the same, for mass'}
+    ${'one quart small onions'}      | ${'950 millilitres small onions'} | ${'an ingredient quantity with the "of" left out'}
+    ${'one quart of large cucumbers'} | ${'950 millilitres of large cucumbers'} | ${'and it now matches the spelled-out form'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(quarts(input)).toBe(expected);
+  });
+});

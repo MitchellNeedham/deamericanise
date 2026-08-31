@@ -68,11 +68,15 @@ function isConventional(measure: Measure, text: string, start: number, end: numb
 }
 
 /**
- * A singular unit followed by a noun is modifying it. Prepositions, conjunctions and the
- * dimension adjectives mean the measurement stands alone instead.
+ * A singular unit is modifying the noun after it only when a determiner opens the phrase:
+ * `a 9 inch dish` describes the dish, so it takes the singular. `one quart small onions`
+ * is an ingredient quantity with the `of` left out, and `one` is itself the determiner,
+ * so it stays plural and reads the same as `one quart of small onions` would.
  */
+const DETERMINER_BEFORE = /\b(?:a|an|the|this|that|each|every|per|another)\s+$/i;
+
 const MODIFIES_A_NOUN =
-  /^[\s-]+(?!(?:of|in|on|at|by|for|and|or|to|from|with|per|thick|wide|long|tall|deep|high|across|away|apart|each|only|or)\b)[a-z]/i;
+  /^[\s-]+(?!(?:of|in|on|at|by|for|and|or|to|from|with|per|thick|wide|long|tall|deep|high|across|away|apart|each|only)\b)[a-z]/i;
 
 /** `6 in` is usually the preposition. `6in` never is. */
 function isBareInch(alias: string, whole: string): boolean {
@@ -337,7 +341,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         // `a 3/8 inch bolt`. What follows decides, not the value, because a fraction is
         // just as attributive. `1/2 gallon of milk` and `1/16 inch thick` are not.
         const attributive =
-          entry.isWord && entry.isSingular && MODIFIES_A_NOUN.test(ctx.text.slice(start + match[0].length));
+          entry.isWord &&
+          entry.isSingular &&
+          DETERMINER_BEFORE.test(ctx.text.slice(Math.max(0, start - 24), start)) &&
+          MODIFIES_A_NOUN.test(ctx.text.slice(start + match[0].length));
         const unit = entry.isWord
           ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
           : ` ${target.symbol}`;

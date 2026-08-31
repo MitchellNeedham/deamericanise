@@ -398,3 +398,30 @@ describe('cooking measures are not Americanisms', () => {
       .toBe('240 millilitres of flour');
   });
 });
+
+describe('US coins used as a unit of size', () => {
+  it.each`
+    input                          | expected              | why
+    ${'dime to quarter-sized hail'} | ${'18 to 24 mm hail'} | ${'the NWS hail convention'}
+    ${'nickel-sized hail'}         | ${'21 mm hail'}       | ${'single coin'}
+    ${'penny sized dent'}          | ${'19 mm dent'}       | ${'not only weather'}
+    ${'half dollar sized hail'}    | ${'31 mm hail'}       | ${'two words'}
+    ${'quarter sized hail'}        | ${'24 mm hail'}       | ${'quarter, with something to size'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                            | why
+    ${'a quarter-sized reduction in staff'} | ${'quarter here is a fraction, and nothing is being sized'}
+    ${'a quarter of the budget'}         | ${'plainly a fraction'}
+    ${'golf ball sized hail'}            | ${'a golf ball is a golf ball everywhere'}
+    ${'pea sized hail'}                  | ${'so is a pea'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('still reads a written-out fraction as a number', () => {
+    expect(convert('one-quarter pound of butter')).toBe('110 grams of butter');
+  });
+});

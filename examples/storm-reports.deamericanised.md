@@ -1,5 +1,5 @@
 > Generated from [storm-reports.md](./storm-reports.md) by [deamericanise](https://www.npmjs.com/package/deamericanise).
-> Preset `read`, dialect `en-AU`, 7 changes. Every change is in **bold**.
+> Preset `read`, dialect `en-AU`, 8 changes. Every change is in **bold**.
 >
 > An ambiguous numeric date, in prose American enough to settle which way it reads.
 
@@ -21,7 +21,7 @@ in brackets.
 
 - Multiple damage to homes on Owltown Road. Several trees and power poles downed. Debris partially blocking Adjacent sections of US-360. (AKQ)
 
-- Multiple reports of dime to quarter-sized hail near Jackson. One photo of close comparison to quarter on social media. (PHI)
+- Multiple reports of **18 to 24 mm** hail near Jackson. One photo of close comparison to quarter on social media. (PHI)
 
 - *** 1 INJ *** Tree fell on a single wide mobile home with one minor injury. Report from the State Watch Office and time is based on radar. (JAX)
 
@@ -55,6 +55,7 @@ subject to copyright protection under 17 U.S.C. section 105.
 | 11 | `2 miles` | `3.2 kilometres` | `units.length.mile` | moderate |
 | 13 | `4 inches` | `10 centimetres` | `units.length.inch` | moderate |
 | 15 | `70 mph` | `110 km/h` | `units.speed.mph` | moderate |
+| 19 | `dime to quarter-sized` | `18 to 24 mm` | `units.length.coin` | risky |
 | 25 | `neighborhood` | `neighbourhood` | `spelling.our` | safe |
 
 ## How American it read

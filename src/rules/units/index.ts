@@ -477,6 +477,78 @@ function temperatureDecadeRule(): Rule {
   };
 }
 
+/**
+ * `dime to quarter-sized hail` is a real American unit of measure, used by the National
+ * Weather Service and by anyone describing a dent or a bruise. It is also completely
+ * opaque anywhere else: an Australian twenty-cent piece is 28 mm, so guessing from a
+ * local coin gets it wrong rather than merely vague.
+ *
+ * Diameters are the United States Mint's, not the rounded values on the NWS hail chart.
+ */
+function coinSizeRule(): Rule {
+  const COINS: Record<string, number> = {
+    penny: 19,
+    pennies: 19,
+    nickel: 21,
+    dime: 18,
+    quarter: 24,
+    'half dollar': 31,
+    'half-dollar': 31,
+    'silver dollar': 38,
+  };
+
+  const names = Object.keys(COINS).sort((a, b) => b.length - a.length).join('|');
+  const pattern = new RegExp(
+    String.raw`(?<![\w-])(${names})(?:\s*(?:to|-)\s*(${names}))?[\s-]*sized?(?![\w-])`,
+    'gi',
+  );
+
+  // `quarter` is also a fraction, so on its own it needs something coin-shaped to size.
+  const SIZED_THING =
+    /\b(?:hail|hailstones?|dent|dents|bruise|bruises|spot|spots|lesion|lesions|patch|patches|hole|holes|blister|welt|mark|marks|lump|nodule|rash)\b/i;
+
+  return {
+    id: 'units.length.coin',
+    category: 'units',
+    confidence: 'risky',
+    priority: 34,
+    find(ctx) {
+      const changes: Change[] = [];
+      pattern.lastIndex = 0;
+
+      for (const match of ctx.text.matchAll(pattern)) {
+        const first = COINS[match[1]!.toLowerCase()];
+        const second = match[2] ? COINS[match[2].toLowerCase()] : undefined;
+        if (first === undefined) continue;
+
+        const onlyQuarter = match[1]!.toLowerCase() === 'quarter' && second === undefined;
+        if (onlyQuarter) {
+          const around = ctx.text.slice(Math.max(0, match.index - 60), match.index + 60);
+          if (!SIZED_THING.test(around)) continue;
+        }
+
+        const body =
+          second === undefined
+            ? `${first} mm`
+            : `${Math.min(first, second)} to ${Math.max(first, second)} mm`;
+
+        changes.push({
+          start: match.index,
+          end: match.index + match[0].length,
+          before: match[0],
+          after: body,
+          ruleId: 'units.length.coin',
+          category: 'units',
+          confidence: 'risky',
+          priority: 34,
+          note: 'a US coin used as a unit of size, which is opaque outside America',
+        });
+      }
+      return changes;
+    },
+  };
+}
+
 function fuelEconomyRule(): Rule {
   const pattern = /(?<![\w.])(\d+(?:\.\d+)?)\s*(mpg|miles per gallon)(?![A-Za-z])/gi;
 
@@ -516,6 +588,7 @@ export function unitRules(options: ResolvedOptions, dialectKeep: string[]): Rule
     feetInchesRule(),
     temperatureRule(),
     temperatureDecadeRule(),
+    coinSizeRule(),
     fuelEconomyRule(),
     ...measurementRules(skip, options.rules),
   ];

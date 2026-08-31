@@ -55,6 +55,11 @@ jobs:
 
       # prepublishOnly runs the typecheck, the tests and the build before it goes out,
       # and the build bakes this version into the CLI.
-      - run: npm publish
+      #
+      # Provenance is requested here rather than in package.json, because it describes
+      # how a particular publish happened rather than anything about the package. In
+      # publishConfig it would apply to every publish everywhere, which breaks publishing
+      # from a laptop: provenance needs OIDC claims that only a CI provider can issue.
+      - run: npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

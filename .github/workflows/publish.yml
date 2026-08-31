@@ -1,0 +1,60 @@
+name: Publish
+
+# The tag is the source of truth for the version. package.json carries a placeholder
+# and is stamped from the tag here, so a release is `git tag vX.Y.Z && git push --tags`
+# with nothing to keep in sync by hand.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish, without the leading v
+        required: true
+
+permissions:
+  contents: read
+  # Required for npm provenance, which package.json turns on.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Resolve the version
+        id: resolve
+        env:
+          # Passed through the environment rather than interpolated into the script.
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            version="$INPUT_VERSION"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "Not a semver version: $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Publishing $version"
+
+      # Before the version is stamped, so the lockfile still matches package.json.
+      - run: npm ci
+
+      - name: Stamp the version from the tag
+        run: npm pkg set version="${{ steps.resolve.outputs.version }}"
+
+      # prepublishOnly runs the typecheck, the tests and the build before it goes out,
+      # and the build bakes this version into the CLI.
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

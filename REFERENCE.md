@@ -442,6 +442,22 @@ Requires Prettier 3.
   for a news story about America. It is `risky`-tagged; `--confidence safe,moderate` drops
   it, and so does `--rule 'dialect.*=false'`.
 
+## Releasing
+
+The git tag is the source of truth for the version. `package.json` carries `0.0.0` as a
+placeholder; CI stamps the real version from the tag before publishing, and the build
+bakes it into the CLI, so `deamericanise --version` and the published package can never
+disagree.
+
+```sh
+git tag v0.1.0
+git push --tags
+```
+
+That is the whole release. There is no version to bump by hand and nothing to keep in
+sync. A tag that is not valid semver fails the job before anything is published, and the
+workflow can also be run by hand from the Actions tab with a version typed in.
+
 ## Licence
 
 MIT

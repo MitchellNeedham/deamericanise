@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { main } from '../src/cli-main.js';
 
+// The CLI must report the version the package was built with, never a literal of its own.
+const version = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version;
+
 let out: string[];
 let err: string[];
 
@@ -36,7 +39,7 @@ describe('informational flags', () => {
   it.each`
     flag                  | contains
     ${'--help'}           | ${'rewrite American English'}
-    ${'--version'}        | ${'0.1.0'}
+    ${'--version'}        | ${version}
     ${'--list-dialects'}  | ${'en-AU'}
     ${'--list-rules'}     | ${'spelling.our'}
   `('$flag prints something containing "$contains"', async ({ flag, contains }) => {

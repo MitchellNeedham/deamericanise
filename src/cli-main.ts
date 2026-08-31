@@ -8,6 +8,9 @@ import { ruleIds } from './rules/index.js';
 import { deamericaniseFile } from './code.js';
 import type { Category, Change, Confidence, Dialect, Options, Preset, Precision } from './types.js';
 
+/** Replaced at build time from package.json, which CI stamps from the release tag. */
+declare const __VERSION__: string;
+
 const SKIP_DIRECTORIES = new Set([
   'node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.cache', 'vendor', 'target',
 ]);
@@ -183,7 +186,7 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
   if (values.version) {
-    process.stdout.write('0.1.0\n');
+    process.stdout.write(`${__VERSION__}\n`);
     return 0;
   }
   if (values['list-dialects']) {

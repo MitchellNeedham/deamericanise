@@ -1,6 +1,6 @@
 {
   "name": "deamericanise",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Rewrite American English text into the version the rest of the world reads: spelling, vocabulary, units, dates and currency. Understands code files and only touches comments.",
   "keywords": [
     "american",

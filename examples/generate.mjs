@@ -26,6 +26,21 @@ const EXAMPLES = [
     note: 'Medical prose, where the ae and oe digraphs do the work rather than the units.',
   },
   {
+    file: 'apollo.md',
+    preset: 'read',
+    note: 'Dates, distances and a mission that has to stay American.',
+  },
+  {
+    file: 'aluminum.md',
+    preset: 'read',
+    note: 'The metal itself, plus dollar amounts that need pinning to a currency.',
+  },
+  {
+    file: 'cookbook.md',
+    preset: 'localise',
+    note: 'A recipe you would cook from, so the vocabulary moves as well as the measures.',
+  },
+  {
     file: 'flood-safety.md',
     preset: 'localise',
     note: 'Advice you would act on, so the emergency number and the vocabulary move too.',

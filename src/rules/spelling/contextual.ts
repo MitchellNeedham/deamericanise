@@ -224,31 +224,12 @@ export const CONTEXTUAL: LexEntry[] = [
     }),
   ),
 
-  // ----- irregular past participles -----
-  ...[
-    ['burned', 'burnt'],
-    ['spelled', 'spelt'],
-    ['dreamed', 'dreamt'],
-    ['leaped', 'leapt'],
-    ['spilled', 'spilt'],
-    ['spoiled', 'spoilt'],
-    ['kneeled', 'knelt'],
-    ['leaned', 'leant'],
-  ].map(([from, to]) =>
-    ctx({ from: from!, to: to!, ruleId: 'spelling.contextual.irregular-past' }),
-  ),
-  ctx({
-    from: 'learned',
-    to: 'learnt',
-    ruleId: 'spelling.contextual.irregular-past',
-    // "a learned professor" is an adjective and keeps the -ed.
-    forbidBefore: /\b(?:a|an|the|very|most|deeply|his|her|our|their|highly)\s+$/i,
-  }),
-  ctx({
-    from: 'smelled',
-    to: 'smelt',
-    ruleId: 'spelling.contextual.irregular-past',
-  }),
+  // The `-ed` past forms are not Americanisms. `burned`, `spelled`, `dreamed`, `spilled`
+  // and `learned` are all ordinary Australian and British English, and `smelled` and
+  // `leaned` are the usual forms here while `smelt` and `leant` read as dated. Only
+  // `kneeled` and `leaped` are genuinely American, and those two need no context, so they
+  // live in the plain irregular wordlist instead.
+
   ctx({
     from: 'gotten',
     to: 'got',

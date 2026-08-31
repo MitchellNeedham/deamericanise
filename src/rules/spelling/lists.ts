@@ -339,6 +339,10 @@ export const IRREGULAR: Pair[] = [
   ['toward', 'towards'],
   ['afterward', 'afterwards'],
   ['counterclockwise', 'anticlockwise'],
+  // The only two `-ed` past forms that are American rather than merely one of two
+  // native options: `knelt` and `leapt` are all but universal outside America.
+  ['kneeled', 'knelt'],
+  ['leaped', 'leapt'],
 ];
 
 /** Correct outside America, but common enough as jargon that they need opting out of. */

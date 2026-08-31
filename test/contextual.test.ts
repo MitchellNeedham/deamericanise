@@ -94,7 +94,8 @@ describe('other sense-dependent spellings', () => {
     ${'a bench vise'}              | ${'a bench vice'}               | ${'vice'}
     ${'400 meters'}                | ${'400 metres'}                 | ${'metre'}
     ${'square meters'}             | ${'square metres'}              | ${'metre'}
-    ${'he burned the toast'}       | ${'he burnt the toast'}         | ${'irregular past'}
+    ${'she kneeled down'}          | ${'she knelt down'}             | ${'irregular past'}
+    ${'he leaped over it'}         | ${'he leapt over it'}           | ${'irregular past'}
     ${'they had gotten it'}        | ${'they had got it'}            | ${'gotten'}
   `('$rule: $input -> $expected', ({ input, expected }) => {
     expect(au(input)).toBe(expected);
@@ -111,7 +112,6 @@ describe('other sense-dependent spellings', () => {
     ${'a parking meter'}             | ${'a device, not the unit'}
     ${'the gas meter reading'}       | ${'a device'}
     ${'ill-gotten gains'}            | ${'a fixed phrase'}
-    ${'a learned professor'}         | ${'the adjective'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(au(unchanged)).toBe(unchanged);
   });
@@ -120,6 +120,31 @@ describe('other sense-dependent spellings', () => {
 describe('with localise on, vocabulary wins the longer match', () => {
   it('prefers "number plate" over "licence plate"', () => {
     expect(deamericaniseText('the license plate', { preset: 'localise' })).toBe('the number plate');
+  });
+});
+
+// `burned`, `spelled`, `learned` and the rest are ordinary Australian English, not
+// Americanisms, so they are left alone. Only `kneeled` and `leaped` are genuinely American.
+describe('past forms that are native here are left alone', () => {
+  it.each`
+    unchanged                      | why
+    ${'the fire burned for days'}  | ${'both forms are native'}
+    ${'burned toast'}              | ${'burnt is preferred, but burned is not American'}
+    ${'she learned quickly'}       | ${'both forms are native'}
+    ${'he spelled it wrong'}       | ${'both forms are native'}
+    ${'they dreamed of it'}        | ${'both forms are native'}
+    ${'the milk spilled'}          | ${'both forms are native'}
+    ${'it smelled bad'}            | ${'smelt reads dated here'}
+    ${'he leaned on the door'}     | ${'leant reads dated here'}
+    ${'a learned professor'}       | ${'the adjective, and native anyway'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it('still fixes the ones that really are American', () => {
+    expect(au('they had gotten it after she kneeled and leaped')).toBe(
+      'they had got it after she knelt and leapt',
+    );
   });
 });
 

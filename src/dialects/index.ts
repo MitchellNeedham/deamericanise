@@ -197,7 +197,6 @@ const CA_DISABLE = [
   'spelling.contextual.tyre',
   'spelling.contextual.kerb',
   'spelling.contextual.draught',
-  'spelling.contextual.irregular-past',
   'spelling.contextual.gotten',
   'vocabulary.*',
   'dialect.*',

@@ -1,5 +1,5 @@
 > Generated from [bear-safety.md](./bear-safety.md) by [deamericanise](https://www.npmjs.com/package/deamericanise).
-> Preset `read`, dialect `en-AU`, 16 changes. Every change is in **bold**.
+> Preset `read`, dialect `en-AU`, 14 changes. Every change is in **bold**.
 >
 > Distances and temperatures, in a document that already carries its own metric conversions.
 >
@@ -15,7 +15,7 @@ Even thermal runoff can be extremely hot and cause burns. Hot springs also conta
 
 More than 20 people have died from burns suffered after they entered or fell into Yellowstone’s hot springs. For your safety and for the protection of thermal features in Yellowstone, it is illegal to swim or bathe in any water that is entirely of thermal origin.
 
-Pets are not allowed in thermal areas or on boardwalks, even if they're on a leash or carried in arms, strollers, or backpacks. This policy exists to protect our pets from being **burnt** or killed in hot springs. Trained service animals that perform tasks directly related to a person's disability are allowed throughout the park and in all park facilities. They must be leashed at all times.
+Pets are not allowed in thermal areas or on boardwalks, even if they're on a leash or carried in arms, strollers, or backpacks. This policy exists to protect our pets from being burned or killed in hot springs. Trained service animals that perform tasks directly related to a person's disability are allowed throughout the park and in all park facilities. They must be leashed at all times.
 
 Toxic gases may accumulate to dangerous levels in some hydrothermal areas. If you begin to feel sick while exploring a geyser basin, leave the area immediately.
 
@@ -23,7 +23,7 @@ The animals in Yellowstone are wild and dangerous, no matter how docile they may
 
 Never feed wildlife, even birds and squirrels. Animals that become dependent on human food may become aggressive **towards** people and have to be killed. Animals also carry diseases that can be transmitted to people.
 
-Don't leave packs, bags, or coolers containing food unattended, even for a few minutes, as animals can learn new food sources quickly. Store these items in vehicles or bear-proof storage lockers, if available. Ravens have also **learnt** to unzip or unfasten many different kinds of zippers and buckles to get to food.
+Don't leave packs, bags, or coolers containing food unattended, even for a few minutes, as animals can learn new food sources quickly. Store these items in vehicles or bear-proof storage lockers, if available. Ravens have also learned to unzip or unfasten many different kinds of zippers and buckles to get to food.
 
 If you're involved in a conflict with an animal, regardless of how minor, contact us or report it to a park ranger as soon as possible. If cell service is available, dial 911. The lives of other people, and the animal, may depend on it.
 
@@ -54,12 +54,10 @@ not subject to copyright protection under 17 U.S.C. section 105.
 
 | Line | Before | After | Rule | Confidence |
 | --- | --- | --- | --- | --- |
-| 11 | `burned` | `burnt` | `spelling.contextual.irregular-past` | risky |
 | 15 | `100 yards (91 m)` | `91 m` | `units.length.yard` | moderate |
 | 15 | `25 yards (23 m)` | `23 m` | `units.length.yard` | moderate |
 | 15 | `willfully` | `wilfully` | `spelling.single-l` | safe |
 | 17 | `toward` | `towards` | `spelling.irregular-ambiguous` | moderate |
-| 19 | `learned` | `learnt` | `spelling.contextual.irregular-past` | risky |
 | 23 | `100 yards (91 meters)` | `91 metres` | `units.length.yard` | moderate |
 | 25 | `defense` | `defence` | `spelling.ence` | safe |
 | 25 | `behavior` | `behaviour` | `spelling.our` | safe |

@@ -12,6 +12,7 @@ the bottom naming the rule behind each one.
 | [apollo.md](./apollo.md) | `read` | Miles and altitudes, in a mission that stays American |
 | [aluminum.md](./aluminum.md) | `read` | The metal, and tons the document says are already metric |
 | [cookbook.md](./cookbook.md) | `localise` | A 1919 recipe: cups and pounds, written out in words |
+| [recalls.md](./recalls.md) | `read` | American prose whose numeric dates are day-first |
 | [flood-safety.md](./flood-safety.md) | `localise` | The emergency number and the vocabulary move too |
 
 Most run in the default `read` mode, which fixes what stops a non-American reading the
@@ -19,7 +20,11 @@ text and leaves the subject matter alone. `flood-safety.md` and `cookbook.md` us
 `localise`, because they are things you would act on rather than read, so `911` becoming
 `000` is the point rather than a mistake.
 
-Two of them are worth reading for what does *not* change. `aluminum.md` opens by saying
+Three of them are worth reading for what does *not* change. `recalls.md` is the sharpest:
+it is US government prose, it says `aluminum`, and it writes its named dates the American
+way round, but the numeric dates in its data are day-first. A tool that scored the whole
+document and then rewrote every date would turn `12/08/2022` into 8 December. The numeric
+dates settle their own order, so all five are left exactly as they are. `aluminum.md` opens by saying
 its figures are in metric tons, so the tonnages are left alone even though `aluminum`
 itself is corrected. `bear-safety.md` already gives its own metric conversions, so the
 imperial half is dropped rather than a second conversion being invented.

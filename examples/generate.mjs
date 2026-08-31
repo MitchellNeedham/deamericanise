@@ -36,6 +36,11 @@ const EXAMPLES = [
     note: 'The metal itself, plus dollar amounts that need pinning to a currency.',
   },
   {
+    file: 'recalls.md',
+    preset: 'read',
+    note: 'American prose whose numeric dates are day-first, so the ambiguous ones are left alone.',
+  },
+  {
     file: 'cookbook.md',
     preset: 'localise',
     note: 'A recipe you would cook from, so the vocabulary moves as well as the measures.',
@@ -77,7 +82,8 @@ const cell = (s) => `\`${s.replace(/\|/g, '\\|').replace(/\n/g, ' ')}\``;
 function scoreSection(signals) {
   const percent = (signals.confidence * 100).toFixed(0);
   const cleared = signals.confidence >= 0.5;
-  const dates = signals.unambiguousMonthFirstDates + signals.unambiguousDayFirstDates;
+  const numeric = signals.unambiguousMonthFirstDates + signals.unambiguousDayFirstDates;
+  const named = signals.namedMonthFirstDates + signals.namedDayFirstDates;
 
   return [
     '## How American it read',
@@ -89,10 +95,17 @@ function scoreSection(signals) {
       ? `Markers found: ${signals.markers.map((m) => `\`${m}\``).join(', ')}.`
       : 'No American markers found.',
     '',
-    dates === 0
-      ? 'No date states its own order, so nothing there settles the question either way.'
-      : `Dates that state their own order: ${signals.unambiguousMonthFirstDates} month-first,` +
-        ` ${signals.unambiguousDayFirstDates} day-first.`,
+    numeric === 0
+      ? 'No numeric date states its own order.'
+      : `Numeric dates that state their own order: ${signals.unambiguousMonthFirstDates}` +
+        ` month-first, ${signals.unambiguousDayFirstDates} day-first. These decide how any` +
+        ' ambiguous numeric date in the same text is read.',
+    '',
+    named === 0
+      ? 'No date is written with the month spelled out.'
+      : `Dates with the month written out: ${signals.namedMonthFirstDates} month-first,` +
+        ` ${signals.namedDayFirstDates} day-first. Evidence about the prose, not about the` +
+        ' numeric dates beside it.',
     '',
   ];
 }

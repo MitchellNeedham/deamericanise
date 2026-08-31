@@ -80,4 +80,6 @@ not subject to copyright protection under 17 U.S.C. section 105.
 
 Markers found: `-or spelling`, `abbreviations with stops`.
 
-No date states its own order, so nothing there settles the question either way.
+No numeric date states its own order.
+
+No date is written with the month spelled out.

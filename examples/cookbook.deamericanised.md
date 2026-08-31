@@ -74,4 +74,6 @@ published before 1929, and distributed by Project Gutenberg.
 
 Markers found: `imperial units`.
 
-No date states its own order, so nothing there settles the question either way.
+No numeric date states its own order.
+
+No date is written with the month spelled out.

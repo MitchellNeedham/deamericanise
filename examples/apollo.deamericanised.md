@@ -50,8 +50,10 @@ section 105.
 
 ## How American it read
 
-**85% American.** Above the 0.5 threshold, so the rules that need to know where the text came from ran.
+**90% American.** Above the 0.5 threshold, so the rules that need to know where the text came from ran.
 
 Markers found: `-or spelling`, `imperial units`, `abbreviations with stops`.
 
-Dates that state their own order: 3 month-first, 0 day-first.
+No numeric date states its own order.
+
+Dates with the month written out: 3 month-first, 0 day-first. Evidence about the prose, not about the numeric dates beside it.

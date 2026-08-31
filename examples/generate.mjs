@@ -31,6 +31,11 @@ const EXAMPLES = [
     note: 'Dates, distances and a mission that has to stay American.',
   },
   {
+    file: 'fasteners.md',
+    preset: 'read',
+    note: 'Bolt sizes in inches, which are designations and must survive untouched.',
+  },
+  {
     file: 'aluminum.md',
     preset: 'read',
     note: 'The metal itself, plus dollar amounts that need pinning to a currency.',

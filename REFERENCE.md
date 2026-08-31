@@ -335,6 +335,11 @@ can hold prose and an `@example` at once, and doc tags keep their operands: the 
 
 Turn it off with `protectCommentedCode: false` or `--no-code-guard`.
 
+One limitation to know about when writing comments: inline code is protected by pairing
+backticks, and the pairing does not cross a line break. A span that wraps onto the next
+line of a block comment is not protected, and the words inside it will be rewritten. Keep
+a backtick span on one line.
+
 ## Integrations
 
 ### remark

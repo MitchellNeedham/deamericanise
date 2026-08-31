@@ -425,3 +425,49 @@ describe('US coins used as a unit of size', () => {
     expect(convert('one-quarter pound of butter')).toBe('110 grams of butter');
   });
 });
+
+describe('a fastener size a few words from its noun', () => {
+  it.each`
+    unchanged                              | why
+    ${'for bolts up to 1 in. in diameter'} | ${'a bolt size, with function words between'}
+    ${'For bolts above 1-in. diameter'}    | ${'the same'}
+    ${'screws smaller than 1/4 inch'}      | ${'the same'}
+    ${'a monitor larger than 27 inches'}   | ${'screens too'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                  | expected                                  | why
+    ${'the bolt was 6 feet from the wall'} | ${'the bolt was 1.8 metres from the wall'} | ${'a real distance, not a size'}
+    ${'hail 2 inches in diameter'}         | ${'hail 5.1 centimetres in diameter'}      | ${'diameter alone is no exemption'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('American designations that only look like measurements', () => {
+  it.each`
+    unchanged                    | why
+    ${'the 40 yard line'}        | ${'there is no 37 metre line'}
+    ${'the 40 yard dash'}        | ${'a named event'}
+    ${'the 147-pound division'}  | ${'a weight class is a name'}
+    ${'a 12 gauge shotgun'}      | ${'gauge is not a unit here'}
+    ${'a 350 cubic inch V8'}     | ${'an engine name'}
+    ${'P215/65R15 tires'}        | ${'a tyre code'}
+    ${'a 5/16-18 UNC bolt'}      | ${'a thread spec'}
+    ${'a #10-32 screw'}          | ${'the same'}
+    ${'a 2x4 stud'}              | ${'lumber'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                            | expected
+    ${'a 40 yard sprint'}            | ${'a 37 metre sprint'}
+    ${'a 147 pound bag of cement'}   | ${'a 66.7 kilogram bag of cement'}
+    ${'100 yards of fabric'}         | ${'91 metres of fabric'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});

@@ -73,8 +73,18 @@ export function metricArea(squareMetres: number): MetricValue {
  * 9.5 mm, and a workshop happily mixes a 10 mm bolt and a 3/8 inch bolt in one sentence.
  */
 const INCH_CONVENTIONS = {
-  before:
-    /\b(?:screen|display|monitor|touchscreen|laptop|tablet|phone|tv|television|panel|wheel|wheels|rim|rims|tyre|tire|pipe|pipes|bore|vinyl|record|drive|disk|disc|barrel|waist|chest|inseam|sensor|lens|nail|nails|bolt|bolts|screw|screws|nut|nuts|socket|sockets|wrench|spanner|thread|threads|drill|bit)\b[\s-]*(?:of\s+)?$/i,
+  // A few function words may sit between the thing and its size. A bolt described as up
+  // to an inch in diameter is being named; a bolt described as standing away from a wall
+  // is being measured. Allowing only function words between the two keeps them apart.
+  before: new RegExp(
+    String.raw`\b(?:screen|display|monitor|touchscreen|laptop|tablet|phone|tv|television|panel|` +
+      String.raw`wheels?|rims?|tyres?|tires?|pipes?|bore|vinyl|record|drive|disk|disc|barrel|waist|` +
+      String.raw`chest|inseam|sensor|lens|nails?|bolts?|screws?|nuts?|washers?|sockets?|wrench(?:es)?|` +
+      String.raw`spanners?|threads?|rivets?|studs?|drill|bit)\b` +
+      String.raw`(?:\s+(?:up|to|above|below|over|under|of|and|or|the|a|an|about|approximately|` +
+      String.raw`larger|smaller|greater|less|than|from|in|is|are|measuring)){0,4}[\s-]*$`,
+    'i',
+  ),
   // Up to three words may sit between the measurement and the thing measured, as in
   // `a 12-inch capacitive LCD touchscreen`.
   after:
@@ -115,6 +125,9 @@ export const MEASURES: Measure[] = [
     words: ['yards', 'yard'],
     abbrevs: ['yds', 'yd'],
     convert: (v) => metricLength(v * 0.9144),
+    // A gridiron yard line and the 40 yard dash are names for things, not lengths. There
+    // is no 37 metre line painted on any field.
+    conventional: { after: /^[\s-]*(?:lines?|dash|markers?)\b/i },
   },
   {
     id: 'units.length.mile',
@@ -168,6 +181,11 @@ export const MEASURES: Measure[] = [
     words: ['pounds', 'pound'],
     abbrevs: ['lbs', 'lb'],
     convert: (v) => metricMass(v * 453.59237),
+    // Fighting weight classes are designations. The 147-pound division is called that
+    // whatever the scales say in kilograms.
+    conventional: {
+      after: /^[\s-]*(?:divisions?|classes|class|limits?|bouts?|titles?|champions?|weight)\b/i,
+    },
   },
   {
     id: 'units.mass.stone',

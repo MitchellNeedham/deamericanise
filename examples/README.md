@@ -10,6 +10,7 @@ the bottom naming the rule behind each one.
 | [bear-safety.md](./bear-safety.md) | `read` | Yards and feet, and the sense-dependent spellings |
 | [anemia.md](./anemia.md) | `read` | Medical prose, where the `ae` and `oe` digraphs carry it |
 | [apollo.md](./apollo.md) | `read` | Miles and altitudes, in a mission that stays American |
+| [fasteners.md](./fasteners.md) | `read` | Bolt sizes in inches, which are names and must not move |
 | [aluminum.md](./aluminum.md) | `read` | The metal, and tons the document says are already metric |
 | [cookbook.md](./cookbook.md) | `localise` | A 1919 recipe: cups and pounds, written out in words |
 | [storm-reports.md](./storm-reports.md) | `read` | An ambiguous date, resolved by how American the prose is |

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Regenerates every *.deamericanised.md from its source. Run after changing any rule:
 //   npm run build && node examples/generate.mjs
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deamericanise } from '../dist/index.js';
@@ -24,11 +24,6 @@ const EXAMPLES = [
     file: 'anemia.md',
     preset: 'read',
     note: 'Medical prose, where the ae and oe digraphs do the work rather than the units.',
-  },
-  {
-    file: 'truck-review.md',
-    preset: 'localise',
-    note: 'A car review, where the vocabulary matters as much as the torque figures.',
   },
   {
     file: 'flood-safety.md',
@@ -60,7 +55,13 @@ function lineOf(text, offset) {
 const cell = (s) => `\`${s.replace(/\|/g, '\\|').replace(/\n/g, ' ')}\``;
 
 for (const { file, preset, note } of EXAMPLES) {
-  const source = readFileSync(join(here, file), 'utf8');
+  const path = join(here, file);
+  // Deleting an example should not break the whole run.
+  if (!existsSync(path)) {
+    console.warn(`${file.padEnd(34)} missing, skipped`);
+    continue;
+  }
+  const source = readFileSync(path, 'utf8');
   const { changes, signals } = deamericanise(source, { preset });
 
   const rows = changes.map(

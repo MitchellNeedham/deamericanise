@@ -19,6 +19,11 @@ export interface Measure {
    * inches everywhere, so are wheels, pipes and vinyl.
    */
   conventional?: { before?: RegExp; after?: RegExp };
+  /**
+   * Skip this measure entirely when the document matches. For units whose name means
+   * different things in different places, the document usually says which it means.
+   */
+  ambiguousWhen?: RegExp;
 }
 
 const m = (value: number, symbol: string, singular: string, plural: string): MetricValue => ({
@@ -57,14 +62,18 @@ export function metricArea(squareMetres: number): MetricValue {
   return m(squareMetres, 'm²', 'square metre', 'square metres');
 }
 
-/** Screens, wheels, pipes and records are sized in inches the world over. */
+/**
+ * Screens, wheels, pipes, records and fasteners are sized in inches the world over. A
+ * 3/8 inch bolt is a designation rather than a measurement: there is no metric bolt of
+ * 9.5 mm, and a workshop happily mixes a 10 mm bolt and a 3/8 inch bolt in one sentence.
+ */
 const INCH_CONVENTIONS = {
   before:
-    /\b(?:screen|display|monitor|touchscreen|laptop|tablet|phone|tv|television|panel|wheel|wheels|rim|rims|tyre|tire|pipe|pipes|bore|vinyl|record|drive|disk|disc|barrel|waist|chest|inseam|sensor|lens|nail|nails)\b[\s-]*(?:of\s+)?$/i,
+    /\b(?:screen|display|monitor|touchscreen|laptop|tablet|phone|tv|television|panel|wheel|wheels|rim|rims|tyre|tire|pipe|pipes|bore|vinyl|record|drive|disk|disc|barrel|waist|chest|inseam|sensor|lens|nail|nails|bolt|bolts|screw|screws|nut|nuts|socket|sockets|wrench|spanner|thread|threads|drill|bit)\b[\s-]*(?:of\s+)?$/i,
   // Up to three words may sit between the measurement and the thing measured, as in
   // `a 12-inch capacitive LCD touchscreen`.
   after:
-    /^[\s-]*(?:[\w-]+\s+){0,3}(?:screens?|displays?|monitors?|touchscreens?|laptops?|tablets?|macbook|tvs?|televisions?|panels?|wheels?|rims?|tyres?|tires?|pipes?|vinyl|records?|drives?|disks?|discs?|floppy|barrels?|sensors?|lens|lenses|nails?|pizzas?|subwoofers?|speakers?)\b/i,
+    /^[\s-]*(?:[\w-]+\s+){0,3}(?:screens?|displays?|monitors?|touchscreens?|laptops?|tablets?|macbook|tvs?|televisions?|panels?|wheels?|rims?|tyres?|tires?|pipes?|vinyl|records?|drives?|disks?|discs?|floppy|barrels?|sensors?|lens|lenses|nails?|pizzas?|subwoofers?|speakers?|bolts?|screws?|nuts?|washers?|sockets?|wrench(?:es)?|spanners?|threads?|hex|ratchets?|rivets?|studs?|dowels?|taps?|fittings?|couplings?|nipples?|unions?|elbows?|npt|unc|unf|bits?)\b/i,
 };
 
 /**
@@ -167,7 +176,10 @@ export const MEASURES: Measure[] = [
     keep: 'ton',
     words: ['tons', 'ton'],
     abbrevs: [],
+    // The US short ton. A document that also says `metric ton` or `tonne` is measuring in
+    // those already, and reading its tons as short tons would be plainly wrong.
     convert: (v) => metricMass(v * 907_184.74),
+    ambiguousWhen: /\b(?:metric\s+tons?|tonnes?|long\s+tons?)\b/i,
   },
 
   // ----- volume. Every one of these is the US measure, which is not the imperial one. -----

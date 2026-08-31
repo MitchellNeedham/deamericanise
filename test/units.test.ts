@@ -253,3 +253,86 @@ describe('a text that already gives the metric value', () => {
     expect(convert(input)).toBe(expected);
   });
 });
+
+describe('fastener sizes are designations, not measurements', () => {
+  it.each`
+    unchanged                                      | why
+    ${'a 3/8 inch bolt'}                           | ${'there is no 9.5 mm bolt'}
+    ${'the 1/2 inch nut'}                          | ${'same'}
+    ${'a 9/16 inch wrench'}                        | ${'tools are sized to the fastener'}
+    ${'a 1/4 inch socket'}                         | ${'same'}
+    ${'a 3/8 inch drive ratchet'}                  | ${'same'}
+    ${'a 1/8 inch drill bit'}                      | ${'bits come in fractional sizes'}
+    ${'1/4 inch threads'}                          | ${'same'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('leaves a sentence mixing both systems exactly as written', () => {
+    const input = 'Fit a 10 mm bolt on one side and a 3/8 inch bolt on the other.';
+    expect(convert(input)).toBe(input);
+  });
+
+  it('still converts a real thickness', () => {
+    expect(convert('The sheet is 1/16 inch thick.')).toBe('The sheet is 1.6 millimetres thick.');
+  });
+});
+
+describe('a singular unit modifying a noun stays singular', () => {
+  it.each`
+    input                     | expected                   | why
+    ${'a 6 foot fence'}       | ${'a 1.8 metre fence'}     | ${'attributive'}
+    ${'a 9 inch dish'}        | ${'a 23 centimetre dish'}  | ${'attributive'}
+    ${'6 feet of rope'}       | ${'1.8 metres of rope'}    | ${'a plural source stays plural'}
+    ${'1/2 gallon of milk'}   | ${'1.9 litres of milk'}    | ${'a preposition, not a noun'}
+    ${'1/16 inch thick'}      | ${'1.6 millimetres thick'} | ${'a dimension adjective, not a noun'}
+    ${'5 inches of rain'}     | ${'13 centimetres of rain'} | ${'plural source'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('numbers written out in words', () => {
+  it.each`
+    input                              | expected
+    ${'one cup of suet'}               | ${'240 millilitres of suet'}
+    ${'two cups of cider'}             | ${'470 millilitres of cider'}
+    ${'one-half cup of citron'}        | ${'120 millilitres of citron'}
+    ${'three-quarters cup of syrup'}   | ${'180 millilitres of syrup'}
+    ${'one and one-half cups of sugar'} | ${'350 millilitres of sugar'}
+    ${'one-quarter pound of citron'}   | ${'110 grams of citron'}
+    ${'two thirds cup'}                | ${'160 millilitres'}
+    ${'six feet tall'}                 | ${'1.8 metres tall'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged              | why
+    ${'six eggs'}          | ${'not a unit'}
+    ${'one of the best'}   | ${'not a measurement'}
+    ${'one thing at a time'} | ${'not a measurement'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input             | expected            | why
+    ${'5-10 feet'}    | ${'1.5-3 metres'}   | ${'a hyphen between digits is still a range'}
+    ${'5 to 10 miles'} | ${'8 to 16 kilometres'} | ${'as is "to"'}
+    ${'10 x 12 feet'} | ${'3 x 3.7 metres'} | ${'and dimensions still pair up'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('tons, when the document says which kind', () => {
+  it.each`
+    input                                                        | expected                                                     | why
+    ${'The mine ships 5,000 tons a year.'}                       | ${'The mine ships 4500 tonnes a year.'}                      | ${'a US document means short tons'}
+    ${'Data in thousand metric tons. The mine ships 5,000 tons.'} | ${'Data in thousand metric tons. The mine ships 5,000 tons.'} | ${'this one already said metric'}
+    ${'Figures in tonnes. It moved 900 tons.'}                   | ${'Figures in tonnes. It moved 900 tons.'}                    | ${'same'}
+  `('$why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});

@@ -8,6 +8,7 @@ import {
 } from './definitions.js';
 import {
   NUMBER_PATTERN,
+  NUMERIC_PATTERN,
   formatNumber,
   formatTemperature,
   parseNumber,
@@ -51,6 +52,11 @@ function buildIndex(
   return { alternation, byAlias };
 }
 
+/** The document says which kind of unit it means, and it is not the American one. */
+function isAmbiguousHere(measure: Measure, text: string): boolean {
+  return measure.ambiguousWhen !== undefined && measure.ambiguousWhen.test(text);
+}
+
 function isConventional(measure: Measure, text: string, start: number, end: number): boolean {
   const rules = measure.conventional;
   if (!rules) return false;
@@ -58,6 +64,13 @@ function isConventional(measure: Measure, text: string, start: number, end: numb
   const after = text.slice(end, end + CONTEXT_WINDOW);
   return Boolean((rules.before?.test(before)) || (rules.after?.test(after)));
 }
+
+/**
+ * A singular unit followed by a noun is modifying it. Prepositions, conjunctions and the
+ * dimension adjectives mean the measurement stands alone instead.
+ */
+const MODIFIES_A_NOUN =
+  /^[\s-]+(?!(?:of|in|on|at|by|for|and|or|to|from|with|per|thick|wide|long|tall|deep|high|across|away|apart|each|only|or)\b)[a-z]/i;
 
 /** `6 in` is usually the preposition. `6in` never is. */
 function isBareInch(alias: string, whole: string): boolean {
@@ -199,7 +212,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     'gi',
   );
   const range = new RegExp(
-    String.raw`(?<![\w.])(${NUMBER_PATTERN})\s*(?:-|–|—|to|and)\s*(${NUMBER_PATTERN})` +
+    String.raw`(?<![\w.])(${NUMERIC_PATTERN})\s*(?:-|–|—|to|and)\s*(${NUMERIC_PATTERN})` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
@@ -207,8 +220,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   // An optional unit after an inner number, so `8.5" x 11"` and `10 ft x 12 ft` both match.
   const INNER_UNIT = String.raw`(?:${GAP}(?:${alternation}))?`;
   const dimensions = new RegExp(
-    String.raw`(?<![\w.])(${NUMBER_PATTERN})${INNER_UNIT}\s*(?:x|×|by)\s*(${NUMBER_PATTERN})` +
-      String.raw`(?:${INNER_UNIT}\s*(?:x|×|by)\s*(${NUMBER_PATTERN}))?` +
+    String.raw`(?<![\w.])(${NUMERIC_PATTERN})${INNER_UNIT}\s*(?:x|×|by)\s*(${NUMERIC_PATTERN})` +
+      String.raw`(?:${INNER_UNIT}\s*(?:x|×|by)\s*(${NUMERIC_PATTERN}))?` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
@@ -230,6 +243,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         if (!entry || low === null || high === null || high === 0) continue;
         const start = match.index;
         if (isConventional(entry.measure, ctx.text, start, start + match[0].length)) continue;
+        if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[3]!, match[0])) continue;
 
         // Both ends share the unit chosen for the larger one, so the range stays readable.
@@ -271,6 +285,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
         const start = match.index;
         if (isConventional(entry.measure, ctx.text, start, start + match[0].length)) continue;
+        if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[4]!, match[0])) continue;
 
         const numbers = values as number[];
@@ -310,14 +325,17 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         if (!entry || value === null) continue;
         const start = match.index;
         if (isConventional(entry.measure, ctx.text, start, start + match[0].length)) continue;
+        if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[2]!, match[0])) continue;
 
         const target = entry.measure.convert(value);
         const { precision, maxDecimals } = ctx.options.units;
         const number = formatNumber(target.value, precision, significantFigures(match[1]!), maxDecimals);
-        // A singular unit beside a number above one is attributive: `a 9 inch dish`.
-        // Below one it is genuine, as in `1/2 gallon`, so the value decides instead.
-        const attributive = entry.isWord && entry.isSingular && Math.abs(value) > 1;
+        // A singular unit modifying a following noun is attributive: `a 9 inch dish`,
+        // `a 3/8 inch bolt`. What follows decides, not the value, because a fraction is
+        // just as attributive. `1/2 gallon of milk` and `1/16 inch thick` are not.
+        const attributive =
+          entry.isWord && entry.isSingular && MODIFIES_A_NOUN.test(ctx.text.slice(start + match[0].length));
         const unit = entry.isWord
           ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
           : ` ${target.symbol}`;

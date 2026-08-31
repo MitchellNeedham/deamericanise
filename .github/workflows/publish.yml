@@ -14,7 +14,8 @@ on:
 
 permissions:
   contents: read
-  # Required for npm provenance, which package.json turns on.
+  # Lets the job mint the OIDC token that npm trusted publishing and provenance use.
+  # There is no npm token anywhere in this workflow.
   id-token: write
 
 jobs:
@@ -28,6 +29,10 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
           cache: npm
+
+      # Trusted publishing needs npm 11.5.1 or newer, which is ahead of the npm that
+      # ships with most Node releases.
+      - run: npm install -g npm@latest
 
       - name: Resolve the version
         id: resolve
@@ -60,6 +65,7 @@ jobs:
       # how a particular publish happened rather than anything about the package. In
       # publishConfig it would apply to every publish everywhere, which breaks publishing
       # from a laptop: provenance needs OIDC claims that only a CI provider can issue.
+      #
+      # Authentication is OIDC, so this only works once the package on npmjs.com has this
+      # repository and workflow set as a trusted publisher.
       - run: npm publish --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

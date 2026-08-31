@@ -458,6 +458,17 @@ That is the whole release. There is no version to bump by hand and nothing to ke
 sync. A tag that is not valid semver fails the job before anything is published, and the
 workflow can also be run by hand from the Actions tab with a version typed in.
 
+CI authenticates with npm through OIDC rather than a token, so there is no `NPM_TOKEN`
+secret to create, rotate or leak, and two-factor authentication on the account is not in
+the way. It requires this repository and the `Publish` workflow to be set as a trusted
+publisher on the package's settings page at npmjs.com.
+
+Provenance is requested on the publish command rather than in `publishConfig`, because it
+describes how a particular publish happened rather than anything about the package. Set
+in `publishConfig` it applies to every publish everywhere, which makes publishing from a
+laptop fail: provenance needs OIDC claims that only a CI provider can issue. If you ever
+do need to publish by hand, `npm publish --no-provenance` is the escape hatch.
+
 ## Licence
 
 MIT

@@ -60,9 +60,11 @@ export function metricArea(squareMetres: number): MetricValue {
 /** Screens, wheels, pipes and records are sized in inches the world over. */
 const INCH_CONVENTIONS = {
   before:
-    /\b(?:screen|display|monitor|laptop|tablet|phone|tv|television|panel|wheel|wheels|rim|rims|tyre|tire|pipe|pipes|bore|vinyl|record|drive|disk|disc|barrel|waist|chest|inseam|sensor|lens|nail|nails)\b[\s-]*(?:of\s+)?$/i,
+    /\b(?:screen|display|monitor|touchscreen|laptop|tablet|phone|tv|television|panel|wheel|wheels|rim|rims|tyre|tire|pipe|pipes|bore|vinyl|record|drive|disk|disc|barrel|waist|chest|inseam|sensor|lens|nail|nails)\b[\s-]*(?:of\s+)?$/i,
+  // Up to three words may sit between the measurement and the thing measured, as in
+  // `a 12-inch capacitive LCD touchscreen`.
   after:
-    /^[\s-]*(?:screen|display|monitor|laptop|tablet|macbook|tv|television|panel|wheels?|rims?|tyres?|tires?|pipes?|vinyl|records?|drive|disk|disc|floppy|barrel|sensor|lens|nails?|pizza|subwoofer|speaker)\b/i,
+    /^[\s-]*(?:[\w-]+\s+){0,3}(?:screens?|displays?|monitors?|touchscreens?|laptops?|tablets?|macbook|tvs?|televisions?|panels?|wheels?|rims?|tyres?|tires?|pipes?|vinyl|records?|drives?|disks?|discs?|floppy|barrels?|sensors?|lens|lenses|nails?|pizzas?|subwoofers?|speakers?)\b/i,
 };
 
 /**
@@ -259,8 +261,9 @@ export const MEASURES: Measure[] = [
   {
     id: 'units.torque.foot-pound',
     keep: 'foot-pound',
-    words: ['foot-pounds', 'foot pounds', 'foot-pound', 'pound-feet'],
-    abbrevs: ['ft-lb', 'ft-lbs', 'lb-ft'],
+    words: ['foot-pounds', 'foot pounds', 'foot-pound', 'pound-feet', 'pound feet', 'pound-foot'],
+    // `lb ft` has to be here, or `400lb ft of torque` is read as 400 pounds of mass.
+    abbrevs: ['ft-lb', 'ft-lbs', 'ft lb', 'ft lbs', 'lb-ft', 'lb ft', 'lbft', 'lb.ft'],
     convert: (v) => m(v * 1.3558179483, 'N·m', 'newton metre', 'newton metres'),
   },
 ];

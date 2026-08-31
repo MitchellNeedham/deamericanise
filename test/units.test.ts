@@ -197,3 +197,36 @@ describe('singular and plural follow the source', () => {
     expect(convert(input)).toBe(expected);
   });
 });
+
+describe('torque is not mass', () => {
+  it.each`
+    input                     | expected        | why
+    ${'400lb ft of torque'}   | ${'540 N·m of torque'} | ${'lb ft with a space still reads as pound-feet'}
+    ${'570 lb-ft'}            | ${'770 N·m'}    | ${'hyphenated'}
+    ${'300 ft-lbs'}           | ${'410 N·m'}    | ${'the other way round'}
+    ${'250 pound-feet'}       | ${'340 newton metres'} | ${'a spelled-out source gets a spelled-out unit'}
+    ${'180 lbs of cargo'}     | ${'82 kg of cargo'} | ${'plain pounds are still mass'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('screen sizes survive an adjective or two', () => {
+  it.each`
+    unchanged                                 | why
+    ${'a 12-inch capacitive LCD touchscreen'} | ${'three words before the noun'}
+    ${'the 27-inch 4K monitor'}               | ${'an intervening word starting with a digit'}
+    ${'a 65 inch 8K OLED TV'}                 | ${'several of them'}
+    ${'a 15 inch laptop'}                     | ${'none at all'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                 | expected
+    ${'5 inches of rain'} | ${'13 centimetres of rain'}
+    ${'a 9 inch dish'}    | ${'a 23 centimetre dish'}
+  `('still converts $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});

@@ -1,9 +1,7 @@
 > Generated from [extreme-heat.md](./extreme-heat.md) by [deamericanise](https://www.npmjs.com/package/deamericanise).
-> Preset `read`, dialect `en-AU`, 7 changes. Every change is in **bold**.
+> Preset `read`, dialect `en-AU`, 8 changes. Every change is in **bold**.
 >
 > An American article stays about America. Only the spellings and the measurements move.
->
-> The text read 60% American (-ize spelling, -er spelling, Fahrenheit, abbreviations with stops).
 
 # Extreme Heat Safety
 
@@ -45,7 +43,7 @@ Children and Heat Vulnerability (Source: The Impacts Of Climate Change On Human 
 
 Protect and prepare: Keep children cool by having them drink plenty of water, take lots of breaks, wear light-**coloured** and lightweight clothing, and limit playing outdoors to cooler times of the day. Make sure fluids are not very cold or high in sugar/sweetener content.
 
-Even on mild days in the 70s, studies have shown that the temperature inside a parked vehicle can rapidly rise to a dangerous level for children, pets and even adults. Leaving the windows slightly open does not significantly decrease the heating rate. A dark dashboard or car seat can quickly reach temperatures in the range of **82.2°C** to over **95°C**. These objects heat the adjacent air by conduction and convection and also give off long wave radiation, which then heats the air trapped inside a vehicle. Click here to learn more and follow these tips to ensure children' s safety.
+Even on mild days **between 21 and 26°C**, studies have shown that the temperature inside a parked vehicle can rapidly rise to a dangerous level for children, pets and even adults. Leaving the windows slightly open does not significantly decrease the heating rate. A dark dashboard or car seat can quickly reach temperatures in the range of **82.2°C** to over **95°C**. These objects heat the adjacent air by conduction and convection and also give off long wave radiation, which then heats the air trapped inside a vehicle. Click here to learn more and follow these tips to ensure children' s safety.
 
 ---
 
@@ -63,5 +61,14 @@ not subject to copyright protection under 17 U.S.C. section 105.
 | 25 | `toward` | `towards` | `spelling.irregular-ambiguous` | moderate |
 | 25 | `90°F` | `32.2°C` | `units.temperature.fahrenheit` | moderate |
 | 39 | `colored` | `coloured` | `spelling.our` | safe |
+| 41 | `in the 70s` | `between 21 and 26°C` | `units.temperature.decade` | risky |
 | 41 | `180°F` | `82.2°C` | `units.temperature.fahrenheit` | moderate |
 | 41 | `200°F` | `95°C` | `units.temperature.fahrenheit` | moderate |
+
+## How American it read
+
+**60% American.** Above the 0.5 threshold, so the rules that need to know where the text came from ran.
+
+Markers found: `-ize spelling`, `-er spelling`, `Fahrenheit`, `abbreviations with stops`.
+
+No date states its own order, so nothing there settles the question either way.

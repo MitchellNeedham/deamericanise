@@ -2,8 +2,6 @@
 > Preset `read`, dialect `en-AU`, 12 changes. Every change is in **bold**.
 >
 > Dates, distances and a mission that has to stay American.
->
-> The text read 85% American (-or spelling, imperial units, abbreviations with stops).
 
 # Apollo 11 Mission Overview
 
@@ -49,3 +47,11 @@ section 105.
 | 17 | `five miles` | `8 kilometres` | `units.length.mile` | moderate |
 | 19 | `four miles` | `6.4 kilometres` | `units.length.mile` | moderate |
 | 19 | `maneuvers` | `manoeuvres` | `spelling.re` | safe |
+
+## How American it read
+
+**85% American.** Above the 0.5 threshold, so the rules that need to know where the text came from ran.
+
+Markers found: `-or spelling`, `imperial units`, `abbreviations with stops`.
+
+Dates that state their own order: 3 month-first, 0 day-first.

@@ -69,6 +69,34 @@ function lineOf(text, offset) {
 
 const cell = (s) => `\`${s.replace(/\|/g, '\\|').replace(/\n/g, ' ')}\``;
 
+/**
+ * How American the text looked, and on what evidence. The score gates the rules that
+ * cannot run without knowing where the text came from: an ambiguous numeric date, and
+ * pinning a bare dollar sign to a currency.
+ */
+function scoreSection(signals) {
+  const percent = (signals.confidence * 100).toFixed(0);
+  const cleared = signals.confidence >= 0.5;
+  const dates = signals.unambiguousMonthFirstDates + signals.unambiguousDayFirstDates;
+
+  return [
+    '## How American it read',
+    '',
+    `**${percent}% American.** ${cleared ? 'Above' : 'Below'} the 0.5 threshold, so the rules that` +
+      ` need to know where the text came from ${cleared ? 'ran' : 'did not run'}.`,
+    '',
+    signals.markers.length
+      ? `Markers found: ${signals.markers.map((m) => `\`${m}\``).join(', ')}.`
+      : 'No American markers found.',
+    '',
+    dates === 0
+      ? 'No date states its own order, so nothing there settles the question either way.'
+      : `Dates that state their own order: ${signals.unambiguousMonthFirstDates} month-first,` +
+        ` ${signals.unambiguousDayFirstDates} day-first.`,
+    '',
+  ];
+}
+
 for (const { file, preset, note } of EXAMPLES) {
   const path = join(here, file);
   // Deleting an example should not break the whole run.
@@ -88,9 +116,6 @@ for (const { file, preset, note } of EXAMPLES) {
     `> Preset \`${preset}\`, dialect \`en-AU\`, ${changes.length} changes. Every change is in **bold**.`,
     `>`,
     `> ${note}`,
-    `>`,
-    `> The text read ${(signals.confidence * 100).toFixed(0)}% American` +
-      (signals.markers.length ? ` (${signals.markers.join(', ')}).` : '.'),
     '',
     highlight(source, changes),
     '## What changed',
@@ -99,6 +124,7 @@ for (const { file, preset, note } of EXAMPLES) {
     '| --- | --- | --- | --- | --- |',
     ...rows,
     '',
+    ...scoreSection(signals),
   ].join('\n');
 
   const target = file.replace(/\.md$/, '.deamericanised.md');

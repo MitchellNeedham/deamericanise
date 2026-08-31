@@ -2,8 +2,6 @@
 > Preset `read`, dialect `en-AU`, 19 changes. Every change is in **bold**.
 >
 > The metal itself, plus dollar amounts that need pinning to a currency.
->
-> The text read 45% American (-ize spelling, aluminum, abbreviations with stops).
 
 # **Aluminium**
 
@@ -60,3 +58,11 @@ under 17 U.S.C. section 105.
 | 23 | `aluminum` | `aluminium` | `spelling.irregular` | safe |
 | 23 | `aluminum` | `aluminium` | `spelling.irregular` | safe |
 | 23 | `aluminum` | `aluminium` | `spelling.irregular` | safe |
+
+## How American it read
+
+**45% American.** Below the 0.5 threshold, so the rules that need to know where the text came from did not run.
+
+Markers found: `-ize spelling`, `aluminum`, `abbreviations with stops`.
+
+No date states its own order, so nothing there settles the question either way.

@@ -2,8 +2,6 @@
 > Preset `read`, dialect `en-AU`, 17 changes. Every change is in **bold**.
 >
 > Medical prose, where the ae and oe digraphs do the work rather than the units.
->
-> The text read 30% American (-or spelling, abbreviations with stops).
 
 # **Anaemia**
 
@@ -75,3 +73,11 @@ not subject to copyright protection under 17 U.S.C. section 105.
 | 21 | `Anemia` | `Anaemia` | `spelling.digraph` | moderate |
 | 23 | `Anemia` | `Anaemia` | `spelling.digraph` | moderate |
 | 37 | `Hemoglobin` | `Haemoglobin` | `spelling.digraph` | moderate |
+
+## How American it read
+
+**30% American.** Below the 0.5 threshold, so the rules that need to know where the text came from did not run.
+
+Markers found: `-or spelling`, `abbreviations with stops`.
+
+No date states its own order, so nothing there settles the question either way.

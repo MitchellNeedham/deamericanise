@@ -2,8 +2,6 @@
 > Preset `localise`, dialect `en-AU`, 4 changes. Every change is in **bold**.
 >
 > Advice you would act on, so the emergency number and the vocabulary move too.
->
-> The text read 30% American (imperial units, abbreviations with stops).
 
 # Flood Safety
 
@@ -34,3 +32,11 @@ not subject to copyright protection under 17 U.S.C. section 105.
 | 13 | `911` | `000` | `dialect.en-AU` | moderate |
 | 13 | `12 inches` | `30 centimetres` | `units.length.inch` | moderate |
 | 13 | `18 inches` | `46 centimetres` | `units.length.inch` | moderate |
+
+## How American it read
+
+**30% American.** Below the 0.5 threshold, so the rules that need to know where the text came from did not run.
+
+Markers found: `imperial units`, `abbreviations with stops`.
+
+No date states its own order, so nothing there settles the question either way.

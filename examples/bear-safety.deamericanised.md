@@ -2,8 +2,6 @@
 > Preset `read`, dialect `en-AU`, 14 changes. Every change is in **bold**.
 >
 > Distances and temperatures, in a document that already carries its own metric conversions.
->
-> The text read 60% American (-or spelling, -er spelling, -ense spelling, Fahrenheit, imperial units, abbreviations with stops).
 
 # Bear Safety in Yellowstone
 
@@ -68,3 +66,11 @@ not subject to copyright protection under 17 U.S.C. section 105.
 | 35 | `airplanes` | `aeroplanes` | `spelling.irregular` | safe |
 | 37 | `Center` | `Centre` | `spelling.re` | safe |
 | 37 | `Center` | `Centre` | `spelling.re` | safe |
+
+## How American it read
+
+**60% American.** Above the 0.5 threshold, so the rules that need to know where the text came from ran.
+
+Markers found: `-or spelling`, `-er spelling`, `-ense spelling`, `Fahrenheit`, `imperial units`, `abbreviations with stops`.
+
+No date states its own order, so nothing there settles the question either way.

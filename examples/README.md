@@ -12,6 +12,7 @@ the bottom naming the rule behind each one.
 | [apollo.md](./apollo.md) | `read` | Miles and altitudes, in a mission that stays American |
 | [aluminum.md](./aluminum.md) | `read` | The metal, and tons the document says are already metric |
 | [cookbook.md](./cookbook.md) | `localise` | A 1919 recipe: cups and pounds, written out in words |
+| [storm-reports.md](./storm-reports.md) | `read` | An ambiguous date, resolved by how American the prose is |
 | [recalls.md](./recalls.md) | `read` | American prose whose numeric dates are day-first |
 | [flood-safety.md](./flood-safety.md) | `localise` | The emergency number and the vocabulary move too |
 
@@ -19,6 +20,12 @@ Most run in the default `read` mode, which fixes what stops a non-American readi
 text and leaves the subject matter alone. `flood-safety.md` and `cookbook.md` use
 `localise`, because they are things you would act on rather than read, so `911` becoming
 `000` is the point rather than a mistake.
+
+`storm-reports.md` and `recalls.md` are a matched pair, and worth reading together. Both
+contain ambiguous numeric dates. The storm reports score 90% American, so `4/3/2024`
+becomes `2024-04-03`. The recall records write their numeric dates day-first, so
+`12/08/2022` is left alone. Same rule, opposite outcomes, decided by the evidence in each
+document rather than by a guess.
 
 Three of them are worth reading for what does *not* change. `recalls.md` is the sharpest:
 it is US government prose, it says `aluminum`, and it writes its named dates the American

@@ -1,5 +1,5 @@
 > Generated from [bear-safety.md](./bear-safety.md) by [deamericanise](https://www.npmjs.com/package/deamericanise).
-> Preset `read`, dialect `en-AU`, 14 changes. Every change is in **bold**.
+> Preset `read`, dialect `en-AU`, 12 changes. Every change is in **bold**.
 >
 > Distances and temperatures, in a document that already carries its own metric conversions.
 
@@ -39,7 +39,7 @@ Bear spray is a non-lethal tool specifically designed to deter bears as a last l
 
 - Bear spray cannot be taken on **aeroplanes** and may cause injury if thrown away in the trash.
 
-- Bear Aware, a park concessioner, offers 24/7 drop-off locations in several areas throughout the greater Yellowstone area, including recycling kiosks next to the Canyon Visitor Education **Centre** and in the Old Faithful Area (yurt next to the Yellowstone Tribal Heritage **Centre**). They accept all used/unwanted bear spray canisters, even if you didn't rent it from them.
+- Bear Aware, a park concessioner, offers 24/7 drop-off locations in several areas throughout the greater Yellowstone area, including recycling kiosks next to the Canyon Visitor Education Center and in the Old Faithful Area (yurt next to the Yellowstone Tribal Heritage Center). They accept all used/unwanted bear spray canisters, even if you didn't rent it from them.
 
 ---
 
@@ -64,8 +64,6 @@ not subject to copyright protection under 17 U.S.C. section 105.
 | 29 | `40 feet (12 m)` | `12 m` | `units.length.foot` | moderate |
 | 33 | `120 degrees Fahrenheit (49 degrees Celsius)` | `49 degrees Celsius` | `units.temperature.fahrenheit` | moderate |
 | 35 | `airplanes` | `aeroplanes` | `spelling.irregular` | safe |
-| 37 | `Center` | `Centre` | `spelling.re` | safe |
-| 37 | `Center` | `Centre` | `spelling.re` | safe |
 
 ## How American it read
 

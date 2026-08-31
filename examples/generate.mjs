@@ -36,6 +36,11 @@ const EXAMPLES = [
     note: 'The metal itself, plus dollar amounts that need pinning to a currency.',
   },
   {
+    file: 'storm-reports.md',
+    preset: 'read',
+    note: 'An ambiguous numeric date, in prose American enough to settle which way it reads.',
+  },
+  {
     file: 'recalls.md',
     preset: 'read',
     note: 'American prose whose numeric dates are day-first, so the ambiguous ones are left alone.',

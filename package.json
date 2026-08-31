@@ -1,0 +1,95 @@
+{
+  "name": "deamericanise",
+  "version": "0.1.0",
+  "description": "Rewrite American English text into the version the rest of the world reads: spelling, vocabulary, units, dates and currency. Understands code files and only touches comments.",
+  "keywords": [
+    "american",
+    "british",
+    "australian",
+    "english",
+    "spelling",
+    "localisation",
+    "i18n",
+    "units",
+    "metric",
+    "text",
+    "comments"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MitchellNeedham/deamericanise.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MitchellNeedham/deamericanise/issues"
+  },
+  "homepage": "https://github.com/MitchellNeedham/deamericanise#readme",
+  "author": "Mitchell Needham",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "deamericanise": "dist/cli.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./remark": {
+      "types": "./dist/plugins/remark.d.ts",
+      "import": "./dist/plugins/remark.js",
+      "require": "./dist/plugins/remark.cjs"
+    },
+    "./eslint": {
+      "types": "./dist/plugins/eslint.d.ts",
+      "import": "./dist/plugins/eslint.js",
+      "require": "./dist/plugins/eslint.cjs"
+    },
+    "./prettier": {
+      "types": "./dist/plugins/prettier.d.ts",
+      "import": "./dist/plugins/prettier.js",
+      "require": "./dist/plugins/prettier.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "prettier": "^3.4.2"
+  },
+  "peerDependencies": {
+    "prettier": ">=3",
+    "eslint": ">=8"
+  },
+  "peerDependenciesMeta": {
+    "prettier": {
+      "optional": true
+    },
+    "eslint": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

@@ -262,7 +262,8 @@ export const MEASURES: Measure[] = [
     id: 'units.torque.foot-pound',
     keep: 'foot-pound',
     words: ['foot-pounds', 'foot pounds', 'foot-pound', 'pound-feet', 'pound feet', 'pound-foot'],
-    // `lb ft` has to be here, or `400lb ft of torque` is read as 400 pounds of mass.
+    // `lb ft` has to be listed, or the mass rule claims the number first and the
+    // torque silently becomes a weight.
     abbrevs: ['ft-lb', 'ft-lbs', 'ft lb', 'ft lbs', 'lb-ft', 'lb ft', 'lbft', 'lb.ft'],
     convert: (v) => m(v * 1.3558179483, 'N·m', 'newton metre', 'newton metres'),
   },

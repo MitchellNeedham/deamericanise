@@ -64,6 +64,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "examples": "node examples/generate.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

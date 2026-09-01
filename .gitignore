@@ -3,3 +3,6 @@ dist/
 *.tsbuildinfo
 .DS_Store
 mitch-docs/
+
+# Built browser bundle for the Pages site.
+site/vendor/

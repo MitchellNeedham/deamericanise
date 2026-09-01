@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>deamericanise</title>
+<meta name="description" content="Rewrite American English into the version the rest of the world reads.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>🇦🇺</text></svg>">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<header>
+  <h1>deamericanise</h1>
+  <p>Paste text or drop a file. American English goes in, the version the rest of the world
+     reads comes out, with every change marked and explained.</p>
+</header>
+
+<section class="controls" aria-label="Options">
+  <label>Mode
+    <select id="preset">
+      <option value="read">read &mdash; keep the subject matter American</option>
+      <option value="localise">localise &mdash; swap vocabulary too</option>
+    </select>
+  </label>
+  <label>Dialect
+    <select id="dialect"></select>
+  </label>
+  <fieldset class="tiers">
+    <legend>Confidence</legend>
+    <label><input type="checkbox" value="safe" checked> safe</label>
+    <label><input type="checkbox" value="moderate" checked> moderate</label>
+    <label><input type="checkbox" value="risky" checked> risky</label>
+  </fieldset>
+  <div class="actions">
+    <button id="sample" type="button">Load a sample</button>
+    <label class="file">Upload a file<input id="file" type="file" hidden></label>
+  </div>
+</section>
+
+<main>
+  <div class="pane">
+    <div class="pane-head">
+      <h2>Input</h2>
+      <span id="filename" class="badge" hidden></span>
+    </div>
+    <textarea id="input" spellcheck="false" placeholder="The color of my favorite theater was gray. It is 6 feet 2 inches wide, 350&deg;F inside, and cost $500 on 3/14/2024."></textarea>
+  </div>
+
+  <div class="pane">
+    <div class="pane-head">
+      <h2>Result</h2>
+      <div class="pane-tools">
+        <button id="copy" type="button">Copy</button>
+        <button id="download" type="button">Download</button>
+      </div>
+    </div>
+    <div id="output" class="output" aria-live="polite"></div>
+  </div>
+
+  <aside class="pane report">
+    <div class="pane-head"><h2>Report</h2></div>
+    <div id="report"></div>
+  </aside>
+</main>
+
+<div id="tip" class="tip" role="tooltip" hidden></div>
+
+<footer>
+  <p><a href="https://www.npmjs.com/package/deamericanise">npm</a> &middot;
+     <a href="https://github.com/MitchellNeedham/deamericanise">source</a> &middot;
+     runs entirely in your browser; nothing is uploaded.</p>
+</footer>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

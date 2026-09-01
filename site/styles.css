@@ -1,0 +1,158 @@
+/* Category colours carry the "what kind of change" axis; the underline style carries
+   confidence, so the two dimensions never fight over the same visual channel. */
+:root {
+  color-scheme: light dark;
+  --bg: #fbfbfa;
+  --panel: #ffffff;
+  --ink: #1b1b1a;
+  --muted: #6b6b68;
+  --line: #e3e3df;
+  --accent: #2f6f4f;
+
+  --spelling: #1c5fa8;
+  --vocabulary: #7a3ea8;
+  --units: #0f6f6a;
+  --dates: #9a6407;
+  --times: #a2530a;
+  --currency: #5a6f10;
+  --punctuation: #a83060;
+  --misc: #4a5568;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16171a;
+    --panel: #1e2024;
+    --ink: #e8e8e6;
+    --muted: #9a9a96;
+    --line: #33363c;
+    --accent: #6fbf95;
+
+    --spelling: #79b4f2;
+    --vocabulary: #c79bec;
+    --units: #5cc7c0;
+    --dates: #e0b45c;
+    --times: #eb9a55;
+    --currency: #b6c96a;
+    --punctuation: #ef8bb2;
+    --misc: #a4b0c0;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 1.25rem 2rem;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+header { max-width: 1400px; margin: 0 auto; padding: 1.75rem 0 1rem; }
+header h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.01em; }
+header p { margin: 0.4rem 0 0; color: var(--muted); max-width: 62ch; }
+
+.controls {
+  max-width: 1400px;
+  margin: 0 auto 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem 1.25rem;
+  align-items: end;
+  padding: 0.9rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.controls label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.82rem; color: var(--muted); }
+.controls select { font: inherit; padding: 0.35rem 0.5rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+
+.tiers { border: 1px solid var(--line); border-radius: 6px; padding: 0.3rem 0.7rem 0.5rem; margin: 0; }
+.tiers legend { font-size: 0.76rem; color: var(--muted); padding: 0 0.3rem; }
+.tiers label { flex-direction: row; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: var(--ink); }
+
+.actions { display: flex; gap: 0.5rem; margin-left: auto; }
+button, .file {
+  font: inherit; font-size: 0.85rem; cursor: pointer;
+  padding: 0.4rem 0.8rem; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+button:hover, .file:hover { border-color: var(--accent); color: var(--accent); }
+
+main {
+  max-width: 1400px; margin: 0 auto;
+  display: grid; gap: 1rem;
+  grid-template-columns: 1fr 1fr 22rem;
+  align-items: start;
+}
+@media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.pane-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--line); }
+.pane-head h2 { margin: 0; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.pane-tools { margin-left: auto; display: flex; gap: 0.4rem; }
+.badge { margin-left: auto; font-size: 0.75rem; color: var(--accent); font-family: ui-monospace, monospace; }
+
+textarea, .output {
+  width: 100%; min-height: 24rem; max-height: 60vh; overflow: auto;
+  padding: 0.9rem; margin: 0; border: 0; resize: vertical;
+  font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: transparent; color: var(--ink);
+  white-space: pre-wrap; word-break: break-word;
+}
+textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.output:empty::before { content: "Nothing yet."; color: var(--muted); }
+
+/* A change: colour by category, underline by confidence. */
+.chg {
+  border-radius: 3px; padding: 0 1px; cursor: help;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+.chg.conf-safe { text-decoration-style: solid; }
+.chg.conf-moderate { text-decoration-style: dashed; }
+.chg.conf-risky { text-decoration-style: dotted; }
+
+.cat-spelling { color: var(--spelling); }
+.cat-vocabulary { color: var(--vocabulary); }
+.cat-units { color: var(--units); }
+.cat-dates { color: var(--dates); }
+.cat-times { color: var(--times); }
+.cat-currency { color: var(--currency); }
+.cat-punctuation { color: var(--punctuation); }
+.cat-misc { color: var(--misc); }
+
+.report { font-size: 0.87rem; }
+.report > div { padding: 0.9rem; }
+.score { font-size: 2rem; font-weight: 600; line-height: 1; }
+.score small { display: block; font-size: 0.8rem; font-weight: 400; color: var(--muted); margin-top: 0.3rem; }
+.meter { height: 7px; border-radius: 4px; background: var(--line); margin: 0.7rem 0; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+.report h3 { font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 1.2rem 0 0.5rem; }
+.report ul { list-style: none; margin: 0; padding: 0; }
+.report li { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.2rem 0; border-bottom: 1px solid var(--line); }
+.report li:last-child { border-bottom: 0; }
+.tally { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.swatch { width: 9px; height: 9px; border-radius: 2px; background: currentColor; flex: none; }
+.was { text-decoration: line-through; color: var(--muted); }
+.now { font-weight: 600; }
+.rule { font-family: ui-monospace, monospace; font-size: 0.74rem; color: var(--muted); }
+.empty { color: var(--muted); }
+
+.tip {
+  position: fixed; z-index: 10; max-width: 22rem;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.55rem 0.7rem; font-size: 0.8rem; line-height: 1.45;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 18%); pointer-events: none;
+}
+.tip b { font-family: ui-monospace, monospace; font-weight: 600; }
+.tip .rule { display: block; margin-top: 0.3rem; }
+
+footer { max-width: 1400px; margin: 1.5rem auto 0; color: var(--muted); font-size: 0.82rem; }
+footer a { color: inherit; }
+body.dragging { outline: 3px dashed var(--accent); outline-offset: -8px; }

@@ -25,5 +25,8 @@ jobs:
       - run: npm test
       - run: npm run build
 
+      # A change that breaks the browser bundle should fail here, not on deploy.
+      - run: npm run build:site
+
       # The package should not be able to fail its own check.
       - run: node dist/cli.js --check src test README.md REFERENCE.md

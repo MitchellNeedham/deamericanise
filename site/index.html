@@ -25,12 +25,17 @@
   <label>Dialect
     <select id="dialect"></select>
   </label>
-  <fieldset class="tiers">
-    <legend>Confidence</legend>
-    <label><input type="checkbox" value="safe" checked> safe</label>
-    <label><input type="checkbox" value="moderate" checked> moderate</label>
-    <label><input type="checkbox" value="risky" checked> risky</label>
-  </fieldset>
+  <details class="tiers" id="tiers">
+    <summary>Confidence<b id="tiers-label">all three</b></summary>
+    <div class="tier-menu">
+      <label><input type="checkbox" value="safe" checked> safe
+        <small>no plausible false positive</small></label>
+      <label><input type="checkbox" value="moderate" checked> moderate
+        <small>a wordlist that could collide with a name</small></label>
+      <label><input type="checkbox" value="risky" checked> risky
+        <small>a guess about what a word means</small></label>
+    </div>
+  </details>
   <div class="actions">
     <button id="sample" type="button">Load a sample</button>
     <label class="file">Upload a file<input id="file" type="file" hidden></label>

@@ -155,7 +155,24 @@ input.addEventListener('input', () => {
   run();
 });
 for (const control of ['preset', 'dialect']) $(control).addEventListener('change', run);
-for (const box of document.querySelectorAll('.tiers input')) box.addEventListener('change', run);
+function updateTierLabel() {
+  const chosen = [...document.querySelectorAll('.tiers input:checked')].map((b) => b.value);
+  $('tiers-label').textContent =
+    chosen.length === 3 ? 'all three' : chosen.length ? chosen.join(', ') : 'none, so all three';
+}
+
+for (const box of document.querySelectorAll('.tiers input')) {
+  box.addEventListener('change', () => {
+    updateTierLabel();
+    run();
+  });
+}
+
+// Clicking away closes the menu, the way a dropdown should.
+document.addEventListener('click', (event) => {
+  const tiers = $('tiers');
+  if (tiers.open && !tiers.contains(event.target)) tiers.open = false;
+});
 
 async function loadFile(file) {
   input.value = await file.text();
@@ -215,4 +232,5 @@ for (const [id, pack] of Object.entries(DIALECTS)) {
   $('dialect').append(new Option(`${id}: ${pack.label}`, id));
 }
 void CATEGORIES;
+updateTierLabel();
 run();

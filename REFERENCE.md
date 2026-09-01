@@ -455,6 +455,11 @@ and explained on hover, beside a report of the changes and the American-ness sco
 Dropping a source file uses `deamericaniseFile`, so a `.ts` file has only its comments
 rewritten.
 
+A collapsible panel lists all 83 rules grouped by family, each with a tick box and a
+count of how many changes it made to the text on the left. Unticking forces a rule off;
+leaving it ticked means the mode and confidence settings still govern it, so the count is
+the honest answer to what actually ran.
+
 The library imports no Node built-ins, so it runs in a browser unchanged. `npm run
 build:site` bundles it to `site/vendor/`, which is generated rather than committed. CI
 runs that build too, so breaking the bundle fails a pull request rather than a deploy.

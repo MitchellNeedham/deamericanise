@@ -68,6 +68,17 @@
   </aside>
 </main>
 
+<details class="rules" id="rules-panel">
+  <summary>Rules<b id="rules-count"></b></summary>
+  <div class="rules-head">
+    <p>Unticking forces a rule off. A ticked rule still has to pass the mode and
+       confidence settings above, so some will sit idle either way. The number beside a
+       rule is how many changes it made to the text on the left.</p>
+    <button id="rules-reset" type="button">Tick everything</button>
+  </div>
+  <div id="rules" class="rules-grid"></div>
+</details>
+
 <div id="tip" class="tip" role="tooltip" hidden></div>
 
 <footer>

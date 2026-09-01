@@ -3,6 +3,7 @@ import {
   DIALECTS,
   deamericanise,
   deamericaniseFile,
+  ruleIds,
 } from './vendor/deamericanise.js';
 
 const $ = (id) => document.getElementById(id);
@@ -23,6 +24,13 @@ const SAMPLE =
   'station on the sidewalk side of the parking lot. Dime to quarter-sized hail dented ' +
   'the hood, and in my judgment the tire was ruined.';
 
+/**
+ * Rules the visitor has switched off. Only these are passed to the library: a ticked rule
+ * is left unmentioned so the mode and confidence settings still govern it, rather than
+ * being forced on.
+ */
+const disabled = new Set();
+
 function options() {
   const confidence = [...document.querySelectorAll('.tiers input:checked')].map((b) => b.value);
   return {
@@ -31,6 +39,7 @@ function options() {
     // An empty tier list would mean "run nothing", which is never what an empty set of
     // ticks is meant to say, so fall back to all of them.
     confidence: confidence.length ? confidence : ['safe', 'moderate', 'risky'],
+    rules: Object.fromEntries([...disabled].map((id) => [id, false])),
   };
 }
 
@@ -127,7 +136,87 @@ function run() {
   lastResult = result;
   output.innerHTML = highlight(source, result.changes);
   renderReport(result);
+  updateRuleHits(result.changes);
 }
+
+// ----- rule browser -----
+const GROUP_ORDER = [
+  'spelling', 'vocabulary', 'dialect', 'units', 'dates', 'times',
+  'currency', 'punctuation', 'grammar', 'misc',
+];
+
+function buildRules() {
+  const ids = ruleIds($('dialect').value);
+  const groups = new Map();
+  for (const id of ids) {
+    const group = id.split('.')[0];
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(id);
+  }
+
+  const rank = (group) => {
+    const index = GROUP_ORDER.indexOf(group);
+    return index === -1 ? GROUP_ORDER.length : index;
+  };
+  const ordered = [...groups].sort((a, b) => rank(a[0]) - rank(b[0]));
+
+  $('rules').innerHTML = ordered
+    .map(
+      ([group, list]) => `<div class="rule-group cat-${group}">
+        <h4>${group} <span class="rule">${list.length}</span>
+          <button type="button" data-group="${group}">none</button></h4>
+        ${list
+          .map(
+            (id) =>
+              `<label data-rule="${id}"><input type="checkbox" value="${id}"${
+                disabled.has(id) ? '' : ' checked'
+              }><span>${id.slice(group.length + 1) || id}</span><span class="hits"></span></label>`,
+          )
+          .join('')}
+      </div>`,
+    )
+    .join('');
+
+  $('rules-count').textContent = `${ids.length} in total`;
+}
+
+function updateRuleHits(changes) {
+  const hits = new Map();
+  for (const c of changes) hits.set(c.ruleId, (hits.get(c.ruleId) ?? 0) + 1);
+  for (const label of document.querySelectorAll('.rule-group label')) {
+    const n = hits.get(label.dataset.rule) ?? 0;
+    label.classList.toggle('fired', n > 0);
+    label.querySelector('.hits').textContent = n || '';
+  }
+}
+
+$('rules').addEventListener('change', (event) => {
+  const box = event.target;
+  if (box.type !== 'checkbox') return;
+  if (box.checked) disabled.delete(box.value);
+  else disabled.add(box.value);
+  run();
+});
+
+$('rules').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-group]');
+  if (!button) return;
+  const boxes = [...$('rules').querySelectorAll(`.cat-${button.dataset.group} input`)];
+  const turningOff = boxes.some((b) => b.checked);
+  for (const box of boxes) {
+    box.checked = !turningOff;
+    if (turningOff) disabled.add(box.value);
+    else disabled.delete(box.value);
+  }
+  button.textContent = turningOff ? 'all' : 'none';
+  run();
+});
+
+$('rules-reset').addEventListener('click', () => {
+  disabled.clear();
+  buildRules();
+  run();
+});
 
 // ----- tooltips -----
 output.addEventListener('mouseover', (event) => {
@@ -154,7 +243,12 @@ input.addEventListener('input', () => {
   filename.hidden = true;
   run();
 });
-for (const control of ['preset', 'dialect']) $(control).addEventListener('change', run);
+$('preset').addEventListener('change', run);
+$('dialect').addEventListener('change', () => {
+  // The dialect changes which rule ids exist, so the list is rebuilt.
+  buildRules();
+  run();
+});
 function updateTierLabel() {
   const chosen = [...document.querySelectorAll('.tiers input:checked')].map((b) => b.value);
   $('tiers-label').textContent =
@@ -233,4 +327,5 @@ for (const [id, pack] of Object.entries(DIALECTS)) {
 }
 void CATEGORIES;
 updateTierLabel();
+buildRules();
 run();

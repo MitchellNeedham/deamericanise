@@ -15,12 +15,13 @@ const filename = $('filename');
 /** Set when a file is dropped or chosen, so a .ts file has only its comments rewritten. */
 let currentFile = null;
 
-const SAMPLE = `The color of my favorite theater was gray, and the whole neighborhood
-canceled its plans. It is 6 feet 2 inches wide, weighs 180 pounds, and the
-oven runs at 350°F. On mild days in the 70s the parked car still gets
-dangerous. We paid $500 on 3/14/2024 for a 3/8 inch bolt and an aluminum
-bracket, then drove 50 miles at 60 mph to the gas station on the sidewalk
-side of the parking lot. Dime to quarter-sized hail dented the hood.`;
+const SAMPLE =
+  'The color of my favorite theater was gray, and the whole neighborhood canceled its ' +
+  'plans. It is 6 feet 2 inches wide, weighs 180 pounds, and the oven runs at 350°F. On ' +
+  'mild days in the 70s a parked car still gets dangerous. We paid $500 on 3/14/2024 for ' +
+  'a 3/8 inch bolt and an aluminum bracket, then drove 50 miles at 60 mph to the gas ' +
+  'station on the sidewalk side of the parking lot. Dime to quarter-sized hail dented ' +
+  'the hood, and in my judgment the tire was ruined.';
 
 function options() {
   const confidence = [...document.querySelectorAll('.tiers input:checked')].map((b) => b.value);
@@ -211,7 +212,7 @@ $('download').addEventListener('click', () => {
 
 // ----- boot -----
 for (const [id, pack] of Object.entries(DIALECTS)) {
-  $('dialect').append(new Option(`${id} — ${pack.label}`, id));
+  $('dialect').append(new Option(`${id}: ${pack.label}`, id));
 }
 void CATEGORIES;
 run();

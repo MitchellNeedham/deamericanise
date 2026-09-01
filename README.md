@@ -4,6 +4,10 @@ Rewrites American English into the version the rest of the world reads. Spelling
 units, dates, times and currency. Point it at a source file and it rewrites only the
 comments, leaving code, strings, identifiers and commented-out code alone.
 
+[**Try it in your browser**](https://mitchellneedham.github.io/deamericanise/) — paste text
+or drop a file, and every change is highlighted and explained. It runs the package itself
+client-side, so nothing you type is uploaded.
+
 ## Install
 
 ```sh

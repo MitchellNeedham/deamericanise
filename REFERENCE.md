@@ -447,6 +447,25 @@ Requires Prettier 3.
   for a news story about America. It is `risky`-tagged; `--confidence safe,moderate` drops
   it, and so does `--rule 'dialect.*=false'`.
 
+## The browser demo
+
+`site/` is a static page that runs the package client-side: paste or drop a file, and the
+result comes back with each change coloured by category, underlined by confidence tier,
+and explained on hover, beside a report of the changes and the American-ness score.
+Dropping a source file uses `deamericaniseFile`, so a `.ts` file has only its comments
+rewritten.
+
+The library imports no Node built-ins, so it runs in a browser unchanged. `npm run
+build:site` bundles it to `site/vendor/`, which is generated rather than committed. CI
+runs that build too, so breaking the bundle fails a pull request rather than a deploy.
+
+To serve it locally:
+
+```sh
+npm run build:site
+npx http-server site      # or: python3 -m http.server --directory site
+```
+
 ## Releasing
 
 The git tag is the source of truth for the version. `package.json` carries `0.0.0` as a

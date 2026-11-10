@@ -605,6 +605,18 @@ in `publishConfig` it applies to every publish everywhere, which makes publishin
 laptop fail: provenance needs OIDC claims that only a CI provider can issue. If you ever
 do need to publish by hand, `npm publish --no-provenance` is the escape hatch.
 
+The same tag also builds the browser extension. Once the npm publish succeeds, CI zips
+`extension/dist/chrome` and `extension/dist/firefox` and attaches them to the GitHub
+release for the tag, creating the release if it does not exist yet. The Chrome zip is the
+one for Edge too. Uploading to the Chrome Web Store, Microsoft Edge Add-ons and Firefox
+Add-ons is manual.
+
+Firefox Add-ons asks for the source of any bundled code. Upload the source archive GitHub
+makes for the same tag, and give `npm ci && npm run build:extension` as the build steps.
+
+The Firefox add-on ID, `deamericanise@mitchellneedham.github.io`, is set in
+`tsup.extension.config.ts`. Once the add-on is listed it can never change.
+
 ## Licence
 
 MIT

@@ -538,6 +538,46 @@ npm run build:site
 npx http-server site      # or: python3 -m http.server --directory site
 ```
 
+## Browser extension
+
+`extension/` is a Manifest V3 extension for Chrome, Edge and Firefox. It runs
+`DomRewriter` on every page and frame you visit, starting before the page has any content,
+so text is rewritten before it is painted. Everything runs on your machine. The
+extension asks for one permission, `storage`, to keep its settings.
+
+```sh
+npm run build:extension
+```
+
+That writes `extension/dist/chrome` (also used for Edge) and `extension/dist/firefox`. They
+are the same build with a different `manifest.json`: the Firefox one carries the add-on ID
+and the data collection declaration that Firefox Add-ons requires. Both are generated, not
+committed.
+
+To load a build without a store:
+
+- **Chrome:** open `chrome://extensions`, turn on **Developer mode**, choose **Load
+  unpacked** and pick `extension/dist/chrome`.
+- **Edge:** the same from `edge://extensions`.
+- **Firefox:** open `about:debugging#/runtime/this-firefox`, choose **Load Temporary
+  Add-on** and pick `extension/dist/firefox/manifest.json`. Firefox removes it again when
+  it closes. Firefox 140 or later is required.
+
+Pages that were already open need a reload before the extension can rewrite them.
+
+The toolbar button shows how many changes the current page has, and switches the extension
+off for that site. The settings page has the dialect, the mode, the confidence tiers, the
+`verdict` and the list of sites switched off. Settings sync between browsers signed in to
+the same account, and changes apply to open pages straight away.
+
+Limits:
+
+- Settings are read asynchronously, so on a page that renders very fast the first paint can
+  happen before the settings arrive. The page is rewritten as soon as they do.
+- A site is switched off by its hostname, frame by frame. A frame from another site embedded
+  in a page you switched off is still rewritten.
+- Text inside shadow DOM is left as it is.
+
 ## Releasing
 
 The git tag is the source of truth for the version. `package.json` carries `0.0.0` as a

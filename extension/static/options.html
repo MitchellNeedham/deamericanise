@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>deamericanise settings</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body>
+  <main class="options">
+    <h1><img src="icons/icon-32.png" alt="">deamericanise settings</h1>
+    <p class="muted">
+      Changes apply to open pages straight away. Each change is made on your computer, and
+      nothing you read is sent anywhere.
+    </p>
+
+    <section>
+      <h2><label for="dialect">Write it as</label></h2>
+      <p><select id="dialect"></select></p>
+    </section>
+
+    <section>
+      <h2>Mode</h2>
+      <label class="choice"><input type="radio" name="preset" value="read">
+        <span>Read</span>
+        <small>Spelling, units, dates, times and currency. An article about America keeps its sidewalks and its 911.</small></label>
+      <label class="choice"><input type="radio" name="preset" value="localise">
+        <span>Localise</span>
+        <small>Also swaps vocabulary for local words, such as capsicum for bell pepper. Best for recipes and guides.</small></label>
+    </section>
+
+    <section>
+      <h2>Confidence</h2>
+      <p class="muted">Leave at least one ticked.</p>
+      <label class="choice"><input type="checkbox" name="confidence" value="safe">
+        <span>Safe</span>
+        <small>No plausible false positive, such as colour or aluminium.</small></label>
+      <label class="choice"><input type="checkbox" name="confidence" value="moderate">
+        <span>Moderate</span>
+        <small>A wordlist that could collide with a name. Most vocabulary and all units.</small></label>
+      <label class="choice"><input type="checkbox" name="confidence" value="risky">
+        <span>Risky</span>
+        <small>A guess about what a word means, such as tyre or cheque.</small></label>
+    </section>
+
+    <section>
+      <h2>Deciding whether a page is American</h2>
+      <p class="muted">
+        This decides how an ambiguous date such as 03/04/2024 is read, and whether a bare $
+        means US dollars. Dates that state their own order, such as 3/14/2024, settle it on
+        any page.
+      </p>
+      <label class="choice"><input type="radio" name="verdict" value="detect">
+        <span>From the page's text</span>
+        <small>Looks for American spellings, units and date habits. Each part of a page marked as a different language or region is judged on its own.</small></label>
+      <label class="choice"><input type="radio" name="verdict" value="lang">
+        <span>From the page's language tag</span>
+        <small>en-US is American and other English regions are not. Pages tagged only as English fall back to the text. WordPress tags every site en-US unless the owner changes it, so many Australian and British sites claim to be American.</small></label>
+      <label class="choice"><input type="radio" name="verdict" value="american">
+        <span>Always American</span>
+        <small>Reads every ambiguous date month-first and every bare $ as US dollars.</small></label>
+    </section>
+
+    <section>
+      <h2>Sites left alone</h2>
+      <p class="muted" id="no-sites">None. Switch a site off from the toolbar button.</p>
+      <ul class="sites" id="sites"></ul>
+    </section>
+
+    <p class="saved" id="saved" aria-live="polite"></p>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

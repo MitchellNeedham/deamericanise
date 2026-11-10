@@ -188,6 +188,20 @@ describe('what is left alone', () => {
     );
   });
 
+  it('ignores an opt-out on the whole page', () => {
+    const marked = (html: string, body: string) => {
+      const content = '<p>the color</p><p translate="no">the color</p>';
+      const doc = parse(`<!doctype html><html lang="en-US" ${html}><body ${body}>${content}</body></html>`);
+      deamericaniseDom(doc);
+      return doc.body.innerHTML;
+    };
+    const expected = '<p>the colour</p><p translate="no">the color</p>';
+    expect(marked('translate="no"', '')).toBe(expected);
+    expect(marked('class="notranslate"', '')).toBe(expected);
+    expect(marked('', 'translate="no"')).toBe(expected);
+    expect(marked('', 'class="notranslate"')).toBe(expected);
+  });
+
   it('does not let an opt-in undo notranslate', () => {
     expect(rewrite('<div class="notranslate"><p translate="yes">color</p></div>')).toBe(
       '<div class="notranslate"><p translate="yes">color</p></div>',

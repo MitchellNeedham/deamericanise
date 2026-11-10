@@ -446,7 +446,10 @@ keeps putting back is left to it after three attempts.
   editable after it was rewritten gets its original back.
 - Anything marked `translate="no"` or `class="notranslate"`, the markers sites already use
   to opt out of machine translation. `translate="yes"` inside `translate="no"` turns
-  rewriting back on. Nothing turns it back on under `notranslate`.
+  rewriting back on. Nothing turns it back on under `notranslate`. Both markers are ignored
+  on `<html>` and `<body>`. Apps such as Outlook mark the whole page to stop Google
+  Translate replacing their text nodes, which breaks React, and rewriting changes text in
+  place without replacing nodes.
 - Any element whose `lang` is not English. An element with no `lang` takes its parent's.
 
 **Deciding whether a page is American.** `verdict` picks how:

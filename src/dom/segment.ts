@@ -16,6 +16,12 @@ const SKIPPED = new Set([
 /** A change that crosses the edge of one of these would move words into or out of it. */
 const ANCHORS = new Set(['a', 'button', 'label']);
 
+/**
+ * Elements where `translate="no"` and `notranslate` are ignored. Apps mark the whole page to
+ * stop Google Translate replacing their text nodes, and rewriting in place never does that.
+ */
+const PAGE_ELEMENTS = new Set(['html', 'body']);
+
 /** Elements whose `title` is not prose: a stylesheet set name, for one. */
 const NO_TITLE = new Set(['base', 'link', 'meta', 'script', 'style', 'template']);
 
@@ -86,9 +92,10 @@ export function rootScope(document: Document | null): Scope {
 
 export function enter(parent: Scope, element: Element): Scope {
   const lang = element.getAttribute('lang') ?? element.getAttribute('xml:lang');
+  const wholePage = element.namespaceURI === HTML_NS && PAGE_ELEMENTS.has(element.localName);
 
   let translate = parent.translate;
-  const translateValue = element.getAttribute('translate')?.toLowerCase();
+  const translateValue = wholePage ? undefined : element.getAttribute('translate')?.toLowerCase();
   if (translateValue === '' || translateValue === 'yes') translate = true;
   if (translateValue === 'no') translate = false;
 
@@ -102,7 +109,7 @@ export function enter(parent: Scope, element: Element): Scope {
   return {
     lang: lang === null ? parent.lang : lang.trim().toLowerCase(),
     translate,
-    notranslate: parent.notranslate || element.classList.contains('notranslate'),
+    notranslate: parent.notranslate || (!wholePage && element.classList.contains('notranslate')),
     editable,
     foreign: parent.foreign || element.namespaceURI !== HTML_NS,
     skippedTag: parent.skippedTag || SKIPPED.has(element.localName),

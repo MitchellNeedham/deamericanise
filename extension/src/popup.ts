@@ -51,6 +51,10 @@ async function main(): Promise<void> {
   }
   show(current);
 
+  const highlight = $<HTMLInputElement>('highlight');
+  highlight.checked = (await loadSettings()).highlight;
+  highlight.addEventListener('change', () => void saveSettings({ highlight: highlight.checked }));
+
   $<HTMLInputElement>('enabled').addEventListener('change', async (event) => {
     const enabled = (event.target as HTMLInputElement).checked;
     const settings = await loadSettings();

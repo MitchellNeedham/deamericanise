@@ -27,6 +27,7 @@ const manifest = {
     {
       matches: ['<all_urls>'],
       js: ['content.js'],
+      css: ['highlight.css'],
       run_at: 'document_start',
       all_frames: true,
     },

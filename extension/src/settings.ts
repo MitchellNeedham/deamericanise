@@ -9,6 +9,7 @@ export interface Settings {
   preset: Preset;
   confidence: Confidence[];
   verdict: Verdict;
+  highlight: boolean;
   /** Hostnames the extension leaves alone. */
   disabledSites: string[];
 }
@@ -20,6 +21,7 @@ export const DEFAULTS: Settings = {
   preset: 'read',
   confidence: [...CONFIDENCES],
   verdict: 'detect',
+  highlight: false,
   disabledSites: [],
 };
 
@@ -37,6 +39,7 @@ function clean(stored: Record<string, unknown>): Settings {
     preset: pick(stored.preset, PRESETS, DEFAULTS.preset),
     confidence: confidence.length > 0 ? confidence : DEFAULTS.confidence,
     verdict: pick(stored.verdict, VERDICTS, DEFAULTS.verdict),
+    highlight: typeof stored.highlight === 'boolean' ? stored.highlight : DEFAULTS.highlight,
     disabledSites: list(stored.disabledSites).filter((s): s is string => typeof s === 'string'),
   };
 }

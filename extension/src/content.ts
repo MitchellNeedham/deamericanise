@@ -1,20 +1,38 @@
 import { DomRewriter } from '../../src/dom/index.js';
 import { api } from './browser.js';
+import { Highlighter } from './highlight.js';
 import { domOptions, isEnabledOn, loadSettings, type Settings, type Status } from './settings.js';
 
 let rewriter: DomRewriter | null = null;
+let highlighter: Highlighter | null = null;
+let applied = '';
 const host = location.hostname;
 
 function apply(settings: Settings): void {
-  const options = domOptions(settings);
   if (!isEnabledOn(settings, host)) {
+    highlighter?.stop();
+    highlighter = null;
     rewriter?.stop({ restore: true });
     rewriter = null;
-  } else if (rewriter) {
-    rewriter.setOptions(options);
-  } else {
+    return;
+  }
+
+  const options = domOptions(settings);
+  // Re-reading every run is the slow part, so a change to another setting skips it.
+  const key = JSON.stringify(options);
+  if (!rewriter) {
     rewriter = new DomRewriter(document, options);
     rewriter.watch();
+  } else if (key !== applied) {
+    rewriter.setOptions(options);
+  }
+  applied = key;
+
+  if (settings.highlight) {
+    highlighter ??= new Highlighter(rewriter);
+  } else {
+    highlighter?.stop();
+    highlighter = null;
   }
 }
 

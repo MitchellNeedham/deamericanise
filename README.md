@@ -83,7 +83,8 @@ import { deamericaniseDom } from 'deamericanise/dom';      // deamericaniseDom(d
 ## Browser extension
 
 `extension/` is an extension for Chrome, Edge and Firefox that rewrites the pages you visit
-as they load, before the text is painted. Everything runs on your machine.
+as they load, before the text is painted. Everything runs on your machine. Switch on
+highlighting from the toolbar button to see each change and the rule that made it.
 
 ```sh
 npm run build:extension   # writes extension/dist/chrome and extension/dist/firefox

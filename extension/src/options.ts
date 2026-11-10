@@ -5,6 +5,7 @@ import { api } from './browser.js';
 import { loadSettings, saveSettings, type Settings } from './settings.js';
 
 const dialect = document.getElementById('dialect') as HTMLSelectElement;
+const highlight = document.getElementById('highlight') as HTMLInputElement;
 const sites = document.getElementById('sites') as HTMLUListElement;
 const saved = document.getElementById('saved') as HTMLParagraphElement;
 
@@ -25,6 +26,7 @@ function render(settings: Settings): void {
   dialect.value = settings.dialect;
   for (const input of inputs('preset')) input.checked = input.value === settings.preset;
   for (const input of inputs('verdict')) input.checked = input.value === settings.verdict;
+  highlight.checked = settings.highlight;
   for (const input of inputs('confidence')) {
     input.checked = settings.confidence.includes(input.value as Confidence);
   }
@@ -63,6 +65,7 @@ async function main(): Promise<void> {
   for (const input of inputs('verdict')) {
     input.addEventListener('change', () => void save({ verdict: input.value as Verdict }));
   }
+  highlight.addEventListener('change', () => void save({ highlight: highlight.checked }));
   for (const input of inputs('confidence')) {
     input.addEventListener('change', () => {
       const ticked = inputs('confidence').filter((i) => i.checked).map((i) => i.value as Confidence);

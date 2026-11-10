@@ -76,6 +76,7 @@ deamericaniseText(text, {
 ```js
 import remarkDeamericanise from 'deamericanise/remark';   // unified().use(remarkDeamericanise)
 import deamericanise from 'deamericanise/eslint';         // rule: deamericanise/comments
+import { deamericaniseDom } from 'deamericanise/dom';      // deamericaniseDom(document)
 // prettier.config.js: plugins: ['deamericanise/prettier']
 ```
 

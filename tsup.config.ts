@@ -14,6 +14,7 @@ export default defineConfig({
     'src/plugins/remark.ts',
     'src/plugins/eslint.ts',
     'src/plugins/prettier.ts',
+    'src/dom/index.ts',
   ],
   format: ['esm', 'cjs'],
   dts: true,

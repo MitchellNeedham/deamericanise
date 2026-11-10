@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en-US"><head>
+  <meta charset="utf-8">
+  <title>Theming | Widget Toolkit Docs</title>
+  <style>.swatch { color: gray; } /* the gray swatch */</style>
+</head>
+<body>
+  <aside class="sidebar">
+    <input type="search" placeholder="Search the docs, e.g. colour">
+  </aside>
+  <main>
+    <h1>Theming</h1>
+    <p>
+      Every widget reads its colours from the theme. Call <code>initializeTheme()</code>
+      once, before any widget renders, to customise the default behaviour.
+    </p>
+    <pre><code>// Initialize the theme with a custom color
+initializeTheme({ color: "gray", center: true });</code></pre>
+    <p>
+      Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to open the colour picker. The sample output looks
+      like <samp>color: gray</samp>.
+    </p>
+    <h2>Options</h2>
+    <table>
+      <tbody><tr><th>Option</th><th>Default</th><th>What it does</th></tr>
+      <tr><td><code>color</code></td><td><code>"gray"</code></td><td>The colour used for borders and dividers.</td></tr>
+      <tr><td><code>center</code></td><td><code>false</code></td><td>Centres the label in the widget.</td></tr>
+    </tbody></table>
+    <h2>Try it</h2>
+    <div class="editor" contenteditable="true">Type a color name here, like gray.</div>
+    <p>
+      The <span class="notranslate">ColorPro Studio</span> plugin adds a palette of
+      favourite colours.
+    </p>
+    <svg width="120" height="40" role="img" aria-label="swatch">
+      <rect width="120" height="40" fill="gray"></rect>
+      <text x="10" y="25">gray</text>
+    </svg>
+    <p>Last updated on 2024-12-20. Licensed under the MIT License.</p>
+  </main>
+
+
+</body></html>

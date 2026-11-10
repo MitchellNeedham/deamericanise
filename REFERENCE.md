@@ -404,6 +404,73 @@ Prettier validates option types and has no object type, so the two settings peop
 actually change are flat and anything else goes through `deamericaniseOptions` as JSON.
 Requires Prettier 3.
 
+### Web pages
+
+```ts
+import { deamericaniseDom, DomRewriter } from 'deamericanise/dom';
+
+// Once, in place.
+deamericaniseDom(document, { dialect: 'en-GB' });
+
+// Or follow the page while it loads and changes.
+const rewriter = new DomRewriter(document);
+rewriter.watch();
+rewriter.setOptions({ preset: 'localise' }); // re-reads every run from its original text
+rewriter.changes();                          // the changes in place now
+rewriter.stop({ restore: true });            // puts the page back
+```
+
+Both take the usual options, plus `verdict` (below) and `attributes`, which is `true` by
+default and rewrites `title`, `alt` and `placeholder` as well as text.
+
+**Runs of text.** A run is the text of one block, joined across inline elements such as
+`b`, `em`, `span` and `a`. So `6 feet <b>2</b> inches` converts as one measurement. Any
+other element ends the run, so a change never reaches across a paragraph, a table cell or a
+line break. A change that crosses elements puts its replacement in the first text node and
+empties its share of the others: `6 feet <b>2</b> inches` becomes `1.88 metres<b></b>`. A
+change that would move text into or out of a link, button or label is skipped, and so is
+an article fix that depended on it.
+
+**Originals.** Every node keeps its original text. A run that grows is re-read from the
+originals, never from its own output, and `stop({ restore: true })` puts them all back.
+Text a script writes over a rewritten node becomes the new original. A node that a script
+keeps putting back is left to it after three attempts.
+
+**Left alone:**
+
+- `code`, `pre`, `kbd`, `samp`, `script`, `style`, `noscript`, `template`, `textarea`,
+  `input`, `select`, `iframe`, `object`, `canvas`, `audio`, `video`, SVG and MathML.
+  Attributes on these elements are still rewritten.
+- Anything editable: `contenteditable`, and a document in design mode. Text that becomes
+  editable after it was rewritten gets its original back.
+- Anything marked `translate="no"` or `class="notranslate"`, the markers sites already use
+  to opt out of machine translation. `translate="yes"` inside `translate="no"` turns
+  rewriting back on. Nothing turns it back on under `notranslate`.
+- Any element whose `lang` is not English. An element with no `lang` takes its parent's.
+
+**Deciding whether a page is American.** `verdict` picks how:
+
+| `verdict` | |
+| --- | --- |
+| `'detect'` (default) | From the page's own text, built up as it loads |
+| `'lang'` | `en-US` is American and any other English region is not. A bare `en`, or no `lang`, falls back to `detect` |
+| `'american'` | Always |
+
+`detect` is the default because WordPress writes `lang="en-US"` unless the site owner
+changes the site language, so many Australian and British WordPress sites claim to be
+American. An explicit `assumeAmerican` wins over `verdict`.
+
+Each region with its own `lang` is judged on its own text. A British page that quotes an
+American source in a `lang="en-US"` block reads its own `04/05/2025` as 4 May. When more of
+the page arrives and changes the verdict, the runs already rewritten are read again.
+
+**While the page loads.** Call `watch()` at document start and each run is rewritten as
+the parser adds it, before it is painted. The run the parser is still adding to waits until
+the parser moves past it, or until `DOMContentLoaded`. So a measurement split across two
+network packets is still read whole.
+
+Shadow DOM is not entered. Text inside a web component's shadow root stays as it is.
+
 ## Options
 
 | Option | Default | |

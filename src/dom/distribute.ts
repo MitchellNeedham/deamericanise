@@ -4,9 +4,19 @@ export interface Distribution {
   /** The new text of each node, in the same order as the sources. */
   outputs: string[];
   applied: Change[];
+  /** Where each applied change's replacement sits in the outputs. An empty one has no place. */
+  placed: Placement[];
 }
 
-type Edit = [start: number, end: number, replacement: string];
+export interface Placement {
+  change: Change;
+  /** Index into the sources. */
+  node: number;
+  start: number;
+  end: number;
+}
+
+type Edit = [start: number, end: number, replacement: string, change: Change | null];
 
 /**
  * Spreads changes found in a run of text back over the nodes the run was joined from.
@@ -52,12 +62,14 @@ export function distribute(
     touched.forEach((i, position) => {
       const from = Math.max(change.start, starts[i]!) - starts[i]!;
       const to = Math.min(change.end, endOf(i)) - starts[i]!;
-      edits[i]!.push([from, to, position === 0 ? change.after : '']);
+      edits[i]!.push(position === 0 ? [from, to, change.after, change] : [from, to, '', null]);
     });
     applied.push(change);
   }
 
-  return { outputs: sources.map((source, i) => applyEdits(source, edits[i]!)), applied };
+  const placed: Placement[] = [];
+  const outputs = sources.map((source, i) => applyEdits(source, edits[i]!, i, placed));
+  return { outputs, applied, placed };
 }
 
 function nodesUnder(
@@ -87,11 +99,15 @@ function leansOnSkipped(article: Change, skipped: Change[], text: string): boole
   );
 }
 
-function applyEdits(source: string, edits: Edit[]): string {
+function applyEdits(source: string, edits: Edit[], node: number, placed: Placement[]): string {
   let out = '';
   let cursor = 0;
-  for (const [start, end, replacement] of edits) {
-    out += source.slice(cursor, start) + replacement;
+  for (const [start, end, replacement, change] of edits) {
+    out += source.slice(cursor, start);
+    if (change && replacement !== '') {
+      placed.push({ change, node, start: out.length, end: out.length + replacement.length });
+    }
+    out += replacement;
     cursor = end;
   }
   return out + source.slice(cursor);

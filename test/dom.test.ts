@@ -32,6 +32,31 @@ function serialise(doc: Document): string {
   return `<!doctype html>\n${doc.documentElement.outerHTML}\n`;
 }
 
+/** The text each highlight covers, next to the replacement it should be covering. */
+function covered(rewriter: DomRewriter): Array<[string, string]> {
+  return rewriter
+    .highlights()
+    .map(({ change, range }): [string, string] => [
+      (range.startContainer as Text).data.slice(range.startOffset, range.endOffset),
+      change.after,
+    ])
+    .sort();
+}
+
+/** Each highlight by text node position, so two copies of a page can be compared. */
+function located(doc: Document, rewriter: DomRewriter): string[] {
+  const index = new Map<Node, number>();
+  const walker = doc.createTreeWalker(doc, 4);
+  for (let node = walker.nextNode(), i = 0; node; node = walker.nextNode(), i++) index.set(node, i);
+  return rewriter
+    .highlights()
+    .map(({ change, range }) => {
+      const at = `${index.get(range.startContainer)}:${range.startOffset}-${range.endOffset}`;
+      return `${at} ${change.ruleId} ${change.after}`;
+    })
+    .sort();
+}
+
 describe('runs of text', () => {
   it('joins text across inline formatting', () => {
     expect(rewrite('<p>It is 6 feet <b>2</b> inches wide.</p>')).toBe(
@@ -105,6 +130,19 @@ describe('spreading changes over nodes', () => {
       change(0, 2, 'X'),
     ]);
     expect(result.outputs).toEqual(['X', '', 'cd']);
+  });
+
+  it('says where each replacement landed', () => {
+    const result = distribute('abcdef', ['ab', 'cd', 'ef'], [null, null, null], [false, false, false], [
+      change(0, 1, 'XY'),
+      change(1, 5, 'Q'),
+      change(5, 6, ''),
+    ]);
+    expect(result.outputs).toEqual(['XYQ', '', '']);
+    expect(result.placed.map(({ node, start, end }) => [node, start, end])).toEqual([
+      [0, 0, 2],
+      [0, 2, 3],
+    ]);
   });
 
   it('leaves a locked node alone', () => {
@@ -349,6 +387,91 @@ describe('following a page', () => {
   });
 });
 
+describe('highlighting', () => {
+  function watched(body: string): [Document, DomRewriter] {
+    const doc = page(body);
+    const rewriter = new DomRewriter(doc);
+    rewriter.watch();
+    return [doc, rewriter];
+  }
+
+  it('covers each replacement where it now reads', () => {
+    const [, rewriter] = watched('<p>the color of <b>the theater</b></p>');
+    expect(covered(rewriter)).toEqual([
+      ['colour', 'colour'],
+      ['theatre', 'theatre'],
+    ]);
+  });
+
+  it('covers a change across nodes in the node that holds it', () => {
+    const [doc, rewriter] = watched('<p>Bake at 300 <abbr>°F</abbr> for an hour</p>');
+    const [highlight] = rewriter.highlights();
+    expect(highlight!.range.startContainer).toBe(doc.querySelector('p')!.firstChild);
+    expect(covered(rewriter)).toEqual([['150°C', '150°C']]);
+  });
+
+  it('leaves out attributes', () => {
+    const [, rewriter] = watched('<img alt="gray">');
+    expect(rewriter.changes()).toHaveLength(1);
+    expect(rewriter.highlights()).toEqual([]);
+  });
+
+  it('follows text the page changes', () => {
+    const [doc, rewriter] = watched('<p>the color</p>');
+    const text = doc.querySelector('p')!.firstChild as Text;
+    text.data = 'the gray sky';
+    rewriter.flush();
+    expect(covered(rewriter)).toEqual([['grey', 'grey']]);
+    text.data = 'plain words';
+    rewriter.flush();
+    expect(covered(rewriter)).toEqual([]);
+  });
+
+  it('keeps a run the page moves, even when read while it is out', () => {
+    const [doc, rewriter] = watched('<p>the color</p><div>other words</div>');
+    const p = doc.querySelector('p')!;
+    p.remove();
+    rewriter.flush();
+    expect(covered(rewriter)).toEqual([]);
+    doc.body.append(p);
+    rewriter.flush();
+    expect(covered(rewriter)).toEqual([['colour', 'colour']]);
+  });
+
+  it('forgets the old run when text arrives in front of it', () => {
+    const [doc, rewriter] = watched('<p>the color</p>');
+    const p = doc.querySelector('p')!;
+    p.prepend('Look at ');
+    rewriter.flush();
+    expect(p.innerHTML).toBe('Look at the colour');
+    expect(covered(rewriter)).toEqual([['colour', 'colour']]);
+  });
+
+  it('drops everything when the page is put back', () => {
+    const [, rewriter] = watched('<p>the color</p>');
+    rewriter.stop({ restore: true });
+    expect(rewriter.highlights()).toEqual([]);
+  });
+
+  it('tells a listener after each batch of rewrites', () => {
+    const [doc, rewriter] = watched('<p>the color</p>');
+    let calls = 0;
+    const remove = rewriter.onRewrite(() => calls++);
+    doc.body.append('the gray');
+    rewriter.flush();
+    expect(calls).toBe(1);
+    const quiet = doc.createElement('p');
+    quiet.textContent = 'nothing to change';
+    doc.body.append(quiet);
+    rewriter.flush();
+    expect(calls).toBe(1);
+    remove();
+    doc.body.append('the gray');
+    rewriter.flush();
+    expect(calls).toBe(1);
+  });
+});
+
 describe('a page that is still loading', () => {
   function loading(): [Document, DomRewriter, () => void] {
     const doc = page('');
@@ -401,7 +524,7 @@ describe('a page that is still loading', () => {
  * Builds `source` into an empty document the way a parser would: every node is added at
  * the end, text arrives in pieces, and the observer gets to run at random points.
  */
-function stream(source: Document, options: DomOptions, seed: number): Document {
+function stream(source: Document, options: DomOptions, seed: number): [Document, DomRewriter] {
   let state = seed;
   const random = () => {
     state = (state * 1664525 + 1013904223) >>> 0;
@@ -446,7 +569,7 @@ function stream(source: Document, options: DomOptions, seed: number): Document {
   rewriter.flush();
   readyState = 'interactive';
   doc.dispatchEvent(new Event('DOMContentLoaded'));
-  return doc;
+  return [doc, rewriter];
 }
 
 describe('html documents', () => {
@@ -470,10 +593,24 @@ describe('html documents', () => {
 
     it.each(verdicts)('ends the same however the page streams in, with verdict %s', (verdict) => {
       const whole = parse(html);
-      deamericaniseDom(whole, { verdict });
+      const once = new DomRewriter(whole, { verdict });
+      once.run();
       for (const seed of [1, 2, 3, 4, 5]) {
-        expect(serialise(stream(parse(html), { verdict }, seed))).toBe(serialise(whole));
+        const [streamed, rewriter] = stream(parse(html), { verdict }, seed);
+        expect(serialise(streamed)).toBe(serialise(whole));
+        expect(located(streamed, rewriter)).toEqual(located(whole, once));
       }
+    });
+
+    it('highlights every change to the text, where it reads', () => {
+      const doc = parse(html);
+      const rewriter = new DomRewriter(doc, { verdict: 'american', attributes: false });
+      rewriter.run();
+      const highlights = rewriter.highlights();
+      expect(highlights.length).toBeGreaterThan(0);
+      for (const [text, after] of covered(rewriter)) expect(text).toBe(after);
+      const visible = rewriter.changes().filter((change) => change.after !== '');
+      expect(new Set(highlights.map((h) => h.change))).toEqual(new Set(visible));
     });
 
     it('puts the page back exactly', () => {

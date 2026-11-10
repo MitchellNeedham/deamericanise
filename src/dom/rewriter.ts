@@ -2,7 +2,7 @@ import { resolveOptions } from '../config.js';
 import { detectAmerican, mergeSignals } from '../engine/detect.js';
 import { findChanges } from '../transform.js';
 import type { AmericanSignals, Change, Options, ResolvedOptions } from '../types.js';
-import { distribute } from './distribute.js';
+import { distribute, type Placement } from './distribute.js';
 import {
   attributesAllowed,
   containerOf,
@@ -45,6 +45,13 @@ export interface DomResult {
   signals: AmericanSignals;
 }
 
+/** A change in the page's text, where it sits now. */
+export interface HighlightedChange {
+  change: Change;
+  /** Covers the change's replacement in the text node that holds it. */
+  range: StaticRange;
+}
+
 interface Written {
   original: string;
   written: string;
@@ -57,6 +64,7 @@ interface Cached {
   /** What was written, so a script putting anything else back is noticed. */
   outputs: string[];
   changes: Change[];
+  placed: Placement[];
 }
 
 /** How many times a script may put back the original before the node is left to it. */
@@ -102,6 +110,11 @@ export class DomRewriter {
   private reverts = new WeakMap<Text, number>();
   private abandoned = new WeakSet<Text>();
   private attributeReverts = new WeakMap<Element, Map<string, number>>();
+
+  /** Runs with a change to highlight. Pruned when read, so it never walks the page. */
+  private placedRuns = new Set<Cached>();
+  private readonly listeners = new Set<() => void>();
+  private rewrote = false;
 
   private observer: MutationObserver | null = null;
   private loading = false;
@@ -170,7 +183,9 @@ export class DomRewriter {
       this.attributeValues = new WeakMap();
       this.runCache = new WeakMap();
       this.attributeCache = new WeakMap();
+      this.placedRuns = new Set();
     }
+    this.notify();
   }
 
   /** The changes in place right now. */
@@ -191,6 +206,43 @@ export class DomRewriter {
       }
     }
     return out;
+  }
+
+  /**
+   * Where each change in the text sits now, in no particular order. Changes to attributes
+   * have no place in the text and are left out, as are changes that only remove text.
+   */
+  highlights(): HighlightedChange[] {
+    // The caller's own global first, for the same reason as in `watch`.
+    const Static = globalThis.StaticRange ?? this.document.defaultView!.StaticRange;
+    const out: HighlightedChange[] = [];
+    for (const cached of this.placedRuns) {
+      const first = cached.nodes[0]!;
+      if (this.runCache.get(first) !== cached || !this.holds(first) || !this.intact(cached)) {
+        this.placedRuns.delete(cached);
+        continue;
+      }
+      for (const { change, node, start, end } of cached.placed) {
+        const text = cached.nodes[node]!;
+        const range = new Static({
+          startContainer: text,
+          startOffset: start,
+          endContainer: text,
+          endOffset: end,
+        });
+        out.push({ change, range });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Calls `listener` after each batch of rewrites, from inside the observer callback, so
+   * anything slow belongs in a later frame. Returns a function that removes it.
+   */
+  onRewrite(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   /** What the page has shown so far about whether it is American, across every region. */
@@ -396,6 +448,13 @@ export class DomRewriter {
       if (segment.kind === 'text') this.rewriteRun(segment.nodes, segment.anchors, segment.lang, text);
       else this.rewriteAttribute(segment.element, segment.name, segment.lang, text);
     });
+    this.notify();
+  }
+
+  private notify(): void {
+    if (!this.rewrote) return;
+    this.rewrote = false;
+    for (const listener of this.listeners) listener();
   }
 
   private read(segment: Segment): string {
@@ -427,14 +486,31 @@ export class DomRewriter {
       cached.text === text &&
       sameNodes(cached.nodes, nodes) &&
       this.intact(cached);
-    if (fresh) return;
+    if (fresh) {
+      // A run moved out of the page and back is dropped from the registry while it is out.
+      if (cached.placed.length > 0) this.placedRuns.add(cached);
+      return;
+    }
 
     const sources = nodes.map((node) => this.sourceOfText(node));
     const locked = nodes.map((node) => this.abandoned.has(node));
     const changes = this.find(text, lang, assume);
-    const { outputs, applied } = distribute(text, sources, anchors, locked, changes);
+    const { outputs, applied, placed } = distribute(text, sources, anchors, locked, changes);
     nodes.forEach((node, i) => this.writeText(node, sources[i]!, outputs[i]!));
-    this.runCache.set(nodes[0]!, { key, text, nodes, outputs, changes: applied });
+
+    // A node that used to start a run and is now inside this one leaves its old entry behind.
+    for (const node of nodes) this.forgetRun(node);
+    const entry: Cached = { key, text, nodes, outputs, changes: applied, placed };
+    this.runCache.set(nodes[0]!, entry);
+    if (placed.length > 0) this.placedRuns.add(entry);
+    if (placed.length > 0 || (cached?.placed.length ?? 0) > 0) this.rewrote = true;
+  }
+
+  private forgetRun(node: Text): void {
+    const cached = this.runCache.get(node);
+    if (!cached) return;
+    this.placedRuns.delete(cached);
+    this.runCache.delete(node);
   }
 
   private rewriteAttribute(element: Element, name: string, lang: string, text: string): void {
@@ -449,7 +525,7 @@ export class DomRewriter {
     const { outputs, applied } = distribute(text, [text], [null], [locked], changes);
     this.writeAttribute(element, name, text, outputs[0]!);
     if (!cache) this.attributeCache.set(element, (cache = new Map()));
-    cache.set(name, { key, text, nodes: [], outputs, changes: applied });
+    cache.set(name, { key, text, nodes: [], outputs, changes: applied, placed: [] });
   }
 
   // ------------------------------- Originals -------------------------------
@@ -470,13 +546,12 @@ export class DomRewriter {
   }
 
   private writeText(node: Text, source: string, output: string): void {
-    if (output === source) {
-      if (node.data !== source) node.data = source;
-      this.texts.delete(node);
-      return;
+    if (node.data !== output) {
+      node.data = output;
+      this.rewrote = true;
     }
-    if (node.data !== output) node.data = output;
-    this.texts.set(node, { original: source, written: output });
+    if (output === source) this.texts.delete(node);
+    else this.texts.set(node, { original: source, written: output });
   }
 
   private restoreText(node: Text): void {
@@ -484,7 +559,8 @@ export class DomRewriter {
     if (!written) return;
     if (node.data === written.written) node.data = written.original;
     this.texts.delete(node);
-    this.runCache.delete(node);
+    this.forgetRun(node);
+    this.rewrote = true;
   }
 
   private sourceOfAttribute(element: Element, name: string): string {
@@ -504,12 +580,14 @@ export class DomRewriter {
 
   private writeAttribute(element: Element, name: string, source: string, output: string): void {
     let values = this.attributeValues.get(element);
+    if (element.getAttribute(name) !== output) {
+      element.setAttribute(name, output);
+      this.rewrote = true;
+    }
     if (output === source) {
-      if (element.getAttribute(name) !== source) element.setAttribute(name, source);
       values?.delete(name);
       return;
     }
-    if (element.getAttribute(name) !== output) element.setAttribute(name, output);
     if (!values) this.attributeValues.set(element, (values = new Map()));
     values.set(name, { original: source, written: output });
   }
@@ -522,6 +600,7 @@ export class DomRewriter {
     }
     this.attributeValues.delete(element);
     this.attributeCache.delete(element);
+    this.rewrote = true;
   }
 }
 

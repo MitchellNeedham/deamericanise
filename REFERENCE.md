@@ -417,6 +417,7 @@ const rewriter = new DomRewriter(document);
 rewriter.watch();
 rewriter.setOptions({ preset: 'localise' }); // re-reads every run from its original text
 rewriter.changes();                          // the changes in place now
+rewriter.highlights();                       // where each change in the text sits now
 rewriter.stop({ restore: true });            // puts the page back
 ```
 
@@ -468,6 +469,25 @@ the page arrives and changes the verdict, the runs already rewritten are read ag
 the parser adds it, before it is painted. The run the parser is still adding to waits until
 the parser moves past it, or until `DOMContentLoaded`. So a measurement split across two
 network packets is still read whole.
+
+**Highlighting.** `highlights()` returns each change in the text with a `StaticRange` over
+its replacement, ready for the CSS Custom Highlight API. It leaves out changes to attributes
+and changes that only remove text, and the list is in no particular order.
+`onRewrite(listener)` calls the listener after each batch of rewrites and returns a function
+that removes it. The listener runs inside the observer callback, so paint in the next frame:
+
+```ts
+rewriter.onRewrite(() =>
+  requestAnimationFrame(() => {
+    const ranges = rewriter.highlights().map(({ range }) => range);
+    CSS.highlights.set('deamericanised', new Highlight(...ranges));
+  }),
+);
+```
+
+```css
+::highlight(deamericanised) { background-color: rgb(47 128 237 / 22%); }
+```
 
 Shadow DOM is not entered. Text inside a web component's shadow root stays as it is.
 

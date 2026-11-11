@@ -17,8 +17,8 @@ export function lexiconFor(dialect: Dialect): CompiledLexicon {
   if (cached) return cached;
 
   const pack = dialectPack(dialect);
-  const entries: LexEntry[] = [...spellingEntries(), ...baseVocabulary(), ...pack.vocabulary];
-  const compiled = compileLexicon(entries);
+  const shared: LexEntry[] = [...spellingEntries(), ...baseVocabulary()];
+  const compiled = compileLexicon(shared, pack.vocabulary);
   lexiconCache.set(dialect, compiled);
   return compiled;
 }

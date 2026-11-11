@@ -325,3 +325,64 @@ describe('overlay words in phrases that already read right', () => {
     expect(say(dialect as Dialect)(input)).toBe(expected);
   });
 });
+
+// Every dialect with a `pants` row.
+const TROUSER_DIALECTS: Dialect[] = ['en-GB', 'en-IE', 'en-ZA'];
+
+describe('pants the verb stays pants', () => {
+  it.each([
+    'The dog pants heavily after a run.',
+    'The dog pants after a run.',
+    'The dog pants.',
+    'He pants for breath.',
+    'She pants and gasps.',
+    'A dog pants to cool down.',
+    'My dog pants a lot at night.',
+    'I think my dog pants too much.',
+    "My neighbour's dog pants constantly.",
+    'a dog that pants all night',
+    'The exhausted collie often pants in the heat.',
+    'When the boxer pants loudly, let it rest.',
+    'As the deer pants for the water brooks, so my soul pants for you.',
+  ])('leaves "%s" alone', (input) => {
+    for (const dialect of TROUSER_DIALECTS) expect(say(dialect)(input), dialect).toBe(input);
+  });
+});
+
+describe('pants in phrases British English says too', () => {
+  it.each`
+    input                           | expected
+    ${'He had ants in his pants.'}  | ${'He had ants in his pants.'}
+    ${'ants-in-her-pants energy'}   | ${'ants-in-her-pants energy'}
+    ${'She wore yoga pants.'}       | ${'She wore yoga pants.'}
+    ${'a pair of hot pants'}        | ${'a pair of hot pants'}
+    ${'potty training pants'}       | ${'potty training pants'}
+    ${'diaper pants'}               | ${'nappy pants'}
+    ${'big-girl pants'}             | ${'big-girl pants'}
+    ${'period pants'}               | ${'period pants'}
+    ${'incontinence pants'}         | ${'incontinence pants'}
+    ${'Liar, liar, pants on fire!'} | ${'Liar, liar, pants on fire!'}
+  `('$input -> $expected', ({ input, expected }) => {
+    for (const dialect of TROUSER_DIALECTS) expect(say(dialect)(input), dialect).toBe(expected);
+  });
+});
+
+describe('pants the garment still become trousers', () => {
+  it.each`
+    input                                           | expected
+    ${'a pair of pants'}                            | ${'a pair of trousers'}
+    ${'his pants were wet'}                         | ${'his trousers were wet'}
+    ${'I bought the blue pants.'}                   | ${'I bought the blue trousers.'}
+    ${'The man wore pants.'}                        | ${'The man wore trousers.'}
+    ${'He ironed his best pants carefully.'}        | ${'He ironed his best trousers carefully.'}
+    ${'The best pants for hiking are light.'}       | ${'The best trousers for hiking are light.'}
+    ${'The black pants in the photo are sold out.'} | ${'The black trousers in the photo are sold out.'}
+    ${'My new pants really fit.'}                   | ${'My new trousers really fit.'}
+    ${'A man in pants.'}                            | ${'A man in trousers.'}
+    ${'These are my every day pants.'}              | ${'These are my every day trousers.'}
+    ${'The Best Pants for Travel'}                  | ${'The Best Trousers for Travel'}
+    ${'She wears the pants in the family.'}         | ${'She wears the trousers in the family.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    for (const dialect of TROUSER_DIALECTS) expect(say(dialect)(input), dialect).toBe(expected);
+  });
+});

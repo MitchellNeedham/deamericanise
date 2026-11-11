@@ -193,7 +193,11 @@ alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 
 Numbers written out in words are read too, fractions and all: `two and a half feet` becomes
 `76 centimetres` and `a quarter mile away` becomes `400 metres away`. So do `half a mile`,
-`a quarter of a mile` and `a mile and a half`, which put the unit inside the number.
+`a quarter of a mile`, `a mile and a half` and `two pounds and a half`, which put the unit
+inside the number. `third`, `fourth`, `eighth` and `sixteenth` are ordinals as well, so they
+read as a fraction only with a count before them or `of a` after them: `one-third mile`,
+`a third mile` and `the last third of a mile` convert, while `the third mile` and
+`every third mile` are left alone. `half` and `quarter` need neither.
 
 A number never continues onto the next line, so the `14` that ends `Step 14` is never taken
 as the whole part of a `1/2 gallon` that opens the next line. The rest of a measurement can
@@ -645,6 +649,8 @@ there each root needs the rules in its own styles.
   the start of the next, or `two and a` then `half feet`, is not read as one. The fraction
   converts on its own and the written-out number is left as written. A web page is read the
   way it is usually laid out, with a line break in its source counting as a space.
+- `a third mile` is read as a fraction, though it can also mean one more mile after two.
+  The same goes for `a fourth`, `an eighth` and `a sixteenth`.
 - A line that ends in a number and a line that opens with a unit word are read as one
   measurement, so `Track 7` above `Miles Davis` becomes `Track 11 kilometres Davis`. A
   blank line or a list marker between them keeps them apart.

@@ -717,9 +717,9 @@ and the lists of rules and sites switched off. A category switched by hand beats
 and stays that way when the mode changes, until you choose **Follow the mode**.
 
 **Fine-tune** on a category opens its options and a switch for each of its rules, labelled
-from `ruleCatalogue()`. Units have `keepOriginal`, `precision` and `fuelEconomy`, dates have
-`format` and `reorderLongDates`, and times have `to24Hour`. An option you leave alone
-follows the mode. A rule switched on there still needs its category on and its tier
+from `ruleCatalogue()`. Units have `keepOriginal`, `precision`, `fuelEconomy` and
+`respectConventions`, dates have `format` and `reorderLongDates`, and times have
+`to24Hour`. An option you leave alone follows the mode. A rule switched on there still needs its category on and its tier
 ticked, unlike `rules` in the package. Currency and Other have one rule each, so their
 category switch is the only one.
 

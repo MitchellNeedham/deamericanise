@@ -14,7 +14,10 @@ import type {
 } from '../../src/types.js';
 import { api } from './browser.js';
 
-export type UnitSettings = Pick<UnitOptions, 'keepOriginal' | 'precision' | 'fuelEconomy'>;
+export type UnitSettings = Pick<
+  UnitOptions,
+  'keepOriginal' | 'precision' | 'fuelEconomy' | 'respectConventions'
+>;
 export type DateSettings = Pick<DateOptions, 'format' | 'reorderLongDates'>;
 export type TimeSettings = Pick<TimeOptions, 'to24Hour'>;
 
@@ -127,6 +130,7 @@ function clean(stored: Record<string, unknown>): Settings {
       keepOriginal: BOOLEAN,
       precision: PRECISIONS,
       fuelEconomy: FUEL_ECONOMY,
+      respectConventions: BOOLEAN,
     }),
     dates: fields<DateSettings>(stored.dates, { format: DATE_FORMATS, reorderLongDates: BOOLEAN }),
     times: fields<TimeSettings>(stored.times, { to24Hour: BOOLEAN }),

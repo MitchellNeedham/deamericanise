@@ -583,7 +583,8 @@ export class DomRewriter {
 
     const sources = nodes.map((node) => this.sourceOfText(node));
     const locked = nodes.map((node) => this.abandoned.has(node));
-    const changes = this.find(text, lang, assume);
+    const laidOut = asLaidOut(text);
+    const changes = inSource(text, laidOut, this.find(laidOut, lang, assume));
     const { outputs, applied, placed } = distribute(text, sources, anchors, locked, changes);
     nodes.forEach((node, i) => this.writeText(node, sources[i]!, outputs[i]!));
 
@@ -695,6 +696,30 @@ export class DomRewriter {
 
 function sameNodes(a: Text[], b: Text[]): boolean {
   return a.length === b.length && a.every((node, i) => node === b[i]);
+}
+
+/**
+ * A run's text with each line break in its source turned into a space, one for one so every
+ * offset holds. A page lays such a break out as a space unless a style preserves it, but the
+ * rules never join a number across a line break, nor a measurement across a blank line.
+ */
+function asLaidOut(text: string): string {
+  return text.replace(/[\n\r\f]/g, ' ');
+}
+
+/**
+ * Puts the source's line breaks back into changes found in its laid-out text, including into
+ * a replacement that repeats the matched text, as `$40` followed by a line break does.
+ */
+function inSource(text: string, laidOut: string, changes: Change[]): Change[] {
+  return changes.map((change) => {
+    const before = text.slice(change.start, change.end);
+    const seen = laidOut.slice(change.start, change.end);
+    if (seen === before) return change;
+    // A match of nothing but spaces could stand for any space in the replacement.
+    const after = /\S/.test(seen) ? change.after.split(seen).join(before) : change.after;
+    return { ...change, before, after };
+  });
 }
 
 /** Rewrites a document or element in place, once. */

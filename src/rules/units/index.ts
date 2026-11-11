@@ -7,18 +7,31 @@ import {
   type MetricValue,
 } from './definitions.js';
 import {
+  COUNTED_FRACTION,
+  FRACTION_WORDS,
+  INLINE_SPACE,
   NUMBER_PATTERN,
   NUMERIC_PATTERN,
+  SOFT_SPACE,
   formatNumber,
   formatTemperature,
   isOvenSetting,
   parseNumber,
   significantFigures,
+  softGap,
 } from './number.js';
 
 const CONTEXT_WINDOW = 48;
 /** Between a number and its unit: a space, a hyphen (`6-foot`), or nothing (`6ft`). */
-const GAP = String.raw`[\s ]*-?[\s ]*`;
+const GAP = softGap('-?');
+const RANGE_JOIN = softGap(String.raw`(?:[-\u2013\u2014]|to|and)`);
+const DIMENSION_JOIN = softGap('(?:x|×|by)');
+
+/**
+ * The second number of a range or dimension is not a measurement of its own, even where the
+ * pair does not match as a whole: `14 1/2 gallon` in `2024-03-14 1/2 gallon`.
+ */
+const NOT_SECOND_OF_PAIR = String.raw`(?<!\d${softGap(String.raw`(?:[-\u2013\u2014]|to|and|x|×|by)`)})`;
 
 function escape(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -31,10 +44,17 @@ interface Alias {
   isSingular: boolean;
 }
 
+function alternate(aliases: string[]): string {
+  return aliases
+    .sort((a, b) => b.length - a.length || a.localeCompare(b))
+    .map(escape)
+    .join('|');
+}
+
 function buildIndex(
   skip: Set<string>,
   forced: Record<string, boolean>,
-): { alternation: string; byAlias: Map<string, Alias> } {
+): { alternation: string; words: string; byAlias: Map<string, Alias> } {
   const byAlias = new Map<string, Alias>();
   for (const measure of MEASURES) {
     // Turning the rule on by id overrides both a dialect that keeps the unit and a
@@ -48,11 +68,9 @@ function buildIndex(
       byAlias.set(a.toLowerCase(), { measure, isWord: false, isSingular: false });
     }
   }
-  const alternation = [...byAlias.keys()]
-    .sort((a, b) => b.length - a.length || a.localeCompare(b))
-    .map(escape)
-    .join('|');
-  return { alternation, byAlias };
+  const alternation = alternate([...byAlias.keys()]);
+  const words = alternate([...byAlias].filter(([, alias]) => alias.isWord).map(([key]) => key));
+  return { alternation, words, byAlias };
 }
 
 /** The document says which kind of unit it means, and it is not the American one. */
@@ -76,8 +94,13 @@ function isConventional(ctx: RuleContext, measure: Measure, start: number, end: 
  */
 const DETERMINER_BEFORE = /\b(?:a|an|the|this|that|each|every|per|another)\s+$/i;
 
-const MODIFIES_A_NOUN =
-  /^[\s-]+(?!(?:of|in|on|at|by|for|and|or|to|from|with|per|thick|wide|long|tall|deep|high|across|away|apart|each|only)\b)[a-z]/i;
+const MODIFIES_A_NOUN = new RegExp(
+  String.raw`^[\s-]+(?!(?:of|in|on|at|by|for|and|or|to|from|with|per|thick|wide|long|tall|deep|high|` +
+    String.raw`across|away|apart|each|only|down|up|north|south|east|west|ahead|behind|past|along|` +
+    String.raw`beyond|into|through|short|further|farther|more|less|longer|shorter|wider|taller|` +
+    String.raw`deeper|higher|closer)\b)[a-z]`,
+  'i',
+);
 
 /** `6 in` is usually the preposition. `6in` never is. */
 function isBareInch(alias: string, whole: string): boolean {
@@ -299,8 +322,10 @@ function pushMeasurement(
 /** `6 feet 2 inches`, `6'2"` and `5 ft 11 in` collapse into a single metric height. */
 function feetInchesRule(): Rule {
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(\d+)\s*(?:feet|foot|ft\.?|′|')\s*(?:and\s+)?` +
-      String.raw`(\d+(?:\.\d+)?|\d+\s+\d+/\d+|\d+/\d+)\s*(?:inches|inch|in\.?|″|")(?![A-Za-z])`,
+    String.raw`(?<![\w.])(\d+)${SOFT_SPACE}(?:feet|foot|ft\.?|′|')` +
+      softGap(String.raw`(?:and(?=\s))?`) +
+      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+/\d+)` +
+      String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|")(?![A-Za-z])`,
     'gi',
   );
 
@@ -332,15 +357,18 @@ function feetInchesRule(): Rule {
 }
 
 function measurementRules(skip: Set<string>, forced: Record<string, boolean>): Rule[] {
-  const { alternation, byAlias } = buildIndex(skip, forced);
+  const { alternation, words, byAlias } = buildIndex(skip, forced);
   if (!alternation) return [];
 
+  const S = INLINE_SPACE;
+  // The pair guard can only apply before a digit, and is too costly to run at every word.
+  const START = String.raw`(?<![\w.])(?:(?=[\d\-−])${NOT_SECOND_OF_PAIR}|(?![\d\-−]))`;
   const single = new RegExp(
-    String.raw`(?<![\w.])(${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])`,
+    String.raw`${START}(${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
   const range = new RegExp(
-    String.raw`(?<![\w.])(${NUMERIC_PATTERN})\s*(?:-|–|—|to|and)\s*(${NUMERIC_PATTERN})` +
+    String.raw`${START}(${NUMERIC_PATTERN})${RANGE_JOIN}(${NUMERIC_PATTERN})` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
@@ -348,13 +376,48 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   // An optional unit after an inner number, so `8.5" x 11"` and `10 ft x 12 ft` both match.
   const INNER_UNIT = String.raw`(?:${GAP}(?:${alternation}))?`;
   const dimensions = new RegExp(
-    String.raw`(?<![\w.])(${NUMERIC_PATTERN})${INNER_UNIT}\s*(?:x|×|by)\s*(${NUMERIC_PATTERN})` +
-      String.raw`(?:${INNER_UNIT}\s*(?:x|×|by)\s*(${NUMERIC_PATTERN}))?` +
+    String.raw`${START}(${NUMERIC_PATTERN})${INNER_UNIT}${DIMENSION_JOIN}(${NUMERIC_PATTERN})` +
+      String.raw`(?:${INNER_UNIT}${DIMENSION_JOIN}(${NUMERIC_PATTERN}))?` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
 
+  // Written-out units only, because an abbreviation can be a word: `a gal and a half`.
+  const fractionOf = new RegExp(
+    String.raw`(?<![\w.])(?:((?:an?${S}+)?half)|(${FRACTION_WORDS})${S}+of)` +
+      String.raw`${S}+an?(?=\s)${SOFT_SPACE}(${words})(?![\w-])`,
+    'gi',
+  );
+  const andAFraction = new RegExp(
+    String.raw`(?<![\w.])an?(?=\s)${SOFT_SPACE}(${words})${S}+and${S}+(${COUNTED_FRACTION})(?![\w-])`,
+    'gi',
+  );
+
   const resolve = (alias: string) => byAlias.get(alias.toLowerCase().replace(/\s+/g, ' '));
+
+  /** A written-out quantity with its unit inside it, as in `half a mile`. */
+  const pushWrapped = (
+    ctx: RuleContext,
+    changes: Change[],
+    start: number,
+    matched: string,
+    value: number | null,
+    alias: string,
+  ): void => {
+    const entry = resolve(alias);
+    if (!entry || value === null) return;
+    // A noun straight after claims the words before it: `half a pound cake` is half a cake,
+    // and `a mile and a half hour later` is half an hour.
+    if (MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) return;
+    if (isConventional(ctx, entry.measure, start, start + matched.length)) return;
+    if (isAmbiguousHere(entry.measure, ctx.text)) return;
+
+    const target = entry.measure.convert(value);
+    const { precision, maxDecimals } = ctx.options.units;
+    const number = formatNumber(target.value, precision, significantFigures(matched), maxDecimals);
+    const body = `${number} ${unitWord(target, Number(number.replace(/,/g, '')))}`;
+    pushMeasurement(ctx, changes, start, matched, body, entry.measure.id, 30);
+  };
 
   const rangeRule: Rule = {
     id: 'units.range',
@@ -459,19 +522,35 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const target = entry.measure.convert(value);
         const { precision, maxDecimals } = ctx.options.units;
         const number = formatNumber(target.value, precision, significantFigures(match[1]!), maxDecimals);
+        const numberStart = start + (/^an?\s+/i.exec(match[1]!)?.[0].length ?? 0);
         // A singular unit modifying a following noun is attributive: `a 9 inch dish`,
         // `a 3/8 inch bolt`. What follows decides, not the value, because a fraction is
         // just as attributive. `1/2 gallon of milk` and `1/16 inch thick` are not.
         const attributive =
           entry.isWord &&
           entry.isSingular &&
-          DETERMINER_BEFORE.test(ctx.text.slice(Math.max(0, start - 24), start)) &&
+          DETERMINER_BEFORE.test(ctx.text.slice(Math.max(0, numberStart - 24), numberStart)) &&
           MODIFIES_A_NOUN.test(ctx.text.slice(start + match[0].length));
         const unit = entry.isWord
           ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
           : ` ${target.symbol}`;
+        // `a quarter mile track` keeps its article for the track, while `a quarter mile away`
+        // gives it to the number.
+        const from = attributive ? numberStart : start;
+        const matched = match[0].slice(from - start);
 
-        pushMeasurement(ctx, changes, start, match[0], `${number}${unit}`, entry.measure.id, 30);
+        pushMeasurement(ctx, changes, from, matched, `${number}${unit}`, entry.measure.id, 30);
+      }
+
+      fractionOf.lastIndex = 0;
+      for (const match of ctx.text.matchAll(fractionOf)) {
+        pushWrapped(ctx, changes, match.index, match[0], parseNumber(match[1] ?? match[2]!), match[3]!);
+      }
+      andAFraction.lastIndex = 0;
+      for (const match of ctx.text.matchAll(andAFraction)) {
+        const fraction = parseNumber(match[2]!);
+        const value = fraction === null ? null : 1 + fraction;
+        pushWrapped(ctx, changes, match.index, match[0], value, match[1]!);
       }
       return changes;
     },

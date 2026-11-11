@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deamericanise, deamericaniseText } from '../src/index.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
+import { NUMERIC_PATTERN } from '../src/rules/units/number.js';
 
 const convert = (input: string, options = {}) =>
   deamericaniseText(input, { categories: { spelling: false, vocabulary: false }, ...options });
@@ -679,5 +680,141 @@ describe('an attributive singular needs a determiner', () => {
     ${'one quart of large cucumbers'} | ${'950 millilitres of large cucumbers'} | ${'and it now matches the spelled-out form'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(quarts(input)).toBe(expected);
+  });
+});
+
+describe('a number never continues onto the next line', () => {
+  it.each`
+    input                                 | expected                              | why
+    ${'Step 14\n1/2 gallon of milk.'}     | ${'Step 14\n1.9 litres of milk.'}     | ${'a step number is not the whole part of a mixed number'}
+    ${'Step 14\r\n1/2 gallon of milk.'}   | ${'Step 14\r\n1.9 litres of milk.'}   | ${'nor after a Windows line ending'}
+    ${'Step 14\n½ gallon of milk.'}       | ${'Step 14\n1.9 litres of milk.'}     | ${'nor before a vulgar fraction'}
+    ${'2 1/2 gallons'}                    | ${'9.5 litres'}                       | ${'on one line the two are one number'}
+    ${'1\u00a01/2 gallons'}               | ${'5.7 litres'}                       | ${'a no-break space stays on the line'}
+    ${'two and a half feet'}              | ${'76 centimetres'}                   | ${'so does a written-out number on one line'}
+  `('$why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                     | why
+    ${'two and a\nhalf feet'}     | ${'the fraction is cut off from its whole number'}
+    ${'two and\na half feet'}     | ${'the same, before the article'}
+    ${'two\nand a half feet'}     | ${'the same, before "and"'}
+    ${'one and\none-half pounds'} | ${'the same, before the numerator'}
+    ${'a\nquarter mile away'}     | ${'the article is cut off from its fraction'}
+    ${'three\nquarters pound'}    | ${'the numerator is cut off from its fraction'}
+    ${'Serves two\nquarter pound burgers'} | ${'a number ending the line above might be part of it'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('the rest of a measurement may wrap onto the next line', () => {
+  it.each`
+    input                              | expected                            | why
+    ${'The fence is 6\nfeet tall'}     | ${'The fence is 1.8 metres tall'}   | ${'between the number and its unit'}
+    ${'The fence is 6\n   feet tall'}  | ${'The fence is 1.8 metres tall'}   | ${'with the next line indented'}
+    ${'6\u202ffeet'}                   | ${'1.8 metres'}                     | ${'a narrow no-break space is a space'}
+    ${'two and a half\nfeet'}          | ${'76 centimetres'}                 | ${'after a written-out number'}
+    ${'a quarter\nmile away'}          | ${'400 metres away'}                | ${'after a fraction with its article'}
+    ${'half a\nmile away'}             | ${'800 metres away'}                | ${'with the unit inside the number'}
+    ${'between 5 and\n10 miles'}       | ${'between 8 and 16 kilometres'}    | ${'after a range connector'}
+    ${'between 5\nand 10 miles'}       | ${'between 8 and 16 kilometres'}    | ${'before one'}
+    ${'5 -\n10 miles'}                 | ${'8-16 kilometres'}                | ${'after a dash that ends the line'}
+    ${'a 10 x\n12 foot room'}          | ${'a 3 x 3.7 metre room'}           | ${'inside a dimension'}
+    ${'a 10 x\r\n12 foot room'}        | ${'a 3 x 3.7 metre room'}           | ${'after a Windows line ending'}
+    ${'a 10 x 12 x\n8 foot shed'}      | ${'a 3 x 3.7 x 2.4 metre shed'}     | ${'before the last of three'}
+    ${'6 feet\n2 inches tall'}         | ${'1.88 metres tall'}               | ${'between feet and inches'}
+    ${'6 feet and\n2 inches tall'}     | ${'1.88 metres tall'}               | ${'the same, after "and"'}
+  `('$why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('never takes a range for the second number alone', () => {
+    expect(convert('Bought 2024-03-14 1/2 gallon')).toBe('Bought 2024-03-14 1.9 litres');
+  });
+});
+
+describe('a measurement never crosses into a new block', () => {
+  it.each`
+    input                                    | expected                                  | why
+    ${'between 5 and\n\n10 miles'}           | ${'between 5 and\n\n16 kilometres'}       | ${'a blank line ends the range'}
+    ${'6 feet\n\n2 inches tall'}             | ${'1.8 metres\n\n5.1 centimetres tall'}   | ${'and feet and inches'}
+    ${'Serves two\n\nQuarter pound of butter'} | ${'Serves two\n\n110 grams of butter'}  | ${'and a written-out number'}
+    ${'Serves 4\n- 2 pounds beef'}           | ${'Serves 4\n- 910 grams beef'}           | ${'a dash opening a line is a bullet, not a range'}
+    ${'Serves 4\n* 2 pounds beef'}           | ${'Serves 4\n* 910 grams beef'}           | ${'so is a star'}
+    ${'Serves 4\n+ 2 pounds beef'}           | ${'Serves 4\n+ 910 grams beef'}           | ${'and a plus'}
+    ${'Serves 4\n1. 2 pounds beef'}          | ${'Serves 4\n1. 910 grams beef'}          | ${'a numbered item'}
+    ${'Serves 4\n1) 2 pounds beef'}          | ${'Serves 4\n1) 910 grams beef'}          | ${'the same'}
+    ${'Chapter 4\n# 2 miles out'}            | ${'Chapter 4\n# 3.2 kilometres out'}      | ${'a heading'}
+    ${'Section 4\n> 2 miles out'}            | ${'Section 4\n> 3.2 kilometres out'}      | ${'a quote'}
+    ${'Total 4\n| 2 miles |'}                | ${'Total 4\n| 3.2 kilometres |'}         | ${'a table row'}
+  `('$why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                          | why
+    ${'The fence is 6\n\nfeet tall'}   | ${'a blank line between the number and its unit'}
+    ${'The fence is 6\n  \nfeet tall'} | ${'the same, with spaces on the blank line'}
+    ${'two and a half\n\nfeet'}        | ${'the same, after a written-out number'}
+    ${'Step 4\n- Feet together'}       | ${'a list item opening with a unit word'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('spelled-out fractions with "a"', () => {
+  it.each`
+    input                                  | expected                   | why
+    ${'two and a half feet'}               | ${'76 centimetres'}        | ${'a whole number and a half'}
+    ${'one and a half pounds of butter'}   | ${'680 grams of butter'}   | ${'the same, before "of"'}
+    ${'one and an eighth inches'}          | ${'2.9 centimetres'}       | ${'"an" before a vowel'}
+    ${'1 and a half pounds'}               | ${'680 grams'}             | ${'digits before "and a half"'}
+    ${'one and one-half pounds of butter'} | ${'680 grams of butter'}   | ${'a written-out numerator still reads'}
+    ${'a quarter mile away'}               | ${'400 metres away'}       | ${'the article belongs to the number'}
+    ${'a quarter pound of butter'}         | ${'110 grams of butter'}   | ${'the same'}
+    ${'about a half mile'}                 | ${'about 800 metres'}      | ${'the same, at the end of the text'}
+    ${'an eighth inch'}                    | ${'3.2 millimetres'}       | ${'"an" as well as "a"'}
+    ${'A quarter mile away'}               | ${'400 metres away'}       | ${'a capital article'}
+    ${'a quarter-mile track'}              | ${'a 400 metre track'}     | ${'attributive, so the article belongs to the noun'}
+    ${'a half-inch gap'}                   | ${'a 1.3 centimetre gap'}  | ${'the same'}
+    ${'half a mile away'}                  | ${'800 metres away'}       | ${'the unit inside the number'}
+    ${'half an inch thick'}                | ${'1.3 centimetres thick'} | ${'the same, with "an"'}
+    ${'a half a pound of butter'}          | ${'230 grams of butter'}   | ${'with a second article'}
+    ${'half of a mile'}                    | ${'800 metres'}            | ${'with "of"'}
+    ${'a quarter of a mile'}               | ${'400 metres'}            | ${'the same'}
+    ${'three quarters of a mile'}          | ${'1.2 kilometres'}        | ${'a counted fraction'}
+    ${'one-quarter of a pound of peel'}    | ${'110 grams of peel'}     | ${'the cookbook spelling'}
+    ${'about a mile and a half'}           | ${'about 2.4 kilometres'}  | ${'the fraction after the unit'}
+    ${'an inch and a quarter thick'}       | ${'3.2 centimetres thick'} | ${'the same, with "an"'}
+    ${'a pound and a half of butter'}      | ${'680 grams of butter'}   | ${'the same, before "of"'}
+    ${'a mile and three quarters.'}        | ${'2.8 kilometres.'}       | ${'a counted fraction after the unit'}
+    ${'a quarter mile down the road'}      | ${'400 metres down the road'} | ${'a direction is not a noun the unit modifies'}
+    ${'half a mile north of town'}         | ${'800 metres north of town'} | ${'the same, with the unit inside'}
+    ${'half an inch longer'}               | ${'1.3 centimetres longer'} | ${'nor is a comparison'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                           | why
+    ${'a half-hour drive'}              | ${'no unit'}
+    ${'a quarter of the class'}         | ${'no unit'}
+    ${'apples were a quarter a pound'}  | ${'a price per pound, not a weight'}
+    ${'half a pound cake'}              | ${'half of a cake'}
+    ${'a quarter of a pound cake'}      | ${'the same'}
+    ${'a mile and a half hour later'}   | ${'the half belongs to the hour'}
+    ${'a pound and a half dozen eggs'}  | ${'the same, for a dozen'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('keeps written-out numbers out of the pattern ranges use', () => {
+    const numeric = new RegExp(`^(?:${NUMERIC_PATTERN})$`, 'i');
+    for (const words of ['half', 'a half', 'one-half', 'two and a half', '1 and a half']) {
+      expect(numeric.test(words), words).toBe(false);
+    }
   });
 });

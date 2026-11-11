@@ -375,4 +375,32 @@ describe('extension: the settings page', () => {
     await vi.waitFor(() => expect(sync.stored()['site:old.example']).toEqual({ enabled: false }));
     expect($('sites').textContent).toContain('old.example');
   });
+
+  it('leaves named measurements alone until the box is unticked', async () => {
+    // jsdom has no modal dialogues.
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    await openOptions();
+    document.querySelector<HTMLButtonElement>('button[data-tune="units"]')!.click();
+    const box = $<HTMLInputElement>('tune-units-respectConventions');
+    expect(box.checked).toBe(true);
+
+    toggle(box);
+    await vi.waitFor(() => expect(sync.stored().units).toEqual({ respectConventions: false }));
+    toggle(box);
+    await vi.waitFor(() => expect(sync.stored().units).toEqual({}));
+  });
+});
+
+describe('extension: named measurements', () => {
+  it('passes a stored respectConventions through to the rewriter', async () => {
+    sync.fill({ units: { respectConventions: false } });
+    expect(settings.domOptions(await settings.loadSettings()).units).toEqual({ respectConventions: false });
+  });
+
+  it('drops a stored respectConventions that is not a boolean', async () => {
+    sync.fill({ units: { respectConventions: 'no' } });
+    expect(settings.domOptions(await settings.loadSettings()).units).toEqual({});
+  });
 });

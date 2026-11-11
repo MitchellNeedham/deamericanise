@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deamericanise, deamericaniseText } from '../src/index.js';
+import type { Change } from '../src/index.js';
+import { resolveChanges } from '../src/engine/apply.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
 import { NUMERIC_PATTERN } from '../src/rules/units/number.js';
 
@@ -290,6 +292,83 @@ describe('measurements that are imperial worldwide', () => {
     ${'12pt font'}       | ${'pt is points, not pints'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a conventional size is never half converted', () => {
+  it.each`
+    unchanged                               | why
+    ${'wheels of 15-17 inches'}             | ${'a range of wheel sizes'}
+    ${'15-17 inch wheels'}                  | ${'the noun after the range'}
+    ${'a 15 to 17 inch wheel'}              | ${'joined by "to"'}
+    ${'13-15 inch laptops'}                 | ${'screens'}
+    ${'wheels of 15½-17 inches'}            | ${'a vulgar fraction ends the first number'}
+    ${'bolts of ½-¾ inch'}                  | ${'a vulgar fraction at each end'}
+    ${'bolts from ½ to ¾ inch'}             | ${'the same, joined by "to"'}
+    ${'sockets of 3/8-1/2 inch'}            | ${'a fraction at each end'}
+    ${'sockets of 3/8-½ inch'}              | ${'two kinds of fraction'}
+    ${'a 15" x 17" panel'}                  | ${'a dimension with a unit on each side'}
+    ${'a 15 in. x 17 in. panel'}            | ${'the same, abbreviated'}
+    ${'a panel of 15" x 17"'}               | ${'the noun before the dimension'}
+    ${'bolts of 1/2 x 3/4 inch'}            | ${'fractions in a dimension'}
+    ${'a 2" x 4" x 8" panel'}               | ${'three dimensions'}
+    ${'panel of 2" x 4" x 8"'}              | ${'three dimensions after the noun'}
+    ${'wheels of 15½-17 inches (38-43 cm)'} | ${'a metric bracket after the range'}
+    ${'bolts of ½-¾ inch (13-19 mm)'}       | ${'the same'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                        | expected
+    ${'wheels of 15½-17 inches'} | ${'wheels of 39-43 centimetres'}
+    ${'bolts of ½-¾ inch'}       | ${'bolts of 1.3-1.9 centimetres'}
+    ${'sockets of 3/8-1/2 inch'} | ${'sockets of 0.95-1.3 centimetres'}
+    ${'a 15" x 17" panel'}       | ${'a 38 x 43 cm panel'}
+    ${'a panel of 15" x 17"'}    | ${'a panel of 38 x 43 cm'}
+    ${'a 2" x 4" x 8" panel'}    | ${'a 5.1 x 10 x 20 cm panel'}
+  `('converts all of $input when respectConventions is off', ({ input, expected }) => {
+    expect(convert(input, { units: { respectConventions: false } })).toBe(expected);
+  });
+
+  it('still converts a measurement that holds a conventional size whole', () => {
+    expect(convert('a 2 foot 6 inch pipe')).toMatch(/^a 76\.2 centimetres? pipe$/);
+  });
+
+  it('converts a measurement beside a conventional size', () => {
+    expect(convert('15-17 inch wheels and 6 feet of pipe')).toBe(
+      '15-17 inch wheels and 1.8 metres of pipe',
+    );
+  });
+});
+
+describe('a held span in change resolution', () => {
+  const at = (start: number, end: number, extra: Partial<Change> = {}): Change => ({
+    start,
+    end,
+    before: 'x'.repeat(end - start),
+    after: 'y',
+    ruleId: 'test',
+    category: 'units',
+    confidence: 'moderate',
+    priority: 30,
+    ...extra,
+  });
+  const held = at(10, 20, { after: 'x'.repeat(10), hold: true, priority: 0 });
+
+  it('is never returned', () => {
+    expect(resolveChanges([held], [])).toEqual([]);
+  });
+
+  it('drops a change that would rewrite only part of it, whatever its priority', () => {
+    expect(resolveChanges([held, at(15, 20, { priority: 99 })], [])).toEqual([]);
+    expect(resolveChanges([held, at(5, 12, { priority: 99 })], [])).toEqual([]);
+  });
+
+  it('keeps a change that rewrites all of it, or none of it', () => {
+    const whole = at(8, 22);
+    const beside = at(0, 5);
+    expect(resolveChanges([held, whole, beside], [])).toEqual([beside, whole]);
   });
 });
 

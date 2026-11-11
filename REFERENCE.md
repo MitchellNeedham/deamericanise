@@ -191,8 +191,11 @@ first is about the strongest signal there is that a document is American, and it
 the ambiguous numeric dates around it.
 
 **Times and currency.** `3:00 P.M.` becomes `3:00pm`; a 12-hour clock is
-normal outside America too, so only the styling goes. `times: { to24Hour: true }` gives
-`15:00` if you want it. Amounts are never converted, because exchange rates move; a bare
+normal outside America too, so only the styling goes. The last stop stays when it also
+ends the sentence, so `It starts at 3 P.M. Bring snacks.` becomes
+`It starts at 3pm. Bring snacks.` A time that runs on, as in `3 P.M. Tuesday` or
+`8 P.M. ET`, loses it. `times: { to24Hour: true }` gives `15:00` if you want it.
+Amounts are never converted, because exchange rates move; a bare
 `$500` becomes `US$500` when the text is American. 
 
 **Punctuation** (`localise` only). House style rather than comprehension, so it waits to

@@ -97,6 +97,27 @@ describe('runs of text', () => {
     );
   });
 
+  it('keeps the sentence stop of a time when the next sentence is in another element', () => {
+    expect(rewrite('<p>It starts at <b>3 P.M.</b> <i>Bring</i> snacks.</p>')).toBe(
+      '<p>It starts at <b>3pm.</b> <i>Bring</i> snacks.</p>',
+    );
+    expect(rewrite('<p>It starts at <b>3 P.M.</b> <i>with</i> snacks.</p>')).toBe(
+      '<p>It starts at <b>3pm</b> <i>with</i> snacks.</p>',
+    );
+  });
+
+  it('ends the sentence of a time at the end of a run', () => {
+    expect(rewrite('<p>It starts at 3 P.M.</p><p>Bring snacks.</p>')).toBe(
+      '<p>It starts at 3pm.</p><p>Bring snacks.</p>',
+    );
+    expect(rewrite('<p>It starts at 3 P.M.<br>with snacks.</p>')).toBe(
+      '<p>It starts at 3pm.<br>with snacks.</p>',
+    );
+    expect(rewrite('<table><tr><td>3 P.M.</td></tr></table>')).toBe(
+      '<table><tbody><tr><td>3pm</td></tr></tbody></table>',
+    );
+  });
+
   it('drops the article fix that leaned on a skipped change', () => {
     const localise: DomOptions = { preset: 'localise' };
     expect(rewrite('<p>Press a gas pedal.</p>', localise)).toBe('<p>Press an accelerator.</p>');

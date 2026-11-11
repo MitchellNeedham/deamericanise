@@ -3,7 +3,7 @@ import { deamericanise, deamericaniseText } from '../src/index.js';
 import type { Change } from '../src/index.js';
 import { resolveChanges } from '../src/engine/apply.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
-import { NUMERIC_PATTERN } from '../src/rules/units/number.js';
+import { NUMERIC_PATTERN, parseNumber } from '../src/rules/units/number.js';
 
 const convert = (input: string, options = {}) =>
   deamericaniseText(input, { categories: { spelling: false, vocabulary: false }, ...options });
@@ -722,6 +722,67 @@ describe('numbers written out in words', () => {
     ${'10 x 12 feet'} | ${'3 x 3.7 metres'} | ${'and dimensions still pair up'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a written-out number of two words', () => {
+  it.each`
+    input                                     | expected                     | why
+    ${'twenty-two pounds of beef'}            | ${'10 kilograms of beef'}    | ${'joined by a hyphen'}
+    ${'twenty two pounds of beef'}            | ${'10 kilograms of beef'}    | ${'joined by a space'}
+    ${'thirty-five miles away'}               | ${'56 kilometres away'}      | ${'before a direction'}
+    ${'ninety-nine feet'}                     | ${'30 metres'}               | ${'the largest pair'}
+    ${'Twenty-One miles'}                     | ${'34 kilometres'}           | ${'in capitals'}
+    ${'twenty-two and a half miles'}          | ${'36 kilometres'}           | ${'before "and a half"'}
+    ${'twenty two and one-half miles'}        | ${'36 kilometres'}           | ${'the same, spaced, with a counted half'}
+    ${'twenty-one and three-quarters inches'} | ${'55 centimetres'}          | ${'before a counted fraction'}
+    ${'twenty-two miles and a half'}          | ${'36 kilometres'}           | ${'with the fraction after the unit'}
+    ${'a twenty-two pound turkey'}            | ${'a 10 kilogram turkey'}    | ${'attributive'}
+    ${'a forty-five-mile drive'}              | ${'a 72 kilometre drive'}    | ${'attributive, hyphenated to its unit'}
+    ${'twenty two\nmiles'}                    | ${'35 kilometres'}           | ${'the unit may wrap onto the next line'}
+    ${'twenty\n\ntwo miles'}                  | ${'twenty\n\n3.2 kilometres'} | ${'a blank line makes the second word a number of its own'}
+    ${'twenty miles'}                         | ${'32 kilometres'}           | ${'a tens word on its own still reads'}
+    ${'twenty and a half pounds'}             | ${'9.3 kilograms'}           | ${'the same, before "and a half"'}
+    ${'two and a half feet'}                  | ${'76 centimetres'}          | ${'a units word on its own still reads'}
+    ${'a half-mile'}                          | ${'800 metres'}              | ${'a hyphen after a fraction word is not a compound'}
+    ${'5-10 feet'}                            | ${'1.5-3 metres'}            | ${'a hyphen between digits is still a range'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                              | expected                         | why
+    ${'one-half cup of citron'}        | ${'120 millilitres of citron'}   | ${'a hyphen before a fraction word is one number'}
+    ${'three-quarters cup of syrup'}   | ${'180 millilitres of syrup'}    | ${'the same, with a plural'}
+  `('$input -> $expected with cups switched on ($why)', ({ input, expected }) => {
+    expect(convert(input, { rules: { 'units.volume.cup': true } })).toBe(expected);
+  });
+
+  it.each`
+    unchanged                               | why
+    ${'catch-twenty-two miles'}             | ${'a hyphenated word the table cannot read'}
+    ${'fifty-fifty miles'}                  | ${'a pair of tens words'}
+    ${'twenty-one-half miles'}              | ${'a pair before a fraction word'}
+    ${'twenty five-pound bags'}             | ${'twenty bags or one weight'}
+    ${'twenty three-quarters inch'}         | ${'the same, before a fraction'}
+    ${'twenty three-quarters of a mile'}    | ${'the same, with the unit inside the number'}
+    ${'catch-twenty-two pounds and a half'} | ${'the same, with the fraction after the unit'}
+    ${'twenty\ntwo miles'}                  | ${'the units word is cut off from its tens'}
+    ${'twenty-\ntwo miles'}                 | ${'the same, after a hyphen'}
+    ${'It cost twenty-two pounds.'}         | ${'money, read as a whole number'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    words                      | value
+    ${'twenty-two'}            | ${22}
+    ${'twenty two'}            | ${22}
+    ${'Ninety-Nine'}           | ${99}
+    ${'twenty-two and a half'} | ${22.5}
+    ${'twenty-three quarters'} | ${5.75}
+  `('reads "$words" as $value', ({ words, value }) => {
+    expect(parseNumber(words)).toBe(value);
   });
 });
 

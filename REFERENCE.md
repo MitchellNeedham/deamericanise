@@ -238,6 +238,13 @@ or a noun such as `drop` after it. `fell to 20°F` names the new temperature and
 as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule of their own,
 `units.temperature.difference`, so they can be switched off apart from temperatures.
 
+Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F` or `degrees Fahrenheit`. A bare `F`,
+as in `165F` or `350 F`, is more often a letter, so it counts only as an upper case `F`
+after a number of two or three figures, in a sentence about heat (an oven, cooking, the
+weather, a fever or a temperature) that gives no Celsius value. `Cook until the chicken
+reaches 165F` becomes `73.9°C`, while `Apartment 3F`, `seat 23F`, `the Boeing 777F`,
+`#33F`, `F-150` and the courtesy figure in `180C/350F/gas 4` stay as they are.
+
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
 source and never claims more accuracy than was written down. `exact` and a fixed number of
@@ -346,6 +353,10 @@ since Australia and New Zealand cook in metric cups. A measured ingredient under
 only Americans use, such as `1 cup all-purpose flour` or `2 tablespoons cornstarch`,
 counts like any other vocabulary, unless the local name sits beside it, as it does in
 `1 cup plain flour (all-purpose flour)`.
+
+A temperature counts as `Fahrenheit` in exactly the forms the unit rules convert, so
+`165 degrees F` counts, `Cook until the chicken reaches 165F` counts, and `Apartment 3F`
+does not. The word `Fahrenheit` on its own counts too.
 
 Ambiguous dates ask a narrower question first, because a document writes its dates one way
 round: a sibling date that states its own order, whether by a day above 12 or by a named

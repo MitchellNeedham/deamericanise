@@ -350,20 +350,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
       v.verdicts !== undefined && v.verdicts[1].unambiguousMonthFirstDates > v.verdicts[0].unambiguousMonthFirstDates,
   },
   {
-    issue: 160,
-    property: 'idempotence',
-    input: 'The ridge is 911 feet high.',
-    options: { ...localise, units: { keepOriginal: true } },
-    matches: (v) => v.change?.before === '911' || v.origin?.before === '911',
-  },
-  {
-    issue: 160,
-    property: 'idempotence',
-    input: 'It cost $1,911 to fix.',
-    options: { ...localise, ...american },
-    matches: (v) => v.change?.before === '911' || v.origin?.before === '911',
-  },
-  {
     issue: 69,
     property: 'idempotence',
     input: 'Bought 3/14/2024 1/2 gallon of milk.',

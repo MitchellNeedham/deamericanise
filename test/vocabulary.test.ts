@@ -97,6 +97,18 @@ describe('trailers', () => {
   });
 });
 
+describe('tuition', () => {
+  it.each`
+    input                   | expected
+    ${'Paid tuition.'}      | ${'Paid tuition fees.'}
+    ${'Paid tuition fees.'} | ${'Paid tuition fees.'}
+    ${'Tuition Fees'}       | ${'Tuition Fees'}
+    ${'the tuition fee'}    | ${'the tuition fee'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
 describe('school years', () => {
   it.each`
     input              | expected

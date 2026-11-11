@@ -222,34 +222,6 @@ const american = { assumeAmerican: true } as const;
 
 const KNOWN_FAILURES: KnownFailure[] = [
   {
-    issue: 152,
-    property: 'idempotence',
-    input: 'Paid tuition.',
-    options: localise,
-    matches: rewritesReplacement('tuition fees'),
-  },
-  {
-    issue: 152,
-    property: 'idempotence',
-    input: 'a garbage truck',
-    options: { ...localise, dialect: 'en-GB' },
-    matches: rewritesReplacement('rubbish truck', 'rubbish trucks'),
-  },
-  {
-    issue: 152,
-    property: 'idempotence',
-    input: 'the mailman',
-    options: { ...localise, dialect: 'en-GB' },
-    matches: rewritesReplacement('postie', 'posties'),
-  },
-  {
-    issue: 152,
-    property: 'idempotence',
-    input: 'an apartment building',
-    options: { ...localise, dialect: 'en-NZ' },
-    matches: rewritesReplacement('apartment block', 'apartment blocks'),
-  },
-  {
     issue: 153,
     property: 'idempotence',
     input: 'Roll it half an inch thick.',

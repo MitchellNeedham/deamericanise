@@ -411,7 +411,10 @@ export function baseVocabulary(): LexEntry[] {
     ...set('vocabulary.everyday', 'moderate', EVERYDAY).flatMap((entry) =>
       entry.from.startsWith('mailbox') ? MAILBOX_GATES.map((gate) => ({ ...entry, ...gate })) : [entry],
     ),
-    ...set('vocabulary.education', 'risky', EDUCATION),
+    ...set('vocabulary.education', 'risky', EDUCATION).map((entry) =>
+      // The replacement ends in `fees`, so a fee already after the word would be said twice.
+      entry.from === 'tuition' ? { ...entry, forbidAfter: /^\s+fees?\b/i } : entry,
+    ),
     ...GRADES,
     ...CONTEXTUAL.map((entry) => ({ ...entry, priority: 20 })),
   ];

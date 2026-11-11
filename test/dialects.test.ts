@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DIALECTS, deamericaniseText } from '../src/index.js';
 import type { Dialect, LexEntry, RuleContext } from '../src/index.js';
 import { compileLexicon, findLexiconMatches } from '../src/engine/lexicon.js';
+import { spellingEntries } from '../src/rules/spelling/index.js';
+import { baseVocabulary } from '../src/rules/vocabulary.js';
 
 // The dialect overlays are vocabulary, so they need the localise preset.
 const say = (dialect: Dialect) => (input: string) =>
@@ -67,7 +69,20 @@ describe('a dialect row outranks the shared row for the same word', () => {
     ${'an apartment building'}           | ${'en-ZA'} | ${'a block of flats'}
     ${'any mailbox'}                     | ${'en-ZA'} | ${'any postbox'}
     ${'a field trip'}                    | ${'en-AU'} | ${'an excursion'}
-    ${'an apartment building'}           | ${'en-NZ'} | ${'an apartment block'}
+    ${'an apartment building'}           | ${'en-NZ'} | ${'a block of flats'}
+    ${'two apartment buildings'}         | ${'en-NZ'} | ${'two blocks of flats'}
+    ${'the mailman'}                     | ${'en-GB'} | ${'the postman'}
+    ${'the mailmen'}                     | ${'en-GB'} | ${'the postmen'}
+    ${'a mail carrier'}                  | ${'en-GB'} | ${'a postman'}
+    ${'two mail carriers'}               | ${'en-GB'} | ${'two postmen'}
+    ${'the mailman'}                     | ${'en-IE'} | ${'the postman'}
+    ${'the mailman'}                     | ${'en-ZA'} | ${'the postman'}
+    ${'the mailman'}                     | ${'en-AU'} | ${'the postie'}
+    ${'the mailmen'}                     | ${'en-NZ'} | ${'the posties'}
+    ${'a garbage truck'}                 | ${'en-GB'} | ${'a bin lorry'}
+    ${'two garbage trucks'}              | ${'en-GB'} | ${'two bin lorries'}
+    ${'two garbage trucks'}              | ${'en-IE'} | ${'two bin lorries'}
+    ${'a fire truck'}                    | ${'en-GB'} | ${'a fire engine'}
   `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
     expect(say(dialect as Dialect)(input)).toBe(expected);
   });
@@ -214,6 +229,9 @@ describe('words that are already correct are left alone', () => {
     ${'candy floss'}    | ${'en-AU'}  | ${'not American, so candy must not fire inside it'}
     ${'candy floss'}    | ${'en-GB'}  | ${'the same'}
     ${'fairy floss'}    | ${'en-AU'}  | ${'the target of another rule'}
+    ${'the postie'}     | ${'en-AU'}  | ${'the target of the shared mailman row'}
+    ${'the postie'}     | ${'en-GB'}  | ${'not American'}
+    ${'the posties'}    | ${'en-IE'}  | ${'the same'}
     ${'a semi-trailer'} | ${'en-AU'}  | ${'not American, so trailer must not fire inside it'}
   `('$dialect leaves "$unchanged" alone ($why)', ({ unchanged, dialect }) => {
     expect(say(dialect as Dialect)(unchanged)).toBe(unchanged);
@@ -317,6 +335,8 @@ describe('trucks', () => {
     ${'a monster truck'}          | ${'a monster truck'}           | ${'a monster truck'}           | ${'a monster truck'}          | ${'a monster truck'}
     ${'a tow truck'}              | ${'a tow truck'}               | ${'a tow truck'}               | ${'a tow truck'}              | ${'a tow truck'}
     ${'an ice cream truck'}       | ${'an ice cream truck'}        | ${'an ice cream truck'}        | ${'an ice cream truck'}       | ${'an ice cream truck'}
+    ${'a garbage truck'}          | ${'a bin lorry'}               | ${'a bin lorry'}               | ${'a rubbish truck'}          | ${'a rubbish truck'}
+    ${'a rubbish truck'}          | ${'a rubbish truck'}           | ${'a rubbish truck'}           | ${'a rubbish truck'}          | ${'a rubbish truck'}
   `('$input -> GB $gb / IE $ie / ZA $za / AU $au', ({ input, gb, ie, za, au }) => {
     expect(say('en-GB')(input), 'en-GB').toBe(gb);
     expect(say('en-IE')(input), 'en-IE').toBe(ie);
@@ -349,7 +369,10 @@ describe('overlay words in phrases that already read right', () => {
     ${'the Pacific Coast Highway'}                          | ${'the Pacific Coast Highway'}                          | ${'en-NZ'}
     ${'an apartment complex'}                               | ${'an apartment complex'}                               | ${'en-GB'}
     ${'a serviced apartment'}                               | ${'a serviced apartment'}                               | ${'en-GB'}
-    ${'two apartment buildings'}                            | ${'two apartment blocks'}                               | ${'en-NZ'}
+    ${'two apartment buildings'}                            | ${'two blocks of flats'}                                | ${'en-NZ'}
+    ${'an apartment block'}                                 | ${'an apartment block'}                                 | ${'en-GB'}
+    ${'two apartment blocks'}                               | ${'two apartment blocks'}                               | ${'en-NZ'}
+    ${'an apartment'}                                       | ${'a flat'}                                             | ${'en-NZ'}
     ${'They rented an apartment.'}                          | ${'They rented a flat.'}                                | ${'en-GB'}
     ${'an apartment complex'}                               | ${'an apartment complex'}                               | ${'en-NZ'}
   `('$dialect: $input -> $expected', ({ input, expected, dialect }) => {
@@ -415,5 +438,21 @@ describe('pants the garment still become trousers', () => {
     ${'She wears the pants in the family.'}         | ${'She wears the trousers in the family.'}
   `('$input -> $expected', ({ input, expected }) => {
     for (const dialect of TROUSER_DIALECTS) expect(say(dialect)(input), dialect).toBe(expected);
+  });
+});
+
+describe('a replacement is left alone by a second run', () => {
+  it.each(Object.keys(DIALECTS) as Dialect[])('%s', (dialect) => {
+    // Every rule runs, including those that wait for the text to read as American.
+    const options = { dialect, preset: 'localise', assumeAmerican: true } as const;
+    // Shared rows a dialect row outranks count too, so gating that dialect row cannot expose one.
+    const written = new Set(
+      [...spellingEntries(), ...baseVocabulary(), ...DIALECTS[dialect].vocabulary].map((entry) => entry.to),
+    );
+    const rewritten = [...written]
+      .map((to) => [to, deamericaniseText(to, options)])
+      .filter(([to, again]) => again !== to)
+      .map(([to, again]) => `${to} -> ${again}`);
+    expect(rewritten).toEqual([]);
   });
 });

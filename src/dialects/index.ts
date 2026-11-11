@@ -92,7 +92,7 @@ const COOKIE: Guard[] = [
 
 /** Trucks Britain calls trucks too. */
 const TRUCK: Guard[] = [
-  { forbidBefore: /\b(?:pick-?up|dump|fork-?lift|food|monster|tow|ice[\s-]cream)[\s-]+$/i },
+  { forbidBefore: /\b(?:pick-?up|dump|fork-?lift|food|monster|tow|ice[\s-]cream|rubbish)[\s-]+$/i },
 ];
 
 const PANTS_OWNER = String.raw`(?:the|your|my|his|her|its|our|their|one['’]s)`;
@@ -244,7 +244,7 @@ const HIGHWAY: Guard[] = [
   },
 ];
 
-const APARTMENT: Guard[] = [{ forbidBefore: /\bserviced\s+$/i, forbidAfter: /^\s+complex(?:es)?\b/i }];
+const APARTMENT: Guard[] = [{ forbidBefore: /\bserviced\s+$/i, forbidAfter: /^\s+(?:complex(?:es)?|blocks?)\b/i }];
 
 /**
  * A postbox is only the kind for posting letters. A mailbox at home is a letterbox, which
@@ -369,6 +369,8 @@ const GB: Row[] = [
   ['fire trucks', 'fire engines'],
   ['firetruck', 'fire engine'],
   ['firetrucks', 'fire engines'],
+  ['garbage truck', 'bin lorry'],
+  ['garbage trucks', 'bin lorries'],
   ['freeway', 'motorway'],
   ['freeways', 'motorways'],
   ['highway', 'motorway'],
@@ -395,8 +397,10 @@ const GB: Row[] = [
   ['liquor stores', 'off-licences'],
   ['bell pepper', 'pepper'],
   ['bell peppers', 'peppers'],
-  ['postie', 'postman'],
-  ['posties', 'postmen'],
+  ['mailman', 'postman'],
+  ['mailmen', 'postmen'],
+  ['mail carrier', 'postman'],
+  ['mail carriers', 'postmen'],
   ['mailbox', 'postbox'],
   ['mailboxes', 'postboxes'],
   ['field trip', 'school trip'],
@@ -421,6 +425,8 @@ const NZ: Row[] = [
   ['potato chips', 'chips'],
   ['apartment', 'flat'],
   ['apartments', 'flats'],
+  ['apartment building', 'block of flats'],
+  ['apartment buildings', 'blocks of flats'],
   ['soccer', 'football'],
   ['freeway', 'motorway'],
   ['highway', 'motorway'],

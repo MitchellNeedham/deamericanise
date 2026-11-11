@@ -255,6 +255,12 @@ Amounts are never converted, because exchange rates move; a bare
 be asked for. `U.S.` becomes `US`, and punctuation that is not part of a quotation moves
 outside the closing quote.
 
+An initialism keeps its last stop when that stop also ends the sentence, as a time does,
+so `She moved to the U.S. It was cold.` becomes `She moved to the US. It was cold.` A
+capital after an initialism is more often the rest of a name, so `the U.S. Army` becomes
+`the US Army`: only a word that opens sentences and never names anything, such as `It`,
+`The`, `In` or `However`, counts as a new sentence.
+
 Full stops on titles follow the contraction rule rather than a list of titles: a
 contraction that already ends in the word's own last letter drops the stop, so `Mr.`,
 `Dr.`, `Sgt.` and `Lt.` become `Mr`, `Dr`, `Sgt` and `Lt`. A truncation keeps it, so

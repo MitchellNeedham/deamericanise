@@ -215,6 +215,13 @@ try {
   // Empty, or the site switched off for the comparison would show in the list.
   await evaluate(options, `chrome.storage.sync.set({ disabledSites: [] })`);
   const settings = await open(extensionPage('options.html'), 1280, 800);
+  // Zoomed out just enough to fit the whole page, so the store shows every setting.
+  const zoom = await evaluate(settings, `(() => {
+    const zoom = Math.min(1, Math.floor((innerHeight / document.documentElement.scrollHeight) * 100) / 100);
+    document.documentElement.style.zoom = String(zoom);
+    return zoom;
+  })()`);
+  console.log(`settings at ${Math.round(zoom * 100)}% zoom`);
   await save(settings, 'screenshot-4-settings.png');
 
   const promo = await open(original('promo.html'), 440, 280);

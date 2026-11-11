@@ -442,7 +442,10 @@ deamericaniseText(text, { minAmericanConfidence: 0.4 });
   Inline code is paired the way CommonMark pairs it: a span closes on a run of as many
   backticks as opened it, so ``` ``a ` b`` ``` is one span, and it may wrap onto the next
   line of its paragraph. A backtick with no partner before the paragraph ends, or one
-  escaped as `` \` ``, protects nothing.
+  escaped as `` \` ``, protects nothing. A fenced code block opens on a line that starts with
+  three or more backticks or tildes and closes on a line of the same character at least as
+  long, so a fence of four backticks can hold one of three. A fence that never closes runs to
+  the end of the text.
 - **Identifiers,** when `protectIdentifiers` is on (the default for source files):
   `normalizeInput`, `MAX_COLOR_VALUE`, `background-color`, `theme.colors.gray`,
   `--color-scheme`, `getColor()`.
@@ -769,6 +772,14 @@ there each root needs the rules in its own styles.
   from its lines: a blank line, or a line that opens a heading, quote, list item, fence,
   rule or table row, ends it. A span that wraps onto the next `>` line of a block quote is
   therefore not protected. The remark plugin reads the real structure.
+- Outside the remark plugin, a fence is read from its own lines, without the list items and
+  quotes around it. A fence that a list item or quote ends without a closing line therefore
+  runs on to the next line that would close it, or to the end of the text. A line of three or
+  more tildes opens a fence in any prose file, so a reStructuredText heading underlined with
+  tildes, or a plain-text divider made of them, leaves the text up to the next such line as
+  written.
+- Outside the remark plugin, an indented code block is rewritten like the prose around it:
+  telling it from indented prose needs to know the text is Markdown.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`
   or `keepOriginal` where the numbers matter.
 - A number that a hard wrap splits, such as `1` at the end of one line and `1/2 gallons` at

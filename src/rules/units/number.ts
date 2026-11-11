@@ -56,6 +56,17 @@ const CARD = Object.keys(CARDINALS).sort((a, b) => b.length - a.length).join('|'
 const FRAC = Object.keys(DENOMINATORS).sort((a, b) => b.length - a.length).join('|');
 const BARE_FRAC = [...UNCOUNTED].sort((a, b) => b.length - a.length).join('|');
 
+const TENS = Object.keys(CARDINALS).filter((word) => CARDINALS[word]! >= 20);
+const ONES = Object.keys(CARDINALS).filter((word) => CARDINALS[word]! < 10);
+
+/**
+ * `twenty-two` and `twenty two`. Spaced, a units word hyphenated to what follows is not
+ * part of the pair, since `twenty five-pound bags` can be twenty bags.
+ */
+const COMPOUND =
+  String.raw`(?:${TENS.join('|')})` +
+  String.raw`(?:-(?:${ONES.join('|')})(?!\w)|${INLINE_SPACE}+(?:${ONES.join('|')})(?![\w-]))`;
+
 /** A spelled-out fraction with its count: `a quarter`, `three-quarters`, `one half`. */
 export const COUNTED_FRACTION = String.raw`(?:an?${INLINE_SPACE}+|(?:${CARD})${SPACE_OR_HYPHEN})(?:${FRAC})`;
 
@@ -72,6 +83,14 @@ const NOT_AFTER_AND = String.raw`(?<!(?:\d|\b(?:${CARD}))${softGap('and')})`;
 const NOT_AFTER_COUNT = String.raw`(?<!\b(?:${CARD}|an?)-?${SOFT_SPACE})`;
 
 /**
+ * Where a written-out number may start: not inside a hyphenated word and not straight after
+ * a tens word, so whatever of `catch-twenty-two`, `twenty-twenty` or `twenty five-pound` the
+ * table cannot read is left whole. A tens word ending the line above counts as well.
+ */
+export const NOT_IN_COMPOUND =
+  String.raw`(?<![A-Za-z]-)(?<!\b(?:${TENS.join('|')})-?(?:${SOFT_BREAK}|${INLINE_SPACE}+))`;
+
+/**
  * `body`, unless `guard` finds it is the tail of a longer number. The lookahead keeps the
  * costlier lookbehind to the few places where `body` can start.
  */
@@ -79,16 +98,19 @@ function unlessTail(guard: string, body: string): string {
   return String.raw`(?=${body})${guard}${body}`;
 }
 
+/** A cardinal of one word or two: `seven`, `twenty-two`, `twenty two`. */
+const CARDINAL = unlessTail(NOT_IN_COMPOUND, String.raw`(?:${COMPOUND}|${CARD})`);
+
 const WORD_NUMBER = [
-  String.raw`(?:${CARD}|\d+)${INLINE_SPACE}+and${INLINE_SPACE}+(?:${CARD}|an?)${SPACE_OR_HYPHEN}(?:${FRAC})`,
-  unlessTail(NOT_AFTER_AND, String.raw`(?:${CARD})${SPACE_OR_HYPHEN}(?:${FRAC})`),
-  String.raw`(?:${CARD})`,
-  unlessTail(NOT_AFTER_AND, String.raw`an?${INLINE_SPACE}+(?:${FRAC})`),
-  unlessTail(NOT_AFTER_COUNT, String.raw`(?:${BARE_FRAC})`),
+  String.raw`(?:${CARDINAL}|\d+)${INLINE_SPACE}+and${INLINE_SPACE}+(?:${CARD}|an?)${SPACE_OR_HYPHEN}(?:${FRAC})`,
+  unlessTail(NOT_AFTER_AND + NOT_IN_COMPOUND, String.raw`(?:${CARD})${SPACE_OR_HYPHEN}(?:${FRAC})`),
+  CARDINAL,
+  unlessTail(NOT_AFTER_AND + NOT_IN_COMPOUND, String.raw`an?${INLINE_SPACE}+(?:${FRAC})`),
+  unlessTail(NOT_AFTER_COUNT + NOT_IN_COMPOUND, String.raw`(?:${BARE_FRAC})`),
 ].join('|');
 
-/** A whole number in digits or one word: `2`, `1,200`, `two`. */
-export const WHOLE_NUMBER = String.raw`(?:${DIGITS}|${CARD})`;
+/** A whole number in digits or words: `2`, `1,200`, `two`, `twenty-two`. */
+export const WHOLE_NUMBER = String.raw`(?:${DIGITS}|${CARDINAL})`;
 
 /**
  * Digits only. Ranges and dimensions use this rather than the full pattern, because a
@@ -116,7 +138,7 @@ function cardinal(word: string): number | undefined {
   return CARDINALS[word];
 }
 
-/** `three-quarters`, `one and one-half`, `two and a half`, `a quarter`, `half`. */
+/** `three-quarters`, `twenty-two`, `one and one-half`, `two and a half`, `a quarter`, `half`. */
 function parseWords(text: string): number | null {
   const parts = text.toLowerCase().replace(/-/g, ' ').split(/\s+/).filter((w) => w !== 'and');
   if (parts.length === 0) return null;
@@ -131,8 +153,10 @@ function parseWords(text: string): number | null {
       total += numerator / denominator;
       continue;
     }
-    const count = cardinal(word);
+    let count = cardinal(word);
     if (count === undefined) return null;
+    // A denominator after the pair divides all of it: `twenty-three quarters`.
+    if (TENS.includes(word) && ONES.includes(parts[i + 1] ?? '')) count += CARDINALS[parts[++i]!]!;
     const next = parts[i + 1];
     if (next && DENOMINATORS[next] !== undefined) total += count / DENOMINATORS[next]!;
     else total += count;

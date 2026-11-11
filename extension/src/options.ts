@@ -132,6 +132,12 @@ const FIELDS: Partial<Record<Category, Field[]>> = {
         'km-per-l': 'Kilometres per litre',
       }),
     },
+    {
+      group: 'units',
+      key: 'respectConventions',
+      label: 'Leave named measurements alone',
+      hint: 'Such as a 15 inch laptop, the 40 yard line and the 147-pound division.',
+    },
   ],
   dates: [
     {

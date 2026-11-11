@@ -80,6 +80,13 @@ the run before anything is read, with `unknown language "..."` on stderr and exi
 and a commented file such as `tsconfig.json` has just its comments rewritten. A `.json`
 file is still skipped unless it is forced this way.
 
+`--rule` and `--units-keep` are checked up front, as `--language` is. A `--rule` pattern
+has to match a rule id of at least one dialect, so a command line shared across dialects
+still runs under `en-CA`, which has no `dialect.*` rules. `--units-keep` takes a unit's
+key, such as `inch` or `square-foot`, or any name the unit is written as, such as `inches`
+or `in`. Any other value stops the run with `unknown rule "..."` or `unknown unit "..."`
+and exit status 2.
+
 `LICENSE`, `COPYING` and `AUTHORS` are not on the list. A licence has to stay verbatim, and
 a list of names is no place for spelling rules.
 

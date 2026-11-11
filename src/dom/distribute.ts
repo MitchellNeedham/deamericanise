@@ -1,3 +1,4 @@
+import { agreesWith } from '../engine/articles.js';
 import type { Change } from '../types.js';
 
 export interface Distribution {
@@ -24,7 +25,7 @@ type Edit = [start: number, end: number, replacement: string, change: Change | n
  * A change inside one node is a plain replacement. A change that crosses nodes puts its
  * whole replacement in the first node and empties its share of the others. It is
  * skipped if the nodes sit in different links, buttons or labels, or if any of them is
- * locked.
+ * locked. An article fix is skipped with the replacement it agrees with.
  */
 export function distribute(
   text: string,
@@ -56,8 +57,7 @@ export function distribute(
   const edits: Edit[][] = sources.map(() => []);
   const applied: Change[] = [];
   for (const [change, touched] of planned) {
-    const article = change.ruleId === 'grammar.article-agreement';
-    if (article && leansOnSkipped(change, skipped, text)) continue;
+    if (skipped.some((s) => agreesWith(change, s))) continue;
 
     touched.forEach((i, position) => {
       const from = Math.max(change.start, starts[i]!) - starts[i]!;
@@ -90,13 +90,6 @@ function nodesUnder(
     }
   }
   return touched;
-}
-
-/** An article fixed to agree with a replacement that is not going to happen. */
-function leansOnSkipped(article: Change, skipped: Change[], text: string): boolean {
-  return skipped.some(
-    (s) => article.end <= s.start && /^\s+$/.test(text.slice(article.end, s.start)),
-  );
 }
 
 function applyEdits(source: string, edits: Edit[], node: number, placed: Placement[]): string {

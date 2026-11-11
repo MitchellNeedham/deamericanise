@@ -9,6 +9,31 @@ const VULGAR: Record<string, number> = {
 const VULGAR_CLASS = `[${Object.keys(VULGAR).join('')}]`;
 const DIGITS = String.raw`\d{1,3}(?:,\d{3})+|\d+`;
 
+/**
+ * Whitespace that stays on one line. A number is never written across a line break, so
+ * `Step 14` at the end of one line and `1/2 gallon` at the start of the next stay apart.
+ */
+export const INLINE_SPACE = String.raw`[^\S\n\r\v\f\u2028\u2029]`;
+const SPACE_OR_HYPHEN = String.raw`(?:${INLINE_SPACE}+|-)`;
+
+const LINE_BREAK = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
+
+/** A line that starts a new block: blank, a list item, a heading, a quote or a table row. */
+const NEW_BLOCK = String.raw`${INLINE_SPACE}*(?:${LINE_BREAK}|$|[-*+](?=\s|$)|\d+[.)](?=\s|$)|[#>|])`;
+
+const SOFT_BREAK = String.raw`${INLINE_SPACE}*${LINE_BREAK}(?!${NEW_BLOCK})${INLINE_SPACE}*`;
+
+/**
+ * Whitespace inside one quantity but outside its number: on one line, or across a single
+ * line break that only wraps the paragraph, as in `6` then `feet` on the next line.
+ */
+export const SOFT_SPACE = String.raw`(?:${SOFT_BREAK}|${INLINE_SPACE}*)`;
+
+/** `SOFT_SPACE` on either side of `token`, with at most one line break between them. */
+export function softGap(token: string): string {
+  return String.raw`(?:${SOFT_SPACE}${token}${INLINE_SPACE}*|${INLINE_SPACE}*${token}${SOFT_BREAK})`;
+}
+
 /** Recipes and older prose write their numbers out: `one cup`, `three-quarters cup`. */
 const CARDINALS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -26,11 +51,31 @@ const DENOMINATORS: Record<string, number> = {
 const CARD = Object.keys(CARDINALS).sort((a, b) => b.length - a.length).join('|');
 const FRAC = Object.keys(DENOMINATORS).sort((a, b) => b.length - a.length).join('|');
 
+/** A spelled-out fraction with its count: `a quarter`, `three-quarters`, `one half`. */
+export const COUNTED_FRACTION = String.raw`(?:an?${INLINE_SPACE}+|(?:${CARD})${SPACE_OR_HYPHEN})(?:${FRAC})`;
+
+/** A spelled-out fraction, counted or not: `half`, `a quarter`, `three-quarters`. */
+export const FRACTION_WORDS = String.raw`(?:${COUNTED_FRACTION}|(?:${FRAC}))`;
+
+// The tail of a longer number that a line break cut off, such as `half feet` after `two and
+// a`, is not a number of its own. A new block in between makes it one again.
+const NOT_AFTER_AND = String.raw`(?<!(?:\d|\b(?:${CARD}))${softGap('and')})`;
+const NOT_AFTER_COUNT = String.raw`(?<!\b(?:${CARD}|an?)-?${SOFT_SPACE})`;
+
+/**
+ * `body`, unless `guard` finds it is the tail of a longer number. The lookahead keeps the
+ * costlier lookbehind to the few places where `body` can start.
+ */
+function unlessTail(guard: string, body: string): string {
+  return String.raw`(?=${body})${guard}${body}`;
+}
+
 const WORD_NUMBER = [
-  String.raw`(?:${CARD})\s+and\s+(?:${CARD})[\s-](?:${FRAC})`,
-  String.raw`(?:${CARD})[\s-](?:${FRAC})`,
+  String.raw`(?:${CARD}|\d+)${INLINE_SPACE}+and${INLINE_SPACE}+(?:${CARD}|an?)${SPACE_OR_HYPHEN}(?:${FRAC})`,
+  unlessTail(NOT_AFTER_AND, String.raw`(?:${CARD})${SPACE_OR_HYPHEN}(?:${FRAC})`),
   String.raw`(?:${CARD})`,
-  String.raw`(?:${FRAC})`,
+  unlessTail(NOT_AFTER_AND, String.raw`an?${INLINE_SPACE}+(?:${FRAC})`),
+  unlessTail(NOT_AFTER_COUNT, String.raw`(?:${FRAC})`),
 ].join('|');
 
 /**
@@ -39,24 +84,27 @@ const WORD_NUMBER = [
  * running from `one` to `half`.
  */
 export const NUMERIC_PATTERN = [
-  String.raw`[-−]?(?:${DIGITS})\s+\d+/\d+`,
-  String.raw`[-−]?(?:${DIGITS})\s*${VULGAR_CLASS}`,
+  String.raw`[-−]?(?:${DIGITS})${INLINE_SPACE}+\d+/\d+`,
+  String.raw`[-−]?(?:${DIGITS})${INLINE_SPACE}*${VULGAR_CLASS}`,
   String.raw`[-−]?\d+/\d+`,
   VULGAR_CLASS,
   String.raw`[-−]?(?:${DIGITS})(?:\.\d+)?`,
 ].join('|');
 
-/** Matches `3`, `3.5`, `1,200`, `1 1/2`, `1½`, `3/4`, `one`, `three-quarters`. */
-export const NUMBER_PATTERN = [
-  String.raw`[-−]?(?:${DIGITS})\s+\d+/\d+`,
-  String.raw`[-−]?(?:${DIGITS})\s*${VULGAR_CLASS}`,
-  String.raw`[-−]?\d+/\d+`,
-  VULGAR_CLASS,
-  String.raw`[-−]?(?:${DIGITS})(?:\.\d+)?`,
-  WORD_NUMBER,
-].join('|');
+/**
+ * Matches `3`, `3.5`, `1,200`, `1 1/2`, `1½`, `3/4`, `one`, `three-quarters`,
+ * `two and a half`, `a quarter`. The article in `a quarter` is part of the match, so a
+ * caller that keeps it for a following noun has to split it off.
+ */
+export const NUMBER_PATTERN = `${NUMERIC_PATTERN}|${WORD_NUMBER}`;
 
-/** `three-quarters`, `one and one-half`, `two thirds`, `half`. */
+function cardinal(word: string): number | undefined {
+  if (word === 'a' || word === 'an') return 1;
+  if (/^\d+$/.test(word)) return Number(word);
+  return CARDINALS[word];
+}
+
+/** `three-quarters`, `one and one-half`, `two and a half`, `a quarter`, `half`. */
 function parseWords(text: string): number | null {
   const parts = text.toLowerCase().replace(/-/g, ' ').split(/\s+/).filter((w) => w !== 'and');
   if (parts.length === 0) return null;
@@ -67,15 +115,15 @@ function parseWords(text: string): number | null {
     const denominator = DENOMINATORS[word];
     if (denominator !== undefined) {
       // A cardinal directly before it is the numerator: `three quarters`.
-      const numerator = i > 0 && CARDINALS[parts[i - 1]!] !== undefined ? 0 : 1;
+      const numerator = i > 0 && cardinal(parts[i - 1]!) !== undefined ? 0 : 1;
       total += numerator / denominator;
       continue;
     }
-    const cardinal = CARDINALS[word];
-    if (cardinal === undefined) return null;
+    const count = cardinal(word);
+    if (count === undefined) return null;
     const next = parts[i + 1];
-    if (next && DENOMINATORS[next] !== undefined) total += cardinal / DENOMINATORS[next]!;
-    else total += cardinal;
+    if (next && DENOMINATORS[next] !== undefined) total += count / DENOMINATORS[next]!;
+    else total += count;
   }
   return total;
 }
@@ -149,6 +197,11 @@ export function formatNumber(
   return trim(roundToSignificant(value, Math.max(2, sourceFigures)), 4);
 }
 
+/** A Fahrenheit value that reads as an oven dial setting rather than a measurement. */
+export function isOvenSetting(fahrenheit: number): boolean {
+  return Number.isInteger(fahrenheit) && fahrenheit >= 200 && fahrenheit % 25 === 0;
+}
+
 /**
  * Oven temperatures are written in fives, so `350F` should land on 175C rather than
  * 176.7C. The habit only applies to the oven range; `100F` is a fever, not a setting.
@@ -161,7 +214,6 @@ export function formatTemperature(
 ): string {
   if (typeof precision === 'number') return celsius.toFixed(precision);
   if (precision === 'exact') return trim(celsius, maxDecimals);
-  const isOvenSetting = Number.isInteger(source) && source >= 200 && source % 25 === 0;
-  if (isOvenSetting) return String(Math.round(celsius / 5) * 5);
+  if (isOvenSetting(source)) return String(Math.round(celsius / 5) * 5);
   return String(Math.round(celsius * 10) / 10);
 }

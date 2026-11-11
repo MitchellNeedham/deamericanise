@@ -91,6 +91,7 @@ const LABELS: Record<string, [label: string, example: string]> = {
   'units.range': ['Ranges', '1.5-3 metres for 5-10 feet'],
   'units.speed.mph': ['Miles per hour', '97 km/h for 60 mph'],
   'units.temperature.decade': ['Temperatures in decades', 'between 32 and 37°C for in the 90s'],
+  'units.temperature.difference': ['Temperature changes', '11°C warmer for 20°F warmer'],
   'units.temperature.fahrenheit': ['Fahrenheit', '175°C for 350°F'],
   'units.torque.foot-pound': ['Foot-pounds', '140 newton metres for 100 foot-pounds'],
   'units.volume.cubic-foot': ['Cubic feet', '280 litres for 10 cubic feet'],

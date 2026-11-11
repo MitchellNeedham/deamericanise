@@ -43,11 +43,37 @@ function covered(rewriter: DomRewriter): Array<[string, string]> {
     .sort();
 }
 
+/** The text nodes under `node` in document order, each open root's after its host's. */
+function textNodes(node: Node, out: Node[] = []): Node[] {
+  for (let child = node.firstChild; child; child = child.nextSibling) {
+    if (child.nodeType === 3) out.push(child);
+    textNodes(child, out);
+    const root = child.nodeType === 1 ? (child as Element).shadowRoot : null;
+    if (root) textNodes(root, out);
+  }
+  return out;
+}
+
+/** The page's HTML, then the HTML of each open root in document order. */
+function serialiseDeep(doc: Document): string {
+  const parts = [serialise(doc)];
+  const visit = (node: Node) => {
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      visit(child);
+      const root = child.nodeType === 1 ? (child as Element).shadowRoot : null;
+      if (root) {
+        parts.push(root.innerHTML);
+        visit(root);
+      }
+    }
+  };
+  visit(doc);
+  return parts.join('\n');
+}
+
 /** Each highlight by text node position, so two copies of a page can be compared. */
 function located(doc: Document, rewriter: DomRewriter): string[] {
-  const index = new Map<Node, number>();
-  const walker = doc.createTreeWalker(doc, 4);
-  for (let node = walker.nextNode(), i = 0; node; node = walker.nextNode(), i++) index.set(node, i);
+  const index = new Map(textNodes(doc).map((node, i) => [node, i]));
   return rewriter
     .highlights()
     .map(({ change, range }) => {
@@ -83,6 +109,16 @@ describe('runs of text', () => {
     expect(rewrite('<p>\n  It is 6 feet\n  <b>2</b>\n  inches wide.\n</p>')).toBe(
       '<p>\n  It is 1.88 metres<b></b> wide.\n</p>',
     );
+    expect(rewrite('<p>\n  Add 1\n  1/2 gallons, then walk two and a\n  half miles.\n</p>')).toBe(
+      '<p>\n  Add 5.7 litres, then walk 4 kilometres.\n</p>',
+    );
+    expect(rewrite('<p>\n  It is 6\n\n  feet wide.\n</p>')).toBe('<p>\n  It is 1.8 metres wide.\n</p>');
+  });
+
+  it('keeps the line breaks a replacement repeats from the source', () => {
+    expect(rewrite('<p>Plots are $40\n  for the year.</p>', { assumeAmerican: true })).toBe(
+      '<p>Plots are US$40\n  for the year.</p>',
+    );
   });
 
   it('skips a change that would move text into or out of a link', () => {
@@ -94,6 +130,27 @@ describe('runs of text', () => {
   it('applies a change that stays inside one link', () => {
     expect(rewrite('<p><a href="#">Stand 6 feet <b>2</b> inches away.</a></p>')).toBe(
       '<p><a href="#">Stand 1.88 metres<b></b> away.</a></p>',
+    );
+  });
+
+  it('keeps the sentence stop of a time when the next sentence is in another element', () => {
+    expect(rewrite('<p>It starts at <b>3 P.M.</b> <i>Bring</i> snacks.</p>')).toBe(
+      '<p>It starts at <b>3pm.</b> <i>Bring</i> snacks.</p>',
+    );
+    expect(rewrite('<p>It starts at <b>3 P.M.</b> <i>with</i> snacks.</p>')).toBe(
+      '<p>It starts at <b>3pm</b> <i>with</i> snacks.</p>',
+    );
+  });
+
+  it('ends the sentence of a time at the end of a run', () => {
+    expect(rewrite('<p>It starts at 3 P.M.</p><p>Bring snacks.</p>')).toBe(
+      '<p>It starts at 3pm.</p><p>Bring snacks.</p>',
+    );
+    expect(rewrite('<p>It starts at 3 P.M.<br>with snacks.</p>')).toBe(
+      '<p>It starts at 3pm.<br>with snacks.</p>',
+    );
+    expect(rewrite('<table><tr><td>3 P.M.</td></tr></table>')).toBe(
+      '<table><tbody><tr><td>3pm</td></tr></tbody></table>',
     );
   });
 
@@ -256,6 +313,19 @@ describe('what is left alone', () => {
   it('leaves a page in another language alone', () => {
     expect(rewrite('<p>the color</p>', {}, 'de')).toBe('<p>the color</p>');
     expect(rewrite('<p lang="en">the color</p>', {}, 'de')).toBe('<p lang="en">the colour</p>');
+  });
+
+  it('leaves a cookie banner alone and still localises the recipe beside it', () => {
+    const banner =
+      '<div role="dialog"><h2>Cookies</h2>' +
+      '<p>We use cookies to improve your experience on our site.</p>' +
+      '<div><button>Accept all cookies</button></div><div><button>Cookie settings</button></div>' +
+      '<div><a href="#" title="Read our cookie policy">Cookie Policy</a></div></div>';
+    const recipe = '<h1>Chocolate Chip Cookies</h1><p>Line a cookie sheet and bake the cookies.</p>';
+    expect(rewrite(banner + recipe, { preset: 'localise', dialect: 'en-GB' })).toBe(
+      banner +
+        '<h1>Chocolate Chip Biscuits</h1><p>Line a baking tray and bake the biscuits.</p>',
+    );
   });
 
   it('leaves a document in design mode alone', () => {
@@ -579,6 +649,190 @@ describe('a page that is still loading', () => {
   });
 });
 
+describe('shadow roots', () => {
+  function attach(host: Element, html: string, mode: ShadowRootMode = 'open'): ShadowRoot {
+    const root = host.attachShadow({ mode });
+    root.innerHTML = html;
+    return root;
+  }
+
+  it('rewrites the text a component renders itself', () => {
+    const doc = page('<p>Light color</p><x-card><span>Slotted color</span></x-card>');
+    const root = attach(doc.querySelector('x-card')!, '<p>Shadow color</p><slot></slot>');
+    deamericaniseDom(doc);
+    expect(doc.body.innerHTML).toBe('<p>Light colour</p><x-card><span>Slotted colour</span></x-card>');
+    expect(root.innerHTML).toBe('<p>Shadow colour</p><slot></slot>');
+  });
+
+  it('enters nested roots, and the root of the element it starts from', () => {
+    const doc = page('<x-outer></x-outer>');
+    const outer = attach(doc.querySelector('x-outer')!, 'the color<x-inner></x-inner>');
+    const inner = attach(outer.querySelector('x-inner')!, '<p title="gray">the theater</p>');
+    deamericaniseDom(doc.querySelector('x-outer')!);
+    expect(outer.innerHTML).toBe('the colour<x-inner></x-inner>');
+    expect(inner.innerHTML).toBe('<p title="grey">the theatre</p>');
+  });
+
+  it('enters a closed root only through a lookup that can find it', () => {
+    const doc = page('<x-card></x-card>');
+    const host = doc.querySelector('x-card')!;
+    const root = attach(host, '<p>the color</p>', 'closed');
+    deamericaniseDom(doc);
+    expect(root.innerHTML).toBe('<p>the color</p>');
+    deamericaniseDom(doc, { shadowRoot: (element) => (element === host ? root : element.shadowRoot) });
+    expect(root.innerHTML).toBe('<p>the colour</p>');
+  });
+
+  it('stays out of every root when the lookup finds none', () => {
+    const doc = page('<x-card></x-card>');
+    const root = attach(doc.querySelector('x-card')!, '<p>the color</p>');
+    deamericaniseDom(doc, { shadowRoot: () => null });
+    expect(root.innerHTML).toBe('<p>the color</p>');
+  });
+
+  it('asks only the elements that can host a root', () => {
+    const asked = new Set<string>();
+    const doc = page(
+      '<p>a <b>b</b> <a href="#">c</a></p><ul><li>d</li></ul><input><video></video>' +
+        '<details><summary>e</summary></details><svg><g></g></svg><x-card></x-card><div></div><span></span>',
+    );
+    deamericaniseDom(doc, {
+      shadowRoot: (host) => {
+        asked.add(host.localName);
+        return null;
+      },
+    });
+    expect([...asked].sort()).toEqual(['body', 'div', 'p', 'span', 'x-card']);
+  });
+
+  it.each([
+    ['lang', '<x-card lang="fr"></x-card>'],
+    ['translate="no"', '<x-card translate="no"></x-card>'],
+    ['notranslate', '<div class="notranslate"><x-card></x-card></div>'],
+    ['editable', '<div contenteditable="true"><x-card></x-card></div>'],
+    ['code', '<code><x-card></x-card></code>'],
+  ])("carries the host's %s into its root", (_, body) => {
+    const doc = page(body);
+    const root = attach(doc.querySelector('x-card')!, '<p>Couleur color</p>');
+    deamericaniseDom(doc);
+    expect(root.innerHTML).toBe('<p>Couleur color</p>');
+  });
+
+  it("reads the host's scope when started from a root", () => {
+    const doc = page('<x-card lang="fr"></x-card>');
+    const root = attach(doc.querySelector('x-card')!, '<p>Couleur color</p>');
+    new DomRewriter(root).run();
+    expect(root.innerHTML).toBe('<p>Couleur color</p>');
+  });
+
+  it('never joins a run across the edge of a root', () => {
+    const doc = page('<x-size>2 inches</x-size>');
+    const root = attach(doc.querySelector('x-size')!, 'It is 6 feet <slot></slot>');
+    deamericaniseDom(doc);
+    expect(root.innerHTML).toBe('It is 1.8 metres <slot></slot>');
+    expect(doc.body.innerHTML).toBe('<x-size>5.1 centimetres</x-size>');
+  });
+
+  it('counts and highlights changes inside a root', () => {
+    const doc = page('<p>the color</p><x-card></x-card>');
+    const root = attach(doc.querySelector('x-card')!, '<p>the theater</p>');
+    const rewriter = new DomRewriter(doc);
+    rewriter.run();
+    expect(rewriter.changes().map((c) => c.after)).toEqual(['colour', 'theatre']);
+    expect(covered(rewriter)).toEqual([
+      ['colour', 'colour'],
+      ['theatre', 'theatre'],
+    ]);
+    const [, inside] = rewriter.highlights().sort((a, b) => a.change.after.localeCompare(b.change.after));
+    expect(inside!.range.startContainer.getRootNode()).toBe(root);
+  });
+
+  it('follows text that changes inside a root', () => {
+    const doc = page('<x-card></x-card>');
+    const root = attach(doc.querySelector('x-card')!, '<p>the color</p>');
+    const rewriter = new DomRewriter(doc);
+    rewriter.watch();
+    root.querySelector('p')!.append(' and gray');
+    root.append('the theater');
+    rewriter.flush();
+    expect(root.innerHTML).toBe('<p>the colour and grey</p>the theatre');
+  });
+
+  it('finds the root of a component added later', () => {
+    const doc = page('<p>the color</p>');
+    const rewriter = new DomRewriter(doc);
+    rewriter.watch();
+    const card = doc.createElement('x-card');
+    const root = attach(card, '<p>the theater</p>');
+    doc.body.append(card);
+    rewriter.flush();
+    expect(root.innerHTML).toBe('<p>the theatre</p>');
+    root.querySelector('p')!.append(' is gray');
+    rewriter.flush();
+    expect(root.innerHTML).toBe('<p>the theatre is grey</p>');
+  });
+
+  it("follows the host's scope as it changes", () => {
+    const doc = page('<x-card></x-card>');
+    const host = doc.querySelector('x-card')!;
+    const root = attach(host, '<p>the color</p>');
+    const rewriter = new DomRewriter(doc);
+    rewriter.watch();
+    expect(root.innerHTML).toBe('<p>the colour</p>');
+    host.setAttribute('lang', 'fr');
+    rewriter.flush();
+    expect(root.innerHTML).toBe('<p>the color</p>');
+  });
+
+  it('leaves a root alone once its host is out of the page', () => {
+    const doc = page('<x-card></x-card>');
+    const host = doc.querySelector('x-card')!;
+    const root = attach(host, '<p>the color</p>');
+    const rewriter = new DomRewriter(doc);
+    rewriter.watch();
+    host.remove();
+    rewriter.flush();
+    root.append('the theater');
+    rewriter.flush();
+    expect(root.innerHTML).toBe('<p>the colour</p>the theater');
+  });
+
+  it('finds roots attached while the page loads once the document has loaded', () => {
+    const doc = page('');
+    let state: DocumentReadyState = 'loading';
+    Object.defineProperty(doc, 'readyState', { configurable: true, get: () => state });
+    const rewriter = new DomRewriter(doc);
+    rewriter.watch();
+    const card = doc.createElement('x-card');
+    doc.body.append(card);
+    rewriter.flush();
+    const root = attach(card, '<p>the color</p>');
+    doc.body.append(doc.createElement('p'));
+    rewriter.flush();
+    expect(root.innerHTML).toBe('<p>the color</p>');
+    expect(rewriter.changes()).toEqual([]);
+    state = 'interactive';
+    doc.dispatchEvent(new Event('DOMContentLoaded'));
+    expect(root.innerHTML).toBe('<p>the colour</p>');
+    root.append('the theater');
+    rewriter.flush();
+    expect(root.innerHTML).toBe('<p>the colour</p>the theatre');
+  });
+
+  it('puts the text of every root back on stop', () => {
+    const doc = page('<p>the color</p><x-outer></x-outer>');
+    const outer = attach(doc.querySelector('x-outer')!, '<p title="gray">the color</p><x-inner></x-inner>');
+    const inner = attach(outer.querySelector('x-inner')!, 'It is 6 feet <b>2</b> inches');
+    const before = [doc.body.innerHTML, outer.innerHTML, inner.innerHTML];
+    const rewriter = new DomRewriter(doc);
+    rewriter.watch();
+    expect(inner.innerHTML).toBe('It is 1.88 metres<b></b>');
+    rewriter.stop({ restore: true });
+    expect([doc.body.innerHTML, outer.innerHTML, inner.innerHTML]).toEqual(before);
+    expect(rewriter.highlights()).toEqual([]);
+  });
+});
+
 /**
  * Builds `source` into an empty document the way a parser would: every node is added at
  * the end, text arrives in pieces, and the observer gets to run at random points.
@@ -621,6 +875,11 @@ function stream(source: Document, options: DomOptions, seed: number): [Document,
     for (const attribute of element.attributes) clone.setAttribute(attribute.name, attribute.value);
     into.appendChild(clone);
     maybeFlush();
+    // A parser fills a declarative shadow root before the host's own children.
+    if (element.shadowRoot) {
+      const root = clone.attachShadow({ mode: 'open' });
+      for (let child = element.shadowRoot.firstChild; child; child = child.nextSibling) copy(child, root);
+    }
     for (let child = element.firstChild; child; child = child.nextSibling) copy(child, clone);
   };
 
@@ -681,5 +940,34 @@ describe('html documents', () => {
       rewriter.stop({ restore: true });
       expect(serialise(doc)).toBe(before);
     });
+  });
+});
+
+describe('a page with shadow roots', () => {
+  function build(): Document {
+    const doc = parse(
+      '<!doctype html><html lang="en-US"><head><title>t</title></head><body>' +
+        '<p>The color of the theater was gray, and they canceled.</p>' +
+        '<x-card><span>About 5 miles away.</span></x-card>' +
+        '<p>Due 03/04/2024.</p></body></html>',
+    );
+    const root = doc.querySelector('x-card')!.attachShadow({ mode: 'open' });
+    root.innerHTML = '<p>It is 6 feet <b>2</b> inches wide, filed 3/14/2024.</p><x-inner></x-inner><slot></slot>';
+    const inner = root.querySelector('x-inner')!.attachShadow({ mode: 'open' });
+    inner.innerHTML = '<p>Bake at 350 °F for an hour, my favorite.</p>';
+    return doc;
+  }
+
+  it('ends the same however it streams in', () => {
+    const whole = build();
+    const once = new DomRewriter(whole);
+    once.run();
+    expect(serialiseDeep(whole)).toContain('It is 1.88 metres<b></b> wide, filed 2024-03-14.');
+    expect(serialiseDeep(whole)).toContain('Due 2024-03-04.');
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const [streamed, rewriter] = stream(build(), {}, seed);
+      expect(serialiseDeep(streamed)).toBe(serialiseDeep(whole));
+      expect(located(streamed, rewriter)).toEqual(located(whole, once));
+    }
   });
 });

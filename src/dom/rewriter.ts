@@ -5,9 +5,10 @@ import type { AmericanSignals, Change, Options, ResolvedOptions } from '../types
 import { distribute, type Placement } from './distribute.js';
 import {
   attributesAllowed,
+  canHostShadowRoot,
   containerOf,
-  containersIn,
-  elementsIn,
+  containersAndElementsIn,
+  hostOf,
   joinsRun,
   lastRunIsOpen,
   ownAttributes,
@@ -19,6 +20,7 @@ import {
   textAllowed,
   type Scope,
   type Segment,
+  type ShadowLookup,
 } from './segment.js';
 
 /**
@@ -37,6 +39,15 @@ export interface DomOptions extends Options {
   verdict?: Verdict;
   /** Also rewrite `title`, `alt` and `placeholder`. Defaults to true. */
   attributes?: boolean;
+  /**
+   * Finds the shadow root an element hosts, so the text a web component renders is
+   * rewritten too. Defaults to `element.shadowRoot`, which finds open roots only. A browser
+   * extension can pass a lookup that finds closed roots as well. Return `null` to leave a
+   * root alone, and `() => null` to stay out of shadow DOM altogether. Pass the same lookup
+   * to `setOptions`: text already rewritten in a root that a new lookup no longer finds is
+   * left as it is.
+   */
+  shadowRoot?: (host: Element) => ShadowRoot | null;
 }
 
 export interface DomResult {
@@ -84,6 +95,8 @@ const NO_EVIDENCE = detectAmerican('');
 const SHOW_ELEMENT = 1;
 const SHOW_TEXT = 4;
 
+const openShadowRoot: ShadowLookup = (host) => host.shadowRoot;
+
 /**
  * Rewrites the text of a document or element in place, and with `watch` keeps it
  * rewritten while the page loads and changes.
@@ -117,6 +130,8 @@ export class DomRewriter {
   private rewrote = false;
 
   private observer: MutationObserver | null = null;
+  /** Shadow roots whose content has been walked, each observed while watching. */
+  private known = new WeakSet<ShadowRoot>();
   private loading = false;
   private readonly deferred = new Set<Node>();
   private readonly dirtyContainers = new Set<Node>();
@@ -152,6 +167,8 @@ export class DomRewriter {
     const View = globalThis.MutationObserver ?? this.document.defaultView!.MutationObserver;
     this.observer = new View((records) => this.onRecords(records));
     this.observer.observe(this.root, OBSERVED);
+    // Roots walked without this observer are not observed by it, so the rescan finds them again.
+    this.known = new WeakSet();
     this.rescan();
   }
 
@@ -178,11 +195,9 @@ export class DomRewriter {
     this.deferred.clear();
 
     if (restore) {
-      const texts = this.document.createTreeWalker(this.root, SHOW_TEXT);
-      for (let node = texts.nextNode(); node; node = texts.nextNode()) this.restoreText(node as Text);
-      const elements = this.document.createTreeWalker(this.root, SHOW_ELEMENT);
-      for (let node = elements.nextNode(); node; node = elements.nextNode()) {
-        this.restoreAttributes(node as Element);
+      for (const node of this.walk(SHOW_ELEMENT | SHOW_TEXT)) {
+        if (node.nodeType === 3) this.restoreText(node as Text);
+        else if (node.nodeType === 1) this.restoreAttributes(node as Element);
       }
       this.texts = new WeakMap();
       this.attributeValues = new WeakMap();
@@ -196,7 +211,7 @@ export class DomRewriter {
   /** The changes in place right now. */
   changes(): Change[] {
     const out: Change[] = [];
-    const [containers, elements] = this.everything();
+    const [containers, elements] = this.everything(this.findShadowRoot);
     for (const [container, scope] of containers) {
       for (const run of ownRuns(container, scope)) {
         const cached = this.runCache.get(run.nodes[0]!);
@@ -259,7 +274,7 @@ export class DomRewriter {
 
   private configure(options: DomOptions): void {
     this.options = options;
-    const { verdict, attributes, ...rest } = options;
+    const { verdict, attributes, shadowRoot, ...rest } = options;
     this.resolved = new Map();
     for (const assume of [undefined, true, false]) {
       this.resolved.set(assume, resolveOptions({ ...rest, assumeAmerican: assume }));
@@ -302,11 +317,20 @@ export class DomRewriter {
     this.flush();
     this.loading = false;
     const containers = new Map<Node, Scope>();
+    const elements = new Map<Element, Scope>();
     for (const container of this.deferred) {
       if (this.holds(container)) containers.set(container, scopeOf(container));
     }
     this.deferred.clear();
-    this.process(containers, new Map());
+    // A custom element defined by a script at the end of the page upgrades where it stands,
+    // and nothing reports the root it attaches.
+    for (const node of this.walk(SHOW_ELEMENT)) {
+      if (node.nodeType === 11 && node !== this.root && !this.known.has(node as ShadowRoot)) {
+        this.adopt(node as ShadowRoot);
+        this.collect(node, containers, elements);
+      }
+    }
+    this.process(containers, elements);
   };
 
   private readonly onStyled = (): void => {
@@ -375,26 +399,77 @@ export class DomRewriter {
     return cached.nodes.every((node, i) => node.data === cached.outputs[i]);
   }
 
+  /** Whether `node` is in the part of the page this rewriter walks, shadow roots included. */
   private holds(node: Node): boolean {
-    return node === this.root || this.root.contains(node);
+    for (let n = node; ; ) {
+      if (n === this.root || this.root.contains(n)) return true;
+      const top = n.getRootNode();
+      const host = hostOf(top);
+      if (!host || this.findShadowRoot(host) !== top) return false;
+      n = host;
+    }
+  }
+
+  // ------------------------------- Shadow roots -------------------------------
+
+  private readonly findShadowRoot: ShadowLookup = (host) => {
+    if (!canHostShadowRoot(host)) return null;
+    return (this.options.shadowRoot ?? openShadowRoot)(host);
+  };
+
+  /** Finds a root while walking its host, and follows it from then on. */
+  private readonly enterShadowRoot: ShadowLookup = (host) => {
+    const root = this.findShadowRoot(host);
+    if (root && !this.known.has(root)) this.adopt(root);
+    return root;
+  };
+
+  private adopt(root: ShadowRoot): void {
+    this.known.add(root);
+    this.observer?.observe(root, OBSERVED);
+  }
+
+  /**
+   * Every element, and every node `show` asks for, under the root and in the shadow roots
+   * below it. Each tree's own root comes first, so the shadow roots are listed too.
+   */
+  private *walk(show: number): Generator<Node> {
+    const trees: Node[] = [this.root];
+    for (let tree = trees.pop(); tree; tree = trees.pop()) {
+      const walker = this.document.createTreeWalker(tree, show | SHOW_ELEMENT);
+      for (let node: Node | null = tree; node; node = walker.nextNode()) {
+        const root = node.nodeType === 1 ? this.findShadowRoot(node as Element) : null;
+        if (root) trees.push(root);
+        yield node;
+      }
+    }
   }
 
   // ------------------------------- Rewriting -------------------------------
 
-  private everything(): [Map<Node, Scope>, Map<Element, Scope>] {
+  private everything(
+    shadowRootOf: ShadowLookup = this.enterShadowRoot,
+  ): [Map<Node, Scope>, Map<Element, Scope>] {
     const containers = new Map<Node, Scope>();
     const elements = new Map<Element, Scope>();
-    this.collect(this.root, containers, elements);
+    this.collect(this.root, containers, elements, shadowRootOf);
     return [containers, elements];
   }
 
-  private collect(node: Node, containers: Map<Node, Scope>, elements: Map<Element, Scope>): void {
-    const scope = scopeOf(node);
+  /**
+   * Gathers what is at or below `node`. Walking with `enterShadowRoot` follows each root
+   * it finds, so only a walk that goes on to rewrite what it found should use it.
+   */
+  private collect(
+    node: Node,
+    containers: Map<Node, Scope>,
+    elements: Map<Element, Scope>,
+    shadowRootOf: ShadowLookup = this.enterShadowRoot,
+  ): void {
     const foundContainers: Array<[Node, Scope]> = [];
-    containersIn(node, scope, foundContainers);
-    for (const [container, s] of foundContainers) containers.set(container, s);
     const foundElements: Array<[Element, Scope]> = [];
-    elementsIn(node, scope, foundElements);
+    containersAndElementsIn(node, scopeOf(node), foundContainers, foundElements, shadowRootOf);
+    for (const [container, s] of foundContainers) containers.set(container, s);
     for (const [element, s] of foundElements) elements.set(element, s);
   }
 
@@ -413,7 +488,11 @@ export class DomRewriter {
         continue;
       }
       const runs = ownRuns(container, scope);
-      if (this.loading && runs.length > 0 && lastRunIsOpen(container, this.document)) {
+      if (
+        this.loading &&
+        runs.length > 0 &&
+        lastRunIsOpen(container, this.document, this.findShadowRoot)
+      ) {
         runs.pop();
         this.deferred.add(container);
       } else {
@@ -504,7 +583,8 @@ export class DomRewriter {
 
     const sources = nodes.map((node) => this.sourceOfText(node));
     const locked = nodes.map((node) => this.abandoned.has(node));
-    const changes = this.find(text, lang, assume);
+    const laidOut = asLaidOut(text);
+    const changes = inSource(text, laidOut, this.find(laidOut, lang, assume));
     const { outputs, applied, placed } = distribute(text, sources, anchors, locked, changes);
     nodes.forEach((node, i) => this.writeText(node, sources[i]!, outputs[i]!));
 
@@ -616,6 +696,30 @@ export class DomRewriter {
 
 function sameNodes(a: Text[], b: Text[]): boolean {
   return a.length === b.length && a.every((node, i) => node === b[i]);
+}
+
+/**
+ * A run's text with each line break in its source turned into a space, one for one so every
+ * offset holds. A page lays such a break out as a space unless a style preserves it, but the
+ * rules never join a number across a line break, nor a measurement across a blank line.
+ */
+function asLaidOut(text: string): string {
+  return text.replace(/[\n\r\f]/g, ' ');
+}
+
+/**
+ * Puts the source's line breaks back into changes found in its laid-out text, including into
+ * a replacement that repeats the matched text, as `$40` followed by a line break does.
+ */
+function inSource(text: string, laidOut: string, changes: Change[]): Change[] {
+  return changes.map((change) => {
+    const before = text.slice(change.start, change.end);
+    const seen = laidOut.slice(change.start, change.end);
+    if (seen === before) return change;
+    // A match of nothing but spaces could stand for any space in the replacement.
+    const after = /\S/.test(seen) ? change.after.split(seen).join(before) : change.after;
+    return { ...change, before, after };
+  });
 }
 
 /** Rewrites a document or element in place, once. */

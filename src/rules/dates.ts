@@ -5,7 +5,7 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const MONTH_PATTERN = MONTHS.map((m) => `${m}|${m.slice(0, 3)}`).join('|');
+export const MONTH_PATTERN = MONTHS.map((m) => `${m}|${m.slice(0, 3)}`).join('|');
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');

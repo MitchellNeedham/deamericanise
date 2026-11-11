@@ -13,6 +13,7 @@ import {
   NUMBER_PATTERN,
   NUMERIC_PATTERN,
   SOFT_SPACE,
+  WHOLE_NUMBER,
   formatNumber,
   formatTemperature,
   isOvenSetting,
@@ -496,8 +497,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       String.raw`${S}+an?(?=\s)${SOFT_SPACE}(${words})(?![\w-])`,
     'gi',
   );
+  // A count straight after `/` or `-` is the tail of `1 1/2` or `twenty-two`, not a number.
   const andAFraction = new RegExp(
-    String.raw`(?<![\w.])an?(?=\s)${SOFT_SPACE}(${words})${S}+and${S}+(${COUNTED_FRACTION})(?![\w-])`,
+    String.raw`${START}(an?(?=\s)|(?<![-−/])${WHOLE_NUMBER})${SOFT_SPACE}(${words})` +
+      String.raw`${S}+and${S}+(${COUNTED_FRACTION})(?![\w-])`,
     'gi',
   );
 
@@ -656,9 +659,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       }
       andAFraction.lastIndex = 0;
       for (const match of ctx.text.matchAll(andAFraction)) {
-        const fraction = parseNumber(match[2]!);
-        const value = fraction === null ? null : 1 + fraction;
-        pushWrapped(ctx, changes, match.index, match[0], value, match[1]!);
+        const whole = parseNumber(match[1]!);
+        const fraction = parseNumber(match[3]!);
+        const value = whole === null || fraction === null ? null : whole + fraction;
+        pushWrapped(ctx, changes, match.index, match[0], value, match[2]!);
       }
       return changes;
     },

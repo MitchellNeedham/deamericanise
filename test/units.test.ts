@@ -585,6 +585,93 @@ describe('numbers written out in words', () => {
   });
 });
 
+describe('a fraction word that is also an ordinal', () => {
+  const cups = (input: string) => convert(input, { rules: { 'units.volume.cup': true } });
+
+  it.each`
+    unchanged                          | why
+    ${'the third mile marker'}         | ${'"the" makes it an ordinal'}
+    ${'the third mile'}                | ${'the same, at the end of the text'}
+    ${'every third mile'}              | ${'"every" as well'}
+    ${'his third pound'}               | ${'a possessive as well'}
+    ${'every third pound of meat'}     | ${'the same, before "of"'}
+    ${'the fourth inch'}               | ${'"fourth" too'}
+    ${'the eighth inch'}               | ${'"eighth" too'}
+    ${'the sixteenth inch'}            | ${'"sixteenth" too'}
+    ${'the third-mile marker'}         | ${'hyphenated'}
+    ${'third mile'}                    | ${'with nothing before it'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    unchanged                          | why
+    ${'their fourth cup of coffee'}    | ${'an ordinal cup'}
+    ${'the third cup of coffee'}       | ${'the same'}
+  `('leaves "$unchanged" alone with cups switched on ($why)', ({ unchanged }) => {
+    expect(cups(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                              | expected                   | why
+    ${'a third of a mile'}             | ${'540 metres'}            | ${'"a" counts it'}
+    ${'a third mile'}                  | ${'540 metres'}            | ${'the same, without "of"'}
+    ${'one-third mile'}                | ${'540 metres'}            | ${'"one" counts it'}
+    ${'one third mile'}                | ${'540 metres'}            | ${'the same, with a space'}
+    ${'the one-third mile marker'}     | ${'the 540 metre marker'}  | ${'a count after "the" is still a fraction'}
+    ${'a third-mile loop'}             | ${'a 540 metre loop'}      | ${'attributive'}
+    ${'the last third of a mile'}      | ${'the last 540 metres'}   | ${'"of a" makes even a bare one a fraction'}
+    ${'one-fourth pound of butter'}    | ${'110 grams of butter'}   | ${'"fourth" is a fraction word'}
+    ${'a fourth of a pound'}           | ${'110 grams'}             | ${'the same, with "of a"'}
+    ${'three fourths of a mile'}       | ${'1.2 kilometres'}        | ${'a plural'}
+    ${'a fourth-inch gap'}             | ${'a 6.4 millimetre gap'}  | ${'attributive'}
+    ${'an eighth inch'}                | ${'3.2 millimetres'}       | ${'"an" counts it'}
+    ${'three and a third miles'}       | ${'5.4 kilometres'}        | ${'after a whole number'}
+    ${'the last quarter mile'}         | ${'the last 400 metres'}   | ${'"quarter" is never an ordinal'}
+    ${'half mile'}                     | ${'800 metres'}            | ${'nor is "half"'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                              | expected                   | why
+    ${'two thirds of a cup'}           | ${'160 millilitres'}       | ${'a counted plural'}
+    ${'three-fourths cup'}             | ${'180 millilitres'}       | ${'"fourths"'}
+    ${'one and three-fourths cups'}    | ${'410 millilitres'}       | ${'after a whole number'}
+    ${'two and a fourth cups'}         | ${'530 millilitres'}       | ${'the same, with "a"'}
+  `('$input -> $expected with cups switched on ($why)', ({ input, expected }) => {
+    expect(cups(input)).toBe(expected);
+  });
+});
+
+describe('a fraction after a counted unit', () => {
+  it.each`
+    input                                       | expected                     | why
+    ${'two pounds and a half of sugar'}         | ${'1.1 kilograms of sugar'}  | ${'a word number'}
+    ${'2 pounds and a half of sugar'}           | ${'1.1 kilograms of sugar'}  | ${'digits'}
+    ${'two miles and a half'}                   | ${'4 kilometres'}            | ${'at the end of the text'}
+    ${'five miles and a half away'}             | ${'8.9 kilometres away'}     | ${'before a direction'}
+    ${'three feet and a half'}                  | ${'1.1 metres'}              | ${'feet'}
+    ${'two pounds and a quarter'}               | ${'1 kilogram'}              | ${'a quarter'}
+    ${'two gallons and a third'}                | ${'8.8 litres'}              | ${'a third'}
+    ${'a pound and a fourth'}                   | ${'570 grams'}               | ${'a fourth, after "a"'}
+    ${'two pounds and three quarters of sugar'} | ${'1.2 kilograms of sugar'}  | ${'a counted fraction'}
+    ${'about a mile and a half'}                | ${'about 2.4 kilometres'}    | ${'"a" still counts one'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                              | why
+    ${'two pounds and a half hour later'}  | ${'910 grams and a half hour later'}  | ${'the half belongs to the hour'}
+    ${'two pounds\nand a half'}            | ${'910 grams\nand a half'}            | ${'the fraction is on the next line'}
+    ${'1 1/2 pounds and a half'}           | ${'680 grams and a half'}             | ${'the 2 of 1 1/2 is not a count'}
+    ${'between 5 and 10 miles and a half'} | ${'between 8 and 16 kilometres and a half'} | ${'nor is the end of a range'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
 describe('tons, when the document says which kind', () => {
   it.each`
     input                                                        | expected                                                     | why

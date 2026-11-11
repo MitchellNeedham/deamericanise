@@ -12,6 +12,7 @@ import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
   INLINE_SPACE,
+  NOT_IN_COMPOUND,
   NUMBER_PATTERN,
   NUMERIC_PATTERN,
   SOFT_SPACE,
@@ -555,7 +556,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
   // Written-out units only, because an abbreviation can be a word: `a gal and a half`.
   const fractionOf = new RegExp(
-    String.raw`(?<![\w.])(?:((?:an?${S}+)?half)|(${FRACTION_WORDS})${S}+of)` +
+    String.raw`(?<![\w.])${NOT_IN_COMPOUND}(?:((?:an?${S}+)?half)|(${FRACTION_WORDS})${S}+of)` +
       String.raw`${S}+an?(?=\s)${SOFT_SPACE}(${words})(?![\w-])`,
     'gi',
   );

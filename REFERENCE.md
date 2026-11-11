@@ -240,6 +240,12 @@ read as a fraction only with a count before them or `of a` after them: `one-thir
 `a third mile` and `the last third of a mile` convert, while `the third mile` and
 `every third mile` are left alone. `half` and `quarter` need neither.
 
+A tens word and a units word are one number, joined by a hyphen or a space:
+`twenty-two pounds` and `twenty two pounds` both become `10 kilograms`. A number never
+starts inside a hyphenated word or straight after a tens word, so a compound that cannot be
+read whole is left as written. That covers `catch-twenty-two miles`, and
+`twenty five-pound bags`, which may be twenty bags or one weight.
+
 A number never continues onto the next line, so the `14` that ends `Step 14` is never taken
 as the whole part of a `1/2 gallon` that opens the next line. The rest of a measurement can
 wrap: `6` at the end of one line and `feet` at the start of the next still convert, and so

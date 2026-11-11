@@ -390,10 +390,54 @@ function metricSpelling(text: string): string {
 const BRACKET_AFTER = new RegExp(String.raw`^${SOFT_SPACE}\(([^()]{1,40})\)`);
 
 /**
+ * A `/` or `or` between one measurement in both systems, as in `180°C/350°F/gas 4`. A
+ * slash before a bare unit is a rate (`5 gallons/minute`), so the metric side needs a figure.
+ */
+const PAIR_JOIN = softGap(String.raw`(?:/|(?<=\s)or(?=\s))`);
+// `(?=\S)` makes a join that wraps take its line break, so the match ends at the next value.
+const METRIC_PAIRED_BEFORE = new RegExp(
+  String.raw`(?<![\w.])(${METRIC_VALUE})${PAIR_JOIN}(?=\S)`,
+  'g',
+);
+const METRIC_PAIRED_AFTER = new RegExp(String.raw`^${PAIR_JOIN}(${METRIC_VALUE})(?!\w)`);
+/** A cheap test passed by every text that `METRIC_PAIRED_BEFORE` can end, and few others. */
+const ENDS_IN_JOIN = /(?:\/|\sor)\s*$/;
+
+/**
+ * The metric text gives the same measurement as `body`, a rule's conversion. Brackets and
+ * pairs share this test, so `6 feet (2 m)` and `6 feet/2 m` are always read alike.
+ */
+function restatesBody(metric: string, body: string, ruleId: string): boolean {
+  const given = readMetric(metric);
+  const converted = readMetric(body);
+  if (!given || !converted) return false;
+  return restatesConversion(given, converted, ruleId === ABSOLUTE_ID);
+}
+
+/** `180°C/350°F` and `180°C or 350°F` give the imperial value after the metric one it restates. */
+function followsItsMetric(
+  ctx: RuleContext,
+  start: number,
+  end: number,
+  body: string,
+  ruleId: string,
+): boolean {
+  const from = Math.max(0, start - CONTEXT_WINDOW);
+  if (!ENDS_IN_JOIN.test(ctx.text.slice(from, start))) return false;
+  // The window runs on to `end` so a line break in the join can see that the next line
+  // holds the measurement and opens no new block.
+  for (const match of ctx.text.slice(from, end).matchAll(METRIC_PAIRED_BEFORE)) {
+    if (from + match.index + match[0].length === start) return restatesBody(match[1]!, body, ruleId);
+  }
+  return false;
+}
+
+/**
  * `30-60 feet (9-18 m)` already carries its own conversion, so converting the imperial
  * half produces `9.1-18 metres (9-18 m)`. Swallow the parenthetical instead and keep the
  * author's own figure, which is the one they rounded on purpose. A bracket that says
  * anything else, as `6 feet (2 kg)` and `6 feet (5 m)` do, stays and nothing is lost.
+ * `350°F/180°C` and `350°F or 180°C` collapse the same way.
  */
 function redundantMetric(
   ctx: RuleContext,
@@ -401,18 +445,16 @@ function redundantMetric(
   body: string,
   ruleId: string,
 ): { end: number; after: string } | null {
-  const match = BRACKET_AFTER.exec(ctx.text.slice(end));
-  if (!match) return null;
-  const bracket = readMetric(match[1]!);
-  const converted = readMetric(body);
-  if (!bracket || !converted) return null;
-  if (!restatesConversion(bracket, converted, ruleId === ABSOLUTE_ID)) return null;
+  const rest = ctx.text.slice(end);
+  const match = BRACKET_AFTER.exec(rest) ?? METRIC_PAIRED_AFTER.exec(rest);
+  if (!match || !restatesBody(match[1]!, body, ruleId)) return null;
   return { end: end + match[0].length, after: metricSpelling(match[1]!.trim()) };
 }
 
 /**
- * Records one converted measurement, collapsing a redundant parenthetical if there is one.
- * A measurement that is itself the parenthetical after its metric value is not recorded.
+ * Records one converted measurement, collapsing a redundant parenthetical or pair if there
+ * is one. A measurement that is itself the parenthetical after its metric value is not
+ * recorded, and one paired after the metric value it restates is held as written.
  */
 function pushMeasurement(
   ctx: RuleContext,
@@ -424,6 +466,10 @@ function pushMeasurement(
   priority: number,
 ): void {
   if (restatesMetric(ctx, start, start + matched.length)) return;
+  if (followsItsMetric(ctx, start, start + matched.length, body, ruleId)) {
+    changes.push(hold(start, matched, ruleId, priority));
+    return;
+  }
   const redundant = redundantMetric(ctx, start + matched.length, body, ruleId);
   if (redundant) {
     changes.push({

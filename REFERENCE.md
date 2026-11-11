@@ -324,7 +324,8 @@ pounds (`a 10-pound note`). A money word reaches only its own amount, so
 `It cost $20 for 5 pounds of beef` still converts. A `£` reaches the whole sentence, but a
 weight word in the measurement's own phrase (`lost`, `weighs`, `of beef`, `a 5-pound bag`)
 outranks it. `lb` and `lbs` are never money, and `respectConventions: false` does not
-convert money.
+convert money. An amount of money is held whole, as a conventional size is, so no other
+rule rewrites any part of it.
 
 **Dates.** `3/14/2024` becomes `2024-03-14` without needing to be told anything, because
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
@@ -796,7 +797,10 @@ there each root needs the rules in its own styles.
   letterbox, because the second sentence says nothing about voicemail. A bare `The mailbox
   is full.` reads as a bounce notice and stays a mailbox, though it can be a letterbox.
 - `localise` rewrites emergency numbers, which is right for a translated recipe and wrong
-  for a news story about America. It is `risky`-tagged; `--confidence safe,moderate` drops
+  for a news story about America. It changes `911` only where the text calls it or names
+  the service by it (`call 911`, `dial 911`, `a 911 call`, `911 dispatchers`), so `$1,911`,
+  `911 feet`, `Porsche 911` and `Room 911` stay as written, and so does a bare
+  `Emergency: 911`. It is `risky`-tagged; `--confidence safe,moderate` drops
   it, and so does `--rule 'dialect.*=false'`.
 
 ## The browser demo

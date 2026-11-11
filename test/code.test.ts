@@ -113,6 +113,57 @@ describe('picking the handler from a filename', () => {
   });
 });
 
+describe('a language option overrides the filename', () => {
+  it.each`
+    filename           | language        | source                              | expected
+    ${'stdin'}         | ${'python'}     | ${'x = "gray" # the color'}         | ${'x = "gray" # the colour'}
+    ${'notes.txt'}     | ${'python'}     | ${'x = "gray" # the color'}         | ${'x = "gray" # the colour'}
+    ${'settings.json'} | ${'ruby'}       | ${'x = "gray" # the color'}         | ${'x = "gray" # the colour'}
+    ${'stdin'}         | ${'shell'}      | ${'x="gray" # the color'}           | ${'x="gray" # the colour'}
+    ${'stdin'}         | ${'golang'}     | ${'x := "gray" // the color'}       | ${'x := "gray" // the colour'}
+    ${'stdin'}         | ${'typescript'} | ${'x = "gray"; // the color'}       | ${'x = "gray"; // the colour'}
+    ${'stdin'}         | ${'Dockerfile'} | ${'ENV X=gray # the color'}         | ${'ENV X=gray # the colour'}
+    ${'a.ts'}          | ${'md'}         | ${'x = "gray"; // the color'}       | ${'x = "grey"; // the colour'}
+    ${'a.ts'}          | ${'MD'}         | ${'x = "gray"; // the color'}       | ${'x = "grey"; // the colour'}
+    ${'a.ts'}          | ${'.txt'}       | ${'x = "gray"; // the color'}       | ${'x = "grey"; // the colour'}
+    ${'stdin'}         | ${'ts'}         | ${'x = "gray"; // the color'}       | ${'x = "gray"; // the colour'}
+    ${'stdin'}         | ${'.ts'}        | ${'x = "gray"; // the color'}       | ${'x = "gray"; // the colour'}
+    ${'a.py'}          | ${'ts'}         | ${'x = "gray"; // the color'}       | ${'x = "gray"; // the colour'}
+    ${'NOTES'}         | ${'md'}         | ${'The color.'}                     | ${'The colour.'}
+  `('$filename with language $language reads "$source" as "$expected"', ({ filename, language, source, expected }) => {
+    expect(deamericaniseFile(filename, source, { language }).text).toBe(expected);
+  });
+
+  it.each(['settings.json', 'stdin', 'a.ts', 'README.md'])(
+    'throws for a language it does not know, whatever the filename (%s)',
+    (filename) => {
+      expect(() => deamericaniseFile(filename, 'The color.', { language: 'nosuchlang' })).toThrow(UnknownLanguageError);
+    },
+  );
+});
+
+describe('json reads only the comments', () => {
+  it.each`
+    source                                          | expected
+    ${'{ "color": "gray" }'}                        | ${'{ "color": "gray" }'}
+    ${'{ "url": "http://example.com/color" }'}      | ${'{ "url": "http://example.com/color" }'}
+    ${'{ "color": "gray" } // the color'}           | ${'{ "color": "gray" } // the colour'}
+    ${'{ /* the color */ "color": "gray" }'}        | ${'{ /* the colour */ "color": "gray" }'}
+  `('$source -> $expected', ({ source, expected }) => {
+    expect(deamericaniseFile('settings.json', source, { language: 'json' }).text).toBe(expected);
+    expect(deamericaniseCode(source, { language: 'json' }).text).toBe(expected);
+  });
+
+  it('reads a .json file as prose when no language is given', () => {
+    expect(deamericaniseFile('settings.json', '{ "color": "gray" }').text).toBe('{ "colour": "grey" }');
+  });
+
+  it('keeps jsonc and json5 on the same lexer', () => {
+    expect(deamericaniseFile('tsconfig.jsonc', '{ "color": 1 } // the color').text).toBe('{ "color": 1 } // the colour');
+    expect(deamericaniseFile('a.json5', "{ color: 'gray' } // the color").text).toBe("{ color: 'gray' } // the colour");
+  });
+});
+
 describe('errors', () => {
   it('names the language it cannot handle', () => {
     expect(() => deamericaniseCode('// color', { language: 'brainfuck' })).toThrow(UnknownLanguageError);

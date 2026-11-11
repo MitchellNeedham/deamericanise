@@ -404,6 +404,100 @@ Prettier validates option types and has no object type, so the two settings peop
 actually change are flat and anything else goes through `deamericaniseOptions` as JSON.
 Requires Prettier 3.
 
+### Web pages
+
+```ts
+import { deamericaniseDom, DomRewriter } from 'deamericanise/dom';
+
+// Once, in place.
+deamericaniseDom(document, { dialect: 'en-GB' });
+
+// Or follow the page while it loads and changes.
+const rewriter = new DomRewriter(document);
+rewriter.watch();
+rewriter.setOptions({ preset: 'localise' }); // re-reads every run from its original text
+rewriter.changes();                          // the changes in place now
+rewriter.highlights();                       // where each change in the text sits now
+rewriter.stop({ restore: true });            // puts the page back
+```
+
+Both take the usual options, plus `verdict` (below) and `attributes`, which is `true` by
+default and rewrites `title`, `alt` and `placeholder` as well as text.
+
+**Runs of text.** A run is the text of one block, joined across inline elements such as
+`b`, `em`, `span` and `a`. So `6 feet <b>2</b> inches` converts as one measurement. Any
+other element ends the run, so a change never reaches across a paragraph, a table cell or a
+line break. So does an inline element that the page lays out in a box of its own, such as a
+span that is a flex item or is styled as a block or an inline-block, because its text never
+reads as part of the word beside it. The layout comes from the page's computed styles, and
+is read again once the page's stylesheets have loaded. A document with no window, such as
+one from `DOMParser`, has no styles, so there the tag alone decides. A change that crosses elements puts its replacement in the first text node and
+empties its share of the others: `6 feet <b>2</b> inches` becomes `1.88 metres<b></b>`. A
+change that would move text into or out of a link, button or label is skipped, and so is
+an article fix that depended on it.
+
+**Originals.** Every node keeps its original text. A run that grows is re-read from the
+originals, never from its own output, and `stop({ restore: true })` puts them all back.
+Text a script writes over a rewritten node becomes the new original. A node that a script
+keeps putting back is left to it after three attempts.
+
+**Left alone:**
+
+- `code`, `pre`, `kbd`, `samp`, `script`, `style`, `noscript`, `template`, `textarea`,
+  `input`, `select`, `iframe`, `object`, `canvas`, `audio`, `video`, SVG and MathML.
+  Attributes on these elements are still rewritten.
+- Anything editable: `contenteditable`, and a document in design mode. Text that becomes
+  editable after it was rewritten gets its original back.
+- Anything marked `translate="no"` or `class="notranslate"`, the markers sites already use
+  to opt out of machine translation. `translate="yes"` inside `translate="no"` turns
+  rewriting back on. Nothing turns it back on under `notranslate`. Both markers are ignored
+  on `<html>` and `<body>`. Apps such as Outlook mark the whole page to stop Google
+  Translate replacing their text nodes, which breaks React, and rewriting changes text in
+  place without replacing nodes.
+- Any element whose `lang` is not English. An element with no `lang` takes its parent's.
+
+**Deciding whether a page is American.** `verdict` picks how:
+
+| `verdict` | |
+| --- | --- |
+| `'detect'` (default) | From the page's own text, built up as it loads |
+| `'lang'` | `en-US` is American and any other English region is not. A bare `en`, or no `lang`, falls back to `detect` |
+| `'american'` | Always |
+
+`detect` is the default because WordPress writes `lang="en-US"` unless the site owner
+changes the site language, so many Australian and British WordPress sites claim to be
+American. An explicit `assumeAmerican` wins over `verdict`.
+
+Each region with its own `lang` is judged on its own text. A British page that quotes an
+American source in a `lang="en-US"` block reads its own `04/05/2025` as 4 May. When more of
+the page arrives and changes the verdict, the runs already rewritten are read again.
+
+**While the page loads.** Call `watch()` at document start and each run is rewritten as
+the parser adds it, before it is painted. The run the parser is still adding to waits until
+the parser moves past it, or until `DOMContentLoaded`. So a measurement split across two
+network packets is still read whole.
+
+**Highlighting.** `highlights()` returns each change in the text with a `StaticRange` over
+its replacement, ready for the CSS Custom Highlight API. It leaves out changes to attributes
+and changes that only remove text, and the list is in no particular order.
+`onRewrite(listener)` calls the listener after each batch of rewrites and returns a function
+that removes it. The listener runs inside the observer callback, so paint in the next frame:
+
+```ts
+rewriter.onRewrite(() =>
+  requestAnimationFrame(() => {
+    const ranges = rewriter.highlights().map(({ range }) => range);
+    CSS.highlights.set('deamericanised', new Highlight(...ranges));
+  }),
+);
+```
+
+```css
+::highlight(deamericanised) { background-color: rgb(47 128 237 / 22%); }
+```
+
+Shadow DOM is not entered. Text inside a web component's shadow root stays as it is.
+
 ## Options
 
 | Option | Default | |
@@ -471,6 +565,54 @@ npm run build:site
 npx http-server site      # or: python3 -m http.server --directory site
 ```
 
+## Browser extension
+
+`extension/` is a Manifest V3 extension for Chrome, Edge and Firefox. It runs
+`DomRewriter` on every page and frame you visit, starting before the page has any content,
+so text is rewritten before it is painted. Everything runs on your machine. The
+extension asks for one permission, `storage`, to keep its settings.
+
+```sh
+npm run build:extension
+```
+
+That writes `extension/dist/chrome` (also used for Edge) and `extension/dist/firefox`. They
+are the same build with a different `manifest.json`: the Firefox one carries the add-on ID
+and the data collection declaration that Firefox Add-ons requires. Both are generated, not
+committed.
+
+To load a build without a store:
+
+- **Chrome:** open `chrome://extensions`, turn on **Developer mode**, choose **Load
+  unpacked** and pick `extension/dist/chrome`.
+- **Edge:** the same from `edge://extensions`.
+- **Firefox:** open `about:debugging#/runtime/this-firefox`, choose **Load Temporary
+  Add-on** and pick `extension/dist/firefox/manifest.json`. Firefox removes it again when
+  it closes. Firefox 140 or later is required.
+
+Pages that were already open need a reload before the extension can rewrite them.
+
+The toolbar button shows how many changes the current page has, switches the extension
+off for that site, and switches highlighting on and off. The settings page has the dialect,
+the mode, the confidence tiers, the `verdict`, highlighting and the list of sites switched
+off.
+
+Highlighting is off by default. When it is on, each change gets a background in its
+category's colour and an underline that is solid for safe, dashed for moderate and dotted
+for risky. Point at a change to see what it replaced, the rule and its confidence. The
+highlights are painted with the CSS Custom Highlight API, so the page's elements stay as
+they were. Changes to `title`, `alt` and `placeholder` are not highlighted, and there is no
+description on a touch screen. Settings sync between browsers signed in to
+the same account, and changes apply to open pages straight away.
+
+Limits:
+
+- Settings are read asynchronously, so on a page that renders very fast the first paint can
+  happen before the settings arrive. The page is rewritten as soon as they do.
+- A site is switched off by its hostname, frame by frame. A frame from another site embedded
+  in a page you switched off is still rewritten.
+- Text inside shadow DOM is left as it is.
+
 ## Releasing
 
 The git tag is the source of truth for the version. `package.json` carries `0.0.0` as a
@@ -497,6 +639,27 @@ describes how a particular publish happened rather than anything about the packa
 in `publishConfig` it applies to every publish everywhere, which makes publishing from a
 laptop fail: provenance needs OIDC claims that only a CI provider can issue. If you ever
 do need to publish by hand, `npm publish --no-provenance` is the escape hatch.
+
+The same tag also builds the browser extension. Once the npm publish succeeds, CI zips
+`extension/dist/chrome` and `extension/dist/firefox` and attaches them to the GitHub
+release for the tag, creating the release if it does not exist yet. The Chrome zip is the
+one for Edge too. Uploading to the Chrome Web Store, Microsoft Edge Add-ons and Firefox
+Add-ons is manual.
+
+The store screenshots and the 440×280 promo tile are in `extension/store/images`, at sizes
+all three stores accept, along with the 300×300 logo Edge asks for. The screenshots show an
+invented American recipe page, `extension/store/sample.html`. To make them again after the
+extension changes, run `npm run build:extension` and then `node extension/store/capture.mjs`,
+which needs Google Chrome.
+
+The privacy policy the stores link to is `site/privacy.html`, which GitHub Pages publishes
+with the demo at <https://mitchellneedham.github.io/deamericanise/privacy.html>.
+
+Firefox Add-ons asks for the source of any bundled code. Upload the source archive GitHub
+makes for the same tag, and give `npm ci && npm run build:extension` as the build steps.
+
+The Firefox add-on ID, `deamericanise@mitchellneedham.github.io`, is set in
+`tsup.extension.config.ts`. Once the add-on is listed it can never change.
 
 ## Licence
 

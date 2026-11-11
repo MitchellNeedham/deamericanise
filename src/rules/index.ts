@@ -24,9 +24,16 @@ export function lexiconFor(dialect: Dialect): CompiledLexicon {
   return compiled;
 }
 
+const ruleCache = new Map<string, Rule[]>();
+
 export function patternRules(options: ResolvedOptions): Rule[] {
+  // Only these options shape the rules themselves. Everything else is read at match time.
+  const key = JSON.stringify([options.dialect, options.unitsKeep, options.rules]);
+  const cached = ruleCache.get(key);
+  if (cached) return cached;
+
   const pack = dialectPack(options.dialect);
-  return [
+  const rules = [
     ...suffixRules,
     ...unitRules(options, pack.unitsKeep),
     ...dateRules(),
@@ -35,6 +42,10 @@ export function patternRules(options: ResolvedOptions): Rule[] {
     ...punctuationRules(),
     ...miscRules(),
   ];
+  // A caller toggling single rules makes a new key each time, so the cache is bounded.
+  if (ruleCache.size >= 32) ruleCache.clear();
+  ruleCache.set(key, rules);
+  return rules;
 }
 
 /** Every rule id the package can emit, for documentation and for `--explain`. */

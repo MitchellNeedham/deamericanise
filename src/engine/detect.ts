@@ -38,11 +38,38 @@ function count(text: string, pattern: RegExp): number {
 }
 
 export function detectAmerican(text: string): AmericanSignals {
-  const markers = MARKERS.filter(([, pattern]) => pattern.test(text)).map(([label]) => label);
-  const monthFirst = count(text, MONTH_FIRST);
-  const dayFirst = count(text, DAY_FIRST);
-  const namedMonthFirst = count(text, MONTH_NAME_FIRST);
-  const namedDayFirst = count(text, DAY_NAME_FIRST);
+  return score({
+    markers: MARKERS.filter(([, pattern]) => pattern.test(text)).map(([label]) => label),
+    unambiguousMonthFirstDates: count(text, MONTH_FIRST),
+    unambiguousDayFirstDates: count(text, DAY_FIRST),
+    namedMonthFirstDates: count(text, MONTH_NAME_FIRST),
+    namedDayFirstDates: count(text, DAY_NAME_FIRST),
+  });
+}
+
+/**
+ * Combines the signals of two pieces of one document, as if they had been detected
+ * together. Lets a document that arrives in pieces build up one verdict without
+ * rescanning what it has already seen.
+ */
+export function mergeSignals(a: AmericanSignals, b: AmericanSignals): AmericanSignals {
+  return score({
+    markers: MARKERS.map(([label]) => label).filter(
+      (label) => a.markers.includes(label) || b.markers.includes(label),
+    ),
+    unambiguousMonthFirstDates: a.unambiguousMonthFirstDates + b.unambiguousMonthFirstDates,
+    unambiguousDayFirstDates: a.unambiguousDayFirstDates + b.unambiguousDayFirstDates,
+    namedMonthFirstDates: a.namedMonthFirstDates + b.namedMonthFirstDates,
+    namedDayFirstDates: a.namedDayFirstDates + b.namedDayFirstDates,
+  });
+}
+
+function score(evidence: Omit<AmericanSignals, 'confidence'>): AmericanSignals {
+  const { markers } = evidence;
+  const monthFirst = evidence.unambiguousMonthFirstDates;
+  const dayFirst = evidence.unambiguousDayFirstDates;
+  const namedMonthFirst = evidence.namedMonthFirstDates;
+  const namedDayFirst = evidence.namedDayFirstDates;
 
   let confidence = Math.min(0.6, markers.length * 0.15);
 
@@ -55,12 +82,5 @@ export function detectAmerican(text: string): AmericanSignals {
   if (namedMonthFirst > 0 && namedDayFirst === 0) confidence += 0.45;
   if (namedDayFirst > 0 && namedMonthFirst === 0) confidence -= 0.4;
 
-  return {
-    confidence: Math.max(0, Math.min(1, confidence)),
-    markers,
-    unambiguousMonthFirstDates: monthFirst,
-    unambiguousDayFirstDates: dayFirst,
-    namedMonthFirstDates: namedMonthFirst,
-    namedDayFirstDates: namedDayFirst,
-  };
+  return { confidence: Math.max(0, Math.min(1, confidence)), ...evidence };
 }

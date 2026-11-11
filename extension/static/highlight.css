@@ -1,0 +1,79 @@
+/* The names must match the ones highlight.ts registers: deamericanise-<category>-<confidence>. */
+
+::highlight(deamericanise-spelling-safe),
+::highlight(deamericanise-spelling-moderate),
+::highlight(deamericanise-spelling-risky) {
+  background-color: rgb(47 128 237 / 22%);
+  text-decoration: underline solid rgb(47 128 237);
+}
+
+::highlight(deamericanise-vocabulary-safe),
+::highlight(deamericanise-vocabulary-moderate),
+::highlight(deamericanise-vocabulary-risky) {
+  background-color: rgb(155 89 214 / 22%);
+  text-decoration: underline solid rgb(155 89 214);
+}
+
+::highlight(deamericanise-units-safe),
+::highlight(deamericanise-units-moderate),
+::highlight(deamericanise-units-risky) {
+  background-color: rgb(20 160 150 / 22%);
+  text-decoration: underline solid rgb(20 160 150);
+}
+
+::highlight(deamericanise-dates-safe),
+::highlight(deamericanise-dates-moderate),
+::highlight(deamericanise-dates-risky) {
+  background-color: rgb(214 150 20 / 22%);
+  text-decoration: underline solid rgb(214 150 20);
+}
+
+::highlight(deamericanise-times-safe),
+::highlight(deamericanise-times-moderate),
+::highlight(deamericanise-times-risky) {
+  background-color: rgb(230 110 30 / 22%);
+  text-decoration: underline solid rgb(230 110 30);
+}
+
+::highlight(deamericanise-currency-safe),
+::highlight(deamericanise-currency-moderate),
+::highlight(deamericanise-currency-risky) {
+  background-color: rgb(120 160 20 / 22%);
+  text-decoration: underline solid rgb(120 160 20);
+}
+
+::highlight(deamericanise-punctuation-safe),
+::highlight(deamericanise-punctuation-moderate),
+::highlight(deamericanise-punctuation-risky) {
+  background-color: rgb(220 70 130 / 22%);
+  text-decoration: underline solid rgb(220 70 130);
+}
+
+::highlight(deamericanise-misc-safe),
+::highlight(deamericanise-misc-moderate),
+::highlight(deamericanise-misc-risky) {
+  background-color: rgb(120 135 155 / 22%);
+  text-decoration: underline solid rgb(120 135 155);
+}
+
+::highlight(deamericanise-spelling-moderate),
+::highlight(deamericanise-vocabulary-moderate),
+::highlight(deamericanise-units-moderate),
+::highlight(deamericanise-dates-moderate),
+::highlight(deamericanise-times-moderate),
+::highlight(deamericanise-currency-moderate),
+::highlight(deamericanise-punctuation-moderate),
+::highlight(deamericanise-misc-moderate) {
+  text-decoration-style: dashed;
+}
+
+::highlight(deamericanise-spelling-risky),
+::highlight(deamericanise-vocabulary-risky),
+::highlight(deamericanise-units-risky),
+::highlight(deamericanise-dates-risky),
+::highlight(deamericanise-times-risky),
+::highlight(deamericanise-currency-risky),
+::highlight(deamericanise-punctuation-risky),
+::highlight(deamericanise-misc-risky) {
+  text-decoration-style: dotted;
+}

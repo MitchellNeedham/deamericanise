@@ -76,8 +76,24 @@ deamericaniseText(text, {
 ```js
 import remarkDeamericanise from 'deamericanise/remark';   // unified().use(remarkDeamericanise)
 import deamericanise from 'deamericanise/eslint';         // rule: deamericanise/comments
+import { deamericaniseDom } from 'deamericanise/dom';      // deamericaniseDom(document)
 // prettier.config.js: plugins: ['deamericanise/prettier']
 ```
+
+## Browser extension
+
+`extension/` is an extension for Chrome, Edge and Firefox that rewrites the pages you visit
+as they load, before the text is painted. Everything runs on your machine. Switch on
+highlighting from the toolbar button to see each change and the rule that made it.
+
+```sh
+npm run build:extension   # writes extension/dist/chrome and extension/dist/firefox
+```
+
+In Chrome or Edge, open `chrome://extensions` or `edge://extensions`, turn on Developer
+mode and load `extension/dist/chrome` unpacked. In Firefox, open
+`about:debugging#/runtime/this-firefox` and load `extension/dist/firefox/manifest.json` as
+a temporary add-on.
 
 Full rule list, dialect tables, supported languages and every option:
 [REFERENCE.md](./REFERENCE.md). Or run `deamericanise --help`.

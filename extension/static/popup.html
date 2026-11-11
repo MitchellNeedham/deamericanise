@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <title>deamericanise</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body>
+  <main class="popup">
+    <h1><img src="icons/icon-32.png" alt="">deamericanise</h1>
+
+    <div id="running" hidden>
+      <label class="switch">
+        <span>Rewrite <span class="host" id="host"></span></span>
+        <input type="checkbox" id="enabled">
+      </label>
+      <label class="switch">
+        <span>Highlight changes</span>
+        <input type="checkbox" id="highlight">
+      </label>
+    </div>
+    <p id="count" class="muted" hidden></p>
+
+    <p id="unavailable" class="muted" hidden>
+      Nothing to rewrite on this page. Browser pages cannot be changed, and a page that was
+      open before the extension was installed needs a reload.
+    </p>
+
+    <p><button type="button" class="link" id="settings">Settings</button></p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

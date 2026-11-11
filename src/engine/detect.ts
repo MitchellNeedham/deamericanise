@@ -1,5 +1,6 @@
 import type { AmericanSignals } from '../types.js';
 import { fahrenheitTemperatures } from '../rules/units/fahrenheit.js';
+import { isUnitInOtherSense } from '../rules/units/index.js';
 
 /** What a marker adds to the confidence unless it names its own weight. */
 const ORDINARY = 0.15;
@@ -95,6 +96,24 @@ const FAHRENHEIT: Pick<RegExp, 'test'> = {
   test: (text) => !fahrenheitTemperatures(text).next().done || /\bFahrenheit\b/i.test(text),
 };
 
+// The number may be written out, as older prose and most recipes do.
+const IMPERIAL_UNIT =
+  /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|half|quarter|quarters)[\s-]*(miles?|feet|foot|inches?|pounds?|ounces?|gallons?|quarts?|pints?|mph|acres?)\b/gi;
+
+/**
+ * An imperial unit, unless the unit rules read it in another sense, as they read
+ * `It cost 400 pounds` as money.
+ */
+const IMPERIAL_UNITS: Pick<RegExp, 'test'> = {
+  test(text) {
+    for (const match of text.matchAll(IMPERIAL_UNIT)) {
+      const unitEnd = match.index + match[0].length;
+      if (!isUnitInOtherSense(text, unitEnd - match[1]!.length, unitEnd)) return true;
+    }
+    return false;
+  },
+};
+
 /**
  * Spellings and habits that only Americans have. Used to decide whether `03/04/2024`
  * means March or April, and whether a bare `$` is US dollars. Each counts once however
@@ -110,11 +129,7 @@ const MARKERS: Array<[label: string, pattern: Pick<RegExp, 'test'>, weight?: num
   ['gray', /\bgray(?:s|er|est|ish|scale)?\b/i],
   ['Fahrenheit', FAHRENHEIT],
   ['Fahrenheit oven setting', FAHRENHEIT_OVEN, RECIPE],
-  // The number may be written out, as older prose and most recipes do.
-  [
-    'imperial units',
-    /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|half|quarter|quarters)[\s-]*(?:miles?|feet|foot|inches?|pounds?|ounces?|gallons?|quarts?|pints?|mph|acres?)\b/i,
-  ],
+  ['imperial units', IMPERIAL_UNITS],
   ['US vocabulary', /\b(?:sidewalk|gasoline|elevator|apartment|zip code|freeway|cell phone|diaper|faucet|drugstore|realtor|vacation|soccer|math)\b/i],
   ['MM/DD/YYYY literal', /\bMM[/\-.]DD[/\-.]YY(?:YY)?\b/i],
   ['abbreviations with stops', /\b(?:U\.S\.|U\.S\.A\.|Mr\.|Mrs\.|Ph\.D\.)/],

@@ -381,6 +381,10 @@ A temperature counts as `Fahrenheit` in exactly the forms the unit rules convert
 `165 degrees F` counts, `Cook until the chicken reaches 165F` counts, and `Apartment 3F`
 does not. The word `Fahrenheit` on its own counts too.
 
+Pounds count as `imperial units` only where the unit rules read them as a weight, so
+`2 pounds of ground beef` counts, and the money in `It cost 1,500 pounds` or
+`400 pounds a week` does not.
+
 Ambiguous dates ask a narrower question first, because a document writes its dates one way
 round: a sibling date that states its own order, whether by a day above 12 or by a named
 month, settles it on its own and outranks the score in both directions. So

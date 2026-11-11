@@ -45,12 +45,40 @@ const PROPER_NOUNS: RegExp[] = [
   /\bGray'?s Anatomy\b/g,
 ];
 
+/** An odd run of backslashes, which escapes the character after it. */
+const ESCAPE = /(?<!\\)(?:\\\\)*\\/.source;
+
+/**
+ * The start of a line that ends the paragraph above it: a blank line, or a heading, quote,
+ * list item, fence, rule, setext underline or table row. A missed break lets an unpaired
+ * backtick pair with one in the next block and expose the code there, so this errs towards
+ * a break, which only leaves a span that wraps onto such a line unprotected.
+ */
+const PARAGRAPH_BREAK =
+  /[ \t]*(?:\r?\n|#{1,6}(?![^ \t\r\n])|>|[-+*](?![^ \t\r\n])|\d{1,9}[.)](?![^ \t\r\n])|`{3}|~{3}|\||(?:[-*_=][ \t]*)+\r?\n)/
+    .source;
+
+/** A line that is a block by itself, so no paragraph runs on below it: a heading, fence or table row. */
+const ONE_LINE_BLOCK = /(?:^|\n)[ \t]*(?:#{1,6}[ \t]|`{3}|~{3}|\|)[^\n]*/.source;
+
+/**
+ * An inline code span as CommonMark reads one: a backtick string closed by the next string of
+ * the same length, so ``a ` b`` is one span. It may wrap onto the next line of its paragraph.
+ * A backtick with no partner before the paragraph ends, or one escaped with a backslash,
+ * opens nothing.
+ */
+const CODE_SPAN = new RegExp(
+  String.raw`(?:(?<!\`|${ESCAPE})|(?<=${ESCAPE}\`))(\`+)(?!\`)` +
+    String.raw`(?:[^\`\n]|(?<!${ONE_LINE_BLOCK})\n(?!${PARAGRAPH_BREAK})|(?!\1(?!\`))\`+(?!\`))*\1(?!\`)`,
+  'g',
+);
+
 const STRUCTURAL: RegExp[] = [
   /\bhttps?:\/\/\S+/g,
   /\bwww\.\S+/g,
   /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
   /`{3}[\s\S]*?`{3}/g,
-  /`[^`\n]+`/g,
+  CODE_SPAN,
   /<[a-zA-Z/][^>\n]*>/g,
 ];
 

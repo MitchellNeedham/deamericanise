@@ -93,6 +93,17 @@ describe('identifiers inside comments survive', () => {
   });
 });
 
+describe('inline code inside a comment', () => {
+  it.each`
+    source                                                              | expected                                                             | why
+    ${'/* Use `the\n   color` here. */'}                                | ${'/* Use `the\n   color` here. */'}                                 | ${'a span that wraps in a block comment'}
+    ${"/**\n * It's a `stray backtick.\n *\n * The color is `red`.\n */"} | ${"/**\n * It's a `stray backtick.\n *\n * The colour is `red`.\n */"} | ${'a bare star line ends the paragraph'}
+    ${"/**\n * Don't use a ` here.\n * Use `color` and `center`.\n */"}  | ${"/**\n * Don't use a ` here.\n * Use `color` and `center`.\n */"}   | ${'an unpaired backtick reaches no further than its line'}
+  `('$why', ({ source, expected }) => {
+    expect(rewrite('ts', source)).toBe(expected);
+  });
+});
+
 describe('a comment that ends on an initialism', () => {
   it.each`
     language    | source                                         | expected

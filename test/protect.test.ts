@@ -51,6 +51,43 @@ describe('structure that is never prose', () => {
   });
 });
 
+describe('inline code, read the way CommonMark reads it', () => {
+  it.each`
+    unchanged                                                                           | why
+    ${'A span on one line, `the color`, stays. A span that wraps, `the\ncolor`, should too.'} | ${'a span that wraps onto the next line'}
+    ${'Set `6 feet` here and `six\nfeet` there.'}                                       | ${'a measurement the wrap splits'}
+    ${'A span that wraps, `the\r\ncolor`, too.'}                                        | ${'a Windows line ending'}
+    ${'- Use `the\n  color` here.'}                                                     | ${'a list item that wraps'}
+    ${'Use ``a ` color`` here.'}                                                        | ${'two backticks around one'}
+    ${'Use ``the\ncolor ` x`` here.'}                                                   | ${'the same, wrapped'}
+    ${'Use ```a `` color``` here.'}                                                     | ${'three backticks around two'}
+    ${'A path ends in \\\\`the color`.'}                                                | ${'an escaped backslash before a real backtick'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                     | expected                                                   | why
+    ${"It's a `stray backtick.\n\nThe color is red."}         | ${"It's a `stray backtick.\n\nThe colour is red."}         | ${'a backtick with no partner before the blank line'}
+    ${"It's a `stray backtick.\n \t\nThe color is `red`."}    | ${"It's a `stray backtick.\n \t\nThe colour is `red`."}    | ${'a blank line holding only spaces'}
+    ${'A `span\n\ncolor` broken by a blank line.'}            | ${'A `span\n\ncolour` broken by a blank line.'}            | ${'a span cannot cross a blank line'}
+    ${'Unequal `color`` runs.'}                               | ${'Unequal `colour`` runs.'}                               | ${'a span closes only on a run of its own length'}
+    ${'Type \\` for a backtick, then the color, then `x`.'}   | ${'Type \\` for a backtick, then the colour, then `x`.'}   | ${'an escaped backtick opens nothing'}
+    ${'The color ` key.\n- Set `color` here.'}                | ${'The colour ` key.\n- Set `color` here.'}                | ${'a list item ends the paragraph'}
+    ${'The color ` key.\n* Set `color` here.'}                | ${'The colour ` key.\n* Set `color` here.'}                | ${'so does a star bullet'}
+    ${'The color ` key.\n1. Set `color` here.'}               | ${'The colour ` key.\n1. Set `color` here.'}               | ${'and a numbered item'}
+    ${'The color ` key.\n> Set `color` here.'}                | ${'The colour ` key.\n> Set `color` here.'}                | ${'and a quote'}
+    ${'The color ` key.\n## Set `color` here'}                | ${'The colour ` key.\n## Set `color` here'}                | ${'and a heading'}
+    ${'The color ` key.\n***\nSet `color` here.'}             | ${'The colour ` key.\n***\nSet `color` here.'}             | ${'and a rule'}
+    ${'The color ` key\n---\nSet `color` here.'}              | ${'The colour ` key\n---\nSet `color` here.'}              | ${'and a setext underline'}
+    ${'## The ` key\nThe color is `red`.'}                    | ${'## The ` key\nThe colour is `red`.'}                    | ${'a heading is one line long'}
+    ${'| Key | Note |\n| --- | --- |\n| ` | The color |\n| `color` | x |'} | ${'| Key | Note |\n| --- | --- |\n| ` | The colour |\n| `color` | x |'} | ${'so is a table row'}
+    ${'```\nconst a = 1;\n```\nThe color is ```x```.'}       | ${'```\nconst a = 1;\n```\nThe colour is ```x```.'}       | ${'a closing fence opens nothing'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
 describe('identifier protection, for comments in source files', () => {
   it.each`
     unchanged                    | why

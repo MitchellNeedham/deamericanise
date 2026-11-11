@@ -238,7 +238,7 @@ alone.
 
 Some rules cannot fire without knowing where the text came from. `03/04/2024` is March or
 April depending, and `$500` is dollars of some kind. `analyse` scores the input on
-spellings, vocabulary, imperial units and date habits:
+spellings, vocabulary, imperial units, kitchen habits and date habits:
 
 ```ts
 import { analyse } from 'deamericanise';
@@ -246,6 +246,25 @@ import { analyse } from 'deamericanise';
 analyse('The color of the theater is gray and they canceled it.');
 // { confidence: 0.6, markers: ['-or spelling', '-er spelling', 'doubled-l dropped', 'gray'], ... }
 ```
+
+Each marker counts once however often it appears, and together they count for at most
+`0.6`. Most are worth `0.15`. Two kitchen habits are worth `0.25`, because nobody outside
+the United States has them: a stick of butter, and an oven set between 300 and 500
+without a Celsius unit, which no home oven reaches in Celsius. The two together reach the
+default bar of `0.5` below, so a short recipe card with no American spelling in it still
+reads as American:
+
+```ts
+analyse('Preheat the oven to 350 degrees. Mix 2 cups of flour with 1 stick of butter.');
+// { confidence: 0.5, markers: ['Fahrenheit oven setting', 'stick of butter'], ... }
+```
+
+The oven is not counted in a sentence about a pizza oven, a wood-fired oven or a
+pyrolytic clean, all of which do run that hot in Celsius. A cup is no evidence at all,
+since Australia and New Zealand cook in metric cups. A measured ingredient under a name
+only Americans use, such as `1 cup all-purpose flour` or `2 tablespoons cornstarch`,
+counts like any other vocabulary, unless the local name sits beside it, as it does in
+`1 cup plain flour (all-purpose flour)`.
 
 Ambiguous dates ask a narrower question first, because a document writes its dates one way
 round: a sibling date that states its own order, whether by a day above 12 or by a named

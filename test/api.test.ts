@@ -161,6 +161,129 @@ describe('analyse', () => {
   });
 });
 
+describe('analyse on recipes', () => {
+  const OVEN = 'Fahrenheit oven setting';
+  const STICK = 'stick of butter';
+  const INGREDIENT = 'US ingredient names';
+
+  it.each`
+    input                                                 | marker
+    ${'Preheat the oven to 350 degrees.'}                 | ${OVEN}
+    ${'Heat oven to 425.'}                                | ${OVEN}
+    ${'Set the oven to 400 degrees F.'}                   | ${OVEN}
+    ${'Preheat the oven to 350°F.'}                       | ${OVEN}
+    ${'Bake at 375 for 20 minutes.'}                      | ${OVEN}
+    ${'Bake, uncovered, for 30 to 35 minutes at 350.'}    | ${OVEN}
+    ${'Roast at 450 until golden.'}                       | ${OVEN}
+    ${'Put the dish in a 350-degree oven.'}               | ${OVEN}
+    ${'Bake in a 375° oven.'}                             | ${OVEN}
+    ${'Bake in a 325 oven.'}                              | ${OVEN}
+    ${'Melt 1 stick of butter.'}                          | ${STICK}
+    ${'2 sticks unsalted butter, softened'}               | ${STICK}
+    ${'1/2 cup (1 stick) butter, melted'}                 | ${STICK}
+    ${'1 stick (1/2 cup) cold butter'}                    | ${STICK}
+    ${'1/2 cup butter (1 stick)'}                         | ${STICK}
+    ${'Cut in half a stick of margarine.'}                | ${STICK}
+    ${'1 cup all-purpose flour'}                          | ${INGREDIENT}
+    ${'2 cups (250 g) all-purpose flour'}                 | ${INGREDIENT}
+    ${"1 cup confectioners' sugar"}                       | ${INGREDIENT}
+    ${'1/2 cup heavy cream'}                              | ${INGREDIENT}
+    ${'2 tablespoons cornstarch'}                         | ${INGREDIENT}
+  `('finds $marker in "$input"', ({ input, marker }) => {
+    expect(analyse(input).markers).toContain(marker);
+  });
+
+  it.each`
+    input                                                      | why
+    ${'Preheat the oven to 180 degrees.'}                      | ${'a Celsius oven'}
+    ${'Bake at 180 degrees for 20 minutes.'}                   | ${'a Celsius oven'}
+    ${'Preheat the oven to 180°C (350°F).'}                    | ${'Fahrenheit given as a courtesy after Celsius'}
+    ${'Preheat the oven to 180C/350F/gas 4.'}                  | ${'Fahrenheit given as a courtesy after Celsius'}
+    ${'Heat the oven to 180C fan or to 400F.'}                 | ${'the setting is in Celsius first'}
+    ${'Heat the oven to 350°C.'}                               | ${'marked Celsius, whatever the number'}
+    ${'Heat the pizza oven to 400 degrees.'}                   | ${'pizza ovens run that hot in Celsius'}
+    ${'Bake at 450 degrees in the wood-fired oven.'}           | ${'so do wood-fired ovens'}
+    ${'A pyrolytic oven heats itself to 500 degrees.'}         | ${'and a cleaning cycle'}
+    ${'Add the baking powder to 300 g of flour.'}              | ${'a weight, not a setting'}
+    ${'Cook in the oven for up to 300 minutes.'}               | ${'a time, not a setting'}
+    ${'The factory made 400 ovens a week.'}                    | ${'a count of ovens'}
+    ${'Microwave oven at 500 watts.'}                          | ${'a power, not a temperature'}
+  `('finds no oven setting in "$input" ($why)', ({ input }) => {
+    expect(analyse(input).markers).not.toContain(OVEN);
+  });
+
+  it.each`
+    input                                     | why
+    ${'Melt 125 g butter.'}                   | ${'butter by weight'}
+    ${'2 sticks of celery and butter'}        | ${'a stick of something else'}
+    ${'1 cinnamon stick'}                     | ${'a stick of something else'}
+    ${'Stir with a stick, then add butter.'}  | ${'a stick that is not a pack size'}
+  `('finds no stick of butter in "$input" ($why)', ({ input }) => {
+    expect(analyse(input).markers).not.toContain(STICK);
+  });
+
+  it.each`
+    input                                                 | why
+    ${'1 cup flour'}                                      | ${'metric cups are Australian too'}
+    ${'2 cups of flour'}                                  | ${'metric cups are Australian too'}
+    ${'1 cup plain flour'}                                | ${'the Commonwealth name'}
+    ${'1/2 cup caster sugar'}                             | ${'the Commonwealth name'}
+    ${'1 1/2 cups (225g) plain flour (all-purpose flour)'} | ${'the US name given as a courtesy'}
+    ${'1 cup all-purpose flour (plain flour)'}            | ${'the US name glossed with the local one'}
+    ${'2 tbsp cornflour (cornstarch)'}                    | ${'the US name given as a courtesy'}
+    ${'1 cup (250ml) thickened cream / heavy cream'}      | ${'the US name given as a courtesy'}
+  `('finds no US ingredient name in "$input" ($why)', ({ input }) => {
+    expect(analyse(input).markers).not.toContain(INGREDIENT);
+  });
+
+  it.each`
+    recipe
+    ${'Preheat the oven to 180 degrees. Sift 1 cup flour and 1/2 cup caster sugar into a bowl, rub in 125g butter, and bake at 180 degrees for 20 minutes.'}
+    ${'Preheat the oven to 200C/180C fan/gas 6. Rub 100g cold butter into 225g self-raising flour, stir in 50g caster sugar and 150ml double cream, and bake for 15 minutes.'}
+  `('gives a Commonwealth recipe no American evidence: $recipe', ({ recipe }) => {
+    expect(analyse(recipe)).toMatchObject({ confidence: 0, markers: [] });
+  });
+
+  it('gives no recipe evidence to an Australian recipe that glosses the US names', () => {
+    const recipe =
+      'Preheat the oven to 180°C/350°F (160°C fan). Mix 1 1/2 cups (225g) plain flour (all-purpose flour), ' +
+      '1 cup (250ml) thickened cream / heavy cream and 2 tbsp cornflour (cornstarch) with 125g butter.';
+    expect(analyse(recipe).markers).toEqual(['Fahrenheit']);
+  });
+
+  it.each`
+    input
+    ${'Preheat the oven to 350 degrees. Mix 2 cups of flour with 1 stick of butter and bake for 20 minutes.'}
+    ${'Preheat the oven to 350°F. Mix 2 cups of flour with 1 stick of butter and bake for 20 minutes.'}
+  `('rates a short American recipe as American: $input', ({ input }) => {
+    expect(analyse(input).confidence).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it('lets the rules that wait for the verdict run on a short American recipe', () => {
+    const recipe = 'Tested 03/04/2024. Preheat the oven to 350 degrees, melt 1 stick of butter, and spend $5 on flour.';
+    expect(deamericaniseText(recipe)).toBe(
+      'Tested 2024-03-04. Preheat the oven to 350 degrees, melt 1 stick of butter, and spend US$5 on flour.',
+    );
+  });
+
+  it.each`
+    input                                                       | confidence | why
+    ${'Melt 1 stick of butter.'}                                | ${0.25}    | ${'a recipe marker outweighs a spelling marker'}
+    ${'Preheat the oven to 350 degrees.'}                       | ${0.25}    | ${'and so does an oven in Fahrenheit'}
+    ${'Preheat the oven to 350°F.'}                             | ${0.25}    | ${'the oven setting and its °F are one sighting'}
+    ${'1 cup all-purpose flour'}                                | ${0.15}    | ${'an ingredient name counts like any other vocabulary'}
+    ${'Melt 1 stick of butter in a gray pan.'}                  | ${0.4}     | ${'one recipe marker and one other fall short of the bar'}
+    ${'Melt 1 stick of butter. Bake at 350.'}                   | ${0.5}     | ${'two recipe markers clear it'}
+  `('scores "$input" at $confidence ($why)', ({ input, confidence }) => {
+    expect(analyse(input).confidence).toBeCloseTo(confidence);
+  });
+
+  it('caps the markers, so a day-first date still pulls an American-looking recipe under the bar', () => {
+    const recipe = 'Tested 25/12/2023. Melt 1 stick of butter, add 1 cup all-purpose flour, and bake at 350 in a gray pan.';
+    expect(analyse(recipe).confidence).toBeCloseTo(0.2);
+  });
+});
+
 describe('paper sizes', () => {
   it.each`
     input                                      | expected                  | why

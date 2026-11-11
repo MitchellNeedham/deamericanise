@@ -128,4 +128,11 @@ describe('change offsets point into the original file', () => {
       expect(source.slice(change.start, change.end)).toBe(change.before);
     }
   });
+
+  it('points an article fix at its replacement in the same file', () => {
+    const source = 'const a = 1;\n// Use an eraser.\n';
+    const [article, word] = deamericaniseCode(source, { language: 'ts', preset: 'localise' }).changes;
+    expect(source.slice(word!.start, word!.end)).toBe('eraser');
+    expect(article?.agreesWith).toEqual({ start: word!.start, end: word!.end });
+  });
 });

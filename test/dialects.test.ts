@@ -113,3 +113,140 @@ describe('words that are already correct are left alone', () => {
     expect(say(dialect as Dialect)(unchanged)).toBe(unchanged);
   });
 });
+
+// Every dialect with a `cookie` row.
+const BISCUIT_DIALECTS: Dialect[] = ['en-AU', 'en-GB', 'en-NZ', 'en-IE', 'en-ZA'];
+
+describe('web cookies stay cookies', () => {
+  it.each([
+    'We use cookies.',
+    'We use cookies to improve your experience.',
+    'This site uses cookies to analyse traffic.',
+    'This website uses cookies to ensure you get the best experience on our website.',
+    'By clicking "Accept All Cookies", you agree to the storing of cookies on your device to enhance site navigation.',
+    'Accept all cookies',
+    'Accept All Cookies',
+    'Reject all cookies',
+    'Allow all cookies',
+    'Accept additional cookies',
+    'Reject non-essential cookies',
+    'Use necessary cookies only',
+    'Cookie settings',
+    'Cookies Settings',
+    'Cookie Policy',
+    'Cookie preferences',
+    'Hide cookie message',
+    'Manage cookies',
+    'Strictly Necessary Cookies',
+    'Performance Cookies',
+    'Analytics cookies',
+    'Third-party cookies',
+    'first party cookies',
+    'HTTP cookies',
+    'Session cookies expire when you close the browser.',
+    'Your browser stores a cookie for each site you visit.',
+    'A cookie is a small text file stored on your computer.',
+    'These cookies are necessary for the website to function.',
+    'Our use of cookies is described in our privacy policy.',
+    'These cookies allow us to count visits and traffic sources so we can improve our site.',
+    'For all other types of cookies we need your permission.',
+    'Clear your cookies and try again.',
+    "the cookie's expiry date",
+    'For more on cookies, e.g. how to block them, see your browser help.',
+    'We value your privacy. We and our partners use cookies.',
+    'Cookies on GOV.UK',
+    'Cookies',
+    'COOKIES',
+    'Cookie:',
+  ])('leaves "%s" alone', (input) => {
+    for (const dialect of BISCUIT_DIALECTS) expect(say(dialect)(input), dialect).toBe(input);
+  });
+});
+
+describe('cookies you eat still become biscuits', () => {
+  it.each`
+    input                                                  | expected
+    ${'Bake the cookies for 12 minutes.'}                  | ${'Bake the biscuits for 12 minutes.'}
+    ${'Store cookies in an airtight container.'}           | ${'Store biscuits in an airtight container.'}
+    ${'Set cookies on a wire rack to cool.'}               | ${'Set biscuits on a wire rack to cool.'}
+    ${'Chocolate Chip Cookies'}                            | ${'Chocolate Chip Biscuits'}
+    ${'These cookies are baked fresh every morning.'}      | ${'These biscuits are baked fresh every morning.'}
+    ${'Read our privacy policy. Then try these cookies.'}  | ${'Read our privacy policy. Then try these biscuits.'}
+    ${'I ate three cookies. Then I checked the website.'}  | ${'I ate three biscuits. Then I checked the website.'}
+    ${'a cookie cutter'}                                   | ${'a biscuit cutter'}
+    ${'the cookie jar'}                                    | ${'the biscuit jar'}
+    ${'cookie dough'}                                      | ${'biscuit dough'}
+  `('$input -> $expected', ({ input, expected }) => {
+    for (const dialect of BISCUIT_DIALECTS) expect(say(dialect)(input), dialect).toBe(expected);
+  });
+});
+
+describe('cookies in fixed phrases', () => {
+  it.each`
+    input                                       | expected
+    ${'Fortune cookies'}                        | ${'Fortune cookies'}
+    ${'a fortune cookie'}                       | ${'a fortune cookie'}
+    ${'Girl Scout cookies'}                     | ${'Girl Scout cookies'}
+    ${'Cookie Monster'}                         | ${'Cookie Monster'}
+    ${'a cookie-cutter approach'}               | ${'a cookie-cutter approach'}
+    ${'Line a cookie sheet with parchment.'}    | ${'Line a baking tray with parchment.'}
+    ${'Grease two cookie sheets.'}              | ${'Grease two baking trays.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    for (const dialect of BISCUIT_DIALECTS) expect(say(dialect)(input), dialect).toBe(expected);
+  });
+});
+
+describe('trucks', () => {
+  it.each`
+    input                         | gb                             | ie                             | za                            | au
+    ${'a truck driver'}           | ${'a lorry driver'}            | ${'a lorry driver'}            | ${'a truck driver'}           | ${'a truck driver'}
+    ${'a fire truck'}             | ${'a fire engine'}             | ${'a fire engine'}             | ${'a fire truck'}             | ${'a fire truck'}
+    ${'Fire trucks raced past.'}  | ${'Fire engines raced past.'}  | ${'Fire engines raced past.'}  | ${'Fire trucks raced past.'}  | ${'Fire trucks raced past.'}
+    ${'a red firetruck'}          | ${'a red fire engine'}         | ${'a red fire engine'}         | ${'a red firetruck'}          | ${'a red firetruck'}
+    ${'the pickup truck'}         | ${'the pickup truck'}          | ${'the pickup truck'}          | ${'the bakkie'}               | ${'the ute'}
+    ${'two pick-up trucks'}       | ${'two pick-up trucks'}        | ${'two pick-up trucks'}        | ${'two pick-up trucks'}       | ${'two pick-up trucks'}
+    ${'a dump truck'}             | ${'a dump truck'}              | ${'a dump truck'}              | ${'a dump truck'}             | ${'a dump truck'}
+    ${'a forklift truck'}         | ${'a forklift truck'}          | ${'a forklift truck'}          | ${'a forklift truck'}         | ${'a forklift truck'}
+    ${'food trucks'}              | ${'food trucks'}               | ${'food trucks'}               | ${'food trucks'}              | ${'food trucks'}
+    ${'a monster truck'}          | ${'a monster truck'}           | ${'a monster truck'}           | ${'a monster truck'}          | ${'a monster truck'}
+    ${'a tow truck'}              | ${'a tow truck'}               | ${'a tow truck'}               | ${'a tow truck'}              | ${'a tow truck'}
+    ${'an ice cream truck'}       | ${'an ice cream truck'}        | ${'an ice cream truck'}        | ${'an ice cream truck'}       | ${'an ice cream truck'}
+  `('$input -> GB $gb / IE $ie / ZA $za / AU $au', ({ input, gb, ie, za, au }) => {
+    expect(say('en-GB')(input), 'en-GB').toBe(gb);
+    expect(say('en-IE')(input), 'en-IE').toBe(ie);
+    expect(say('en-ZA')(input), 'en-ZA').toBe(za);
+    expect(say('en-AU')(input), 'en-AU').toBe(au);
+  });
+});
+
+describe('overlay words in phrases that already read right', () => {
+  it.each`
+    input                                                   | expected                                                | dialect
+    ${"Don't be a smarty-pants."}                           | ${"Don't be a smarty-pants."}                           | ${'en-GB'}
+    ${'smarty pants'}                                       | ${'smarty pants'}                                       | ${'en-GB'}
+    ${'a fancy-pants restaurant'}                           | ${'a fancy-pants restaurant'}                           | ${'en-GB'}
+    ${'flying by the seat of your pants'}                   | ${'flying by the seat of your pants'}                   | ${'en-GB'}
+    ${'a seat-of-the-pants decision'}                       | ${'a seat-of-the-pants decision'}                       | ${'en-GB'}
+    ${'It scared the pants off me.'}                        | ${'It scared the pants off me.'}                        | ${'en-GB'}
+    ${'He took his pants off.'}                             | ${'He took his trousers off.'}                          | ${'en-GB'}
+    ${'Iron the pants.'}                                    | ${'Iron the trousers.'}                                 | ${'en-GB'}
+    ${'It is my way or the highway.'}                       | ${'It is my way or the highway.'}                       | ${'en-GB'}
+    ${'That is highway robbery.'}                           | ${'That is highway robbery.'}                           | ${'en-GB'}
+    ${'Highway 101 was closed.'}                            | ${'Highway 101 was closed.'}                            | ${'en-GB'}
+    ${'near NW Highway 225A'}                               | ${'near NW Highway 225A'}                               | ${'en-GB'}
+    ${'the Pacific Coast Highway'}                          | ${'the Pacific Coast Highway'}                          | ${'en-GB'}
+    ${'across the William F. Stone Highway'}                | ${'across the William F. Stone Highway'}                | ${'en-GB'}
+    ${'the California Highway Patrol'}                      | ${'the California Highway Patrol'}                      | ${'en-GB'}
+    ${'the National Highway Traffic Safety Administration'} | ${'the National Highway Traffic Safety Administration'} | ${'en-GB'}
+    ${'Take the highway north.'}                            | ${'Take the motorway north.'}                           | ${'en-GB'}
+    ${'The highway was closed.'}                            | ${'The motorway was closed.'}                           | ${'en-GB'}
+    ${'the Pacific Coast Highway'}                          | ${'the Pacific Coast Highway'}                          | ${'en-NZ'}
+    ${'an apartment complex'}                               | ${'an apartment complex'}                               | ${'en-GB'}
+    ${'a serviced apartment'}                               | ${'a serviced apartment'}                               | ${'en-GB'}
+    ${'two apartment buildings'}                            | ${'two apartment blocks'}                               | ${'en-NZ'}
+    ${'They rented an apartment.'}                          | ${'They rented a flat.'}                                | ${'en-GB'}
+    ${'an apartment complex'}                               | ${'an apartment complex'}                               | ${'en-NZ'}
+  `('$dialect: $input -> $expected', ({ input, expected, dialect }) => {
+    expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+});

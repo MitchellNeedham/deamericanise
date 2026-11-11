@@ -1,4 +1,4 @@
-import { DomRewriter } from '../../src/dom/index.js';
+import { DomRewriter, type DomOptions } from '../../src/dom/index.js';
 import { api } from './browser.js';
 import { Highlighter, type RuleSwitch } from './highlight.js';
 import {
@@ -23,6 +23,14 @@ const rules: RuleSwitch = {
   switchOff: (ruleId) => void switchOffRule(ruleId),
 };
 
+/** Finds closed shadow roots as well as open ones. */
+function shadowRootOf(host: Element): ShadowRoot | null {
+  if (api.dom) return api.dom.openOrClosedShadowRoot(host as HTMLElement);
+  // Firefox has no `dom` API, and shows extensions a closed root on the element itself.
+  const element = host as Element & { openOrClosedShadowRoot?: ShadowRoot | null };
+  return element.openOrClosedShadowRoot ?? host.shadowRoot;
+}
+
 function apply(settings: Settings): void {
   current = settings;
   if (!isEnabledOn(settings, host)) {
@@ -33,7 +41,7 @@ function apply(settings: Settings): void {
     return;
   }
 
-  const options = domOptions(settings);
+  const options: DomOptions = { ...domOptions(settings), shadowRoot: shadowRootOf };
   // Re-reading every run is the slow part, so a change to another setting skips it.
   const key = JSON.stringify(options);
   if (!rewriter) {

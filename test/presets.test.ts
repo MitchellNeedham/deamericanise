@@ -16,7 +16,7 @@ describe('read is the default and keeps the subject matter American', () => {
     ${'It is 6 feet wide.'}        | ${'It is 1.8 metres wide.'}     | ${'units need converting to mean anything'}
     ${'Bake at 350°F.'}            | ${'Bake at 175°C.'}             | ${'the same'}
     ${'Due 3/14/2024.'}            | ${'Due 2024-03-14.'}            | ${'a date order that means the wrong day'}
-    ${'Starts at 3:00 P.M.'}       | ${'Starts at 3:00pm'}           | ${'the styling, not the clock'}
+    ${'Starts at 3:00 P.M.'}       | ${'Starts at 3:00pm.'}          | ${'the styling, not the clock'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(read(input)).toBe(expected);
   });

@@ -61,6 +61,21 @@ $ echo 'A flat tire on the sidewalk, 10 miles away.' | deamericanise -l --langua
   stdin:1  10 miles -> 16 kilometres  [units.length.mile, moderate]
 ```
 
+A directory is walked for the files it knows: source in any language `--list-languages`
+prints, and prose (`.md`, `.txt`, `.rst` and the like, plus `README`, `CHANGELOG`,
+`CHANGES`, `HISTORY`, `NEWS` and `CONTRIBUTING` with no extension). A file named on the
+command line has to pass the same test, so a glob such as `deamericanise --write *` never
+rewrites `settings.json` or `yarn.lock` as prose. Each named file that fails is skipped
+with a line on stderr, and it does not change the exit status in any mode, `--check`
+included. To read one anyway, force the language:
+
+```sh
+deamericanise --language md NOTES
+```
+
+`LICENSE`, `COPYING` and `AUTHORS` are not on the list. A licence has to stay verbatim, and
+a list of names is no place for spelling rules.
+
 Run `deamericanise --help` for the full list of flags.
 
 ## Library
@@ -73,7 +88,7 @@ deamericaniseText('The color of the theater.');
 
 const result = deamericanise('They canceled it on 3/14/2024.');
 result.text;     // 'They cancelled it on 2024-03-14.'
-result.changes;  // [{ start, end, before, after, ruleId, category, confidence, note? }]
+result.changes;  // [{ start, end, before, after, ruleId, category, confidence, note?, agreesWith? }]
 result.signals;  // how American the input looked, and why
 
 deamericaniseCode('const color = "color"; // set the color', { language: 'ts' }).text;
@@ -83,8 +98,16 @@ deamericaniseCode('const color = "color"; // set the color', { language: 'ts' })
 Every change carries offsets into the input, so you can build your own diff, editor
 decoration or review UI from `result.changes` without re-running anything.
 
+An article fix also carries `agreesWith`, the `start` and `end` of the replacement it was
+fixed to suit, which is in the same list. Under `localise`, `an eraser` gives two changes:
+`an` to `a` with `agreesWith: { start: 3, end: 9 }`, and `eraser` to `rubber` at 3 to 9.
+Apply the two together or not at all, because either one alone leaves `a eraser` or
+`an rubber`.
+
 `deamericaniseFile(filename, source)` picks prose or comment-only handling from the
-extension, which is what the CLI uses.
+extension, which is what the CLI uses. It reads any file it has no lexer for as prose, JSON
+included, so choose the files before calling it. The CLI does that with the test described
+under [Command line](#command-line).
 
 ## Dialects
 
@@ -147,7 +170,11 @@ together with `--confidence safe,moderate`.
 nappy, `zip code` to postcode, `parking lot` to car park, `windshield` to windscreen,
 `ground beef` to mince, `5th grade` to Year 5, and about two hundred more. Context-gated
 where the word has an innocent sense: `buying gas` becomes petrol but `a gas giant` does
-not; `in the fall of 2024` becomes autumn but `prices will fall` does not.
+not; `in the fall of 2024` becomes autumn but `prices will fall` does not; `bake the
+cookies` becomes biscuits but `Accept all cookies`, `This site uses cookies` and a lone
+`Cookies` link do not. Phrases the rest of the world already says keep their words:
+`fortune cookie`, `food truck`, `my way or the highway`, `Highway 101`, `seat of your
+pants`. In British English a `fire truck` is a fire engine and a `pickup truck` stays one.
 
 **Units.** Length, area, mass, volume, temperature, speed, pressure, power, torque and
 fuel economy. The volume measures are the US ones, which are not the imperial ones.
@@ -163,6 +190,14 @@ fuel economy. The volume measures are the US ones, which are not the imperial on
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 `22 x 28 centimetres`, both ends sharing the unit chosen for the larger.
+
+Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
+`Bake at 175-190°C`. A change in temperature has no 32° offset to take off, so
+`dropped 20°F` becomes `dropped 11°C` and `10°F warmer` becomes `5.6°C warmer`. The words
+beside the number tell the two apart: a verb of change or `by` before it, a comparative
+or a noun such as `drop` after it. `fell to 20°F` names the new temperature and converts
+as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule of their own,
+`units.temperature.difference`, so they can be switched off apart from temperatures.
 
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
@@ -198,8 +233,11 @@ first is about the strongest signal there is that a document is American, and it
 the ambiguous numeric dates around it.
 
 **Times and currency.** `3:00 P.M.` becomes `3:00pm`; a 12-hour clock is
-normal outside America too, so only the styling goes. `times: { to24Hour: true }` gives
-`15:00` if you want it. Amounts are never converted, because exchange rates move; a bare
+normal outside America too, so only the styling goes. The last stop stays when it also
+ends the sentence, so `It starts at 3 P.M. Bring snacks.` becomes
+`It starts at 3pm. Bring snacks.` A time that runs on, as in `3 P.M. Tuesday` or
+`8 P.M. ET`, loses it. `times: { to24Hour: true }` gives `15:00` if you want it.
+Amounts are never converted, because exchange rates move; a bare
 `$500` becomes `US$500` when the text is American. 
 
 **Punctuation** (`localise` only). House style rather than comprehension, so it waits to
@@ -219,7 +257,7 @@ alone.
 
 Some rules cannot fire without knowing where the text came from. `03/04/2024` is March or
 April depending, and `$500` is dollars of some kind. `analyse` scores the input on
-spellings, vocabulary, imperial units and date habits:
+spellings, vocabulary, imperial units, kitchen habits and date habits:
 
 ```ts
 import { analyse } from 'deamericanise';
@@ -227,6 +265,25 @@ import { analyse } from 'deamericanise';
 analyse('The color of the theater is gray and they canceled it.');
 // { confidence: 0.6, markers: ['-or spelling', '-er spelling', 'doubled-l dropped', 'gray'], ... }
 ```
+
+Each marker counts once however often it appears, and together they count for at most
+`0.6`. Most are worth `0.15`. Two kitchen habits are worth `0.25`, because nobody outside
+the United States has them: a stick of butter, and an oven set between 300 and 500
+without a Celsius unit, which no home oven reaches in Celsius. The two together reach the
+default bar of `0.5` below, so a short recipe card with no American spelling in it still
+reads as American:
+
+```ts
+analyse('Preheat the oven to 350 degrees. Mix 2 cups of flour with 1 stick of butter.');
+// { confidence: 0.5, markers: ['Fahrenheit oven setting', 'stick of butter'], ... }
+```
+
+The oven is not counted in a sentence about a pizza oven, a wood-fired oven or a
+pyrolytic clean, all of which do run that hot in Celsius. A cup is no evidence at all,
+since Australia and New Zealand cook in metric cups. A measured ingredient under a name
+only Americans use, such as `1 cup all-purpose flour` or `2 tablespoons cornstarch`,
+counts like any other vocabulary, unless the local name sits beside it, as it does in
+`1 cup plain flour (all-purpose flour)`.
 
 Ambiguous dates ask a narrower question first, because a document writes its dates one way
 round: a sibling date that states its own order, whether by a day above 12 or by a named
@@ -399,8 +456,11 @@ export default [
 ```
 
 The rule reports each Americanism in a comment at its exact position and offers a fix for
-just that word, so `--fix` never rewrites more than it flagged. `deamericanise.configs.recommended`
-is there if you want the defaults.
+just that word, so `--fix` never rewrites more than it flagged. An article fixed to suit a
+replacement is reported with it, as one problem whose one fix covers both words, so a quick
+fix in the editor never leaves `a eraser` or `an rubber`. The editor shows
+`"an eraser" is American English. Use "a rubber".` `deamericanise.configs.recommended` is
+there if you want the defaults.
 
 ### Prettier
 
@@ -516,7 +576,23 @@ rewriter.onRewrite(() =>
 ::highlight(deamericanised) { background-color: rgb(47 128 237 / 22%); }
 ```
 
-Shadow DOM is not entered. Text inside a web component's shadow root stays as it is.
+**Shadow DOM.** The text a web component renders into its own shadow root is rewritten
+too, along with the attributes in it. By default the rewriter finds open roots through
+`element.shadowRoot`. The `shadowRoot` option takes a lookup of your own, such as one that
+also finds closed roots in a browser extension, and `shadowRoot: () => null` stays out of
+shadow DOM altogether. Inside a root, the host's `lang`, `translate`, `notranslate` and
+`contenteditable` still apply, so a component on a `lang="fr"` element is left alone. A
+shadow root starts a run of text of its own, so no change reaches across its edge or across
+a `<slot>`.
+
+`watch()` finds a root when its host is added to the page, and looks for new roots again at
+`DOMContentLoaded` and `load`. Nothing in the page reports a root attached after `load` to
+an element already there, which is what a custom element defined late does. Its text stays
+as it is until `setOptions` reads the page again.
+
+`highlights()` includes the changes inside shadow roots. Chrome paints them with the page's
+own `::highlight()` rules. Firefox does not apply the page's rules inside a shadow root, so
+there each root needs the rules in its own styles.
 
 ## Options
 
@@ -558,6 +634,9 @@ Shadow DOM is not entered. Text inside a web component's shadow root stays as it
   anyone read it.
 - Grade-to-year mapping assumes the Australian and British numbering, which does not line
   up with every system.
+- A web cookie is told from a baked one by the words in its own sentence. A short line
+  with a second word but nothing about the web in it, such as `About cookies`, still
+  becomes biscuits.
 - `localise` rewrites emergency numbers, which is right for a translated recipe and wrong
   for a news story about America. It is `risky`-tagged; `--confidence safe,moderate` drops
   it, and so does `--rule 'dialect.*=false'`.
@@ -570,7 +649,7 @@ and explained on hover, beside a report of the changes and the American-ness sco
 Dropping a source file uses `deamericaniseFile`, so a `.ts` file has only its comments
 rewritten.
 
-A collapsible panel lists all 83 rules grouped by family, each with a tick box and a
+A collapsible panel lists all 84 rules grouped by family, each with a tick box and a
 count of how many changes it made to the text on the left. Unticking forces a rule off;
 leaving it ticked means the mode and confidence settings still govern it, so the count is
 the honest answer to what actually ran.
@@ -642,7 +721,11 @@ Limits:
   happen before the settings arrive. The page is rewritten as soon as they do.
 - A site is switched off by its hostname, frame by frame. A frame from another site embedded
   in a page you switched off is still rewritten.
-- Text inside shadow DOM is left as it is.
+- Web components are rewritten, closed shadow roots included. A component defined after the
+  page has loaded, whose tag was already on the page, keeps its American text.
+- Changes inside a web component are highlighted in Chrome and Edge but not in Firefox.
+  Pointing at one shows its description in Chrome and Edge 128 or later, and in Firefox 150
+  or later.
 
 ## Releasing
 

@@ -61,8 +61,14 @@ export function articleAgreements(text: string, changes: Change[]): Change[] {
       ...ARTICLE_AGREEMENT,
       priority: 50,
       note: `the replacement starts with a ${wanted === 'an' ? 'vowel' : 'consonant'} sound`,
+      agreesWith: { start: change.start, end: change.end },
     });
   }
 
   return extra;
+}
+
+/** True when `article` is the fix that agrees with `change`. */
+export function agreesWith(article: Change, change: Change): boolean {
+  return article.agreesWith?.start === change.start && article.agreesWith.end === change.end;
 }

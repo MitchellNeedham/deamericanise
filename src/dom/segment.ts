@@ -25,6 +25,15 @@ const ANCHORS = new Set(['a', 'button', 'label']);
  */
 const PAGE_ELEMENTS = new Set(['html', 'body']);
 
+/**
+ * The built-in elements `attachShadow` accepts, as the DOM standard lists them. No other
+ * element can host a root, so no other element costs a lookup.
+ */
+const SHADOW_HOSTS = new Set([
+  'article', 'aside', 'blockquote', 'body', 'div', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5',
+  'h6', 'header', 'main', 'nav', 'p', 'section', 'span',
+]);
+
 /** Elements whose `title` is not prose: a stylesheet set name, for one. */
 const NO_TITLE = new Set(['base', 'link', 'meta', 'script', 'style', 'template']);
 
@@ -67,6 +76,22 @@ export interface AttributeValue {
 }
 
 export type Segment = TextRun | AttributeValue;
+
+/** Finds the shadow root an element hosts, or null. */
+export type ShadowLookup = (host: Element) => ShadowRoot | null;
+
+/** Whether a page can attach a shadow root to `element`. */
+export function canHostShadowRoot(element: Element): boolean {
+  return (
+    element.namespaceURI === HTML_NS &&
+    (SHADOW_HOSTS.has(element.localName) || element.localName.includes('-'))
+  );
+}
+
+/** The host of a shadow root, or null for any other node. */
+export function hostOf(node: Node): Element | null {
+  return node.nodeType === 11 ? ((node as ShadowRoot).host ?? null) : null;
+}
 
 export function isEnglish(lang: string): boolean {
   return lang === '' || lang === 'en' || lang.startsWith('en-');
@@ -119,10 +144,13 @@ export function enter(parent: Scope, element: Element): Scope {
   };
 }
 
-/** The scope inside `node`, worked out from its ancestors. */
+/**
+ * The scope inside `node`, worked out from its ancestors. Inside a shadow root it carries
+ * on from the host, the way the browser inherits `lang`.
+ */
 export function scopeOf(node: Node): Scope {
   const chain: Element[] = [];
-  for (let n: Node | null = node; n; n = n.parentNode) {
+  for (let n: Node | null = node; n; n = n.parentNode ?? hostOf(n)) {
     if (n.nodeType === 1) chain.push(n as Element);
   }
   let scope = rootScope(node.ownerDocument ?? (node as Document));
@@ -168,15 +196,29 @@ export function containerOf(node: Node, root: Node): Node {
   return current ?? root;
 }
 
-/** Every container at or below `node`, with the scope inside each. */
-export function containersIn(node: Node, scope: Scope, out: Array<[Node, Scope]>): void {
+/**
+ * Every container and every element at or below `node`, shadow roots included, with the
+ * scope inside each. A shadow root is a container of its own, so no run reaches across its
+ * edge.
+ */
+export function containersAndElementsIn(
+  node: Node,
+  scope: Scope,
+  containers: Array<[Node, Scope]>,
+  elements: Array<[Element, Scope]>,
+  shadowRootOf: ShadowLookup,
+): void {
   const isElement = node.nodeType === 1;
   if (!isElement && node.nodeType !== 9 && node.nodeType !== 11) return;
+  if (isElement) elements.push([node as Element, scope]);
   // The text of an inline element belongs to the runs of the container around it.
-  if (!isElement || !joinsRun(node as Element)) out.push([node, scope]);
+  if (!isElement || !joinsRun(node as Element)) containers.push([node, scope]);
   for (let child = node.firstChild; child; child = child.nextSibling) {
-    if (child.nodeType === 1) containersIn(child, enter(scope, child as Element), out);
+    if (child.nodeType !== 1) continue;
+    containersAndElementsIn(child, enter(scope, child as Element), containers, elements, shadowRootOf);
   }
+  const root = isElement ? shadowRootOf(node as Element) : null;
+  if (root) containersAndElementsIn(root, scope, containers, elements, shadowRootOf);
 }
 
 /**
@@ -240,22 +282,20 @@ export function ownAttributes(element: Element, scope: Scope): AttributeValue[] 
   return out;
 }
 
-/** Every element at or below `node` that can carry a prose attribute, with its scope. */
-export function elementsIn(node: Node, scope: Scope, out: Array<[Element, Scope]>): void {
-  if (node.nodeType === 1) out.push([node as Element, scope]);
-  for (let child = node.firstChild; child; child = child.nextSibling) {
-    if (child.nodeType === 1) elementsIn(child, enter(scope, child as Element), out);
-  }
-}
-
 /**
  * Whether the last run of `container` may still grow while the page is loading. The
  * parser only ever adds to the end of the document, so the run counts as open while the
  * last node in the document sits inside it.
  */
-export function lastRunIsOpen(container: Node, root: Node): boolean {
+export function lastRunIsOpen(container: Node, root: Node, shadowRootOf: ShadowLookup): boolean {
   let last: Node = root;
-  while (last.lastChild) last = last.lastChild;
+  for (;;) {
+    // The parser fills a declarative shadow root before the host's own children.
+    const root = last.nodeType === 1 && !last.lastChild ? shadowRootOf(last as Element) : null;
+    const next = last.lastChild ?? root?.lastChild;
+    if (!next) break;
+    last = next;
+  }
   if (last === container) return false;
 
   for (let n: Node | null = last.nodeType === 1 ? last : last.parentNode; n; n = n.parentNode) {

@@ -24,6 +24,10 @@ export interface ExtensionApi {
     query(query: { active: boolean; currentWindow: boolean }): Promise<Array<{ id?: number }>>;
     sendMessage(tabId: number, message: unknown, options?: { frameId?: number }): Promise<unknown>;
   };
+  /** Chrome and Edge only. */
+  dom?: {
+    openOrClosedShadowRoot(element: HTMLElement): ShadowRoot | null;
+  };
 }
 
 const scope = globalThis as unknown as { browser?: ExtensionApi; chrome?: ExtensionApi };

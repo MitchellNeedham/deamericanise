@@ -22,6 +22,8 @@ export class Highlighter {
   private readonly unsubscribe: () => void;
   private names = new Set<string>();
   private byNode = new Map<Node, HighlightedChange[]>();
+  /** Every shadow root holding a change, and every root around those. */
+  private shadowRoots: ShadowRoot[] = [];
   private refreshFrame = 0;
   private hoverFrame = 0;
   private pointer: [x: number, y: number] | null = null;
@@ -60,6 +62,7 @@ export class Highlighter {
     this.refreshFrame = 0;
     const groups = new Map<string, Highlight>();
     const byNode = new Map<Node, HighlightedChange[]>();
+    const roots = new Set<ShadowRoot>();
     for (const highlighted of this.rewriter.highlights()) {
       const name = nameOf(highlighted.change);
       let group = groups.get(name);
@@ -68,8 +71,16 @@ export class Highlighter {
 
       const node = highlighted.range.startContainer;
       const list = byNode.get(node);
-      if (list) list.push(highlighted);
-      else byNode.set(node, [highlighted]);
+      if (list) {
+        list.push(highlighted);
+        continue;
+      }
+      byNode.set(node, [highlighted]);
+      let top = node.getRootNode();
+      while (isShadowRoot(top) && !roots.has(top)) {
+        roots.add(top);
+        top = top.host.getRootNode();
+      }
     }
 
     for (const name of this.names) {
@@ -78,6 +89,7 @@ export class Highlighter {
     for (const [name, group] of groups) CSS.highlights.set(name, group);
     this.names = new Set(groups.keys());
     this.byNode = byNode;
+    this.shadowRoots = [...roots];
     if (this.tip.showing) this.hover();
   };
 
@@ -106,7 +118,7 @@ export class Highlighter {
 
   /** The change under a point, with the box of the line it is on. */
   private changeAt(x: number, y: number): [HighlightedChange, DOMRect] | null {
-    const caret = caretAt(x, y);
+    const caret = caretAt(x, y, this.shadowRoots);
     if (!caret) return null;
     const [node, offset] = caret;
     for (const highlighted of this.byNode.get(node) ?? []) {
@@ -126,14 +138,19 @@ export class Highlighter {
   }
 }
 
-function caretAt(x: number, y: number): [Node, number] | null {
+function caretAt(x: number, y: number, shadowRoots: ShadowRoot[]): [Node, number] | null {
   // Chrome and Edge before 128 have only the older, non-standard call.
   if (document.caretPositionFromPoint) {
-    const position = document.caretPositionFromPoint(x, y);
+    // A caret inside a root left off this list is reported at the root's host.
+    const position = document.caretPositionFromPoint(x, y, { shadowRoots });
     return position ? [position.offsetNode, position.offset] : null;
   }
   const range = document.caretRangeFromPoint(x, y);
   return range ? [range.startContainer, range.startOffset] : null;
+}
+
+function isShadowRoot(node: Node): node is ShadowRoot {
+  return node.nodeType === 11 && Boolean((node as ShadowRoot).host);
 }
 
 const LIGHT = {
@@ -227,6 +244,8 @@ class Tip {
     }
 
     this.host = document.createElement('deamericanise-tip');
+    // The rewriter enters closed roots too, and the card quotes each American original.
+    this.host.setAttribute('translate', 'no');
     const root = this.host.attachShadow({ mode: 'closed' });
     this.box = document.createElement('div');
     this.box.popover = 'manual';

@@ -44,6 +44,19 @@ describe('the remark plugin', () => {
     expect(flatten(run(tree))).toEqual(['const color = 1;']);
   });
 
+  it('leaves a wrapped code span alone and reads past a stray backtick, as the plain path does', () => {
+    const tree = root(
+      paragraph(text('A span that wraps, '), { type: 'inlineCode', value: 'the\ncolor' }, text(', stays.')),
+      paragraph(text("It's a `stray backtick and\nthe color is red.")),
+    );
+    expect(flatten(run(tree))).toEqual([
+      'A span that wraps, ',
+      'the\ncolor',
+      ', stays.',
+      "It's a `stray backtick and\nthe colour is red.",
+    ]);
+  });
+
   it('judges American-ness across the whole document, not one node at a time', () => {
     const tree = root(
       paragraph(text('The color of the theater is gray and they canceled it.')),

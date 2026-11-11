@@ -242,6 +242,7 @@ describe('the trash of an email client or file manager stays the trash', () => {
     'Drag it to the trash.',
     'Windows calls the trash the Recycle Bin.',
     'Click the Trash can icon.',
+    'Press the trash button.',
     'Tap the trash can to delete the email.',
     'Items in the Trash can be restored.',
   ])('leaves "%s" alone', (input) => {

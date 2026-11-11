@@ -171,6 +171,64 @@ describe('analyse', () => {
   });
 });
 
+describe('the Fahrenheit marker', () => {
+  const FAHRENHEIT = 'Fahrenheit';
+
+  const READ = [
+    'Cook until the chicken reaches 165°F.',
+    'Cook until the chicken reaches 165 degrees F.',
+    'Cook until the chicken reaches 165F.',
+    'Bake at 350 F for 20 minutes.',
+    'Bake at 350 deg F.',
+    'Bake at 350 deg. F.',
+    'It was 70℉ outside.',
+    'A fever of 102.5F needs a doctor.',
+    'Bake at 350-375F.',
+  ];
+
+  const NOT_READ = [
+    'Apartment 3F',
+    'Apartment 3F has no heat.',
+    'The heating on floor 5F is broken.',
+    'I sat in seat 23F.',
+    'The Boeing 777F carries 102 tonnes.',
+    'Ford recalled the 2024 F-150 after heat damage.',
+    'The heat map uses #1F1F1F and #33F.',
+    'Mask the byte with 0x1F before heating.',
+    'Sketch with a 2F pencil.',
+    'Bake part B4F.',
+    '// 3F ends the header before the oven data',
+    'The A330-200F flies in hot weather.',
+    'Scale it by 100f before baking.',
+    'Preheat the oven to 180C/350F/gas 4.',
+    'Heat the oven to 180C fan or to 400F.',
+  ];
+
+  it.each(READ)('finds Fahrenheit in "%s"', (input) => {
+    expect(analyse(input).markers).toContain(FAHRENHEIT);
+  });
+
+  it.each(NOT_READ)('finds no Fahrenheit in "%s"', (input) => {
+    expect(analyse(input).markers).not.toContain(FAHRENHEIT);
+  });
+
+  it('still counts the scale named on its own', () => {
+    expect(analyse('Set the thermostat in Fahrenheit.').markers).toContain(FAHRENHEIT);
+  });
+
+  it.each([...READ, ...NOT_READ])('agrees with the temperature rule on "%s"', (input) => {
+    const converted = deamericanise(input).changes.some((c) => c.ruleId.startsWith('units.temperature.'));
+    expect(analyse(input).markers.includes(FAHRENHEIT)).toBe(converted);
+  });
+
+  it('lets a bare F count towards the verdict', () => {
+    const recipe = 'Melt 1 stick of butter in a gray pan, cook the chicken to 165F, and spend $5 on it.';
+    expect(deamericaniseText(recipe)).toBe(
+      'Melt 1 stick of butter in a grey pan, cook the chicken to 73.9°C, and spend US$5 on it.',
+    );
+  });
+});
+
 describe('analyse on recipes', () => {
   const OVEN = 'Fahrenheit oven setting';
   const STICK = 'stick of butter';

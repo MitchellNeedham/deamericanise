@@ -172,6 +172,67 @@ describe('Fahrenheit ranges', () => {
   });
 });
 
+describe('Fahrenheit written as a bare F', () => {
+  it.each`
+    input                                       | expected                                    | why
+    ${'Cook until the chicken reaches 165F.'}   | ${'Cook until the chicken reaches 73.9°C.'} | ${'glued to the number'}
+    ${'Bake at 350 F for 20 minutes.'}          | ${'Bake at 175°C for 20 minutes.'}          | ${'after a space'}
+    ${'Roast at 425F until golden.'}            | ${'Roast at 220°C until golden.'}           | ${'an oven setting lands on fives'}
+    ${'Highs of 95F are forecast.'}             | ${'Highs of 35°C are forecast.'}            | ${'two figures, in a forecast'}
+    ${'A fever of 102.5F needs a doctor.'}      | ${'A fever of 39.2°C needs a doctor.'}      | ${'a decimal'}
+    ${'Overnight lows of -10F.'}                | ${'Overnight lows of -23.3°C.'}             | ${'a negative'}
+    ${'Bake at 350-375F.'}                      | ${'Bake at 175-190°C.'}                     | ${'a range'}
+    ${'Bake at 350F-375F.'}                     | ${'Bake at 175°C-190°C.'}                   | ${'a range with both ends marked'}
+    ${'Set the oven to 350F/gas 4.'}            | ${'Set the oven to 175°C/gas 4.'}           | ${'beside a gas mark'}
+    ${'Turn the heat down by 25F.'}             | ${'Turn the heat down by 14°C.'}            | ${'a difference'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                              | why
+    ${'Apartment 3F'}                                      | ${'a flat'}
+    ${'Apartment 3F has no heat.'}                         | ${'one figure, even in a sentence about heat'}
+    ${'The heating on floor 5F is broken.'}                | ${'a floor'}
+    ${'I sat in seat 23F.'}                                | ${'a seat, with no word about heat'}
+    ${'She wears a 34F.'}                                  | ${'a size'}
+    ${'The Boeing 777F carries 102 tonnes.'}               | ${'a model'}
+    ${'Ford recalled the 2024 F-150 after heat damage.'}   | ${'a name after a year'}
+    ${'The heat map uses #1F1F1F and #33F.'}               | ${'hex colours'}
+    ${'Mask the byte with 0x1F before heating.'}           | ${'a hex literal'}
+    ${'Sketch with a 2F pencil.'}                          | ${'a pencil grade'}
+    ${'Bake part B4F.'}                                    | ${'a part number'}
+    ${'// 3F ends the header before the oven data'}        | ${'a hex byte in a code comment'}
+    ${'The A330-200F flies in hot weather.'}               | ${'a hyphenated designation'}
+    ${'Cook it at 350 f.'}                                 | ${'a lower case f'}
+    ${'Scale it by 100f before baking.'}                   | ${'a float literal'}
+    ${'Preheat the oven to 180C/350F/gas 4.'}              | ${'the courtesy figure after Celsius'}
+    ${'Bake at 350F (180C).'}                              | ${'the courtesy figure before Celsius'}
+    ${'It was 75F today.'}                                 | ${'no word about heat in the sentence'}
+    ${'Bake well.\nApartment 3F'}                          | ${'the word about heat is in another sentence'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                              | expected
+    ${'Cook until the chicken reaches 165°F.'}         | ${'Cook until the chicken reaches 73.9°C.'}
+    ${'Cook until the chicken reaches 165 degrees F.'} | ${'Cook until the chicken reaches 73.9 degrees Celsius.'}
+    ${'Bake at 350 deg F.'}                            | ${'Bake at 175°C.'}
+    ${'It was 70℉ out.'}                               | ${'It was 21.1°C out.'}
+    ${'It was 10 °F out.'}                             | ${'It was -12.2°C out.'}
+  `('converts the written unit in $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('runs twice on a kept original without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('Cook until the chicken reaches 165F.', options);
+    expect(once).toBe('Cook until the chicken reaches 73.9°C (165F).');
+    expect(convert(once, options)).toBe(once);
+  });
+});
+
 describe('speed, power and economy', () => {
   it.each`
     input                | expected

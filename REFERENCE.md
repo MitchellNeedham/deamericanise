@@ -270,6 +270,15 @@ form `keepOriginal` writes, so running it again changes nothing. The bracket can
 with a word such as `about`, but it has to hold nothing else, and the dimension has to
 match: `2 metres (6 pounds)` still converts.
 
+A `/` or `or` between the two values reads the same way as a bracket, by the same test of
+agreement. `350°F/180°C` and `350°F or 180°C` become `180°C`, and
+`Preheat to 350°F/180°C/gas 4` becomes `Preheat to 180°C/gas 4`. `180°C/350°F` and
+`180°C or 350°F` are left as they are. A pair can also offer two different measurements,
+so the values have to agree with the metric one first too: `Cut 6 feet or 3 metres of rope`
+becomes `Cut 1.8 metres or 3 metres of rope`, and `Cut 3 metres or 6 feet of rope` becomes
+`Cut 3 metres or 1.8 metres of rope`. A slash with no figure after it is a rate, so
+`5 gallons/minute` becomes `19 litres/minute`.
+
 Measurements that are imperial worldwide are left alone: screens, wheels, pipes, vinyl.
 `a 15 inch laptop` stays a 15 inch laptop. So does a unit that is part of a name, such as
 `the 40 yard line` or `the 147-pound division`. A range or dimension of them stays whole,

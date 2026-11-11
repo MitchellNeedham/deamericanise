@@ -115,20 +115,134 @@ function withOriginal(ctx: RuleContext, body: string, original: string): string 
 
 
 /**
- * A metric measurement as it appears inside a parenthetical, whether written in symbols,
- * written out, or written the American way. Longer unit names are listed first so the
- * end anchor cannot cut one short.
+ * Metric units by dimension, in every form the unit rules write them and in the American
+ * spellings. Each key names a capture group, which is how a match reports its dimension.
  */
-const METRIC_INNER = new RegExp(
-  String.raw`^\s*[-−]?\d[\d,]*(?:\.\d+)?` +
-    String.raw`(?:\s*(?:-|–|—|to|x|×)\s*[-−]?\d[\d,]*(?:\.\d+)?)*\s*` +
-    String.raw`(?:degrees?\s+(?:Celsius|C)\b|°\s*C|` +
+const METRIC_UNITS = {
+  temperature: String.raw`degrees?\s+(?:Celsius|C)\b|°\s*C`,
+  speed: String.raw`(?:kilometres?|kilometers?)\s+per\s+hour|km/h`,
+  torque: String.raw`newton[\s-]+(?:metres?|meters?)|N·m|Nm`,
+  area: String.raw`square\s+(?:kilometres?|kilometers?|metres?|meters?)|hectares?|km²|km2|m²|m2|ha`,
+  economy: String.raw`L/100\s*km|km/L`,
+  length:
     String.raw`kilometres?|kilometers?|centimetres?|centimeters?|millimetres?|millimeters?|` +
-    String.raw`millilitres?|milliliters?|kilograms?|hectares?|kilowatts?|kilojoules?|` +
-    String.raw`tonnes?|metres?|meters?|litres?|liters?|grams?|` +
-    String.raw`km/h|kPa|kW|kJ|N·m|Nm|km²|km2|m²|m2|ha|mm|cm|km|kg|mg|mL|ml|` +
-    String.raw`m|g|t|L|l)\s*$`,
+    String.raw`metres?|meters?|km|cm|mm|m`,
+  volume: String.raw`millilitres?|milliliters?|litres?|liters?|mL|ml|L|l`,
+  mass: String.raw`kilograms?|tonnes?|grams?|kg|mg|g|t`,
+  pressure: String.raw`kilopascals?|kPa`,
+  power: String.raw`kilowatts?|kW`,
+  energy: String.raw`kilojoules?|kJ`,
+} satisfies Record<string, string>;
+
+type Dimension = keyof typeof METRIC_UNITS;
+
+const METRIC_NUMBER = String.raw`[-−]?\d[\d,]*(?:\.\d+)?`;
+const METRIC_VALUE =
+  String.raw`${METRIC_NUMBER}(?:\s*(?:-|–|—|to|and|x|×|by)\s*${METRIC_NUMBER})*\s*-?\s*` +
+  `(?:${Object.entries(METRIC_UNITS)
+    .map(([dimension, units]) => `(?<${dimension}>${units})`)
+    .join('|')})`;
+
+/**
+ * A metric measurement filling a parenthetical, whether written in symbols, written out,
+ * or written the American way.
+ */
+const METRIC_INNER = new RegExp(String.raw`^\s*${METRIC_VALUE}\s*$`);
+
+/** A metric measurement ending the text before a parenthetical. */
+const METRIC_BEFORE = new RegExp(String.raw`(?<![\w.])${METRIC_VALUE}\s*$`);
+
+function dimensionOf(match: RegExpMatchArray | null): Dimension | undefined {
+  const groups = match?.groups ?? {};
+  return Object.keys(groups).find((dimension) => groups[dimension] !== undefined) as
+    | Dimension
+    | undefined;
+}
+
+/**
+ * Imperial units by the dimension of what they convert to: every unit in MEASURES, and
+ * the forms that only the feet-and-inches, temperature and fuel economy rules read.
+ */
+const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
+  temperature: [
+    String.raw`°\s*F(?:ahrenheit)?`,
+    '℉',
+    String.raw`degrees?\s+F(?:ahrenheit)?`,
+    String.raw`deg\.?\s*F`,
+  ],
+  economy: ['mpg', String.raw`miles\s+per\s+gallon`],
+  length: ["'"],
+};
+for (const measure of MEASURES) {
+  const dimension = dimensionOf(METRIC_INNER.exec(`1 ${measure.convert(1).symbol}`));
+  if (dimension === undefined) continue;
+  (IMPERIAL_UNITS[dimension] ??= []).push(...[...measure.words, ...measure.abbrevs].map(escape));
+}
+
+/** Each dimension's units as one pattern, for naming the dimension of a unit already read. */
+const UNIT_OF = Object.entries(IMPERIAL_UNITS).map(([dimension, units]) => ({
+  dimension: dimension as Dimension,
+  pattern: new RegExp(`^(?:${units.join('|')})$`, 'i'),
+}));
+
+const JOINER = String.raw`[-–—]|(?:to|and|x|×|by)(?![A-Za-z])`;
+
+/**
+ * One piece of an imperial measurement: a unit, a number, or what joins them. A unit has
+ * to be followed by another piece or the end, which is what reads `40 miles per gallon`
+ * as fuel economy and not as a length followed by a stray `per`.
+ */
+const MEASUREMENT_PIECE = new RegExp(
+  String.raw`\s*(?:(?:${Object.values(IMPERIAL_UNITS)
+    .flat()
+    // Longest first, so `lb-ft` is torque and not `lb` joined to `ft`.
+    .sort((a, b) => b.length - a.length)
+    .join('|')})(?=\s*(?:$|${NUMBER_PATTERN}|${JOINER}))|${NUMBER_PATTERN}|${JOINER})`,
+  'giy',
 );
+
+/** Words that round a restatement, as in `a 2 metre (about 6 feet) fence`. */
+const APPROXIMATELY =
+  /^(?:about|around|approximately|approx\.|roughly|nearly|almost|some|circa|c\.|ca\.|~|≈)\s*/i;
+
+/**
+ * The dimension of the imperial measurement the text holds and nothing else, after an
+ * optional word of approximation. `about 6 feet 2 inches` is a length, while
+ * `10 feet for the old one` and `6 feet 3 pounds` are neither, and give undefined.
+ */
+function measurementDimension(text: string): Dimension | undefined {
+  const rest = text.trim().replace(APPROXIMATELY, '');
+  let read = 0;
+  let dimension: Dimension | undefined;
+  for (const piece of rest.matchAll(MEASUREMENT_PIECE)) {
+    read += piece[0].length;
+    const unit = UNIT_OF.find(({ pattern }) => pattern.test(piece[0].trim()))?.dimension;
+    if (unit === undefined) continue;
+    if (dimension !== undefined && unit !== dimension) return undefined;
+    dimension = unit;
+  }
+  return read === rest.length ? dimension : undefined;
+}
+
+/**
+ * `1.8 metres (6 feet)` is what `keepOriginal` writes, and what a careful author writes by
+ * hand. A bracket that holds nothing but an imperial measurement, directly after a metric
+ * value of the same dimension, restates that value. Every match inside it is left alone,
+ * including a piece of the measurement such as the `2 inches` in `(6 feet 2 inches)`.
+ */
+function restatesMetric(ctx: RuleContext, start: number, end: number): boolean {
+  const head = ctx.text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
+  const tail = ctx.text.slice(end, end + CONTEXT_WINDOW);
+  const open = head.lastIndexOf('(');
+  const close = tail.indexOf(')');
+  if (open < 0 || close < 0) return false;
+  const inside = head.slice(open + 1) + ctx.text.slice(start, end) + tail.slice(0, close);
+  const dimension = measurementDimension(inside);
+  if (dimension === undefined) return false;
+  const bracket = start - head.length + open;
+  const before = ctx.text.slice(Math.max(0, bracket - CONTEXT_WINDOW), bracket);
+  return dimensionOf(METRIC_BEFORE.exec(before)) === dimension;
+}
 
 /** The author wrote the metric side; only its spelling needs bringing across. */
 function metricSpelling(text: string): string {
@@ -149,7 +263,10 @@ function redundantMetric(ctx: RuleContext, end: number): { end: number; after: s
   return { end: end + match[0].length, after: metricSpelling(match[1]!.trim()) };
 }
 
-/** Records one converted measurement, collapsing a redundant parenthetical if there is one. */
+/**
+ * Records one converted measurement, collapsing a redundant parenthetical if there is one.
+ * A measurement that is itself the parenthetical after its metric value is not recorded.
+ */
 function pushMeasurement(
   ctx: RuleContext,
   changes: Change[],
@@ -159,6 +276,7 @@ function pushMeasurement(
   ruleId: string,
   priority: number,
 ): void {
+  if (restatesMetric(ctx, start, start + matched.length)) return;
   const redundant = redundantMetric(ctx, start + matched.length);
   if (redundant) {
     changes.push({
@@ -577,15 +695,8 @@ function fuelEconomyRule(): Rule {
         const value = perLitre ? mpg * 0.425143707 : 235.214583 / mpg;
         const { precision, maxDecimals } = ctx.options.units;
         const number = formatNumber(value, precision, Math.max(2, significantFigures(match[1]!)), maxDecimals);
-        changes.push(
-          change(
-            match.index,
-            match[0],
-            withOriginal(ctx, `${number} ${perLitre ? 'km/L' : 'L/100km'}`, match[0]),
-            'units.economy.mpg',
-            35,
-          ),
-        );
+        const body = `${number} ${perLitre ? 'km/L' : 'L/100km'}`;
+        pushMeasurement(ctx, changes, match.index, match[0], body, 'units.economy.mpg', 35);
       }
       return changes;
     },

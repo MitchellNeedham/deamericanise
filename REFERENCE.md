@@ -175,6 +175,13 @@ deamericaniseText('6 feet', { units: { precision: 1 } });              // '1.8 m
 deamericaniseText('6 feet', { units: { keepOriginal: true } });        // '1.8 metres (6 feet)'
 ```
 
+A measurement that already gives both values is converted once, not twice. `6 feet (1.8 m)`
+becomes `1.8 m`, keeping the figure the author rounded. `1.8 metres (6 feet)` is left as
+it is, because the bracket only restates the metric value in front of it. That is the
+form `keepOriginal` writes, so running it again changes nothing. The bracket can open
+with a word such as `about`, but it has to hold nothing else, and the dimension has to
+match: `2 metres (6 pounds)` still converts.
+
 Measurements that are imperial worldwide are left alone: screens, wheels, pipes, vinyl.
 `a 15 inch laptop` stays a 15 inch laptop. So does a unit that is part of a name, such as
 `the 40 yard line` or `the 147-pound division`. `units: { respectConventions: false }`

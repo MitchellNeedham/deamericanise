@@ -117,6 +117,24 @@ button.link {
   gap: 20px;
 }
 
+@media (min-width: 1000px) {
+  .options {
+    max-width: 980px;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 56px;
+  }
+
+  .options > h1,
+  .options > p {
+    grid-column: 1 / -1;
+  }
+
+  /* A section shares its row with a taller one, and keeps its own content at the top. */
+  .options section {
+    align-content: start;
+  }
+}
+
 .options section {
   display: grid;
   gap: 8px;

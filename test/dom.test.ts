@@ -362,6 +362,19 @@ describe('what is left alone', () => {
     }
   });
 
+  it('leaves the webmail Trash and Vacation responder alone and still localises the chores beside them', () => {
+    const webmail =
+      '<nav><ul><li>Inbox</li><li>Trash</li></ul></nav>' +
+      '<p>Move it to the <b>Trash</b> folder.</p>' +
+      '<div><label>Vacation responder:</label> <span>Vacation responder on</span></div>';
+    const chores = '<p>Take out the <em>trash</em> before your <em>vacation</em>.</p>';
+    for (const dialect of ['en-AU', 'en-GB'] as const) {
+      expect(rewrite(webmail + chores, { preset: 'localise', dialect }), dialect).toBe(
+        webmail + '<p>Take out the <em>rubbish</em> before your <em>holiday</em>.</p>',
+      );
+    }
+  });
+
   it('leaves a document in design mode alone', () => {
     const doc = page('<p>the color</p>');
     doc.designMode = 'on';

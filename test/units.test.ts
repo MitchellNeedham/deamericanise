@@ -648,6 +648,92 @@ describe('an imperial original in brackets after its metric value', () => {
   });
 });
 
+describe('a value paired with its metric value by a slash or "or"', () => {
+  it.each`
+    unchanged                                         | why
+    ${'Preheat the oven to 180°C/350°F (160°C fan).'} | ${'a slash'}
+    ${'Heat to 180°C or 350°F.'}                      | ${'or'}
+    ${'Preheat the oven to 180°C/350°F/gas 4.'}       | ${'the British trio'}
+    ${'Preheat the oven to 180°C / 350°F / gas 4.'}   | ${'spaced'}
+    ${'Preheat the oven to 180C/350F/gas 4.'}         | ${'the trio in bare forms'}
+    ${'Heat to 180C or 350F.'}                        | ${'bare forms joined by or'}
+    ${'Bake at 175-190°C/350-375°F.'}                 | ${'a range of temperatures'}
+    ${'It is 5 cm/2 inches long.'}                    | ${'a length'}
+    ${'It is 1.88 m/6 feet 2 inches tall.'}           | ${'no piece of feet and inches converts'}
+    ${'a 2 m/6-foot fence'}                           | ${'attributive'}
+    ${'a sheet of 22 x 28 cm/8.5 x 11 inches'}        | ${'dimensions'}
+    ${'Add 500 g/1 pound of butter.'}                 | ${'a cook rounding, as a bracket allows'}
+    ${'It goes 97 km/h or 60 mph.'}                   | ${'speed, with a slash in the metric unit'}
+    ${'It does 7.8 L/100km/30 mpg.'}                  | ${'fuel economy, the same'}
+    ${'It is 1.8 metres or\n6 feet tall.'}            | ${'a wrapped line'}
+    ${'Preheat the oven to 350F/180C/gas 4.'}         | ${'a bare F beside a Celsius value is not read as Fahrenheit'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                        | expected                              | why
+    ${'Bake at 350°F/180°C.'}                    | ${'Bake at 180°C.'}                   | ${'the imperial half goes'}
+    ${'Bake at 350°F or 180°C.'}                 | ${'Bake at 180°C.'}                   | ${'or'}
+    ${'Bake at 350°F / 180°C.'}                  | ${'Bake at 180°C.'}                   | ${'spaced'}
+    ${'Preheat the oven to 350°F/180°C/gas 4.'}  | ${'Preheat the oven to 180°C/gas 4.'} | ${'the British trio'}
+    ${'Bake at 350-375°F/175-190°C.'}            | ${'Bake at 175-190°C.'}               | ${'a range of temperatures'}
+    ${'It dropped 20°F/11°C.'}                   | ${'It dropped 11°C.'}                 | ${'a change in temperature'}
+    ${'It is 2 inches/5 cm long.'}               | ${'It is 5 cm long.'}                 | ${'a length'}
+    ${'It is 6 feet 2 inches/1.88 m tall.'}      | ${'It is 1.88 m tall.'}               | ${'feet and inches'}
+    ${'a 6-foot or 2-metre fence'}               | ${'a 2-metre fence'}                  | ${'attributive'}
+    ${'a sheet of 8.5 x 11 inches/22 x 28 cm'}   | ${'a sheet of 22 x 28 cm'}            | ${'dimensions'}
+    ${'Add 1 pound/500 g of butter.'}            | ${'Add 500 g of butter.'}             | ${'a cook rounding'}
+    ${'It is 100 yards/91 meters long.'}         | ${'It is 91 metres long.'}            | ${'only the spelling is brought across'}
+    ${'It goes 60 mph or 97 km/h.'}              | ${'It goes 97 km/h.'}                 | ${'speed'}
+    ${'It does 30 mpg/7.8 L/100km.'}             | ${'It does 7.8 L/100km.'}             | ${'fuel economy'}
+    ${'Cut 6 feet or 2 metres of rope.'}         | ${'Cut 2 metres of rope.'}            | ${'as close as 6 feet (2 m), which collapses too'}
+    ${'It is 6 feet\n/1.8 m tall.'}              | ${'It is 1.8 m tall.'}                | ${'a wrapped line'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                         | expected                                        | why
+    ${'Cut 6 feet or 3 metres of rope.'}          | ${'Cut 1.8 metres or 3 metres of rope.'}        | ${'two lengths that disagree'}
+    ${'Cut 3 metres or 6 feet of rope.'}          | ${'Cut 3 metres or 1.8 metres of rope.'}        | ${'the same, metric first'}
+    ${'Heat to 180°C or 400°F.'}                  | ${'Heat to 180°C or 205°C.'}                    | ${'two settings'}
+    ${'Bake at 350°F/160°C.'}                     | ${'Bake at 175°C/160°C.'}                       | ${'a fan oven setting'}
+    ${'It weighs 6 pounds/2 m.'}                  | ${'It weighs 2.7 kilograms/2 m.'}               | ${'a different dimension'}
+    ${'It flows at 5 gallons/minute.'}            | ${'It flows at 19 litres/minute.'}              | ${'a slash between two units is a rate'}
+    ${'Bake at 350°F or until golden.'}           | ${'Bake at 175°C or until golden.'}             | ${'or with no measurement after it'}
+    ${'Gas mark 4 and 350°F are the same heat.'}  | ${'Gas mark 4 and 175°C are the same heat.'}    | ${'and is not a pair'}
+    ${'It is 1.8 metres or\n\n6 feet tall.'}      | ${'It is 1.8 metres or\n\n1.8 metres tall.'}    | ${'a blank line ends the pair'}
+    ${'It is 6 feet/\n\n1.8 m tall.'}             | ${'It is 1.8 metres/\n\n1.8 m tall.'}           | ${'the same, imperial first'}
+    ${'Heat to 180°Cor 350°F.'}                   | ${'Heat to 180°Cor 175°C.'}                     | ${'or has to be a word of its own'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                    | expected
+    ${'Bake at 175°C (350°F).'}              | ${'Bake at 175°C (350°F).'}
+    ${'Bake at 350°F (175°C).'}              | ${'Bake at 175°C.'}
+  `('reads a bracket the same way: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                         | expected
+    ${'Preheat the oven to 180°C/350°F/gas 4.'}   | ${'Preheat the oven to 180°C/350°F/gas 4.'}
+    ${'Preheat the oven to 350°F/180°C/gas 4.'}   | ${'Preheat the oven to 180°C/gas 4.'}
+    ${'Heat to 180°C or 350°F.'}                  | ${'Heat to 180°C or 350°F.'}
+    ${'It is 1.88 m/6 feet 2 inches tall.'}       | ${'It is 1.88 m/6 feet 2 inches tall.'}
+    ${'Cut 6 feet or 3 metres of rope.'}          | ${'Cut 1.8 metres (6 feet) or 3 metres of rope.'}
+    ${'Cut 3 metres or 6 feet of rope.'}          | ${'Cut 3 metres or 1.8 metres (6 feet) of rope.'}
+  `('with keepOriginal, $input -> $expected and stays there', ({ input, expected }) => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert(input, options);
+    expect(once).toBe(expected);
+    expect(convert(once, options)).toBe(once);
+  });
+});
+
 describe('fastener sizes are designations, not measurements', () => {
   it.each`
     unchanged                                      | why

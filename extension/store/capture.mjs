@@ -215,8 +215,6 @@ try {
   // Empty, or the site switched off for the comparison would show in the list.
   await evaluate(options, `chrome.storage.sync.set({ disabledSites: [] })`);
   const settings = await open(extensionPage('options.html'), 1280, 800);
-  // As at 120% browser zoom, so the text stays readable when a store shows the image smaller.
-  await evaluate(settings, `document.documentElement.style.zoom = '1.2'`);
   await save(settings, 'screenshot-4-settings.png');
 
   const promo = await open(original('promo.html'), 440, 280);

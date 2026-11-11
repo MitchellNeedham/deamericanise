@@ -110,16 +110,31 @@ button.link {
 /* ------- Options page ------- */
 
 .options {
-  max-width: 640px;
+  max-width: 680px;
   margin: 0 auto;
-  padding: 24px 16px 48px;
+  padding: 28px 16px 48px;
   display: grid;
-  gap: 20px;
+  gap: 24px;
+  font-size: 16px;
+}
+
+.options h1 {
+  font-size: 22px;
+  gap: 10px;
+}
+
+.options h1 img {
+  width: 28px;
+  height: 28px;
+}
+
+.options h2 {
+  font-size: 18px;
 }
 
 @media (min-width: 1000px) {
   .options {
-    max-width: 980px;
+    max-width: 1040px;
     grid-template-columns: 1fr 1fr;
     column-gap: 56px;
   }
@@ -137,8 +152,8 @@ button.link {
 
 .options section {
   display: grid;
-  gap: 8px;
-  padding-top: 16px;
+  gap: 10px;
+  padding-top: 18px;
   border-top: 1px solid var(--line);
 }
 
@@ -150,11 +165,14 @@ button.link {
 }
 
 .choice input {
+  width: 16px;
+  height: 16px;
   accent-color: var(--accent);
 }
 
 .choice small {
   grid-column: 2;
+  font-size: 14px;
   color: var(--muted);
 }
 

@@ -38,7 +38,7 @@ export interface Change {
 export interface AmericanSignals {
   /** 0-1. Rules that need American-ness compare against `dates.minConfidence`. */
   confidence: number;
-  /** Spellings and words that only Americans use. */
+  /** Labels for the American spellings, words and habits found in the text. */
   markers: string[];
   /**
    * Numeric dates that state their own order, by carrying a day component above 12.

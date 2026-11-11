@@ -70,9 +70,9 @@ published before 1929, and distributed by Project Gutenberg.
 
 ## How American it read
 
-**15% American.** Below the 0.5 threshold, so the rules that need to know where the text came from did not run.
+**30% American.** Below the 0.5 threshold, so the rules that need to know where the text came from did not run.
 
-Markers found: `imperial units`.
+Markers found: `imperial units`, `US ingredient names`.
 
 No numeric date states its own order.
 

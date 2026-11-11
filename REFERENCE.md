@@ -222,7 +222,12 @@ deamericaniseText('6 feet', { units: { keepOriginal: true } });        // '1.8 m
 ```
 
 A measurement that already gives both values is converted once, not twice. `6 feet (1.8 m)`
-becomes `1.8 m`, keeping the figure the author rounded. `1.8 metres (6 feet)` is left as
+becomes `1.8 m`, keeping the figure the author rounded. That needs a bracket that restates
+the conversion: the same dimension, and each figure within a quarter of the converted one
+(10 °C for a temperature) once both are read to the figures they are written to. So
+`1 pound (500 g)` and an imperial `1 pint (568 ml)` collapse, while `6 feet (2 kg)` and
+`6 feet (5 m)` convert as normal and keep their bracket. The bracket may start on the next
+line, but not after a blank line. `1.8 metres (6 feet)` is left as
 it is, because the bracket only restates the metric value in front of it. That is the
 form `keepOriginal` writes, so running it again changes nothing. The bracket can open
 with a word such as `about`, but it has to hold nothing else, and the dimension has to

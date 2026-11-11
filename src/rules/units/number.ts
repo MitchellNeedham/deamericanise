@@ -216,13 +216,18 @@ export const NUMBER_START = String.raw`(?<![\w.]|\d[-\u2013\u2014/,:])`;
  */
 export const RANGE_START = String.raw`(?<![$£€]\s?)`;
 
+/** `from` or `between` before a first number, which opens a range whatever its ends. */
+const RANGE_WORD_BEFORE = /\b(?:from|between)\s+$/i;
+
 /**
- * Whether `low` and `high` can be the two ends of one range. A first number more than ten
- * times the size of the second is a year or a count before a quantity, as in
- * `In 2024 - 5 feet`. A second end of zero says nothing, since `from 20 to 0°F` is a range.
+ * Whether `low`, which starts at `start` in `text`, and `high` can be the two ends of one
+ * range. A first number more than ten times the size of the second is a year or a count
+ * before a quantity, as in `In 2024 - 5 feet`, unless `from` or `between` opens the range, as
+ * in `fell from 10 to 0.5 miles`. A second end of zero says nothing, as in `lows of 10 to 0°F`.
  */
-export function canBeRange(low: number, high: number): boolean {
-  return high === 0 || low <= 10 * Math.abs(high);
+export function canBeRange(text: string, start: number, low: number, high: number): boolean {
+  if (high === 0 || low <= 10 * Math.abs(high)) return true;
+  return RANGE_WORD_BEFORE.test(text.slice(Math.max(0, start - 16), start));
 }
 
 function roundToSignificant(value: number, figures: number): number {

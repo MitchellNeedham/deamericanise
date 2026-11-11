@@ -44,7 +44,7 @@ const NOT_SECOND_OF_PAIR = String.raw`(?<!\d${softGap(String.raw`(?:[-\u2013\u20
 /** A range's first number and its join, ending where the range's second number starts. */
 const RANGE_BEFORE = new RegExp(
   String.raw`(?<=${NUMBER_START}${RANGE_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=[\d\-−])`,
-  'y',
+  'dy',
 );
 
 /**
@@ -54,10 +54,10 @@ const RANGE_BEFORE = new RegExp(
  */
 function endsRange(text: string, start: number, value: number): boolean {
   RANGE_BEFORE.lastIndex = start;
-  const first = RANGE_BEFORE.exec(text)?.[1];
-  if (first === undefined) return false;
-  const low = parseNumber(first);
-  return low === null || canBeRange(low, value);
+  const before = RANGE_BEFORE.exec(text);
+  if (before === null) return false;
+  const low = parseNumber(before[1]!);
+  return low === null || canBeRange(text, before.indices![1]![0], low, value);
 }
 
 function escape(s: string): string {
@@ -769,7 +769,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const entry = resolve(match[3]!);
         const low = parseNumber(match[1]!);
         const high = parseNumber(match[2]!);
-        if (!entry || low === null || high === null || high === 0 || !canBeRange(low, high)) continue;
+        if (!entry || low === null || high === null || high === 0) continue;
+        if (!canBeRange(ctx.text, match.index, low, high)) continue;
         const start = match.index;
         if (isOtherSense(ctx, entry, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;

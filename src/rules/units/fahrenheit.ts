@@ -69,7 +69,8 @@ function bareIsFahrenheit(text: string, match: RegExpExecArray): boolean {
 export function* fahrenheitTemperatures(text: string): Generator<RegExpExecArray> {
   const pattern = new RegExp(PATTERN);
   for (let match: RegExpExecArray | null; (match = pattern.exec(text)) !== null; ) {
-    if (match[1] !== undefined && !canBeRange(parseNumber(match[1])!, parseNumber(match[3]!)!)) {
+    const low = match[1] === undefined ? null : parseNumber(match[1]);
+    if (low !== null && !canBeRange(text, match.index, low, parseNumber(match[3]!)!)) {
       // The scan goes on as past a start the pattern refused, so the second number can still
       // be a temperature of its own.
       pattern.lastIndex = match.index + 1;

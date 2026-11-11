@@ -341,15 +341,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     matches: (v) => v.change?.ruleId === 'dates.numeric' && v.origin?.ruleId === 'dates.numeric',
   },
   {
-    issue: 159,
-    property: 'idempotence',
-    input: 'Speeds of 2-622 miles an hour cost $1,317.',
-    options: {},
-    // The first run wrote something the second run's detection counts as a month-first date.
-    matches: (v) =>
-      v.verdicts !== undefined && v.verdicts[1].unambiguousMonthFirstDates > v.verdicts[0].unambiguousMonthFirstDates,
-  },
-  {
     issue: 160,
     property: 'idempotence',
     input: 'The ridge is 911 feet high.',

@@ -230,8 +230,10 @@ match: `2 metres (6 pounds)` still converts.
 
 Measurements that are imperial worldwide are left alone: screens, wheels, pipes, vinyl.
 `a 15 inch laptop` stays a 15 inch laptop. So does a unit that is part of a name, such as
-`the 40 yard line` or `the 147-pound division`. `units: { respectConventions: false }`
-converts all of them.
+`the 40 yard line` or `the 147-pound division`. A range or dimension of them stays whole,
+so `bolts of ½-¾ inch` and `a 15" x 17" panel` are left exactly as written, with no
+piece of them converted on its own. `units: { respectConventions: false }` converts all
+of them.
 
 **Dates.** `3/14/2024` becomes `2024-03-14` without needing to be told anything, because
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the

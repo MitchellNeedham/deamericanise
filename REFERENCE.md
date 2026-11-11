@@ -73,6 +73,13 @@ included. To read one anyway, force the language:
 deamericanise --language md NOTES
 ```
 
+`--language` takes any name `--list-languages` prints: a lexer, or a prose type such as `md`
+or `txt`. It applies to stdin and to every file read, named or walked. Any other value stops
+the run before anything is read, with `unknown language "..."` on stderr and exit status 2.
+`--language json` reads only comments, so plain JSON, which has none, comes back untouched
+and a commented file such as `tsconfig.json` has just its comments rewritten. A `.json`
+file is still skipped unless it is forced this way.
+
 `LICENSE`, `COPYING` and `AUTHORS` are not on the list. A licence has to stay verbatim, and
 a list of names is no place for spelling rules.
 
@@ -108,6 +115,16 @@ Apply the two together or not at all, because either one alone leaves `a eraser`
 extension, which is what the CLI uses. It reads any file it has no lexer for as prose, JSON
 included, so choose the files before calling it. The CLI does that with the test described
 under [Command line](#command-line).
+
+A `language` option overrides the filename, as `--language` does. A prose type such as `md`
+reads the source as prose, any other value has to name a lexer, and an unknown one throws
+`UnknownLanguageError` whatever the filename:
+
+```ts
+deamericaniseFile('stdin', source, { language: 'python' });  // comments only
+deamericaniseFile('a.ts', source, { language: 'md' });       // prose
+deamericaniseFile('a.json', source, { language: 'nosuch' }); // throws UnknownLanguageError
+```
 
 ## Dialects
 
@@ -394,7 +411,7 @@ and something may be asserting on it. `docstrings: true` includes them.
 
 `lexerFor` accepts an id, an extension, a filename or a common alias, so `ruby`, `rb`,
 `shell`, `golang`, `c++` and `Dockerfile` all resolve. `languageNames()` lists the lot,
-and so does `--list-languages`.
+and `--list-languages` prints them with the prose types added.
 
 ### Commented-out code
 

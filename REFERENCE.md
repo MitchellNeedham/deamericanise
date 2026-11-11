@@ -85,6 +85,9 @@ has to match a rule id of at least one dialect, so a command line shared across 
 still runs under `en-CA`, which has no `dialect.*` rules. `--units-keep` takes a unit's
 key, such as `inch` or `square-foot`, or any name the unit is written as, such as `inches`
 or `in`. Any other value stops the run with `unknown rule "..."` or `unknown unit "..."`
+and exit status 2. The value after a rule's `=` is `true`, `on`, `1` or `yes` to switch it
+on, or `false`, `off`, `0` or `no` to switch it off, in any case. A pattern with no `=`
+switches the rule off, and any other value stops the run with `unknown rule value "..."`
 and exit status 2.
 
 `LICENSE`, `COPYING` and `AUTHORS` are not on the list. A licence has to stay verbatim, and
@@ -756,6 +759,9 @@ there each root needs the rules in its own styles.
 | `minAmericanConfidence` | `0.5` | The bar detection has to clear |
 
 `units`, `dates`, `times` and `currency` each accept `false` to switch the category off.
+
+A `dialect` or `preset` outside its list throws an `Error` that names the value and the
+ones it accepts, such as `Unknown preset: Localise. Expected one of read, localise.`
 
 ## Known limits
 

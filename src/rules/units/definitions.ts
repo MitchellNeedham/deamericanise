@@ -1,3 +1,5 @@
+import { isMoney } from './money.js';
+
 export interface MetricValue {
   value: number;
   symbol: string;
@@ -24,6 +26,12 @@ export interface Measure {
    * different things in different places, the document usually says which it means.
    */
   ambiguousWhen?: RegExp;
+  /**
+   * Whether the written-out unit in the quantity `text.slice(start, end)` is being used in
+   * another sense, such as `pounds` for money. Checked whatever `respectConventions` says,
+   * because what it finds is not a measurement at all.
+   */
+  otherSense?: (text: string, start: number, end: number) => boolean;
   /**
    * Left alone unless the rule is turned on by id. For measures that are not American at
    * all, merely imperial-descended and used everywhere.
@@ -186,6 +194,7 @@ export const MEASURES: Measure[] = [
     conventional: {
       after: /^[\s-]*(?:divisions?|classes|class|limits?|bouts?|titles?|champions?|weight)\b/i,
     },
+    otherSense: isMoney,
   },
   {
     id: 'units.mass.stone',

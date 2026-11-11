@@ -86,6 +86,10 @@ function isConventional(ctx: RuleContext, measure: Measure, start: number, end: 
   return Boolean((rules.before?.test(before)) || (rules.after?.test(after)));
 }
 
+function isOtherSense(ctx: RuleContext, alias: Alias, start: number, end: number): boolean {
+  return alias.isWord && alias.measure.otherSense?.(ctx.text, start, end) === true;
+}
+
 /**
  * A singular unit is modifying the noun after it only when a determiner opens the phrase:
  * `a 9 inch dish` describes the dish, so it takes the singular. `one quart small onions`
@@ -410,6 +414,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     // and `a mile and a half hour later` is half an hour.
     if (MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) return;
     if (isConventional(ctx, entry.measure, start, start + matched.length)) return;
+    if (isOtherSense(ctx, entry, start, start + matched.length)) return;
     if (isAmbiguousHere(entry.measure, ctx.text)) return;
 
     const target = entry.measure.convert(value);
@@ -434,6 +439,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         if (!entry || low === null || high === null || high === 0) continue;
         const start = match.index;
         if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
+        if (isOtherSense(ctx, entry, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[3]!, match[0])) continue;
 
@@ -476,6 +482,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
         const start = match.index;
         if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
+        if (isOtherSense(ctx, entry, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[4]!, match[0])) continue;
 
@@ -516,6 +523,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         if (!entry || value === null) continue;
         const start = match.index;
         if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
+        if (isOtherSense(ctx, entry, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[2]!, match[0])) continue;
 

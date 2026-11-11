@@ -103,6 +103,16 @@ describe('running twice changes nothing the second time', () => {
     const once = deamericaniseText(input);
     expect(deamericaniseText(once)).toBe(once);
   });
+
+  it.each`
+    input
+    ${'He is 6 feet 2 inches tall and weighs 180 pounds.'}
+    ${'Bake at 350°F on 3/14/2024 at 3:00 PM.'}
+  `('is stable for $input with keepOriginal', ({ input }) => {
+    const options = { units: { keepOriginal: true } };
+    const once = deamericaniseText(input, options);
+    expect(deamericaniseText(once, options)).toBe(once);
+  });
 });
 
 describe('categories and confidence tiers', () => {

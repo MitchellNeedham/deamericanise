@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deamericanise, deamericaniseText } from '../src/index.js';
+import { MEASURES } from '../src/rules/units/definitions.js';
 
 const convert = (input: string, options = {}) =>
   deamericaniseText(input, { categories: { spelling: false, vocabulary: false }, ...options });
@@ -223,6 +224,38 @@ describe('keeping the original', () => {
   `('$input -> $expected', ({ input, expected }) => {
     expect(convert(input, { units: { keepOriginal: true } })).toBe(expected);
   });
+
+  it.each`
+    input
+    ${'It is 6 feet tall.'}
+    ${'He is 6 feet 2 inches tall, or 6\'2" in socks.'}
+    ${'Bake at 350°F, or 350 degrees Fahrenheit.'}
+    ${'a drop of 30-60 feet, or 30 to 60 feet'}
+    ${'between 5 and 10 miles'}
+    ${'a sheet of 8.5 x 11 inches, 8.5" x 11", or 10 ft x 12 ft x 8 ft'}
+    ${'a 6-foot fence and a 9 inch dish'}
+    ${'It weighs 180 pounds, 3 ounces and 12 stone.'}
+    ${'It holds 1/2 gallon, 2 quarts, 3 pints, 4 fluid ounces and 5 cubic feet.'}
+    ${'It covers 20 square feet, 2 square miles and 10 acres.'}
+    ${'It goes 60 miles per hour, or 60 mph.'}
+    ${'It runs at 32 psi with 300 horsepower, 100 foot-pounds and 1000 BTU.'}
+    ${'It does 30 mpg.'}
+  `('running it again on "$input" changes nothing', ({ input }) => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert(input, options);
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each(MEASURES.map((measure) => [measure.id, measure.words[0]!]))(
+    'running it again on %s changes nothing',
+    (id, unit) => {
+      const options = { units: { keepOriginal: true }, rules: { [id]: true } };
+      const input = `It is 7 ${unit} here.`;
+      const once = convert(input, options);
+      expect(once).not.toBe(input);
+      expect(convert(once, options)).toBe(once);
+    },
+  );
 });
 
 describe('measurements that are imperial worldwide', () => {
@@ -348,6 +381,11 @@ describe('a text that already gives the metric value', () => {
     ${'6 feet (1.8 m) tall'}                         | ${'1.8 m tall'}         | ${'mid-sentence'}
     ${'90 feet (30m)'}                               | ${'30m'}                | ${'the author spacing is kept'}
     ${'10 miles (16 km) away'}                       | ${'16 km away'}         | ${'any unit'}
+    ${'6 feet (1.8 metres)'}                         | ${'1.8 metres'}         | ${'written out'}
+    ${'2000 square feet (190 square metres)'}        | ${'190 square metres'}  | ${'any form a conversion writes'}
+    ${'60 mph (97 kilometres per hour)'}             | ${'97 kilometres per hour'} | ${'the same'}
+    ${'30 mpg (7.8 L/100km)'}                        | ${'7.8 L/100km'}        | ${'fuel economy too'}
+    ${'10 by 12 feet (3 by 3.7 m)'}                  | ${'3 by 3.7 m'}         | ${'dimensions too'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -356,6 +394,46 @@ describe('a text that already gives the metric value', () => {
     input                            | expected                            | why
     ${'6 feet (about two paces)'}    | ${'1.8 metres (about two paces)'}   | ${'not a measurement, so it converts as normal'}
     ${'6 feet (see the diagram)'}    | ${'1.8 metres (see the diagram)'}   | ${'the same'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('an imperial original in brackets after its metric value', () => {
+  it.each`
+    unchanged                                                  | why
+    ${'It is 1.8 metres (6 feet) tall.'}                       | ${'what keepOriginal writes'}
+    ${'It is 1.8 meters (6 ft) tall.'}                         | ${'any spelling or symbol'}
+    ${'It is 1.88 metres (6 feet 2 inches) tall.'}             | ${'feet and inches'}
+    ${`It is 1.88 m (6'2") tall.`}                             | ${'feet and inches in symbols'}
+    ${'It is 1.8 m (5 ft 11 in) tall.'}                        | ${'abbreviated'}
+    ${'a 1.8 metre (6-foot) fence'}                            | ${'attributive'}
+    ${'a 2 metre (about 6 feet) fence'}                        | ${'a rounded restatement'}
+    ${'a 2-metre (roughly 6-foot) fence'}                      | ${'the same'}
+    ${'a drop of 9.1-18 metres (30-60 feet)'}                  | ${'ranges'}
+    ${'between 8 and 16 kilometres (5 and 10 miles)'}          | ${'a range joined by and'}
+    ${'a sheet of 22 x 28 centimetres (8.5 x 11 inches)'}      | ${'dimensions'}
+    ${'a sheet of 22 x 28 cm (8.5" x 11")'}                    | ${'dimensions with a unit on each side'}
+    ${'Bake at 175°C (350°F).'}                                | ${'temperatures'}
+    ${'Bake at 175 degrees Celsius (350 degrees Fahrenheit).'} | ${'temperatures written out'}
+    ${'It covers 190 square metres (2000 square feet).'}       | ${'area'}
+    ${'It goes 97 kilometres per hour (60 miles per hour).'}   | ${'speed'}
+    ${'It does 7.8 L/100km (30 mpg).'}                         | ${'fuel economy'}
+    ${'It does 5.9 L/100km (40 miles per gallon).'}            | ${'fuel economy written out, not a length'}
+    ${'It turns at 140 N·m (100 lb-ft).'}                      | ${'torque, not a weight joined to a length'}
+    ${'It is 1.8 metres\n(6 feet) tall.'}                      | ${'a wrapped line'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                     | expected                                                   | why
+    ${'It weighs 2 metres (6 pounds).'}                       | ${'It weighs 2 metres (2.7 kilograms).'}                   | ${'a different dimension restates nothing'}
+    ${'The rope is 2 metres long (the old one was 10 feet).'} | ${'The rope is 2 metres long (the old one was 3 metres).'} | ${'the bracket does not follow the metric value'}
+    ${'It is 2 metres (the old one was 10 feet).'}            | ${'It is 2 metres (the old one was 3 metres).'}            | ${'the bracket holds more than a measurement'}
+    ${'It is 2 metres (10 feet for the old one).'}            | ${'It is 2 metres (3 metres for the old one).'}            | ${'the same'}
+    ${'Room 2 (6 feet) is free.'}                             | ${'Room 2 (1.8 metres) is free.'}                          | ${'a number without a metric unit'}
+    ${'a 3 m (50 lb 3 oz) beam'}                              | ${'a 3 m (23 kg 85 g) beam'}                               | ${'every piece of a weight converts after a length'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });

@@ -210,8 +210,10 @@ mailbox is full`, `a shared mailbox in Outlook`, `a voicemail mailbox` and a lon
 label do not. Phrases the rest of the world already says keep their words:
 `fortune cookie`, `food truck`, `my way or the highway`, `Highway 101`, `seat of your
 pants`, `ants in his pants`, `yoga pants`. In British English a `fire truck` is a fire engine
-and a `pickup truck` stays one. The verb stays too: `the dog pants heavily` keeps its `pants`,
-while `his pants were wet` becomes `his trousers were wet`.
+and a `pickup truck` stays one. Only a trailer people live or holiday in becomes a caravan:
+a `travel trailer` does, while a `boat trailer` and a `movie trailer` stay trailers. The
+verb stays too: `the dog pants heavily` keeps its `pants`, while `his pants were wet`
+becomes `his trousers were wet`.
 
 **Units.** Length, area, mass, volume, temperature, speed, pressure, power, torque and
 fuel economy. The volume measures are the US ones, which are not the imperial ones.

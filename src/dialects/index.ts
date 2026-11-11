@@ -341,7 +341,6 @@ const AU: Row[] = [
   ['cooler', 'esky'],
   ['pickup truck', 'ute'],
   ['downtown', 'the CBD'],
-  ['trailer', 'caravan'],
   ['rain boots', 'gumboots'],
   ['galoshes', 'gumboots'],
   ['911', '000'],

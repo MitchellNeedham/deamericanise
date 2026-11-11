@@ -243,13 +243,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     matches: rewritesReplacement('postie', 'posties'),
   },
   {
-    issue: 151,
-    property: 'idempotence',
-    input: 'a tractor trailer',
-    options: localise,
-    matches: rewritesReplacement('semi-trailer', 'semi-trailers'),
-  },
-  {
     issue: 152,
     property: 'idempotence',
     input: 'an apartment building',

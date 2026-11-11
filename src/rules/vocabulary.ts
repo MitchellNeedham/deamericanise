@@ -185,6 +185,13 @@ const EVERYDAY: Row[] = [
   ['tic-tac-toe', 'noughts and crosses'],
   ['jump rope', 'skipping rope'],
   ['trailer park', 'caravan park'],
+  ['trailer parks', 'caravan parks'],
+  ['travel trailer', 'caravan'],
+  ['travel trailers', 'caravans'],
+  ['house trailer', 'caravan'],
+  ['house trailers', 'caravans'],
+  ['camping trailer', 'caravan'],
+  ['camping trailers', 'caravans'],
 ];
 
 const EDUCATION: Row[] = [

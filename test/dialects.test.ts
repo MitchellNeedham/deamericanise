@@ -214,6 +214,7 @@ describe('words that are already correct are left alone', () => {
     ${'candy floss'}    | ${'en-AU'}  | ${'not American, so candy must not fire inside it'}
     ${'candy floss'}    | ${'en-GB'}  | ${'the same'}
     ${'fairy floss'}    | ${'en-AU'}  | ${'the target of another rule'}
+    ${'a semi-trailer'} | ${'en-AU'}  | ${'not American, so trailer must not fire inside it'}
   `('$dialect leaves "$unchanged" alone ($why)', ({ unchanged, dialect }) => {
     expect(say(dialect as Dialect)(unchanged)).toBe(unchanged);
   });

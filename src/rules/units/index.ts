@@ -133,9 +133,10 @@ export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: num
  * A singular unit is modifying the noun after it only when a determiner opens the phrase:
  * `a 9 inch dish` describes the dish, so it takes the singular. `one quart small onions`
  * is an ingredient quantity with the `of` left out, and `one` is itself the determiner,
- * so it stays plural and reads the same as `one quart of small onions` would.
+ * so it stays plural and reads the same as `one quart of small onions` would. A count
+ * opens the phrase as a determiner does, so `2 x 4 ounce cans` keeps the singular.
  */
-const DETERMINER_BEFORE = /\b(?:a|an|the|this|that|each|every|per|another)\s+$/i;
+const DETERMINER_BEFORE = /(?:\b(?:a|an|the|this|that|each|every|per|another)\s+|\d\s*[x×]\s*)$/i;
 
 const MODIFIES_A_NOUN = new RegExp(
   String.raw`^[\s-]+(?!(?:of|in|on|at|by|for|and|or|to|from|with|per|thick|wide|long|tall|deep|high|` +
@@ -281,6 +282,15 @@ function commonScale(measures: Measure[]): Map<Measure, number> | undefined {
   const dimension = bases[0]?.dimension;
   if (bases.some((base) => base === undefined || base.dimension !== dimension)) return undefined;
   return new Map(measures.map((measure, i) => [measure, bases[i]!.value]));
+}
+
+/**
+ * Only a length has sides. A bare number joined by `x` to any other measure is a count:
+ * `2 x 4 oz cans` is two cans.
+ */
+function hasSides(measure: Measure): boolean {
+  const { symbol } = measure.convert(1);
+  return METRIC_FORMS.find((form) => form.pattern.test(symbol))?.dimension === 'length';
 }
 
 /** A minus sign straight after a number is the dash of a range: `9-18 m`. */
@@ -580,6 +590,7 @@ function feetInchesRule(): Rule {
 }
 
 const NOT_SECOND = new RegExp(NOT_SECOND_OF_PAIR, 'y');
+const NOT_END_OF_RANGE = new RegExp(String.raw`(?<!\d${RANGE_JOIN})`, 'y');
 
 /** `1st`, `21st` and `101st` are ordinals. `11st` is not. */
 const ORDINAL = /^(?:\d*[02-9])?1st(?![a-z])/i;
@@ -587,7 +598,8 @@ const ORDINAL = /^(?:\d*[02-9])?1st(?![a-z])/i;
 /**
  * `7 pounds 8 ounces`, `11st 4lb` and `11 stone 4 pounds 8 ounces` are each one weight, as
  * `6 feet 2 inches` is one height. A weight that cannot be converted whole is held whole:
- * one in a unit that is kept, and one that ends a range or dimension, as in `7-8 lb 4 oz`.
+ * one in a unit that is kept, and one that ends a range, as in `7-8 lb 4 oz`. A weight has
+ * no sides, so the number in `2 x 4 lb 8 oz bags` counts the bags.
  */
 function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule[] {
   // A written-out number never starts inside another, such as the `two` of `twenty-two`.
@@ -605,6 +617,7 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
       String.raw`${START}(${WHOLE_NUMBER})${GAP}${largest}${part(next!)}${optional}`,
       'gi',
     );
+    const notSecond = hasSides(compound.measures[0]!) ? NOT_SECOND : NOT_END_OF_RANGE;
 
     return {
       id: compound.id,
@@ -622,10 +635,10 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
           if (values.some((v) => v === null)) continue;
 
           const start = match.index;
-          NOT_SECOND.lastIndex = start;
+          notSecond.lastIndex = start;
           const kept =
             forced[compound.id] !== true && parts.some((p) => isKept(p.measure, skip, forced));
-          if (kept || !NOT_SECOND.test(ctx.text)) {
+          if (kept || !notSecond.test(ctx.text)) {
             changes.push(hold(start, match[0], compound.id, 40));
             continue;
           }
@@ -731,6 +744,49 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     pushMeasurement(ctx, changes, start, matched, body, entry.measure.id, 30);
   };
 
+  /** A quantity read on its own, as in `6 feet` or the `4 oz` of `2 x 4 oz cans`. */
+  const pushSingle = (
+    ctx: RuleContext,
+    changes: Change[],
+    start: number,
+    matched: string,
+    raw: string,
+    alias: string,
+  ): void => {
+    const entry = resolve(alias);
+    const value = parseNumber(raw);
+    if (!entry || value === null) return;
+    if (isOtherSense(ctx, entry, start, start + matched.length)) return;
+    if (isAmbiguousHere(entry.measure, ctx.text)) return;
+    if (isBareInch(alias, matched)) return;
+    if (isConventional(ctx, entry.measure, start, start + matched.length)) {
+      changes.push(hold(start, matched, entry.measure.id, 30));
+      return;
+    }
+
+    const target = entry.measure.convert(value);
+    const { precision, maxDecimals } = ctx.options.units;
+    const number = formatNumber(target.value, precision, significantFigures(raw), maxDecimals);
+    const numberStart = start + (/^an?\s+/i.exec(raw)?.[0].length ?? 0);
+    // A singular unit modifying a following noun is attributive: `a 9 inch dish`,
+    // `a 3/8 inch bolt`. What follows decides, not the value, because a fraction is
+    // just as attributive. `1/2 gallon of milk` and `1/16 inch thick` are not.
+    const attributive =
+      entry.isWord &&
+      entry.isSingular &&
+      DETERMINER_BEFORE.test(ctx.text.slice(Math.max(0, numberStart - 24), numberStart)) &&
+      MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length));
+    const unit = entry.isWord
+      ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
+      : ` ${target.symbol}`;
+    // `a quarter mile track` keeps its article for the track, while `a quarter mile away`
+    // gives it to the number.
+    const from = attributive ? numberStart : start;
+    const quantity = matched.slice(from - start);
+
+    pushMeasurement(ctx, changes, from, quantity, `${number}${unit}`, entry.measure.id, 30);
+  };
+
   const rangeRule: Rule = {
     id: 'units.range',
     category: 'units',
@@ -774,7 +830,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
    * `8.5 x 11 inches` and `10 x 12 x 8 feet` are one measurement, not two or three.
    * Converting half of a dimension pair produces nonsense, so they move together and
    * share the unit chosen for the largest of them. Each side is read in its own unit, so
-   * `2 feet x 6 inches` comes to `61 x 15 centimetres`.
+   * `2 feet x 6 inches` comes to `61 x 15 centimetres`. Only a length has sides. With any
+   * other unit a bare number is a count and each quantity converts on its own, so
+   * `2 x 4 oz cans` comes to `2 x 110 g cans`.
    */
   const dimensionRule: Rule = {
     id: 'units.dimensions',
@@ -815,6 +873,17 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
         if (units.some((u) => isOtherSense(ctx, u, start, end))) continue;
         if (measures.some((m) => isAmbiguousHere(m, ctx.text))) continue;
+        // After the sense checks, because a count is part of the amount in `It cost 2 x 5 pounds`.
+        if (!measures.every(hasSides)) {
+          for (const [i, side] of sides.entries()) {
+            if (side.alias === undefined) continue;
+            const [number, unit] = groups[i]!;
+            const from = match.indices![number]![0];
+            const quantity = ctx.text.slice(from, match.indices![unit]![1]);
+            pushSingle(ctx, changes, from, quantity, side.raw, side.alias);
+          }
+          continue;
+        }
         // Beside an earlier side with a unit of its own, as in `10 ft x 12 in`, `in` is the unit.
         if (last.bareInch && !sides.some((s) => s !== last && s.entry && !s.bareInch)) continue;
 
@@ -867,39 +936,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       const changes: Change[] = [];
       single.lastIndex = 0;
       for (const match of ctx.text.matchAll(single)) {
-        const entry = resolve(match[2]!);
-        const value = parseNumber(match[1]!);
-        if (!entry || value === null) continue;
-        const start = match.index;
-        if (isOtherSense(ctx, entry, start, start + match[0].length)) continue;
-        if (isAmbiguousHere(entry.measure, ctx.text)) continue;
-        if (isBareInch(match[2]!, match[0])) continue;
-        if (isConventional(ctx, entry.measure, start, start + match[0].length)) {
-          changes.push(hold(start, match[0], entry.measure.id, 30));
-          continue;
-        }
-
-        const target = entry.measure.convert(value);
-        const { precision, maxDecimals } = ctx.options.units;
-        const number = formatNumber(target.value, precision, significantFigures(match[1]!), maxDecimals);
-        const numberStart = start + (/^an?\s+/i.exec(match[1]!)?.[0].length ?? 0);
-        // A singular unit modifying a following noun is attributive: `a 9 inch dish`,
-        // `a 3/8 inch bolt`. What follows decides, not the value, because a fraction is
-        // just as attributive. `1/2 gallon of milk` and `1/16 inch thick` are not.
-        const attributive =
-          entry.isWord &&
-          entry.isSingular &&
-          DETERMINER_BEFORE.test(ctx.text.slice(Math.max(0, numberStart - 24), numberStart)) &&
-          MODIFIES_A_NOUN.test(ctx.text.slice(start + match[0].length));
-        const unit = entry.isWord
-          ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
-          : ` ${target.symbol}`;
-        // `a quarter mile track` keeps its article for the track, while `a quarter mile away`
-        // gives it to the number.
-        const from = attributive ? numberStart : start;
-        const matched = match[0].slice(from - start);
-
-        pushMeasurement(ctx, changes, from, matched, `${number}${unit}`, entry.measure.id, 30);
+        pushSingle(ctx, changes, match.index, match[0], match[1]!, match[2]!);
       }
 
       fractionOf.lastIndex = 0;

@@ -400,6 +400,74 @@ describe('a text that already gives the metric value', () => {
   });
 });
 
+describe('a metric bracket goes only when it restates the conversion', () => {
+  it.each`
+    input                                  | expected                  | why
+    ${'6 feet (1.8 metres)'}               | ${'1.8 metres'}           | ${'the same figure'}
+    ${'It is 6 feet\n(1.8 m) tall.'}       | ${'It is 1.8 m tall.'}    | ${'the bracket wraps onto the next line'}
+    ${'It is 6 feet\r\n(1.8 m) tall.'}     | ${'It is 1.8 m tall.'}    | ${'a Windows line break'}
+    ${'It is 6 feet (2 m) tall.'}          | ${'It is 2 m tall.'}      | ${'rounded to one figure'}
+    ${'It is 6 feet (180 cm) tall.'}       | ${'It is 180 cm tall.'}   | ${'another unit of the same dimension'}
+    ${'It is 6 feet 2 inches (1.88 m).'}   | ${'It is 1.88 m.'}        | ${'feet and inches'}
+    ${'Cut it into 1/4 inch (5 mm) dice.'} | ${'Cut it into 5 mm dice.'} | ${'a small figure rounded to its last digit'}
+    ${'1 mile (1,600 m)'}                  | ${'1,600 m'}              | ${'a grouped figure'}
+    ${'1 pound (500 g) of butter'}         | ${'500 g of butter'}      | ${'a cook rounding'}
+    ${'1 ounce (25 g) of butter'}          | ${'25 g of butter'}       | ${'the same'}
+    ${'1 gallon (4.5 L) of water'}         | ${'4.5 L of water'}       | ${'an imperial gallon'}
+    ${'1 pint (568 ml) of milk'}           | ${'568 ml of milk'}       | ${'an imperial pint'}
+    ${'It does 30 mpg (9.4 L/100km).'}     | ${'It does 9.4 L/100km.'} | ${'a UK mpg'}
+    ${'It does 30 mpg (13 km/L).'}         | ${'It does 13 km/L.'}     | ${'the inverse measure of economy'}
+    ${'Bake at 250°F (130°C).'}            | ${'Bake at 130°C.'}       | ${'an oven table'}
+    ${'Bake at 350-375°F (175-190°C).'}    | ${'Bake at 175-190°C.'}   | ${'a range of temperatures'}
+    ${'It was -40°F (-40°C).'}             | ${'It was -40°C.'}        | ${'a negative temperature'}
+    ${'It dropped 20°F (11°C).'}           | ${'It dropped 11°C.'}     | ${'a change in temperature'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                                 | why
+    ${'It is 6 feet (2 kg) tall.'}         | ${'It is 1.8 metres (2 kg) tall.'}       | ${'a weight restates no height'}
+    ${'Bake at 350°F (2 kg).'}             | ${'Bake at 175°C (2 kg).'}               | ${'nor a temperature'}
+    ${'It does 30 mpg (2 km).'}            | ${'It does 7.8 L/100km (2 km).'}         | ${'nor fuel economy'}
+    ${'It is 6 feet (5 metres) tall.'}     | ${'It is 1.8 metres (5 metres) tall.'}   | ${'a different figure'}
+    ${'It is 6 feet (3 m) tall.'}          | ${'It is 1.8 metres (3 m) tall.'}        | ${'further apart than rounding'}
+    ${'It is 6 feet (1.8 km) tall.'}       | ${'It is 1.8 metres (1.8 km) tall.'}     | ${'the wrong unit'}
+    ${'It is 5 miles (8 m) away.'}         | ${'It is 8 kilometres (8 m) away.'}      | ${'the same'}
+    ${'Bake at 350°F (350°C).'}            | ${'Bake at 175°C (350°C).'}              | ${'the figure left unconverted'}
+    ${'Bake at 350°F (160°C).'}            | ${'Bake at 175°C (160°C).'}              | ${'a fan oven setting'}
+    ${'a 10 x 12 foot (3 m) room'}         | ${'a 3 x 3.7 metre (3 m) room'}          | ${'fewer figures'}
+    ${'a 10 x 12 foot (3-3.7 m) room'}     | ${'a 3 x 3.7 metre (3-3.7 m) room'}      | ${'a range is not two sides'}
+    ${'It is 6 feet\n\n(1.8 m) tall.'}     | ${'It is 1.8 metres\n\n(1.8 m) tall.'}   | ${'a blank line ends the measurement'}
+    ${'It is 6 feet\n- (1.8 m) tall.'}     | ${'It is 1.8 metres\n- (1.8 m) tall.'}   | ${'so does a list item'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    options                                  | input                              | expected
+    ${{ precision: 0 }}                      | ${'It is 6 feet (1.8 m) tall.'}    | ${'It is 1.8 m tall.'}
+    ${{ precision: 0 }}                      | ${'It is 1 inch (2.5 cm) wide.'}   | ${'It is 2.5 cm wide.'}
+    ${{ precision: 'exact' }}                | ${'It is 6 feet (1.8 m) tall.'}    | ${'It is 1.8 m tall.'}
+    ${{ fuelEconomy: 'km-per-l' }}           | ${'It does 30 mpg (7.8 L/100km).'} | ${'It does 7.8 L/100km.'}
+  `('with $options: $input -> $expected', ({ options, input, expected }) => {
+    expect(convert(input, { units: options })).toBe(expected);
+  });
+
+  it.each(
+    MEASURES
+      // Tons are skipped in any document that says tonnes.
+      .filter((measure) => !measure.ambiguousWhen?.test(measure.convert(7).plural))
+      .flatMap((measure) =>
+        [measure.words[0]!, measure.abbrevs[0]].flatMap((unit) => (unit ? [[measure.id, unit]] : [])),
+      ),
+  )('%s: 7 %s collapses into its own conversion', (id, unit) => {
+    const options = { rules: { [id]: true } };
+    const metric = convert(`7 ${unit}`, options);
+    expect(convert(`It is 7 ${unit} (${metric}) here.`, options)).toBe(`It is ${metric} here.`);
+  });
+});
+
 describe('an imperial original in brackets after its metric value', () => {
   it.each`
     unchanged                                                  | why

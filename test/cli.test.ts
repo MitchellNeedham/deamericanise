@@ -235,6 +235,95 @@ describe('choosing which files to read', () => {
   });
 });
 
+describe('--language', () => {
+  function exits(): void {
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`exited ${code}`);
+    }) as never);
+  }
+
+  it.each(['nosuchlang', '', 'settings.json'])(
+    'rejects "%s" on stdin with exit 2 and a pointer to --list-languages',
+    async (language) => {
+      exits();
+      withStdin('The color.');
+      await expect(main(['--language', language])).rejects.toThrow('exited 2');
+      expect(stderr()).toBe(`deamericanise: unknown language "${language}". Try --list-languages.\n`);
+      expect(stdout()).toBe('');
+    },
+  );
+
+  it.each(['settings.json', 'a.md', 'a.ts'])('rejects an unknown value before touching %s', async (name) => {
+    exits();
+    const path = withFile(name, 'The color.');
+    await expect(main(['--write', '--language', 'nosuchlang', path])).rejects.toThrow('exited 2');
+    expect(readFileSync(path, 'utf8')).toBe('The color.');
+    expect(stderr()).toContain('unknown language "nosuchlang"');
+    expect(stdout()).toBe('');
+  });
+
+  it.each`
+    language        | input                            | expected
+    ${'python'}     | ${'x = "gray" # the color\n'}    | ${'x = "gray" # the colour\n'}
+    ${'ruby'}       | ${'x = "gray" # the color\n'}    | ${'x = "gray" # the colour\n'}
+    ${'shell'}      | ${'x="gray" # the color\n'}      | ${'x="gray" # the colour\n'}
+    ${'golang'}     | ${'x := "gray" // the color\n'}  | ${'x := "gray" // the colour\n'}
+    ${'Dockerfile'} | ${'ENV X=gray # the color\n'}    | ${'ENV X=gray # the colour\n'}
+    ${'ts'}         | ${'x = "gray"; // the color\n'}  | ${'x = "gray"; // the colour\n'}
+    ${'.ts'}        | ${'x = "gray"; // the color\n'}  | ${'x = "gray"; // the colour\n'}
+    ${'py'}         | ${'x = "gray" # the color\n'}    | ${'x = "gray" # the colour\n'}
+    ${'jsonc'}      | ${'{"color": 1} // the color\n'} | ${'{"color": 1} // the colour\n'}
+    ${'md'}         | ${'x = "gray" # the color\n'}    | ${'x = "grey" # the colour\n'}
+    ${'MD'}         | ${'x = "gray" # the color\n'}    | ${'x = "grey" # the colour\n'}
+    ${'txt'}        | ${'x = "gray" # the color\n'}    | ${'x = "grey" # the colour\n'}
+  `('reads stdin as $language', async ({ language, input, expected }) => {
+    withStdin(input as string);
+    expect(await main(['--language', language as string])).toBe(0);
+    expect(stdout()).toBe(expected);
+    expect(stderr()).toBe('');
+  });
+
+  it.each`
+    language    | name           | input                           | expected
+    ${'python'} | ${'notes.txt'} | ${'x = "gray" # the color\n'}   | ${'x = "gray" # the colour\n'}
+    ${'ruby'}   | ${'script'}    | ${'x = "gray" # the color\n'}   | ${'x = "gray" # the colour\n'}
+    ${'md'}     | ${'a.ts'}      | ${'x = "gray"; // the color\n'} | ${'x = "grey"; // the colour\n'}
+    ${'ts'}     | ${'a.py'}      | ${'x = "gray"; // the color\n'} | ${'x = "gray"; // the colour\n'}
+  `('forces $name through $language', async ({ language, name, input, expected }) => {
+    const path = withFile(name as string, input as string);
+    expect(await main(['--write', '--language', language as string, path])).toBe(0);
+    expect(readFileSync(path, 'utf8')).toBe(expected);
+    expect(stderr()).toBe('');
+  });
+
+  it('reads only the comments of JSON, so plain JSON is left alone', async () => {
+    const plain = withFile('settings.json', '{ "color": "gray" }\n');
+    const commented = withFile('tsconfig.json', '{\n  // the color\n  "color": "gray"\n}\n');
+    expect(await main(['--write', '--language', 'json', plain, commented])).toBe(0);
+    expect(readFileSync(plain, 'utf8')).toBe('{ "color": "gray" }\n');
+    expect(readFileSync(commented, 'utf8')).toBe('{\n  // the colour\n  "color": "gray"\n}\n');
+  });
+
+  it('reads JSON on stdin the same way', async () => {
+    withStdin('{"color":"gray"}');
+    expect(await main(['--language', 'json'])).toBe(0);
+    expect(stdout()).toBe('{"color":"gray"}');
+  });
+
+  it('still skips a .json file named without --language', async () => {
+    const path = withFile('settings.json', '{ "color": "gray" }\n');
+    expect(await main(['--write', path])).toBe(0);
+    expect(stderr()).toContain(`skipping ${path}`);
+  });
+
+  it('--list-languages prints every value --language accepts', async () => {
+    expect(await main(['--list-languages'])).toBe(0);
+    const names = stdout().trimEnd().split('\n');
+    for (const name of ['md', 'markdown', 'txt', 'json', 'jsonc', 'python', 'ruby', 'ts']) expect(names).toContain(name);
+    expect(names).toEqual([...names].sort());
+  });
+});
+
 describe('a reader that stops early', () => {
   let cli: string;
 

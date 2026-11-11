@@ -212,7 +212,13 @@ function parseWords(text: string): number | null {
   return total + group;
 }
 
+/** The value `raw` is written as, or null where it is not a finite number, as `5/0` is not. */
 export function parseNumber(raw: string): number | null {
+  const value = readNumber(raw);
+  return value !== null && Number.isFinite(value) ? value : null;
+}
+
+function readNumber(raw: string): number | null {
   const text = raw.trim().replace(/−/g, '-').replace(/,/g, '');
   if (/[a-z]/i.test(text)) return parseWords(text);
   const sign = text.startsWith('-') ? -1 : 1;
@@ -230,8 +236,7 @@ export function parseNumber(raw: string): number | null {
   const fraction = body.match(/^(\d+)\/(\d+)$/);
   if (fraction) return sign * (Number(fraction[1]) / Number(fraction[2]));
 
-  const value = Number(body);
-  return Number.isFinite(value) ? sign * value : null;
+  return sign * Number(body);
 }
 
 /**

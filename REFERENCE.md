@@ -263,6 +263,9 @@ starts after `hundred` or `thousand` with at most a comma, `and` or `to` between
 `hundreds of miles`, `a few hundred feet`, `between one hundred and two hundred miles` and
 `a hundred thousand miles` are left as written. `It cost a hundred pounds.` is still money.
 
+A fraction with a zero denominator, as in `5/0 inches`, is not a quantity, so it is left as
+written, and so is a height or weight it is part of, as in `5 feet 1/0 inches`.
+
 A number never continues onto the next line, so the `14` that ends `Step 14` is never taken
 as the whole part of a `1/2 gallon` that opens the next line. The rest of a measurement can
 wrap: `6` at the end of one line and `feet` at the start of the next still convert, and so

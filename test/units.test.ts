@@ -338,6 +338,50 @@ describe('fractions and ranges', () => {
   });
 });
 
+describe('a number that is not finite', () => {
+  it.each`
+    unchanged
+    ${'It is 5/0 inches.'}
+    ${'a 1/0 mile walk'}
+    ${'0/0 feet'}
+    ${'1 1/0 miles'}
+    ${'1/0-2 inches'}
+    ${'1/0 x 2 feet'}
+    ${'5 feet 1/0 inches'}
+    ${'7 pounds 1/0 ounces'}
+  `('leaves "$unchanged" alone', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input              | expected
+    ${'1/2 inch'}      | ${'1.3 centimetres'}
+    ${'0 inches'}      | ${'0 millimetres'}
+    ${'1 1/2 miles'}   | ${'2.4 kilometres'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each(['5/0', '-5/0', '0/0', '1 1/0'])('reads "%s" as no number', (raw) => {
+    expect(parseNumber(raw)).toBeNull();
+  });
+
+  it('never writes NaN or Infinity in any unit', () => {
+    const rules = Object.fromEntries(MEASURES.map((m) => [m.id, true]));
+    const options = { assumeAmerican: true, rules, units: { respectConventions: false } };
+    const shapes = ['5/0', '0/0', '1 1/0', '1/0-2', '2 to 1/0', '1/0 x 2', '2 x 3 x 1/0'];
+    const written: string[] = [];
+    for (const unit of MEASURES.flatMap((m) => [...m.words, ...m.abbrevs])) {
+      for (const shape of shapes) {
+        for (const change of deamericanise(`It is ${shape} ${unit} long.`, options).changes) {
+          if (/NaN|Infinity/.test(change.after)) written.push(`${change.before} -> ${change.after}`);
+        }
+      }
+    }
+    expect(written).toEqual([]);
+  });
+});
+
 describe('precision options', () => {
   it.each`
     precision      | input        | expected

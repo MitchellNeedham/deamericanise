@@ -262,6 +262,14 @@ does a range or dimension broken at its `to`, `-` or `x`. Nothing joins across a
 or into a line that opens a list item, heading, quote or table row, so `Serves 4` followed
 by `- 2 pounds beef` is a serving count and a bullet, not a range.
 
+A measurement never starts straight after `-`, `/`, `,` or `:` following a digit, where the
+number is the tail of a date, a fraction, a grouped number or a clock time. So
+`3/14/2024 1/2 gallon` converts the `1/2 gallon` alone, and `a 7:30 mile pace` is left as
+written, while `Distance:5 miles` still converts. A range's first number is never a price
+either, and never more than ten times the size of the second, which makes it a year or a
+count. The second number then converts on its own: `In 2024 - 5 feet` becomes
+`In 2024 - 1.5 metres`, and `Price $5 - 10 inches` keeps its price.
+
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
 `Bake at 175-190°C`. A change in temperature has no 32° offset to take off, so
 `dropped 20°F` becomes `dropped 11°C` and `10°F warmer` becomes `5.6°C warmer`. The words

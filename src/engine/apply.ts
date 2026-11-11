@@ -9,14 +9,25 @@ function overlaps(a: Range, b: Range): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
+/** `change` would rewrite some of `held` and leave the rest as written. */
+function splits(change: Range, held: Range): boolean {
+  return overlaps(change, held) && (change.start > held.start || change.end < held.end);
+}
+
 /**
  * Picks a non-overlapping subset of candidate changes. Higher priority wins outright;
  * at equal priority the longer match wins, which is what makes `6 feet 2 inches`
- * beat the two measurements inside it.
+ * beat the two measurements inside it. A span a rule holds is never split, whatever the
+ * priority of the change that would split it.
  */
 export function resolveChanges(candidates: Change[], protectedRanges: Range[]): Change[] {
+  const held = candidates.filter((c) => c.hold);
   const viable = candidates.filter(
-    (c) => c.before !== c.after && !protectedRanges.some((p) => overlaps(c, p)),
+    (c) =>
+      !c.hold &&
+      c.before !== c.after &&
+      !protectedRanges.some((p) => overlaps(c, p)) &&
+      !held.some((h) => splits(c, h)),
   );
 
   const ranked = [...viable].sort((a, b) => {

@@ -315,6 +315,10 @@ capital after an initialism is more often the rest of a name, so `the U.S. Army`
 `the US Army`: only a word that opens sentences and never names anything, such as `It`,
 `The`, `In` or `However`, counts as a new sentence.
 
+`P.M.` and `A.M.` take the lower case only after a time, so `3 P.M.` becomes `3 pm` even
+with times switched off. Without a time they stand for something else, such as a prime
+minister or AM radio, so `The P.M. said no.` becomes `The PM said no.`
+
 Full stops on titles follow the contraction rule rather than a list of titles: a
 contraction that already ends in the word's own last letter drops the stop, so `Mr.`,
 `Dr.`, `Sgt.` and `Lt.` become `Mr`, `Dr`, `Sgt` and `Lt`. A truncation keeps it, so

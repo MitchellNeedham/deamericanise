@@ -86,6 +86,7 @@ describe('runs of text', () => {
     expect(rewrite('<p>\n  Add 1\n  1/2 gallons, then walk two and a\n  half miles.\n</p>')).toBe(
       '<p>\n  Add 5.7 litres, then walk 4 kilometres.\n</p>',
     );
+    expect(rewrite('<p>\n  It is 6\n\n  feet wide.\n</p>')).toBe('<p>\n  It is 1.8 metres wide.\n</p>');
   });
 
   it('keeps the line breaks a replacement repeats from the source', () => {

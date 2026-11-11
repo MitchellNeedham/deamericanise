@@ -12,22 +12,25 @@ import {
   INLINE_SPACE,
   NUMBER_PATTERN,
   NUMERIC_PATTERN,
+  SOFT_SPACE,
   formatNumber,
   formatTemperature,
   parseNumber,
   significantFigures,
+  softGap,
 } from './number.js';
 
 const CONTEXT_WINDOW = 48;
 /** Between a number and its unit: a space, a hyphen (`6-foot`), or nothing (`6ft`). */
-const GAP = String.raw`${INLINE_SPACE}*-?${INLINE_SPACE}*`;
+const GAP = softGap('-?');
+const RANGE_JOIN = softGap(String.raw`(?:[-\u2013\u2014]|to|and)`);
+const DIMENSION_JOIN = softGap('(?:x|×|by)');
 
 /**
- * The second number of a range or dimension is not a measurement of its own, which matters
- * when a line break splits the pair: `5 to` then `10 miles`. A dash that opens a line is a
- * list bullet, so only a dash on the first number's line joins the two.
+ * The second number of a range or dimension is not a measurement of its own, even where the
+ * pair does not match as a whole: `14 1/2 gallon` in `2024-03-14 1/2 gallon`.
  */
-const NOT_SECOND_OF_PAIR = String.raw`(?<!\d(?:${INLINE_SPACE}*[-\u2013\u2014]|\s*(?:to|and|x|×|by))\s*)`;
+const NOT_SECOND_OF_PAIR = String.raw`(?<!\d${softGap(String.raw`(?:[-\u2013\u2014]|to|and|x|×|by)`)})`;
 
 function escape(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -199,10 +202,11 @@ function pushMeasurement(
 
 /** `6 feet 2 inches`, `6'2"` and `5 ft 11 in` collapse into a single metric height. */
 function feetInchesRule(): Rule {
-  const S = INLINE_SPACE;
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(\d+)${S}*(?:feet|foot|ft\.?|′|')${S}*(?:and${S}+)?` +
-      String.raw`(\d+(?:\.\d+)?|\d+${S}+\d+/\d+|\d+/\d+)${S}*(?:inches|inch|in\.?|″|")(?![A-Za-z])`,
+    String.raw`(?<![\w.])(\d+)${SOFT_SPACE}(?:feet|foot|ft\.?|′|')` +
+      softGap(String.raw`(?:and(?=\s))?`) +
+      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+/\d+)` +
+      String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|")(?![A-Za-z])`,
     'gi',
   );
 
@@ -238,13 +242,14 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   if (!alternation) return [];
 
   const S = INLINE_SPACE;
-  const START = String.raw`(?<![\w.])${NOT_SECOND_OF_PAIR}`;
+  // The pair guard can only apply before a digit, and is too costly to run at every word.
+  const START = String.raw`(?<![\w.])(?:(?=[\d\-−])${NOT_SECOND_OF_PAIR}|(?![\d\-−]))`;
   const single = new RegExp(
     String.raw`${START}(${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
   const range = new RegExp(
-    String.raw`${START}(${NUMERIC_PATTERN})${S}*(?:-|–|—|to|and)${S}*(${NUMERIC_PATTERN})` +
+    String.raw`${START}(${NUMERIC_PATTERN})${RANGE_JOIN}(${NUMERIC_PATTERN})` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
@@ -252,8 +257,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   // An optional unit after an inner number, so `8.5" x 11"` and `10 ft x 12 ft` both match.
   const INNER_UNIT = String.raw`(?:${GAP}(?:${alternation}))?`;
   const dimensions = new RegExp(
-    String.raw`${START}(${NUMERIC_PATTERN})${INNER_UNIT}${S}*(?:x|×|by)${S}*(${NUMERIC_PATTERN})` +
-      String.raw`(?:${INNER_UNIT}${S}*(?:x|×|by)${S}*(${NUMERIC_PATTERN}))?` +
+    String.raw`${START}(${NUMERIC_PATTERN})${INNER_UNIT}${DIMENSION_JOIN}(${NUMERIC_PATTERN})` +
+      String.raw`(?:${INNER_UNIT}${DIMENSION_JOIN}(${NUMERIC_PATTERN}))?` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
@@ -261,11 +266,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   // Written-out units only, because an abbreviation can be a word: `a gal and a half`.
   const fractionOf = new RegExp(
     String.raw`(?<![\w.])(?:((?:an?${S}+)?half)|(${FRACTION_WORDS})${S}+of)` +
-      String.raw`${S}+an?${S}+(${words})(?![\w-])`,
+      String.raw`${S}+an?(?=\s)${SOFT_SPACE}(${words})(?![\w-])`,
     'gi',
   );
   const andAFraction = new RegExp(
-    String.raw`(?<![\w.])an?${S}+(${words})${S}+and${S}+(${COUNTED_FRACTION})(?![\w-])`,
+    String.raw`(?<![\w.])an?(?=\s)${SOFT_SPACE}(${words})${S}+and${S}+(${COUNTED_FRACTION})(?![\w-])`,
     'gi',
   );
 

@@ -166,9 +166,14 @@ alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 
 Numbers written out in words are read too, fractions and all: `two and a half feet` becomes
 `76 centimetres` and `a quarter mile away` becomes `400 metres away`. So do `half a mile`,
-`a quarter of a mile` and `a mile and a half`, which put the unit inside the number. A
-measurement is read within one line, so the `14` that ends `Step 14` is never taken as the
-whole part of a `1/2 gallon` that opens the next line.
+`a quarter of a mile` and `a mile and a half`, which put the unit inside the number.
+
+A number never continues onto the next line, so the `14` that ends `Step 14` is never taken
+as the whole part of a `1/2 gallon` that opens the next line. The rest of a measurement can
+wrap: `6` at the end of one line and `feet` at the start of the next still convert, and so
+does a range or dimension broken at its `to`, `-` or `x`. Nothing joins across a blank line
+or into a line that opens a list item, heading, quote or table row, so `Serves 4` followed
+by `- 2 pounds beef` is a serving count and a bullet, not a range.
 
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
@@ -553,9 +558,13 @@ Shadow DOM is not entered. Text inside a web component's shadow root stays as it
   survives. Turn it off with `protectIdentifiers: false`.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`
   or `keepOriginal` where the numbers matter.
-- A measurement that a hard wrap splits, such as `6` at the end of one line and `feet` at
-  the start of the next, is left as written. A web page is read the way it is usually laid
-  out, with a line break in its source counting as a space.
+- A number that a hard wrap splits, such as `1` at the end of one line and `1/2 gallons` at
+  the start of the next, or `two and a` then `half feet`, is not read as one. The fraction
+  converts on its own and the written-out number is left as written. A web page is read the
+  way it is usually laid out, with a line break in its source counting as a space.
+- A line that ends in a number and a line that opens with a unit word are read as one
+  measurement, so `Track 7` above `Miles Davis` becomes `Track 11 kilometres Davis`. A
+  blank line or a list marker between them keeps them apart.
 - Currency amounts are never converted. Rates move; the output would be wrong by the time
   anyone read it.
 - Grade-to-year mapping assumes the Australian and British numbering, which does not line

@@ -10,11 +10,29 @@ const VULGAR_CLASS = `[${Object.keys(VULGAR).join('')}]`;
 const DIGITS = String.raw`\d{1,3}(?:,\d{3})+|\d+`;
 
 /**
- * Whitespace that stays on one line. A quantity is never written across a line break, so
+ * Whitespace that stays on one line. A number is never written across a line break, so
  * `Step 14` at the end of one line and `1/2 gallon` at the start of the next stay apart.
  */
 export const INLINE_SPACE = String.raw`[^\S\n\r\v\f\u2028\u2029]`;
 const SPACE_OR_HYPHEN = String.raw`(?:${INLINE_SPACE}+|-)`;
+
+const LINE_BREAK = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
+
+/** A line that starts a new block: blank, a list item, a heading, a quote or a table row. */
+const NEW_BLOCK = String.raw`${INLINE_SPACE}*(?:${LINE_BREAK}|$|[-*+](?=\s|$)|\d+[.)](?=\s|$)|[#>|])`;
+
+const SOFT_BREAK = String.raw`${INLINE_SPACE}*${LINE_BREAK}(?!${NEW_BLOCK})${INLINE_SPACE}*`;
+
+/**
+ * Whitespace inside one quantity but outside its number: on one line, or across a single
+ * line break that only wraps the paragraph, as in `6` then `feet` on the next line.
+ */
+export const SOFT_SPACE = String.raw`(?:${SOFT_BREAK}|${INLINE_SPACE}*)`;
+
+/** `SOFT_SPACE` on either side of `token`, with at most one line break between them. */
+export function softGap(token: string): string {
+  return String.raw`(?:${SOFT_SPACE}${token}${INLINE_SPACE}*|${INLINE_SPACE}*${token}${SOFT_BREAK})`;
+}
 
 /** Recipes and older prose write their numbers out: `one cup`, `three-quarters cup`. */
 const CARDINALS: Record<string, number> = {
@@ -40,16 +58,24 @@ export const COUNTED_FRACTION = String.raw`(?:an?${INLINE_SPACE}+|(?:${CARD})${S
 export const FRACTION_WORDS = String.raw`(?:${COUNTED_FRACTION}|(?:${FRAC}))`;
 
 // The tail of a longer number that a line break cut off, such as `half feet` after `two and
-// a`, is not a number of its own.
-const NOT_AFTER_AND = String.raw`(?<!(?:\d|\b(?:${CARD}))\s+and\s+)`;
-const NOT_AFTER_COUNT = String.raw`(?<!\b(?:${CARD}|an?)[\s-]+)`;
+// a`, is not a number of its own. A new block in between makes it one again.
+const NOT_AFTER_AND = String.raw`(?<!(?:\d|\b(?:${CARD}))${softGap('and')})`;
+const NOT_AFTER_COUNT = String.raw`(?<!\b(?:${CARD}|an?)-?${SOFT_SPACE})`;
+
+/**
+ * `body`, unless `guard` finds it is the tail of a longer number. The lookahead keeps the
+ * costlier lookbehind to the few places where `body` can start.
+ */
+function unlessTail(guard: string, body: string): string {
+  return String.raw`(?=${body})${guard}${body}`;
+}
 
 const WORD_NUMBER = [
   String.raw`(?:${CARD}|\d+)${INLINE_SPACE}+and${INLINE_SPACE}+(?:${CARD}|an?)${SPACE_OR_HYPHEN}(?:${FRAC})`,
-  String.raw`${NOT_AFTER_AND}(?:${CARD})${SPACE_OR_HYPHEN}(?:${FRAC})`,
+  unlessTail(NOT_AFTER_AND, String.raw`(?:${CARD})${SPACE_OR_HYPHEN}(?:${FRAC})`),
   String.raw`(?:${CARD})`,
-  String.raw`${NOT_AFTER_AND}an?${INLINE_SPACE}+(?:${FRAC})`,
-  String.raw`${NOT_AFTER_COUNT}(?:${FRAC})`,
+  unlessTail(NOT_AFTER_AND, String.raw`an?${INLINE_SPACE}+(?:${FRAC})`),
+  unlessTail(NOT_AFTER_COUNT, String.raw`(?:${FRAC})`),
 ].join('|');
 
 /**

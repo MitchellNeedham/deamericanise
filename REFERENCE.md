@@ -276,7 +276,18 @@ deamericaniseText(text, { unitsKeep: ['mile', 'pint'] });
 ```
 
 A category set by hand beats the preset, and `rules` beats everything, so an explicit
-`true` brings a rule back even if its preset, category or tier would have dropped it. `ruleIds()` lists every id, and so does `--list-rules`.
+`true` brings a rule back even if its preset, category or tier would have dropped it.
+`ruleIds()` lists every id, and so does `--list-rules`.
+
+`ruleCatalogue(dialect)` describes each rule for a settings screen. Each entry has the
+rule's category, the tiers it runs under, a short label and an example, whether the
+dialect leaves it off until `rules` turns it on, and whether `rules` can switch it at all:
+
+```ts
+ruleCatalogue('en-GB').find((rule) => rule.id === 'units.length.mile');
+// { id: 'units.length.mile', category: 'units', confidence: ['moderate'], label: 'Miles',
+//   example: '16 kilometres for 10 miles', offByDefault: true, switchable: true }
+```
 
 The three confidence tiers mean:
 

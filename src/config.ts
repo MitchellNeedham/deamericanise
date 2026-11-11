@@ -94,7 +94,8 @@ export function resolveOptions(options: Options = {}, defaults: Partial<Options>
   };
 }
 
-function matchesRuleId(pattern: string, ruleId: string): boolean {
+/** A `rules` key matches its own id, and a key ending in `*` matches by prefix. */
+export function matchesRuleId(pattern: string, ruleId: string): boolean {
   if (pattern === ruleId) return true;
   if (pattern.endsWith('.*')) return ruleId.startsWith(pattern.slice(0, -1));
   if (pattern.endsWith('*')) return ruleId.startsWith(pattern.slice(0, -1));

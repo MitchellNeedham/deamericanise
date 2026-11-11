@@ -9,7 +9,6 @@ import { timeRules } from './times.js';
 import { currencyRules } from './currency.js';
 import { punctuationRules } from './punctuation.js';
 import { miscRules } from './misc.js';
-import { MEASURES } from './units/definitions.js';
 
 const lexiconCache = new Map<Dialect, CompiledLexicon>();
 
@@ -46,17 +45,4 @@ export function patternRules(options: ResolvedOptions): Rule[] {
   if (ruleCache.size >= 32) ruleCache.clear();
   ruleCache.set(key, rules);
   return rules;
-}
-
-/** Every rule id the package can emit, for documentation and for `--explain`. */
-export function ruleIds(dialect: Dialect = 'en-AU'): string[] {
-  const pack = dialectPack(dialect);
-  const fromEntries = [...spellingEntries(), ...baseVocabulary(), ...pack.vocabulary].map((e) => e.ruleId);
-  const fromRules = patternRules({
-    dialect,
-    unitsKeep: [],
-    rules: {},
-  } as unknown as ResolvedOptions).map((r) => r.id);
-  const fromMeasures = MEASURES.map((m) => m.id);
-  return [...new Set([...fromEntries, ...fromRules, ...fromMeasures, 'grammar.article-agreement'])].sort();
 }

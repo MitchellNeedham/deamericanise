@@ -7,7 +7,8 @@ import {
   deamericaniseText,
   ruleIds,
 } from '../src/index.js';
-import type { Category } from '../src/index.js';
+import type { Category, Change } from '../src/index.js';
+import { articleAgreements } from '../src/engine/articles.js';
 
 describe('case is carried across', () => {
   it.each`
@@ -43,6 +44,9 @@ describe('articles follow the replacement', () => {
     ${'an apartment'}    | ${'an apartment'}      | ${'unchanged in en-AU'}
     ${'a popsicle'}      | ${'an icy pole'}       | ${'consonant to vowel'}
     ${'An eraser'}       | ${'A rubber'}          | ${'capitalisation carried across'}
+    ${'A popsicle'}      | ${'An icy pole'}       | ${'a lone capital A'}
+    ${'A POPSICLE'}      | ${'AN ICY POLE'}       | ${'a lone A in text in capitals'}
+    ${'AN ERASER'}       | ${'A RUBBER'}          | ${'text in capitals'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(deamericaniseText(input, { preset: 'localise' })).toBe(expected);
   });
@@ -56,6 +60,120 @@ describe('articles follow the replacement', () => {
   it('links nothing else', () => {
     const { changes } = deamericanise('Use an eraser on the gray sidewalk.', { preset: 'localise' });
     expect(changes.filter((c) => c.agreesWith).map((c) => c.before)).toEqual(['an']);
+  });
+});
+
+describe('articles follow a replacement that starts with a number', () => {
+  const american = { assumeAmerican: true };
+  const clock = { assumeAmerican: true, times: { to24Hour: true } };
+  const dmy = { assumeAmerican: true, dates: { format: 'dmy' as const } };
+  const long = { assumeAmerican: true, dates: { reorderLongDates: true } };
+
+  it.each`
+    input                          | options     | expected                         | why
+    ${'an 8 foot fence'}           | ${{}}       | ${'a 2.4 metre fence'}           | ${'eight to two'}
+    ${'an 8 inch pan'}             | ${american} | ${'a 20 centimetre pan'}         | ${'eight to twenty'}
+    ${'an eighth-inch gap'}        | ${american} | ${'a 3.2 millimetre gap'}        | ${'a fraction word to a figure'}
+    ${'an 18 inch gap'}            | ${american} | ${'a 46 centimetre gap'}         | ${'eighteen to forty-six'}
+    ${'a 60 foot tree'}            | ${american} | ${'an 18 metre tree'}            | ${'sixty to eighteen'}
+    ${'a 7 mile run'}              | ${american} | ${'an 11 kilometre run'}         | ${'seven to eleven'}
+    ${'a 50 mile trip'}            | ${american} | ${'an 80 kilometre trip'}        | ${'fifty to eighty'}
+    ${'a 500 mile trip'}           | ${american} | ${'an 800 kilometre trip'}       | ${'five hundred to eight hundred'}
+    ${'a 28 foot boat'}            | ${american} | ${'an 8.5 metre boat'}           | ${'a decimal is read from its whole part'}
+    ${'a 2,900 gallon tank'}       | ${american} | ${'an 11,000 litre tank'}        | ${'eleven thousand'}
+    ${'a 480 gallon tank'}         | ${american} | ${'a 1800 litre tank'}           | ${'one thousand or eighteen hundred, so left'}
+    ${'an 480 gallon tank'}        | ${american} | ${'an 1800 litre tank'}          | ${'the same the other way'}
+    ${'a 20°F drop'}               | ${american} | ${'an 11°C drop'}                | ${'a temperature difference'}
+    ${'an 80°F day'}               | ${american} | ${'a 26.7°C day'}                | ${'a temperature'}
+    ${'an 8°F night'}              | ${american} | ${'a -13.3°C night'}             | ${'minus'}
+    ${'a dime-sized dent'}         | ${american} | ${'an 18 mm dent'}               | ${'a coin size'}
+    ${'a 15 inch laptop'}          | ${american} | ${'a 15 inch laptop'}            | ${'a conventional size is left alone'}
+    ${'a 6 foot fence'}            | ${american} | ${'a 1.8 metre fence'}           | ${'one point eight'}
+    ${'A 60 foot tree fell.'}      | ${american} | ${'An 18 metre tree fell.'}      | ${'a capital article'}
+    ${'an 8 P.M. meeting'}         | ${clock}    | ${'a 20:00 meeting'}             | ${'twenty hundred'}
+    ${'a 6 P.M. meeting'}          | ${clock}    | ${'an 18:00 meeting'}            | ${'eighteen hundred'}
+    ${'a 5 A.M. start'}            | ${clock}    | ${'a 05:00 start'}               | ${'oh five or five, so left'}
+    ${'a 11 A.M. start'}           | ${american} | ${'an 11am start'}               | ${'the 12-hour clock'}
+    ${'an 8/14/2024 deadline'}     | ${american} | ${'a 2024-08-14 deadline'}       | ${'twenty twenty-four'}
+    ${'a 3/14/1812 letter'}        | ${american} | ${'an 1812-03-14 letter'}        | ${'a year is said in pairs'}
+    ${'a 3/8/2024 deadline'}       | ${dmy}      | ${'an 08/03/2024 deadline'}      | ${'eighth'}
+    ${'a March 11th deadline'}     | ${long}     | ${'an 11 March deadline'}        | ${'eleven'}
+    ${'an April 1st deadline'}     | ${long}     | ${'a 1 April deadline'}          | ${'one'}
+    ${'a $5 note'}                 | ${american} | ${'a US$5 note'}                 | ${'the amount is said before the currency'}
+    ${'an $8 fee'}                 | ${american} | ${'an US$8 fee'}                 | ${'the same with eight'}
+    ${'a $1.8 million deal'}       | ${american} | ${'a US$1.8 million deal'}       | ${'one point eight million'}
+  `('$input -> $expected ($why)', ({ input, options, expected }) => {
+    expect(deamericaniseText(input, options)).toBe(expected);
+  });
+
+  it('records which measurement the article fix agrees with', () => {
+    const [article, measurement] = deamericanise('Build an 8 foot fence.').changes;
+    expect(measurement).toMatchObject({ before: '8 foot', after: '2.4 metre', start: 9, end: 15 });
+    expect(article).toMatchObject({ before: 'an', after: 'a', agreesWith: { start: 9, end: 15 } });
+  });
+
+  /** The article `after` takes, or `either` when neither is changed. */
+  function articleFor(after: string, category: Category): string {
+    const kept = ['a', 'an'].filter((article) => {
+      const text = `${article} ${after}`;
+      const change: Change = {
+        start: article.length + 1,
+        end: text.length,
+        before: after,
+        after,
+        ruleId: 'test',
+        category,
+        confidence: 'safe',
+      };
+      return articleAgreements(text, [change]).length === 0;
+    });
+    return kept.length === 1 ? kept[0]! : 'either';
+  }
+
+  it.each`
+    after                | category      | article
+    ${'8 metre'}         | ${'units'}    | ${'an'}
+    ${'80 metre'}        | ${'units'}    | ${'an'}
+    ${'800 metre'}       | ${'units'}    | ${'an'}
+    ${'8.5 metre'}       | ${'units'}    | ${'an'}
+    ${'8000 tonne'}      | ${'units'}    | ${'an'}
+    ${'11 metre'}        | ${'units'}    | ${'an'}
+    ${'18 metre'}        | ${'units'}    | ${'an'}
+    ${'11,000 litre'}    | ${'units'}    | ${'an'}
+    ${'18,500 litre'}    | ${'units'}    | ${'an'}
+    ${'1 metre'}         | ${'units'}    | ${'a'}
+    ${'1.8 metre'}       | ${'units'}    | ${'a'}
+    ${'100 metre'}       | ${'units'}    | ${'a'}
+    ${'180 metre'}       | ${'units'}    | ${'a'}
+    ${'110,000 litre'}   | ${'units'}    | ${'a'}
+    ${'1,800,000 litre'} | ${'units'}    | ${'a'}
+    ${'0.8 metre'}       | ${'units'}    | ${'a'}
+    ${'.8 metre'}        | ${'units'}    | ${'a'}
+    ${'-8°C'}            | ${'units'}    | ${'a'}
+    ${'1100 litre'}      | ${'units'}    | ${'either'}
+    ${'1,850 litre'}     | ${'units'}    | ${'either'}
+    ${'8pm'}             | ${'times'}    | ${'an'}
+    ${'11:30am'}         | ${'times'}    | ${'an'}
+    ${'12pm'}            | ${'times'}    | ${'a'}
+    ${'18:00'}           | ${'times'}    | ${'an'}
+    ${'20:00'}           | ${'times'}    | ${'a'}
+    ${'08:00'}           | ${'times'}    | ${'an'}
+    ${'05:00'}           | ${'times'}    | ${'either'}
+    ${'00:30'}           | ${'times'}    | ${'either'}
+    ${'08/03/2024'}      | ${'dates'}    | ${'an'}
+    ${'05/03/2024'}      | ${'dates'}    | ${'a'}
+    ${'18 March'}        | ${'dates'}    | ${'an'}
+    ${'1812-03-14'}      | ${'dates'}    | ${'an'}
+    ${'1100-03-14'}      | ${'dates'}    | ${'an'}
+    ${'1999-03-14'}      | ${'dates'}    | ${'a'}
+    ${'2008-03-14'}      | ${'dates'}    | ${'a'}
+    ${'US$8'}            | ${'currency'} | ${'an'}
+    ${'US$5'}            | ${'currency'} | ${'a'}
+    ${'US$18 million'}   | ${'currency'} | ${'an'}
+    ${'8 US dollars'}    | ${'currency'} | ${'an'}
+    ${'A4'}              | ${'misc'}     | ${'an'}
+  `('$after ($category) takes $article', ({ after, category, article }) => {
+    expect(articleFor(after, category)).toBe(article);
   });
 });
 

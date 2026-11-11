@@ -157,6 +157,25 @@ describe('the ESLint plugin', () => {
     });
   });
 
+  describe('an article fix and the measurement it agrees with', () => {
+    const code = 'const a = 1; // Build an 8 foot fence.\n';
+    const reports = lint(code);
+
+    it('are one problem', () => {
+      expect(reports).toHaveLength(1);
+      expect(reports[0]?.data).toEqual({ before: 'an 8 foot', after: 'a 2.4 metre' });
+    });
+
+    it('point at the span from the article to the end of the measurement', () => {
+      const { start, end } = reports[0]!.loc;
+      expect(code.slice(start.column, end.column)).toBe('an 8 foot');
+    });
+
+    it('share one fix', () => {
+      expect(quickFix(code, reports[0]!)).toBe('const a = 1; // Build a 2.4 metre fence.\n');
+    });
+  });
+
   it('takes rule options', () => {
     expect(lint(source, [{ categories: { spelling: false } }])).toHaveLength(0);
   });

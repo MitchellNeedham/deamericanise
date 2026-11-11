@@ -161,6 +161,14 @@ describe('runs of text', () => {
       '<p>Press a <a href="#">gas</a> pedal.</p>',
     );
   });
+
+  it('fixes the article before a converted measurement, or drops it with the measurement', () => {
+    expect(rewrite('<p>Build an 8 foot fence.</p>')).toBe('<p>Build a 2.4 metre fence.</p>');
+    expect(rewrite('<p>Build an <b>8</b> foot fence.</p>')).toBe('<p>Build a <b>2.4 metre</b> fence.</p>');
+    expect(rewrite('<p>Build an 8 <a href="#">foot</a> fence.</p>')).toBe(
+      '<p>Build an 8 <a href="#">foot</a> fence.</p>',
+    );
+  });
 });
 
 describe('runs of text in a laid-out page', () => {

@@ -392,6 +392,10 @@ deamericaniseText(text, { minAmericanConfidence: 0.4 });
   Australian Labor Party, rigor mortis, Fahrenheit 451, the MIT License, Prolog, and
   trademarks such as Band-Aid and Realtor.
 - **Structure.** URLs, email addresses, inline code, fenced code blocks and HTML tags.
+  Inline code is paired the way CommonMark pairs it: a span closes on a run of as many
+  backticks as opened it, so ``` ``a ` b`` ``` is one span, and it may wrap onto the next
+  line of its paragraph. A backtick with no partner before the paragraph ends, or one
+  escaped as `` \` ``, protects nothing.
 - **Identifiers,** when `protectIdentifiers` is on (the default for source files):
   `normalizeInput`, `MAX_COLOR_VALUE`, `background-color`, `theme.colors.gray`,
   `--color-scheme`, `getColor()`.
@@ -497,10 +501,11 @@ can hold prose and an `@example` at once, and doc tags keep their operands: the 
 
 Turn it off with `protectCommentedCode: false` or `--no-code-guard`.
 
-One limitation to know about when writing comments: inline code is protected by pairing
-backticks, and the pairing does not cross a line break. A span that wraps onto the next
-line of a block comment is not protected, and the words inside it will be rewritten. Keep
-a backtick span on one line.
+One limitation to know about when writing comments: a backtick span that wraps is
+protected only where its next line reads as more of the same paragraph. Each `//` line is
+a comment of its own, and a block comment line that starts with `*` reads as a list item,
+so a span that wraps onto either is not protected, and the words inside it will be
+rewritten. Keep a backtick span on one line there.
 
 ## Integrations
 
@@ -713,6 +718,10 @@ there each root needs the rules in its own styles.
 - Identifier protection is deliberately over-eager in code: a hyphenated token containing
   `color`, `center` or `license` is treated as an API name, so `color-coded` in a comment
   survives. Turn it off with `protectIdentifiers: false`.
+- Outside the remark plugin, the paragraph an inline code span may wrap within is found
+  from its lines: a blank line, or a line that opens a heading, quote, list item, fence,
+  rule or table row, ends it. A span that wraps onto the next `>` line of a block quote is
+  therefore not protected. The remark plugin reads the real structure.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`
   or `keepOriginal` where the numbers matter.
 - A number that a hard wrap splits, such as `1` at the end of one line and `1/2 gallons` at

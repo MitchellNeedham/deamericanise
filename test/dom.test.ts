@@ -154,6 +154,19 @@ describe('runs of text', () => {
     );
   });
 
+  it('keeps the sentence stop of an initialism across elements and runs', () => {
+    const localise: DomOptions = { preset: 'localise' };
+    expect(rewrite('<p>She moved to the <b>U.S.</b> <i>It</i> was cold.</p>', localise)).toBe(
+      '<p>She moved to the <b>US.</b> <i>It</i> was cold.</p>',
+    );
+    expect(rewrite('<p>She joined the <b>U.S.</b> <i>Army</i> in 2001.</p>', localise)).toBe(
+      '<p>She joined the <b>US</b> <i>Army</i> in 2001.</p>',
+    );
+    expect(rewrite('<p>She moved to the U.K.</p><p>It was cold.</p>', localise)).toBe(
+      '<p>She moved to the UK.</p><p>It was cold.</p>',
+    );
+  });
+
   it('drops the article fix that leaned on a skipped change', () => {
     const localise: DomOptions = { preset: 'localise' };
     expect(rewrite('<p>Press a gas pedal.</p>', localise)).toBe('<p>Press an accelerator.</p>');

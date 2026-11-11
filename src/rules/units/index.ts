@@ -138,25 +138,49 @@ function withOriginal(ctx: RuleContext, body: string, original: string): string 
 }
 
 
+/** A metric unit's forms, and what a value in it comes to in its dimension's base unit. */
+type MetricUnit = [forms: string, toBase: (value: number) => number];
+
+const times = (factor: number) => (value: number) => value * factor;
+const BASE = times(1);
+
 /**
  * Metric units by dimension, in every form the unit rules write them and in the American
  * spellings. Each key names a capture group, which is how a match reports its dimension.
  */
 const METRIC_UNITS = {
-  temperature: String.raw`degrees?\s+(?:Celsius|C)\b|°\s*C`,
-  speed: String.raw`(?:kilometres?|kilometers?)\s+per\s+hour|km/h`,
-  torque: String.raw`newton[\s-]+(?:metres?|meters?)|N·m|Nm`,
-  area: String.raw`square\s+(?:kilometres?|kilometers?|metres?|meters?)|hectares?|km²|km2|m²|m2|ha`,
-  economy: String.raw`L/100\s*km|km/L`,
-  length:
-    String.raw`kilometres?|kilometers?|centimetres?|centimeters?|millimetres?|millimeters?|` +
-    String.raw`metres?|meters?|km|cm|mm|m`,
-  volume: String.raw`millilitres?|milliliters?|litres?|liters?|mL|ml|L|l`,
-  mass: String.raw`kilograms?|tonnes?|grams?|kg|mg|g|t`,
-  pressure: String.raw`kilopascals?|kPa`,
-  power: String.raw`kilowatts?|kW`,
-  energy: String.raw`kilojoules?|kJ`,
-} satisfies Record<string, string>;
+  temperature: [[String.raw`degrees?\s+(?:Celsius|C)\b|°\s*C`, BASE]],
+  speed: [[String.raw`(?:kilometres?|kilometers?)\s+per\s+hour|km/h`, BASE]],
+  torque: [[String.raw`newton[\s-]+(?:metres?|meters?)|N·m|Nm`, BASE]],
+  area: [
+    [String.raw`square\s+(?:kilometres?|kilometers?)|km²|km2`, times(1e6)],
+    [String.raw`square\s+(?:metres?|meters?)|m²|m2`, BASE],
+    [String.raw`hectares?|ha`, times(1e4)],
+  ],
+  economy: [
+    [String.raw`L/100\s*km`, BASE],
+    [String.raw`km/L`, (kmPerLitre) => 100 / kmPerLitre],
+  ],
+  length: [
+    [String.raw`kilometres?|kilometers?|km`, times(1000)],
+    [String.raw`centimetres?|centimeters?|cm`, times(0.01)],
+    [String.raw`millimetres?|millimeters?|mm`, times(0.001)],
+    [String.raw`metres?|meters?|m`, BASE],
+  ],
+  volume: [
+    [String.raw`millilitres?|milliliters?|mL|ml`, times(0.001)],
+    [String.raw`litres?|liters?|L|l`, BASE],
+  ],
+  mass: [
+    [String.raw`kilograms?|kg`, times(1000)],
+    [String.raw`tonnes?|t`, times(1e6)],
+    [String.raw`grams?|g`, BASE],
+    [String.raw`mg`, times(0.001)],
+  ],
+  pressure: [[String.raw`kilopascals?|kPa`, BASE]],
+  power: [[String.raw`kilowatts?|kW`, BASE]],
+  energy: [[String.raw`kilojoules?|kJ`, BASE]],
+} satisfies Record<string, MetricUnit[]>;
 
 type Dimension = keyof typeof METRIC_UNITS;
 
@@ -164,7 +188,7 @@ const METRIC_NUMBER = String.raw`[-−]?\d[\d,]*(?:\.\d+)?`;
 const METRIC_VALUE =
   String.raw`${METRIC_NUMBER}(?:\s*(?:-|–|—|to|and|x|×|by)\s*${METRIC_NUMBER})*\s*-?\s*` +
   `(?:${Object.entries(METRIC_UNITS)
-    .map(([dimension, units]) => `(?<${dimension}>${units})`)
+    .map(([dimension, units]) => `(?<${dimension}>${units.map(([forms]) => forms).join('|')})`)
     .join('|')})`;
 
 /**
@@ -181,6 +205,78 @@ function dimensionOf(match: RegExpMatchArray | null): Dimension | undefined {
   return Object.keys(groups).find((dimension) => groups[dimension] !== undefined) as
     | Dimension
     | undefined;
+}
+
+const METRIC_FORMS = Object.entries(METRIC_UNITS).flatMap(([dimension, units]) =>
+  units.map(([forms, toBase]) => ({
+    dimension: dimension as Dimension,
+    pattern: new RegExp(`^(?:${forms})$`),
+    toBase,
+  })),
+);
+
+/** A minus sign straight after a number is the dash of a range: `9-18 m`. */
+const METRIC_FIGURE = /(?:(?<![\d.]\s*)[-−])?\d[\d,]*(?:\.\d+)?/g;
+
+interface MetricReading {
+  dimension: Dimension;
+  /** Each figure as the span its written precision allows, in the dimension's base unit. */
+  spans: Array<[low: number, high: number]>;
+  /** `3 x 3.7 m` gives the sides of one thing, where `3-3.7 m` is a range. */
+  sides: boolean;
+}
+
+/** `9-18 m` reads as a length of 8.5-9.5 m and 17.5-18.5 m. */
+function readMetric(text: string): MetricReading | undefined {
+  const match = METRIC_INNER.exec(text);
+  const dimension = dimensionOf(match);
+  if (dimension === undefined) return undefined;
+  const unit = match!.groups![dimension]!;
+  const form = METRIC_FORMS.find((f) => f.dimension === dimension && f.pattern.test(unit));
+  if (form === undefined) return undefined;
+  const figures = text.slice(0, text.lastIndexOf(unit));
+  const spans = [...figures.matchAll(METRIC_FIGURE)].map(([figure]): [number, number] => {
+    const value = Number(figure.replace(/,/g, '').replace('−', '-'));
+    const half = 0.5 * 10 ** -(figure.split('.')[1]?.length ?? 0);
+    const ends = [form.toBase(value - half), form.toBase(value + half)];
+    return [Math.min(...ends), Math.max(...ends)];
+  });
+  return { dimension, spans, sides: /x|×|by/.test(figures) };
+}
+
+/**
+ * Authors round a restatement and some use a unit of another country (an imperial pint or
+ * gallon, a UK mpg), which can put it a fifth away from the American conversion.
+ */
+const RESTATEMENT_SLACK = 0.25;
+
+/**
+ * An absolute temperature has no zero to take a fraction of. Published oven tables sit up
+ * to 10 °C from the oven setting this rounds to. A fan oven's setting, 20 °C lower, is not
+ * a restatement.
+ */
+const TEMPERATURE_SLACK = 10;
+
+/**
+ * The bracket gives the same measurement as the conversion: the same dimension, as many
+ * figures joined the same way, and each figure close to the converted one once both are
+ * read to the precision they are written to.
+ */
+function restatesConversion(
+  bracket: MetricReading,
+  converted: MetricReading,
+  absoluteTemperature: boolean,
+): boolean {
+  if (bracket.dimension !== converted.dimension) return false;
+  if (bracket.spans.length !== converted.spans.length) return false;
+  if (bracket.sides !== converted.sides) return false;
+  return bracket.spans.every(([low, high], i) => {
+    const [convertedLow, convertedHigh] = converted.spans[i]!;
+    const slack = absoluteTemperature
+      ? TEMPERATURE_SLACK
+      : RESTATEMENT_SLACK * Math.max(Math.abs(convertedLow), Math.abs(convertedHigh));
+    return low <= convertedHigh + slack && high >= convertedLow - slack;
+  });
 }
 
 /**
@@ -276,14 +372,26 @@ function metricSpelling(text: string): string {
   );
 }
 
+const BRACKET_AFTER = new RegExp(String.raw`^${SOFT_SPACE}\(([^()]{1,40})\)`);
+
 /**
  * `30-60 feet (9-18 m)` already carries its own conversion, so converting the imperial
  * half produces `9.1-18 metres (9-18 m)`. Swallow the parenthetical instead and keep the
- * author's own figure, which is the one they rounded on purpose.
+ * author's own figure, which is the one they rounded on purpose. A bracket that says
+ * anything else, as `6 feet (2 kg)` and `6 feet (5 m)` do, stays and nothing is lost.
  */
-function redundantMetric(ctx: RuleContext, end: number): { end: number; after: string } | null {
-  const match = /^[ \t]*\(([^()]{1,40})\)/.exec(ctx.text.slice(end));
-  if (!match || !METRIC_INNER.test(match[1]!)) return null;
+function redundantMetric(
+  ctx: RuleContext,
+  end: number,
+  body: string,
+  ruleId: string,
+): { end: number; after: string } | null {
+  const match = BRACKET_AFTER.exec(ctx.text.slice(end));
+  if (!match) return null;
+  const bracket = readMetric(match[1]!);
+  const converted = readMetric(body);
+  if (!bracket || !converted) return null;
+  if (!restatesConversion(bracket, converted, ruleId === ABSOLUTE_ID)) return null;
   return { end: end + match[0].length, after: metricSpelling(match[1]!.trim()) };
 }
 
@@ -301,7 +409,7 @@ function pushMeasurement(
   priority: number,
 ): void {
   if (restatesMetric(ctx, start, start + matched.length)) return;
-  const redundant = redundantMetric(ctx, start + matched.length);
+  const redundant = redundantMetric(ctx, start + matched.length, body, ruleId);
   if (redundant) {
     changes.push({
       start,

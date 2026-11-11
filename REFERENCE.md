@@ -276,7 +276,18 @@ deamericaniseText(text, { unitsKeep: ['mile', 'pint'] });
 ```
 
 A category set by hand beats the preset, and `rules` beats everything, so an explicit
-`true` brings a rule back even if its preset, category or tier would have dropped it. `ruleIds()` lists every id, and so does `--list-rules`.
+`true` brings a rule back even if its preset, category or tier would have dropped it.
+`ruleIds()` lists every id, and so does `--list-rules`.
+
+`ruleCatalogue(dialect)` describes each rule for a settings screen. Each entry has the
+rule's category, the tiers it runs under, a short label and an example, whether the
+dialect leaves it off until `rules` turns it on, and whether `rules` can switch it at all:
+
+```ts
+ruleCatalogue('en-GB').find((rule) => rule.id === 'units.length.mile');
+// { id: 'units.length.mile', category: 'units', confidence: ['moderate'], label: 'Miles',
+//   example: '16 kilometres for 10 miles', offByDefault: true, switchable: true }
+```
 
 The three confidence tiers mean:
 
@@ -594,14 +605,24 @@ Pages that were already open need a reload before the extension can rewrite them
 
 The toolbar button shows how many changes the current page has, switches the extension
 off for that site, and switches highlighting on and off. The settings page has the dialect,
-the mode, the confidence tiers, the `verdict`, highlighting and the list of sites switched
-off.
+the mode, a switch for each category, the confidence tiers, the `verdict`, highlighting,
+and the lists of rules and sites switched off. A category switched by hand beats the mode,
+and stays that way when the mode changes, until you choose **Follow the mode**.
+
+**Fine-tune** on a category opens its options and a switch for each of its rules, labelled
+from `ruleCatalogue()`. Units have `keepOriginal`, `precision` and `fuelEconomy`, dates have
+`format` and `reorderLongDates`, and times have `to24Hour`. An option you leave alone
+follows the mode. A rule switched on there still needs its category on and its tier
+ticked, unlike `rules` in the package. Currency and Other have one rule each, so their
+category switch is the only one.
 
 Highlighting is off by default. When it is on, each change gets a background in its
 category's colour and an underline that is solid for safe, dashed for moderate and dotted
-for risky. Point at a change to see what it replaced, the rule and its confidence. The
-highlights are painted with the CSS Custom Highlight API, so the page's elements stay as
-they were. Changes to `title`, `alt` and `placeholder` are not highlighted, and there is no
+for risky. Point at a change to see what it replaced, the rule and its confidence. Move the
+pointer onto that description and choose **Switch off this rule** to stop the rule on every
+site. An article fixed to suit a replacement, such as `an` to `a`, follows that replacement
+and has no switch of its own. The highlights are painted with the CSS Custom Highlight
+API, so the page's elements stay as they were. Changes to `title`, `alt` and `placeholder` are not highlighted, and there is no
 description on a touch screen. Settings sync between browsers signed in to
 the same account, and changes apply to open pages straight away.
 

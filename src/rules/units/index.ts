@@ -1,4 +1,4 @@
-import type { Change, ResolvedOptions, Rule, RuleContext } from '../../types.js';
+import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import {
   MEASURES,
   SINGULAR_WORDS,
@@ -87,6 +87,9 @@ function unitWord(target: MetricValue, value: number): string {
   return Math.abs(value) === 1 ? target.singular : target.plural;
 }
 
+/** The tier of every change made under a unit's own id. */
+export const MEASUREMENT_CONFIDENCE = 'moderate' satisfies Confidence;
+
 function change(
   start: number,
   before: string,
@@ -101,7 +104,7 @@ function change(
     after,
     ruleId,
     category: 'units',
-    confidence: 'moderate',
+    confidence: MEASUREMENT_CONFIDENCE,
     priority,
   };
 }
@@ -165,7 +168,7 @@ function pushMeasurement(
       after: redundant.after,
       ruleId,
       category: 'units',
-      confidence: 'moderate',
+      confidence: MEASUREMENT_CONFIDENCE,
       priority: 55,
       note: 'the text already gave the metric value, so the imperial half goes',
     });

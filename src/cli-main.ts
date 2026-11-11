@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 import { CATEGORIES, CONFIDENCES, PRESETS } from './config.js';
 import { DIALECTS } from './dialects/index.js';
 import { PROSE_EXTENSIONS, languageNames, lexerFor } from './lexers/index.js';
-import { ruleIds } from './rules/index.js';
+import { ruleIds } from './rules/catalogue.js';
 import { deamericaniseFile } from './code.js';
 import type { Category, Change, Confidence, Dialect, Options, Preset, Precision } from './types.js';
 

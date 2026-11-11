@@ -23,6 +23,13 @@ function matchCase(source: string, replacement: string): string {
 
 const ARTICLE = /\b(a|an)(\s+)$/i;
 
+/** Every article fix carries these. */
+export const ARTICLE_AGREEMENT = {
+  ruleId: 'grammar.article-agreement',
+  category: 'punctuation',
+  confidence: 'safe',
+} as const satisfies Pick<Change, 'ruleId' | 'category' | 'confidence'>;
+
 /**
  * `an eraser` becomes `a rubber`, not `an rubber`. Runs after the main changes are
  * settled, so it only ever sees replacements that are actually going to happen.
@@ -51,9 +58,7 @@ export function articleAgreements(text: string, changes: Change[]): Change[] {
       end,
       before: match[1]!,
       after: matchCase(match[1]!, wanted),
-      ruleId: 'grammar.article-agreement',
-      category: 'punctuation',
-      confidence: 'safe',
+      ...ARTICLE_AGREEMENT,
       priority: 50,
       note: `the replacement starts with a ${wanted === 'an' ? 'vowel' : 'consonant'} sound`,
     });

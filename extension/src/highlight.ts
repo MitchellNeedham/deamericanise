@@ -3,6 +3,12 @@ import type { Change } from '../../src/types.js';
 
 const LISTENING: AddEventListenerOptions = { capture: true, passive: true };
 
+/** Switches off the rule behind a change from its description. */
+export interface RuleSwitch {
+  canSwitchOff(ruleId: string): boolean;
+  switchOff(ruleId: string): void;
+}
+
 /** Must match the selectors in highlight.css. */
 function nameOf(change: Change): string {
   return `deamericanise-${change.category}-${change.confidence}`;
@@ -19,9 +25,13 @@ export class Highlighter {
   private refreshFrame = 0;
   private hoverFrame = 0;
   private pointer: [x: number, y: number] | null = null;
-  private readonly tip = new Tip();
+  private readonly tip: Tip;
 
-  constructor(private readonly rewriter: DomRewriter) {
+  constructor(
+    private readonly rewriter: DomRewriter,
+    rules: RuleSwitch,
+  ) {
+    this.tip = new Tip(rules);
     this.unsubscribe = rewriter.onRewrite(this.scheduleRefresh);
     document.addEventListener('mousemove', this.onMove, LISTENING);
     document.addEventListener('mouseout', this.onOut, LISTENING);
@@ -91,7 +101,7 @@ export class Highlighter {
     this.hoverFrame = 0;
     const found = this.pointer ? this.changeAt(...this.pointer) : null;
     if (found) this.tip.show(found[0].change, found[1]);
-    else this.tip.hide();
+    else this.tip.hideSoon();
   };
 
   /** The change under a point, with the box of the line it is on. */
@@ -126,8 +136,24 @@ function caretAt(x: number, y: number): [Node, number] | null {
   return range ? [range.startContainer, range.startOffset] : null;
 }
 
-const LIGHT = { background: '#ffffff', text: '#1c2421', muted: '#5d6b66', line: '#d9e0dd' };
-const DARK = { background: '#1e2522', text: '#e6ecea', muted: '#9aa8a3', line: '#2d3734' };
+const LIGHT = {
+  background: '#ffffff',
+  text: '#1c2421',
+  muted: '#5d6b66',
+  line: '#d9e0dd',
+  accent: '#1d5c4f',
+};
+const DARK = {
+  background: '#1e2522',
+  text: '#e6ecea',
+  muted: '#9aa8a3',
+  line: '#2d3734',
+  accent: '#5fbfa6',
+};
+
+/** Long enough to move the pointer across the gap between a change and its description. */
+const HIDE_DELAY = 300;
+
 
 /**
  * The description of one change. It sits in a closed shadow root so the page's styles
@@ -138,12 +164,17 @@ class Tip {
   private box!: HTMLElement;
   private card!: HTMLElement;
   private shown: Change | null = null;
+  private hovered = false;
+  private hideTimer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor(private readonly rules: RuleSwitch) {}
 
   get showing(): boolean {
     return this.shown !== null;
   }
 
   show(change: Change, line: DOMRect): void {
+    this.cancelHide();
     if (change === this.shown) return;
     this.mount();
     this.fill(change);
@@ -159,13 +190,30 @@ class Tip {
     this.box.style.top = `${top}px`;
   }
 
+  /** Keeps the description open while the pointer is on its way to it, or on it. */
+  hideSoon(): void {
+    if (!this.shown || this.hovered || this.hideTimer) return;
+    this.hideTimer = setTimeout(() => {
+      this.hideTimer = undefined;
+      if (!this.hovered) this.hide();
+    }, HIDE_DELAY);
+  }
+
   hide(): void {
+    this.cancelHide();
+    this.hovered = false;
     if (!this.shown) return;
     if (this.box.matches(':popover-open')) this.box.hidePopover();
     this.shown = null;
   }
 
+  private cancelHide(): void {
+    clearTimeout(this.hideTimer);
+    this.hideTimer = undefined;
+  }
+
   remove(): void {
+    this.cancelHide();
     this.host?.remove();
     this.host = null;
     this.shown = null;
@@ -187,6 +235,14 @@ class Tip {
       'position: fixed; inset: auto; margin: 0; padding: 0; border: 0; overflow: visible; ' +
       'background: transparent; pointer-events: none;';
     this.card = document.createElement('div');
+    this.card.addEventListener('pointerenter', () => {
+      this.hovered = true;
+      this.cancelHide();
+    });
+    this.card.addEventListener('pointerleave', () => {
+      this.hovered = false;
+      this.hideSoon();
+    });
     this.box.append(this.card);
     root.append(this.box);
     document.documentElement.append(this.host);
@@ -200,7 +256,7 @@ class Tip {
       `font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; ` +
       `color: ${colours.text}; background: ${colours.background}; ` +
       `border: 1px solid ${colours.line}; border-radius: 8px; ` +
-      `box-shadow: 0 6px 24px rgb(0 0 0 / 18%);`;
+      `box-shadow: 0 6px 24px rgb(0 0 0 / 18%); pointer-events: auto;`;
 
     const code = (text: string) => {
       const element = document.createElement('b');
@@ -215,12 +271,24 @@ class Tip {
       return element;
     };
 
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Switch off this rule';
+    button.style.cssText =
+      `all: initial; display: block; margin-top: 6px; font: inherit; color: ${colours.accent}; ` +
+      `text-decoration: underline; cursor: pointer;`;
+    button.addEventListener('click', () => {
+      this.hide();
+      this.rules.switchOff(change.ruleId);
+    });
+
     this.card.replaceChildren(
       code(change.before),
       ' → ',
       code(change.after),
       line(`${change.ruleId} · ${change.confidence}`),
       ...(change.note ? [line(change.note)] : []),
+      ...(this.rules.canSwitchOff(change.ruleId) ? [button] : []),
     );
   }
 }

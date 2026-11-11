@@ -215,7 +215,12 @@ fuel economy. The volume measures are the US ones, which are not the imperial on
 
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
-`22 x 28 centimetres`, both ends sharing the unit chosen for the larger.
+`22 x 28 centimetres`, both ends sharing the unit chosen for the larger. Each side is read
+in its own unit, so `2 feet x 6 inches` becomes `61 x 15 centimetres` and `10 ft x 12 in`
+becomes `3 x 0.3 m`, where the `in` is the unit because the side before it has one. Sides
+that measure different things, as in `2 feet x 6 pounds`, convert as two measurements. A
+dimension is left as written when a side with no unit sits between two different units
+(`10 ft x 12 x 6 in`), or when the rule for one of its units is switched off.
 
 Numbers written out in words are read too, fractions and all: `two and a half feet` becomes
 `76 centimetres` and `a quarter mile away` becomes `400 metres away`. So do `half a mile`,

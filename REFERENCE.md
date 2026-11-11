@@ -262,7 +262,17 @@ contraction that already ends in the word's own last letter drops the stop, so `
 alone.
 
 **Articles.** Replacements drag their article along: `an eraser` becomes `a rubber`, and
-`a popsicle` becomes `an icy pole`.
+`a popsicle` becomes `an icy pole`. A converted number takes the article it is said with,
+so `an 8 foot fence` becomes `a 2.4 metre fence` and `a 60 foot tree` becomes
+`an 18 metre tree`. Eight, eleven and eighteen take `an`, and so does any figure whose
+spoken form starts with one of them, such as `80`, `8.5`, `11,000` or `18 million`. A
+temperature below zero takes `a`, for minus. A currency sign is said after its amount, so
+`US$8` takes `an` as `$8` does. A date's day drops its leading zero
+(`a 05/03/2024 deadline`) and a year is said in pairs (`an 1812-03-14 letter`). Where the
+usual readings disagree, the article is left as it was: `1100` to `1199` and `1800` to
+`1899` (one thousand eight hundred, or eighteen hundred), and a 24-hour time with a
+leading zero other than `08:00` (`05:00` is oh five hundred to some readers and five to
+others).
 
 ## Deciding whether the text is American
 

@@ -1,6 +1,9 @@
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
-/** Elements that sit inside a line of text. Any other element ends the run of text. */
+/**
+ * Elements that sit inside a line of text, unless the page lays them out otherwise. Any other
+ * element ends the run of text.
+ */
 const INLINE = new Set([
   'a', 'abbr', 'acronym', 'b', 'bdi', 'bdo', 'big', 'button', 'cite', 'data', 'dfn', 'em',
   'font', 'i', 'label', 'mark', 'nobr', 'output', 'q', 's', 'small', 'span', 'strike',
@@ -136,8 +139,21 @@ export function joinsRun(element: Element): boolean {
     !element.hasAttribute('xml:lang') &&
     !element.hasAttribute('translate') &&
     !element.hasAttribute('contenteditable') &&
-    !element.classList.contains('notranslate')
+    !element.classList.contains('notranslate') &&
+    laidOutInline(element)
   );
+}
+
+/**
+ * Whether the browser lays the element out inside the line around it. A span that is a flex
+ * item, or styled as a block or an inline-block, sits in a box of its own, so text on either
+ * side of its edge never reads as one word. Without styles to go on, the tag decides.
+ */
+function laidOutInline(element: Element): boolean {
+  const view = element.ownerDocument.defaultView;
+  if (!view) return true;
+  const display = view.getComputedStyle(element).display;
+  return display === '' || display === 'inline' || display === 'contents';
 }
 
 /**

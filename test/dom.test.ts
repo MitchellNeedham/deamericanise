@@ -106,6 +106,51 @@ describe('runs of text', () => {
   });
 });
 
+describe('runs of text in a laid-out page', () => {
+  // DOMParser documents have no window and so no styles, so these use the test's own document.
+  function laidOut(body: string): HTMLElement {
+    const host = document.createElement('div');
+    host.innerHTML = body;
+    document.body.append(host);
+    return host;
+  }
+  const tab =
+    '<button><span style="display: block">Customize actions</span>' +
+    '<span style="display: block">Customize actions</span></button>';
+
+  it('ends a run at an inline element laid out in a box of its own', () => {
+    const host = laidOut(tab);
+    deamericaniseDom(host);
+    expect(host.innerHTML).toBe(tab.replaceAll('Customize', 'Customise'));
+    host.remove();
+  });
+
+  it('joins across an element with display: contents', () => {
+    const host = laidOut('<p>It is 6 feet <span style="display: contents">2</span> inches.</p>');
+    deamericaniseDom(host);
+    expect(host.innerHTML).toBe('<p>It is 1.88 metres<span style="display: contents"></span>.</p>');
+    host.remove();
+  });
+
+  it('reads the layout again once the stylesheets have loaded', () => {
+    const host = laidOut('<button><span>Customize actions</span><span>Customize actions</span></button>');
+    Object.defineProperty(document, 'readyState', { configurable: true, get: () => 'interactive' });
+    const rewriter = new DomRewriter(host);
+    rewriter.watch();
+    Reflect.deleteProperty(document, 'readyState');
+    expect(host.textContent).toBe('Customise actionsCustomise actions');
+
+    for (const span of host.querySelectorAll('span')) span.style.display = 'block';
+    window.dispatchEvent(new Event('load'));
+    expect(host.innerHTML).toBe(
+      '<button><span style="display: block;">Customise actions</span>' +
+        '<span style="display: block;">Customise actions</span></button>',
+    );
+    rewriter.stop();
+    host.remove();
+  });
+});
+
 describe('spreading changes over nodes', () => {
   const change = (start: number, end: number, after: string, ruleId = 'test'): Change => ({
     start,

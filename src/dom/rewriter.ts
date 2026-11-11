@@ -143,6 +143,10 @@ export class DomRewriter {
     if (this.observer) return;
     this.loading = this.document.readyState === 'loading';
     if (this.loading) this.document.addEventListener('DOMContentLoaded', this.onLoaded);
+    // Stylesheets that arrive after the HTML can change which elements sit inline.
+    if (this.document.readyState !== 'complete') {
+      this.document.defaultView?.addEventListener('load', this.onStyled);
+    }
     // The caller's own global first: in a Firefox content script the page's constructor
     // sits behind an Xray wrapper.
     const View = globalThis.MutationObserver ?? this.document.defaultView!.MutationObserver;
@@ -169,6 +173,7 @@ export class DomRewriter {
     this.observer?.disconnect();
     this.observer = null;
     this.document.removeEventListener('DOMContentLoaded', this.onLoaded);
+    this.document.defaultView?.removeEventListener('load', this.onStyled);
     this.loading = false;
     this.deferred.clear();
 
@@ -302,6 +307,11 @@ export class DomRewriter {
     }
     this.deferred.clear();
     this.process(containers, new Map());
+  };
+
+  private readonly onStyled = (): void => {
+    this.flush();
+    this.rescan();
   };
 
   private onRecords(records: MutationRecord[]): void {

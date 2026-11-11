@@ -206,7 +206,9 @@ not; `in the fall of 2024` becomes autumn but `prices will fall` does not; `bake
 cookies` becomes biscuits but `Accept all cookies`, `This site uses cookies` and a lone
 `Cookies` link do not; `Check the mailbox for the parcel` becomes a letterbox but `Your
 mailbox is full`, `a shared mailbox in Outlook`, `a voicemail mailbox` and a lone `Mailbox`
-label do not. Phrases the rest of the world already says keep their words:
+label do not; `take out the trash` becomes rubbish but `Empty the trash in Gmail` and
+`Drag the file to the Trash` do not; `my vacation` becomes a holiday but Gmail's `Vacation
+responder` does not. Phrases the rest of the world already says keep their words:
 `fortune cookie`, `food truck`, `my way or the highway`, `Highway 101`, `seat of your
 pants`, `ants in his pants`, `yoga pants`. In British English a `fire truck` is a fire engine
 and a `pickup truck` stays one. The verb stays too: `the dog pants heavily` keeps its `pants`,
@@ -795,6 +797,9 @@ there each root needs the rules in its own styles.
   sentence. `Set up your voicemail. Your mailbox has not been set up.` still gives a
   letterbox, because the second sentence says nothing about voicemail. A bare `The mailbox
   is full.` reads as a bounce notice and stays a mailbox, though it can be a letterbox.
+- The trash of an email client or file manager is told from household rubbish the same way,
+  and a capitalised `Trash` partway through a sentence is read as the folder's name. So a
+  heading in title case, such as `How to Take Out the Trash`, keeps its trash.
 - `localise` rewrites emergency numbers, which is right for a translated recipe and wrong
   for a news story about America. It is `risky`-tagged; `--confidence safe,moderate` drops
   it, and so does `--rule 'dialect.*=false'`.

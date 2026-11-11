@@ -94,6 +94,22 @@ describe('the shared row is the fallback when the dialect row does not apply', (
   });
 });
 
+describe('an email mailbox is no postbox either', () => {
+  it.each`
+    input                                                     | dialect    | expected
+    ${'Grant access to any mailbox in Exchange.'}             | ${'en-GB'} | ${'Grant access to any mailbox in Exchange.'}
+    ${'You can search any mailbox in your organization.'}     | ${'en-GB'} | ${'You can search any mailbox in your organisation.'}
+    ${'Any mailbox can be converted to a shared mailbox.'}    | ${'en-GB'} | ${'Any mailbox can be converted to a shared mailbox.'}
+    ${'Any mailbox can be converted to a shared mailbox.'}    | ${'en-IE'} | ${'Any mailbox can be converted to a shared mailbox.'}
+    ${'Find any mailbox that is over its quota.'}             | ${'en-ZA'} | ${'Find any mailbox that is over its quota.'}
+    ${'Drop it in the nearest mailbox.'}                      | ${'en-GB'} | ${'Drop it in the nearest postbox.'}
+    ${'the mailbox'}                                          | ${'en-GB'} | ${'the letterbox'}
+    ${'Your mailbox is full. Drop it in the nearest mailbox.'} | ${'en-GB'} | ${'Your mailbox is full. Drop it in the nearest postbox.'}
+  `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
+    expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+});
+
 describe('the order the lexicon tries rows for one word in', () => {
   const widget = (to: string, extra: Partial<LexEntry> = {}): LexEntry => ({
     from: 'widget',

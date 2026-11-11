@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deamericaniseText } from '../src/index.js';
+import type { Dialect } from '../src/index.js';
 
 // Vocabulary is the `localise` half of the package, so every case here opts in.
 const au = (input: string, options = {}) =>
@@ -127,5 +128,92 @@ describe('gas that is not fuel', () => {
     ${'the gas meter reading'}         | ${'a device'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(au(unchanged)).toBe(unchanged);
+  });
+});
+
+// Every dialect with vocabulary. en-GB, en-IE and en-ZA also have a `postbox` row of their own.
+const MAILBOX_DIALECTS: Dialect[] = ['en-AU', 'en-GB', 'en-NZ', 'en-IE', 'en-ZA'];
+
+describe('an email or voicemail mailbox stays a mailbox', () => {
+  it.each([
+    'Your mailbox is full.',
+    'Set up a shared mailbox in Outlook.',
+    'The mailbox quota is 50 GB.',
+    'a voicemail mailbox',
+    'Your mailbox is almost full.',
+    'Your mailbox is full. You might not be able to send or receive new items.',
+    'Your mailbox has exceeded one or more size limits set by your administrator.',
+    'Your mailbox is over its size limit.',
+    "You can't send or receive email because your mailbox is full.",
+    'Open a shared mailbox in Outlook on the web.',
+    'Manage mailbox permissions.',
+    'Automatic replies are turned on for this mailbox.',
+    'Use Mailbox Cleanup to reduce the size of your mailbox.',
+    'Free up mailbox space.',
+    'This mailbox has been disabled.',
+    'Convert a user mailbox to a shared mailbox.',
+    'Create a room mailbox for each conference room.',
+    'The mailbox database is offline.',
+    'Run Get-Mailbox to list every mailbox.',
+    'Move mailboxes to Exchange Online.',
+    'Archive mailboxes have a separate quota.',
+    'Public folder mailboxes',
+    'Give a user Full Access permission to another mailbox.',
+    'Mailbox size and quota',
+    'Gmail stores every message in one mailbox.',
+    'Your Gmail mailbox is almost out of storage.',
+    'Add an IMAP mailbox in Thunderbird.',
+    'Enter the server name for your POP3 mailbox.',
+    'Sign in to your mailbox to read your messages.',
+    'Forward mail from your old mailbox to support@example.com.',
+    'In the Mail app, tap Mailboxes in the top left.',
+    'Open Mail settings and choose Mailboxes.',
+    'The mailbox is full and cannot accept any messages at this time.',
+    'The voice mailbox you have reached is full.',
+    'The mailbox you are trying to reach is full.',
+    "The subscriber's mailbox is full.",
+    'Dial *86 to check your mailbox.',
+    'Set up your voicemail mailbox from your phone.',
+    'You have 3 new messages in your mailbox.',
+    'Choose a passcode for your mailbox.',
+    'Your mailbox is 95% full.',
+    'Your mailbox has reached its storage quota.',
+    'Mailbox quota exceeded',
+    'You are using 1.9 GB of your 2 GB mailbox.',
+    'Your mailbox is approaching the size limit.',
+    'The mailbox is over quota.',
+    'Mailbox full',
+    '550 5.2.2 mailbox full',
+    'Mailbox unavailable',
+    'Mailbox not found',
+    'The recipient mailbox does not exist.',
+    "The recipient's mailbox is full and can't accept messages now.",
+    'Mailbox',
+    'Mailboxes',
+  ])('leaves "%s" alone', (input) => {
+    for (const dialect of MAILBOX_DIALECTS) expect(au(input, { dialect }), dialect).toBe(input);
+  });
+});
+
+describe('a mailbox for post still becomes a letterbox', () => {
+  it.each`
+    input                                                        | expected
+    ${'Check the mailbox for the parcel.'}                       | ${'Check the letterbox for the parcel.'}
+    ${'The mailbox is full of flyers.'}                          | ${'The letterbox is full of flyers.'}
+    ${'Our mailbox is full of junk mail again.'}                 | ${'Our letterbox is full of junk mail again.'}
+    ${'a mailbox full of letters'}                               | ${'a letterbox full of letters'}
+    ${'Our mailbox fills up with flyers.'}                       | ${'Our letterbox fills up with flyers.'}
+    ${'the mailbox'}                                             | ${'the letterbox'}
+    ${'Put the letter in the mailbox.'}                          | ${'Put the letter in the letterbox.'}
+    ${'He checked the mailbox at the end of the driveway.'}      | ${'He checked the letterbox at the end of the driveway.'}
+    ${'A car knocked over our mailbox.'}                         | ${'A car knocked over our letterbox.'}
+    ${'We share a mailbox with the neighbours.'}                 | ${'We share a letterbox with the neighbours.'}
+    ${'Pop it in the mailbox on your way out.'}                  | ${'Pop it in the letterbox on your way out.'}
+    ${'The mailbox key is on the hook.'}                         | ${'The letterbox key is on the hook.'}
+    ${'Put a sign on the mailbox.'}                              | ${'Put a sign on the letterbox.'}
+    ${'Mailboxes for sale'}                                      | ${'Letterboxes for sale'}
+    ${'Your mailbox is full. Check the mailbox for the parcel.'} | ${'Your mailbox is full. Check the letterbox for the parcel.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    for (const dialect of MAILBOX_DIALECTS) expect(au(input, { dialect }), dialect).toBe(expected);
   });
 });

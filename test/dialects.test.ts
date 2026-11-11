@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DIALECTS, deamericaniseText } from '../src/index.js';
-import type { Dialect } from '../src/index.js';
+import type { Dialect, LexEntry, RuleContext } from '../src/index.js';
+import { compileLexicon, findLexiconMatches } from '../src/engine/lexicon.js';
 
 // The dialect overlays are vocabulary, so they need the localise preset.
 const say = (dialect: Dialect) => (input: string) =>
@@ -48,6 +49,77 @@ describe('words only some dialects change', () => {
     ${'a bell pepper'} | ${'en-GB'} | ${'a pepper'}
   `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
     expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+});
+
+describe('a dialect row outranks the shared row for the same word', () => {
+  it.each`
+    input                                | dialect    | expected
+    ${'a field trip'}                    | ${'en-GB'} | ${'a school trip'}
+    ${'Field trips are fun.'}            | ${'en-GB'} | ${'School trips are fun.'}
+    ${'an apartment building'}           | ${'en-GB'} | ${'a block of flats'}
+    ${'two apartment buildings'}         | ${'en-GB'} | ${'two blocks of flats'}
+    ${'Drop it in the nearest mailbox.'} | ${'en-GB'} | ${'Drop it in the nearest postbox.'}
+    ${'public mailboxes'}                | ${'en-GB'} | ${'public postboxes'}
+    ${'a field trip'}                    | ${'en-IE'} | ${'a school trip'}
+    ${'an apartment building'}           | ${'en-IE'} | ${'a block of flats'}
+    ${'a field trip'}                    | ${'en-ZA'} | ${'a school trip'}
+    ${'an apartment building'}           | ${'en-ZA'} | ${'a block of flats'}
+    ${'any mailbox'}                     | ${'en-ZA'} | ${'any postbox'}
+    ${'a field trip'}                    | ${'en-AU'} | ${'an excursion'}
+    ${'an apartment building'}           | ${'en-NZ'} | ${'an apartment block'}
+  `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
+    expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+});
+
+describe('the shared row is the fallback when the dialect row does not apply', () => {
+  it.each`
+    input                     | dialect    | expected
+    ${'the mailbox'}          | ${'en-GB'} | ${'the letterbox'}
+    ${'Check your mailbox.'}  | ${'en-GB'} | ${'Check your letterbox.'}
+    ${'the mailboxes'}        | ${'en-IE'} | ${'the letterboxes'}
+    ${'the mailbox'}          | ${'en-ZA'} | ${'the letterbox'}
+    ${'the grocery store'}    | ${'en-ZA'} | ${'the supermarket'}
+  `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
+    expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+
+  it('uses the shared row when the dialect rule is switched off', () => {
+    const options = { dialect: 'en-GB', preset: 'localise', rules: { 'dialect.en-GB': false } } as const;
+    expect(deamericaniseText('a field trip', options)).toBe('an excursion');
+  });
+});
+
+describe('the order the lexicon tries rows for one word in', () => {
+  const widget = (to: string, extra: Partial<LexEntry> = {}): LexEntry => ({
+    from: 'widget',
+    to,
+    ruleId: `test.${to}`,
+    category: 'vocabulary',
+    confidence: 'safe',
+    ...extra,
+  });
+  const swap = (text: string, ...layers: LexEntry[][]): string[] =>
+    findLexiconMatches({ text, american: true } as RuleContext, compileLexicon(...layers), () => true)
+      .map((change) => change.after);
+
+  it('tries a later layer first, whatever the priority', () => {
+    expect(swap('a widget', [widget('shared', { priority: 90 })], [widget('dialect')])).toEqual(['dialect']);
+  });
+
+  it('tries a higher priority first within a layer', () => {
+    expect(swap('a widget', [widget('plain'), widget('gated', { priority: 20 })])).toEqual(['gated']);
+  });
+
+  it('keeps the listed order between equal priorities', () => {
+    expect(swap('a widget', [widget('first'), widget('second')])).toEqual(['first']);
+  });
+
+  it('falls back to an earlier layer when the later row is refused by its context', () => {
+    const layers = [[widget('shared')], [widget('dialect', { requireBefore: /\bblue\s+$/ })]];
+    expect(swap('a widget', ...layers)).toEqual(['shared']);
+    expect(swap('a blue widget', ...layers)).toEqual(['dialect']);
   });
 });
 

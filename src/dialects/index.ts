@@ -144,6 +144,17 @@ const MAILBOX: Guard[] = [
 ];
 
 /**
+ * A university or science field trip is not a school trip, and a `school field trip` would
+ * say school twice. The shared word stands for both.
+ */
+const FIELD_TRIP: Guard[] = [
+  {
+    forbidBefore:
+      /\b(?:[a-z]+olog(?:y|ical)|university|college|undergraduate|graduate|postgraduate|research|science|scientific|geography|geographical|botany|botanical|marine|environmental|school|class)\s+$/i,
+  },
+];
+
+/**
  * Guards for words that also appear inside a phrase the rest of the world already says.
  * `candy floss` is not American, so `candy` must not fire inside it. A row with several
  * guards fires when any one of them lets it through.
@@ -162,6 +173,8 @@ const GATES: Record<string, Guard[]> = {
   apartments: APARTMENT,
   mailbox: MAILBOX,
   mailboxes: MAILBOX,
+  'field trip': FIELD_TRIP,
+  'field trips': FIELD_TRIP,
 };
 
 function rows(id: Dialect, list: Row[], confidence: Confidence = 'moderate'): LexEntry[] {

@@ -27,15 +27,40 @@ const OPENERS = [
 // A word joined to a hyphen, digit or stop belongs to a name, as in `A-10`, `I-95` or `A.I.`.
 const OPENER = new RegExp(String.raw`(?:${OPENERS.join('|')})(?![\p{L}\p{N}.‐‑-])`, 'uy');
 
+/** Number words that can end a written time, as in `ten P.M.` or `ten forty-five P.M.`. */
+const TIME_WORDS = [
+  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
+  'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen',
+  'twenty', 'thirty', 'forty', 'fifty',
+];
+
+// `times.clock` outranks this rule, so a time in figures only reaches here when that rule is
+// off or cannot read the hour.
+const AFTER_TIME = new RegExp(
+  String.raw`(?<=(?:(?<![\w:])\d{1,2}(?::[0-5]\d){0,2}|\b(?:${TIME_WORDS.join('|')}))\s*)` +
+    String.raw`[AP]\.M\.(?![A-Za-z])`,
+  'iy',
+);
+
+/**
+ * After a time, `A.M.` and `P.M.` are the meridiem and take the lower case, as in `3 pm`.
+ * Without one they stand for something else, as in a prime minister or AM radio, so they
+ * keep their capitals.
+ */
+function meridiem(text: string, start: number): string {
+  const letter = text[start]!;
+  AFTER_TIME.lastIndex = start;
+  return AFTER_TIME.test(text) ? `${letter.toLowerCase()}m` : `${letter}M`;
+}
+
 function abbreviationRule(): Rule {
   const titles = new RegExp(String.raw`\b(${CONTRACTIONS.join('|')})\.(?=\s+[A-Z])`, 'g');
-  const initialisms: Array<[RegExp, string]> = [
+  const initialisms: Array<[RegExp, string | ((text: string, start: number) => string)]> = [
     [/\bU\.S\.A\./g, 'USA'],
     [new RegExp(String.raw`\bU\.S\.(?=\s|$|[,;:]|${CLOSING})`, 'g'), 'US'],
     [/\bU\.K\./g, 'UK'],
     [/\bPh\.\s?D\./g, 'PhD'],
-    [/\bA\.M\./g, 'am'],
-    [/\bP\.M\./g, 'pm'],
+    [/\b[AP]\.M\./g, meridiem],
   ];
 
   return {
@@ -64,11 +89,12 @@ function abbreviationRule(): Rule {
         for (const match of ctx.text.matchAll(pattern)) {
           const start = match.index;
           const end = start + match[0].length;
+          const written = typeof replacement === 'string' ? replacement : replacement(ctx.text, start);
           changes.push({
             start,
             end,
             before: match[0],
-            after: endsSentence(ctx.text, start, end, OPENER) ? `${replacement}.` : replacement,
+            after: endsSentence(ctx.text, start, end, OPENER) ? `${written}.` : written,
             ruleId: 'punctuation.abbreviations',
             category: 'punctuation',
             confidence: 'safe',

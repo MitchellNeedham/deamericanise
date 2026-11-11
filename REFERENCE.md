@@ -268,7 +268,9 @@ number is the tail of a date, a fraction, a grouped number or a clock time. So
 written, while `Distance:5 miles` still converts. A range's first number is never a price
 either, and never more than ten times the size of the second, which makes it a year or a
 count. The second number then converts on its own: `In 2024 - 5 feet` becomes
-`In 2024 - 1.5 metres`, and `Price $5 - 10 inches` keeps its price.
+`In 2024 - 1.5 metres`, and `Price $5 - 10 inches` keeps its price. `from` or `between`
+before the first number makes a range of any two, so `fell from 10 to 0.5 miles` converts
+whole.
 
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
 `Bake at 175-190°C`. A change in temperature has no 32° offset to take off, so

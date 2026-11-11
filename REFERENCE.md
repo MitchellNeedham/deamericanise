@@ -652,6 +652,9 @@ all three stores accept. They show an invented American recipe page,
 `npm run build:extension` and then `node extension/store/capture.mjs`, which needs Google
 Chrome.
 
+The privacy policy the stores link to is `site/privacy.html`, which GitHub Pages publishes
+with the demo at <https://mitchellneedham.github.io/deamericanise/privacy.html>.
+
 Firefox Add-ons asks for the source of any bundled code. Upload the source archive GitHub
 makes for the same tag, and give `npm ci && npm run build:extension` as the build steps.
 

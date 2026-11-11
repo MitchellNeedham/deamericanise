@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy | deamericanise</title>
+<meta name="description" content="What the deamericanise browser extension reads, stores and sends.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>🇦🇺</text></svg>">
+<link rel="stylesheet" href="./styles.css">
+<style>
+  header, article, footer { max-width: 44rem; }
+  article { margin: 0 auto; }
+  article h2 { font-size: 1.1rem; margin: 1.75rem 0 0.4rem; }
+  article ul { padding-left: 1.25rem; }
+  article li + li { margin-top: 0.3rem; }
+  article a { color: var(--accent); }
+  code { font: 0.9em ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Privacy policy</h1>
+  <p>The deamericanise extension for Chrome, Edge and Firefox. Last updated 11 November 2026.</p>
+</header>
+
+<article>
+  <p>The extension sends nothing anywhere. It reads the pages you visit so that it can
+     rewrite them, and it does this inside your browser, on your device. It makes no network
+     requests, and it has no analytics, no advertising and no cookies. The
+     <a href="https://github.com/MitchellNeedham/deamericanise">source code</a> is public, so
+     anyone can check this.</p>
+
+  <h2>What the extension reads</h2>
+  <ul>
+    <li>The text of each page you open, in every frame, and the <code>title</code>,
+        <code>alt</code> and <code>placeholder</code> text of its elements. This is the text it
+        rewrites.</li>
+    <li>The markup around that text, such as the language the page declares and the parts it
+        marks as not to be translated.</li>
+    <li>The address of each page, to check whether you switched the extension off for that
+        site.</li>
+    <li>The position of your pointer, when highlighting is on, to show what a change
+        replaced.</li>
+  </ul>
+  <p>None of this leaves your device, and none of it is kept after you leave the page.</p>
+
+  <h2>What the extension stores</h2>
+  <p>It stores your settings: the dialect, the mode, the confidence levels, how it decides a
+     page is American, whether highlighting is on, and the sites you switched it off for. You
+     can see and change all of them on the extension's settings page.</p>
+  <p>The settings are kept in your browser's storage for extensions. If you sync your browser,
+     it copies them to your other devices through your Google, Microsoft or Mozilla account.
+     Your browser's maker handles that copy under its own privacy policy. The list of sites
+     you switched off is the only setting that says anything about your browsing.</p>
+
+  <h2>Sharing</h2>
+  <p>The developer never receives any data from the extension, so there is nothing to sell,
+     share or transfer.</p>
+
+  <h2>Permissions</h2>
+  <ul>
+    <li><b>Storage</b> keeps your settings.</li>
+    <li><b>Access to every site</b> lets the extension rewrite text on any page you read. Your
+        browser may describe this as reading and changing your data on all websites.</li>
+  </ul>
+
+  <h2>Changes to this policy</h2>
+  <p>A new version of this policy goes on this page with a new date. Every earlier version is
+     in the <a href="https://github.com/MitchellNeedham/deamericanise/commits/main/site/privacy.html">project's history</a>.</p>
+
+  <h2>Contact</h2>
+  <p>Ask a question or report a problem in the
+     <a href="https://github.com/MitchellNeedham/deamericanise/issues">project's issues</a>.</p>
+</article>
+
+<footer>
+  <p><a href="./">Try deamericanise in your browser</a> &middot;
+     <a href="https://github.com/MitchellNeedham/deamericanise">source</a></p>
+</footer>
+</body>
+</html>

@@ -186,4 +186,14 @@ describe('change offsets point into the original file', () => {
     expect(source.slice(word!.start, word!.end)).toBe('eraser');
     expect(article?.agreesWith).toEqual({ start: word!.start, end: word!.end });
   });
+
+  it('points an article fix at a converted measurement in the same file', () => {
+    const source = 'const a = 1;\n// Build an 8 foot fence.\n';
+    const result = deamericaniseCode(source, { language: 'ts' });
+    const [article, measurement] = result.changes;
+    expect(result.text).toBe('const a = 1;\n// Build a 2.4 metre fence.\n');
+    expect(source.slice(article!.start, article!.end)).toBe('an');
+    expect(source.slice(measurement!.start, measurement!.end)).toBe('8 foot');
+    expect(article?.agreesWith).toEqual({ start: measurement!.start, end: measurement!.end });
+  });
 });

@@ -46,3 +46,6 @@ function wordsBefore(text: string, start: number): boolean {
   }
   return false;
 }
+
+/** One character that does not end the sentence. A blank line ends one too. */
+export const IN_SENTENCE = String.raw`(?:(?![!?](?:\s|$)|(?<!\b(?:e\.g|i\.e))\.(?:\s|$)|\n[ \t]*\n)[\s\S])`;

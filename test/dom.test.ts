@@ -349,6 +349,19 @@ describe('what is left alone', () => {
     );
   });
 
+  it('leaves a webmail mailbox alone and still localises the letterbox beside it', () => {
+    const webmail =
+      '<nav><ul><li>Mailbox</li><li>Shared mailboxes</li></ul></nav>' +
+      '<div role="alert"><b>Your mailbox is almost full.</b> <a href="#">Manage storage</a></div>' +
+      '<p>The <em>mailbox</em> you tried to reach is full.</p>';
+    const post = '<p>Check the <em>mailbox</em> for the parcel.</p>';
+    for (const dialect of ['en-AU', 'en-GB'] as const) {
+      expect(rewrite(webmail + post, { preset: 'localise', dialect }), dialect).toBe(
+        webmail + '<p>Check the <em>letterbox</em> for the parcel.</p>',
+      );
+    }
+  });
+
   it('leaves a document in design mode alone', () => {
     const doc = page('<p>the color</p>');
     doc.designMode = 'on';

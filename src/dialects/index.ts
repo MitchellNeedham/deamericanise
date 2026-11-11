@@ -1,3 +1,5 @@
+import { IN_SENTENCE } from '../rules/sentence.js';
+import { NOT_EMAIL_MAILBOX } from '../rules/vocabulary.js';
 import type { Confidence, Dialect, LexEntry } from '../types.js';
 
 export interface DialectPack {
@@ -18,9 +20,6 @@ type Row = [from: string, to: string];
 type Guard = Pick<LexEntry, 'requireBefore' | 'requireAfter' | 'forbidBefore' | 'forbidAfter'>;
 
 const anyOf = (words: string[]): string => words.join('|');
-
-/** One character that does not end the sentence. A blank line ends one too. */
-const IN_SENTENCE = String.raw`(?:(?![!?](?:\s|$)|(?<!\b(?:e\.g|i\.e))\.(?:\s|$)|\n[ \t]*\n)[\s\S])`;
 
 /** Words that put a cookie on the web from anywhere in its sentence. */
 const WEB_CONTEXT = anyOf([
@@ -249,10 +248,14 @@ const APARTMENT: Guard[] = [{ forbidBefore: /\bserviced\s+$/i, forbidAfter: /^\s
 
 /**
  * A postbox is only the kind for posting letters. A mailbox at home is a letterbox, which
- * is what the shared vocabulary says when this refuses.
+ * is what the shared vocabulary says when this refuses. An email mailbox is neither, and
+ * the shared row refuses it too.
  */
 const MAILBOX: Guard[] = [
-  { requireBefore: /\b(?:public|blue|usps|collection|corner|nearest|nearby|any)\s+$/i },
+  {
+    ...NOT_EMAIL_MAILBOX,
+    requireBefore: /\b(?:public|blue|usps|collection|corner|nearest|nearby|any)\s+$/i,
+  },
 ];
 
 /**

@@ -1,4 +1,5 @@
 import type { Confidence, LexEntry } from '../types.js';
+import { IN_SENTENCE } from './sentence.js';
 
 /**
  * Words that are American rather than merely spelt the American way. Everything here
@@ -7,6 +8,8 @@ import type { Confidence, LexEntry } from '../types.js';
  */
 
 type Row = [from: string, to: string];
+
+type Guard = Pick<LexEntry, 'requireBefore' | 'requireAfter' | 'forbidBefore' | 'forbidAfter'>;
 
 function set(ruleId: string, confidence: Confidence, rows: Row[]): LexEntry[] {
   return rows.map(([from, to]) => ({
@@ -305,6 +308,90 @@ const GRADES: LexEntry[] = Array.from({ length: 12 }, (_, i) => i + 1).flatMap((
 const NOT_FUEL_BEFORE =
   /\b(?:natural|propane|butane|liquefied|liquified|lp|lpg|cng|lng|shale|coal|landfill|town|producer)\s+$/i;
 
+/** Kinds of email mailbox, as Exchange and webmail name them. They count only right before one. */
+const MAIL_KIND = [
+  'shared', 'groups?', 'teams?', 'rooms?', 'resource', 'equipment', 'archived?', 'archiving',
+  'primary', 'linked', 'inactive', 'remote', 'cloud', 'hosted', 'virtual', 'online',
+  'on-?prem(?:ises)?', 'site', 'folders?', 'discovery', 'arbitration', 'support',
+  String.raw`help[\s-]?desk`, 'source', 'target', 'destination', 'voice', 'pop', 'generic',
+  'functional',
+].join('|');
+
+/** The verbs of the Exchange cmdlets, as in `Get-Mailbox`. */
+const MAIL_CMDLET = [
+  'get', 'set', 'new', 'remove', 'enable', 'disable', 'search', 'export', 'import', 'add', 'move',
+  'restore', 'test', 'update', 'connect', 'suspend', 'resume',
+].join('|');
+
+/** What an email mailbox has that a letterbox does not, right after one. */
+const MAIL_PART = [
+  String.raw`size\s+limits?`, 'limits?', 'space', 'access', 'rights', String.raw`move\s+requests?`,
+  'audit(?:s|ing|ed)?', 'exports?', 'imports?', 'providers?', 'folders?', 'properties', 'items?',
+  'usage', 'statistics', 'retention', 'archives?', 'archiving', 'search(?:es)?', 'clean-?up',
+].join('|');
+
+/** Words that put a mailbox in email, voicemail or an account from anywhere in its sentence. */
+const MAIL_CONTEXT = [
+  'e-?mails?', 'e-?mail(?:ed|ing)', 'inbox(?:es)?', 'outbox', 'webmail', String.raw`voice[\s-]?mails?`,
+  'outlook', 'exchange', 'gmail', 'hotmail', 'yahoo', 'icloud', 'aol', String.raw`proton\s?mail`,
+  'thunderbird', String.raw`(?:microsoft|office)\s+365`, '[mo]365', 'imap', String.raw`pop\s?3`,
+  'smtp', 'mapi', 'activesync', 'quotas?', 'storage', 'exceed(?:s|ed|ing)?',
+  String.raw`(?:size|storage|send(?:ing)?|receiv(?:e|ing))\s+limits?`,
+  String.raw`\d+(?:[.,]\d+)?\s?(?:[kmgt]b|(?:kilo|mega|giga|tera)bytes?)`,
+  'servers?', 'databases?', String.raw`(?<!\b(?:on|into)\s+)accounts?`, 'users?',
+  'admin(?:istrator)?s?', 'passwords?', 'passcodes?', 'logins?', String.raw`log(?:ged|ging)?[\s-]?(?:in|on)`,
+  String.raw`sign(?:ed|ing)?[\s-]?in`, 'sign-on', 'settings', 'permissions?', String.raw`full\s+access`,
+  'delegat(?:e|es|ed|ing|ion)', 'migrat(?:e|es|ed|ing|ions?)', 'sync(?:s|ed|ing)?',
+  'synchroni[sz](?:e|es|ed|ing|ation)', 'domains?', 'organi[sz]ations?', 'messages?', 'attachments?',
+  'spam', 'phishing', 'undeliverable', String.raw`(?:automatic|auto)[\s-]?repl(?:y|ies)`,
+  String.raw`out[\s-]of[\s-](?:the[\s-])?office`, String.raw`mail[\s-](?:clients?|apps?|flow|enabled)`,
+  'phones?', String.raw`dial(?:s|ed|ing|led|ling)?\s+(?:[*#+]|\d+|in(?:to)?\b)`,
+  String.raw`[\w.+-]+@[\w-]+(?:\.[\w-]+)+`,
+  // Another mailbox in the sentence that is plainly the email kind.
+  String.raw`(?:${MAIL_CMDLET})-mailbox\w*`, String.raw`(?:${MAIL_KIND})[\s-]+mailbox(?:es)?`,
+  String.raw`mailbox(?:es)?[\s-]+(?:${MAIL_PART})`,
+].join('|');
+
+const MAIL_STATE_ADVERB =
+  String.raw`(?:\s+(?:almost|nearly|completely|currently|now|already|too|over|\d+\s?%))*`;
+
+/**
+ * A bounce or quota notice: `mailbox full`, `is almost full`, `unavailable`. A letterbox
+ * that is full is full of something, so a full one counts from anywhere after it.
+ */
+const MAIL_STATE =
+  String.raw`^(?:['’]s|\s+(?:is|was|are|were|gets|got|getting|has\s+been|has\s+become))?` +
+  String.raw`${MAIL_STATE_ADVERB}\s+(?:full\b(?!\s+of\b)|filling\s+up\b(?!\s+with\b)` +
+  String.raw`|unavailable|not\s+found|does\s+not\s+exist|doesn['’]t\s+exist|disabled|deactivated` +
+  String.raw`|suspended)\b` +
+  String.raw`|^${IN_SENTENCE}*?\b(?:is|are|was|were)${MAIL_STATE_ADVERB}\s+full\b(?!\s+of\b)`;
+
+/**
+ * Refuses a mailbox that holds email or voicemail, which is no letterbox or postbox in any
+ * dialect. The shared rows and every dialect's `mailbox` rows carry it.
+ */
+export const NOT_EMAIL_MAILBOX: Guard = {
+  forbidBefore: new RegExp(
+    String.raw`\b(?:${MAIL_KIND})(?:['’]s)?[\s-]+$|\b(?:${MAIL_CMDLET})-$` +
+      String.raw`|\b(?:${MAIL_CONTEXT})\b${IN_SENTENCE}*$`,
+    'i',
+  ),
+  forbidAfter: new RegExp(
+    String.raw`^(?:['’]s)?[\s-]+(?:${MAIL_PART})\b|${MAIL_STATE}` +
+      String.raw`|^${IN_SENTENCE}*?\b(?:${MAIL_CONTEXT})\b`,
+    'i',
+  ),
+};
+
+/**
+ * A mailbox alone in its sentence is a label, and in webmail that is the email one. So the
+ * shared row needs another word beside it, on one side or the other.
+ */
+const MAILBOX_GATES: Guard[] = [
+  { ...NOT_EMAIL_MAILBOX, requireBefore: new RegExp(`[a-z0-9]${IN_SENTENCE}*$`, 'i') },
+  { ...NOT_EMAIL_MAILBOX, requireAfter: new RegExp(`^${IN_SENTENCE}*?[a-z0-9]`, 'i') },
+];
+
 export function baseVocabulary(): LexEntry[] {
   return [
     ...set('vocabulary.motoring', 'moderate', MOTORING).map((entry) =>
@@ -314,7 +401,9 @@ export function baseVocabulary(): LexEntry[] {
     ...set('vocabulary.food', 'moderate', FOOD),
     ...set('vocabulary.household', 'moderate', HOUSEHOLD),
     ...set('vocabulary.clothing', 'moderate', CLOTHING),
-    ...set('vocabulary.everyday', 'moderate', EVERYDAY),
+    ...set('vocabulary.everyday', 'moderate', EVERYDAY).flatMap((entry) =>
+      entry.from.startsWith('mailbox') ? MAILBOX_GATES.map((gate) => ({ ...entry, ...gate })) : [entry],
+    ),
     ...set('vocabulary.education', 'risky', EDUCATION),
     ...GRADES,
     ...CONTEXTUAL.map((entry) => ({ ...entry, priority: 20 })),

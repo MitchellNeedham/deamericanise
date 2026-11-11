@@ -59,11 +59,11 @@ function isAmbiguousHere(measure: Measure, text: string): boolean {
   return measure.ambiguousWhen !== undefined && measure.ambiguousWhen.test(text);
 }
 
-function isConventional(measure: Measure, text: string, start: number, end: number): boolean {
+function isConventional(ctx: RuleContext, measure: Measure, start: number, end: number): boolean {
   const rules = measure.conventional;
-  if (!rules) return false;
-  const before = text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
-  const after = text.slice(end, end + CONTEXT_WINDOW);
+  if (!rules || !ctx.options.units.respectConventions) return false;
+  const before = ctx.text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
+  const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
   return Boolean((rules.before?.test(before)) || (rules.after?.test(after)));
 }
 
@@ -251,7 +251,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const high = parseNumber(match[2]!);
         if (!entry || low === null || high === null || high === 0) continue;
         const start = match.index;
-        if (isConventional(entry.measure, ctx.text, start, start + match[0].length)) continue;
+        if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[3]!, match[0])) continue;
 
@@ -293,7 +293,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         if (values.some((v) => v === null)) continue;
 
         const start = match.index;
-        if (isConventional(entry.measure, ctx.text, start, start + match[0].length)) continue;
+        if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[4]!, match[0])) continue;
 
@@ -333,7 +333,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const value = parseNumber(match[1]!);
         if (!entry || value === null) continue;
         const start = match.index;
-        if (isConventional(entry.measure, ctx.text, start, start + match[0].length)) continue;
+        if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[2]!, match[0])) continue;
 

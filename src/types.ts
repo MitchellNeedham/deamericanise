@@ -74,8 +74,9 @@ export interface UnitOptions {
   /** Cap for `precision: 'exact'`. */
   maxDecimals?: number;
   /**
-   * Skip measurements that are inches worldwide: screen sizes, wheel rims, pipe bores,
-   * vinyl, lumber. On by default.
+   * Leave a measurement alone where the unit is part of a name: inches for screens,
+   * wheels, pipes, vinyl and lumber, yards for the lines on a field, and pounds for weight
+   * classes. On by default.
    */
   respectConventions?: boolean;
   /** Convert `mpg` to `L/100km` rather than `km/L`. */

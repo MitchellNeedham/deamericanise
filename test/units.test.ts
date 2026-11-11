@@ -138,6 +138,17 @@ describe('measurements that are imperial worldwide', () => {
   });
 
   it.each`
+    input                       | expected
+    ${'a 15 inch laptop'}       | ${'a 38 centimetre laptop'}
+    ${'the 17 inch wheels'}     | ${'the 43 centimetre wheels'}
+    ${'wheels of 15-17 inches'} | ${'wheels of 38-43 centimetres'}
+    ${'the 40 yard line'}       | ${'the 37 metre line'}
+    ${'the 147-pound division'} | ${'the 66.7 kilogram division'}
+  `('converts $input when respectConventions is off', ({ input, expected }) => {
+    expect(convert(input, { units: { respectConventions: false } })).toBe(expected);
+  });
+
+  it.each`
     unchanged            | why
     ${'6 in total'}      | ${'"in" here is the preposition'}
     ${'sections 3 to 5'} | ${'no unit at all'}

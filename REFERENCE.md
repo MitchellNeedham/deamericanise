@@ -176,7 +176,9 @@ deamericaniseText('6 feet', { units: { keepOriginal: true } });        // '1.8 m
 ```
 
 Measurements that are imperial worldwide are left alone: screens, wheels, pipes, vinyl.
-`a 15 inch laptop` stays a 15 inch laptop.
+`a 15 inch laptop` stays a 15 inch laptop. So does a unit that is part of a name, such as
+`the 40 yard line` or `the 147-pound division`. `units: { respectConventions: false }`
+converts all of them.
 
 **Dates.** `3/14/2024` becomes `2024-03-14` without needing to be told anything, because
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
@@ -525,6 +527,7 @@ Shadow DOM is not entered. Text inside a web component's shadow root stays as it
 | `units.precision` | `'natural'` | `natural`, `exact`, or a number of decimal places |
 | `units.keepOriginal` | `false` | Write `1.8 metres (6 ft)` |
 | `units.fuelEconomy` | `'l-per-100km'` | Or `km-per-l` |
+| `units.respectConventions` | `true` | Leave screen sizes, yard lines and weight classes alone |
 | `dates.format` | `'iso'` | `iso`, `dmy`, `long` |
 | `dates.reorderLongDates` | `localise` only | `March 5, 2024` to `5 March 2024` |
 | `times.to24Hour` | `false` | On gives `15:00` rather than `3pm` |

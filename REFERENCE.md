@@ -403,7 +403,12 @@ analyse('Preheat the oven to 350 degrees. Mix 2 cups of flour with 1 stick of bu
 ```
 
 The oven is not counted in a sentence about a pizza oven, a wood-fired oven or a
-pyrolytic clean, all of which do run that hot in Celsius. A cup is no evidence at all,
+pyrolytic clean, all of which do run that hot in Celsius. The number has to belong to
+the cooking: a word that names a thing (`bake sale`, `bake-off`, `baked goods`,
+`baked beans`, `baking tin`) is no cue, and a verb that takes an amount of its own
+(`came to`, `rose to`, `raised`, `cost`, `sold`) stops the search, so
+`The bake sale takings came to 320.` has no oven in it, while
+`Bake at 350 and sell them at the bake sale.` does. A cup is no evidence at all,
 since Australia and New Zealand cook in metric cups. A measured ingredient under a name
 only Americans use, such as `1 cup all-purpose flour` or `2 tablespoons cornstarch`,
 counts like any other vocabulary, unless the local name sits beside it, as it does in
@@ -411,7 +416,9 @@ counts like any other vocabulary, unless the local name sits beside it, as it do
 
 A temperature counts as `Fahrenheit` in exactly the forms the unit rules convert, so
 `165 degrees F` counts, `Cook until the chicken reaches 165F` counts, and `Apartment 3F`
-does not. The word `Fahrenheit` on its own counts too.
+does not. The word `Fahrenheit` on its own counts too where it names the scale, as in
+`Set the thermostat in Fahrenheit`, but not straight before a number, where it is part
+of a title such as `Fahrenheit 451` or `Fahrenheit 9/11`.
 
 Pounds count as `imperial units` only where the unit rules read them as a weight, so
 `2 pounds of ground beef` counts, and the money in `It cost 1,500 pounds` or

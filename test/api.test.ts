@@ -347,6 +347,67 @@ describe('the Fahrenheit marker', () => {
   });
 });
 
+describe('the imperial units marker', () => {
+  const IMPERIAL = 'imperial units';
+
+  const MEASURED = [
+    'Brown 2 pounds of ground beef.',
+    'It weighs 5 pounds.',
+    'The crate weighs 1,500 pounds.',
+    'It cost £5 and weighed 3 pounds.',
+    'It cost $20 for 5 pounds of beef.',
+    'It cost 400 pounds and weighed 3 pounds.',
+    'Walk 5 miles.',
+    'Add 3 gallons of water.',
+  ];
+
+  const MONEY = [
+    'The apartment cost 400 pounds a week.',
+    'He paid a fine of 200 pounds.',
+    'It came to 5 pounds 50.',
+    'She earns 30,000 pounds a year.',
+    'It cost 1,500 pounds.',
+    'It cost 2.50 pounds.',
+    'Tickets cost 500-600 pounds.',
+    'It cost between 500 and 600 pounds.',
+    'It cost two and a half pounds.',
+    'It cost five pounds.',
+    'I found a 5-pound note.',
+  ];
+
+  it.each(MEASURED)('counts "%s"', (input) => {
+    expect(analyse(input).markers).toContain(IMPERIAL);
+  });
+
+  it.each(MONEY)('does not count the money in "%s"', (input) => {
+    expect(analyse(input).markers).not.toContain(IMPERIAL);
+  });
+
+  it.each([...MEASURED, ...MONEY])('agrees with the unit rules on "%s"', (input) => {
+    const converted = deamericanise(input).changes.some((c) => c.category === 'units');
+    expect(analyse(input).markers.includes(IMPERIAL)).toBe(converted);
+  });
+
+  it('keeps a British date British beside pounds of money', () => {
+    const text = 'The apartment cost 400 pounds a week. We organized it through Mr. Jones and moved in on 03/04/2024.';
+    expect(analyse(text).confidence).toBeCloseTo(0.45);
+    expect(deamericaniseText(text)).toBe(
+      'The apartment cost 400 pounds a week. We organised it through Mr. Jones and moved in on 03/04/2024.',
+    );
+  });
+
+  it('still lets pounds of weight count towards the verdict', () => {
+    const text = 'The apartment needed 400 pounds of sand. We organized it through Mr. Jones and moved in on 03/04/2024.';
+    expect(deamericaniseText(text)).toBe(
+      'The apartment needed 180 kilograms of sand. We organised it through Mr. Jones and moved in on 2024-03-04.',
+    );
+  });
+
+  it('leaves a text with no other American marker below the bar', () => {
+    expect(analyse('Brown 2 pounds of ground beef.').confidence).toBeCloseTo(0.15);
+  });
+});
+
 describe('analyse on recipes', () => {
   const OVEN = 'Fahrenheit oven setting';
   const STICK = 'stick of butter';

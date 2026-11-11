@@ -53,13 +53,14 @@ const PRICED_THINGS =
 
 /**
  * Pence after the pounds: `5 pounds 50`, `five pounds fifty`, `3 pounds 99p`. Bare pence
- * have to end the phrase, or the number belongs to whatever follows: `5 pounds 2 inches`.
+ * have to end the phrase, or the number belongs to whatever follows: `5 pounds 2 inches`,
+ * `1 pound 85% lean beef`.
  */
 const PENCE =
   String.raw`(?:\d{1,2}(?![\d.,]?\d)|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)` +
   String.raw`(?:[\s-](?:one|two|three|four|five|six|seven|eight|nine))?|ten|eleven|twelve|` +
   String.raw`thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen)` +
-  String.raw`(?:p\b|\s+pence\b|(?=\s*(?:[^\sa-z]|$)|\s+(?:for|each|a|an|per|at|in|on|to|and|or|` +
+  String.raw`(?:p\b|\s+pence\b|(?=\s*(?:[.,;:!?)]|$)|\s+(?:for|each|a|an|per|at|in|on|to|and|or|` +
   String.raw`but|plus|please|then|now)\b))`;
 
 const MONEY_BEFORE = new RegExp(

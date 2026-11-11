@@ -595,6 +595,7 @@ describe('pounds of money are not weights', () => {
     ${'He weighs 180 pounds and earns 30,000 pounds a year.'}   | ${'He weighs 82 kilograms and earns 30,000 pounds a year.'}  | ${'the same'}
     ${'The cost of 10 pounds of potatoes rose.'}                | ${'The cost of 4.5 kilograms of potatoes rose.'}             | ${'of potatoes outranks cost'}
     ${'Aim to lose 2 pounds a week.'}                           | ${'Aim to lose 910 grams a week.'}                           | ${'a weight verb outranks a rate'}
+    ${'1 pound 85% lean ground beef'}                           | ${'450 grams 85% lean ground beef'}                          | ${'a number after the unit is not pence'}
     ${'won a 20-pound salmon'}                                  | ${'won a 9.1 kilogram salmon'}                               | ${'the article belongs to the salmon'}
     ${'It cost £20 for 5 pounds of beef.'}                      | ${'It cost £20 for 2.3 kilograms of beef.'}                  | ${'of beef outranks the £'}
     ${'It cost £3 and weighed 5 pounds.'}                       | ${'It cost £3 and weighed 2.3 kilograms.'}                   | ${'weighed outranks the £'}

@@ -197,6 +197,11 @@ export function formatNumber(
   return trim(roundToSignificant(value, Math.max(2, sourceFigures)), 4);
 }
 
+/** A Fahrenheit value that reads as an oven dial setting rather than a measurement. */
+export function isOvenSetting(fahrenheit: number): boolean {
+  return Number.isInteger(fahrenheit) && fahrenheit >= 200 && fahrenheit % 25 === 0;
+}
+
 /**
  * Oven temperatures are written in fives, so `350F` should land on 175C rather than
  * 176.7C. The habit only applies to the oven range; `100F` is a fever, not a setting.
@@ -209,7 +214,6 @@ export function formatTemperature(
 ): string {
   if (typeof precision === 'number') return celsius.toFixed(precision);
   if (precision === 'exact') return trim(celsius, maxDecimals);
-  const isOvenSetting = Number.isInteger(source) && source >= 200 && source % 25 === 0;
-  if (isOvenSetting) return String(Math.round(celsius / 5) * 5);
+  if (isOvenSetting(source)) return String(Math.round(celsius / 5) * 5);
   return String(Math.round(celsius * 10) / 10);
 }

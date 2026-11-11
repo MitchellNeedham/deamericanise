@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deamericaniseText } from '../src/index.js';
+import { deamericanise, deamericaniseText } from '../src/index.js';
+import { MEASURES } from '../src/rules/units/definitions.js';
 import { NUMERIC_PATTERN } from '../src/rules/units/number.js';
 
 const convert = (input: string, options = {}) =>
@@ -71,6 +72,106 @@ describe('temperature', () => {
   });
 });
 
+describe('temperature differences', () => {
+  it.each`
+    input                                             | expected                                          | why
+    ${'The temperature dropped 20°F overnight.'}      | ${'The temperature dropped 11°C overnight.'}      | ${'a verb of change before it'}
+    ${'It will be 10°F warmer than yesterday.'}       | ${'It will be 5.6°C warmer than yesterday.'}      | ${'a comparative after it'}
+    ${'Temperatures rose by 15 degrees F.'}           | ${'Temperatures rose by 8.3 degrees Celsius.'}    | ${'by, and spelled out stays spelled out'}
+    ${'Preheat to 350°F, then lower it by 25°F.'}     | ${'Preheat to 175°C, then lower it by 14°C.'}     | ${'a difference is not an oven setting'}
+    ${'10°F below freezing'}                          | ${'5.6°C below freezing'}                         | ${'measured from freezing'}
+    ${'Highs will run 5°F above normal.'}             | ${'Highs will run 2.8°C above normal.'}           | ${'measured from normal'}
+    ${'a 30°F swing in a day'}                        | ${'a 17°C swing in a day'}                        | ${'a noun of change after it'}
+    ${'a 10°F temperature drop'}                      | ${'a 5.6°C temperature drop'}                     | ${'the same, with temperature between'}
+    ${'a drop of 20°F'}                               | ${'a drop of 11°C'}                               | ${'a noun of change before it'}
+    ${'It is up 5°F on yesterday.'}                   | ${'It is up 2.8°C on yesterday.'}                 | ${'up'}
+    ${'Temperatures dropped nearly 20°F.'}            | ${'Temperatures dropped nearly 11°C.'}            | ${'a hedge between the verb and the number'}
+    ${'It rose 1.8 degrees F.'}                       | ${'It rose 1 degree Celsius.'}                    | ${'one degree is singular'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                             | expected                                          | why
+    ${'It was 10°F below zero.'}                      | ${'It was -23.3°C.'}                              | ${'below zero is a negative temperature'}
+    ${'It was 10 degrees F below zero.'}              | ${'It was -23.3 degrees Celsius.'}                | ${'the same, spelled out'}
+    ${'It was 10°F above zero.'}                      | ${'It was -12.2°C.'}                              | ${'above zero is the temperature itself'}
+    ${'It fell to 20°F.'}                             | ${'It fell to -6.7°C.'}                           | ${'to names the new temperature'}
+    ${'It rose from 50°F to 70°F.'}                   | ${'It rose from 10°C to 21.1°C.'}                 | ${'so does from'}
+    ${'It climbed to 100°F.'}                         | ${'It climbed to 37.8°C.'}                        | ${'the same'}
+    ${'Temperatures up to 100°F.'}                    | ${'Temperatures up to 37.8°C.'}                   | ${'up to is a ceiling'}
+    ${'Store below 40°F.'}                            | ${'Store below 4.4°C.'}                           | ${'below before the number is a threshold'}
+    ${'Keep it above 90°F.'}                          | ${'Keep it above 32.2°C.'}                        | ${'so is above'}
+    ${'It dropped 20°F to 40°F.'}                     | ${'It dropped 11°C to 4.4°C.'}                    | ${'one of each'}
+    ${'a warm 80°F day'}                              | ${'a warm 26.7°C day'}                            | ${'warm describes the day'}
+    ${'Temperatures rose 20°F (11°C) in an hour.'}    | ${'Temperatures rose 11°C in an hour.'}           | ${'the author figure stays'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('gives the same answer whatever the verdict', () => {
+    const input = 'The temperature dropped 20°F overnight.';
+    expect(convert(input, { assumeAmerican: true })).toBe(convert(input, { assumeAmerican: false }));
+  });
+
+  it('tags a difference with its own rule', () => {
+    const { changes } = deamericanise('Preheat to 350°F, then lower it by 25°F.');
+    expect(changes.map((c) => [c.after, c.ruleId])).toEqual([
+      ['175°C', 'units.temperature.fahrenheit'],
+      ['14°C', 'units.temperature.difference'],
+    ]);
+  });
+
+  it.each`
+    rule                              | expected
+    ${'units.temperature.difference'} | ${'Preheat to 175°C, then lower it by 25°F.'}
+    ${'units.temperature.fahrenheit'} | ${'Preheat to 350°F, then lower it by 14°C.'}
+  `('switches $rule off without touching the other', ({ rule, expected }) => {
+    expect(convert('Preheat to 350°F, then lower it by 25°F.', { rules: { [rule]: false } })).toBe(
+      expected,
+    );
+  });
+
+  it.each`
+    options                            | expected
+    ${{ precision: 'exact' }}          | ${'dropped 11.111111°C'}
+    ${{ precision: 1 }}                | ${'dropped 11.1°C'}
+    ${{ keepOriginal: true }}          | ${'dropped 11°C (20°F)'}
+  `('honours $options', ({ options, expected }) => {
+    expect(convert('dropped 20°F', { units: options })).toBe(expected);
+  });
+});
+
+describe('Fahrenheit ranges', () => {
+  it.each`
+    input                                             | expected                                          | why
+    ${'Bake at 350-375°F.'}                           | ${'Bake at 175-190°C.'}                           | ${'an oven range lands on fives'}
+    ${'Bake at 350 to 375°F.'}                        | ${'Bake at 175 to 190°C.'}                        | ${'to'}
+    ${'Bake at 350–375°F.'}                           | ${'Bake at 175–190°C.'}                           | ${'the author dash is kept'}
+    ${'between 60 and 70°F'}                          | ${'between 16 and 21°C'}                          | ${'and, after between'}
+    ${'between 60 and 70 degrees Fahrenheit'}         | ${'between 16 and 21 degrees Celsius'}            | ${'spelled out stays spelled out'}
+    ${'Normal is 98-99°F.'}                           | ${'Normal is 36.7-37.2°C.'}                       | ${'the ends never collapse into one'}
+    ${'from -10 to 5°F'}                              | ${'from -23 to -15°C'}                            | ${'a negative end'}
+    ${'Bake at 350°F to 375°F.'}                      | ${'Bake at 175°C to 190°C.'}                      | ${'both ends marked'}
+    ${'a 10-15°F drop'}                               | ${'a 5.6-8.3°C drop'}                             | ${'a range that is also a difference'}
+    ${'Temperatures fell 10 to 15°F.'}                | ${'Temperatures fell 5.6 to 8.3°C.'}              | ${'the same, from the verb'}
+    ${'10 to 20°F below zero'}                        | ${'-23 to -29°C'}                                 | ${'both ends below zero'}
+    ${'Gas mark 4 and 350°F are the same heat.'}      | ${'Gas mark 4 and 175°C are the same heat.'}      | ${'and without between is not a range'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('keeps the original range', () => {
+    expect(convert('Bake at 350-375°F.', { units: { keepOriginal: true } })).toBe(
+      'Bake at 175-190°C (350-375°F).',
+    );
+  });
+
+  it('takes the author figure for a range', () => {
+    expect(convert('Bake at 350-375°F (175-190°C).')).toBe('Bake at 175-190°C.');
+  });
+});
+
 describe('speed, power and economy', () => {
   it.each`
     input                | expected
@@ -124,6 +225,38 @@ describe('keeping the original', () => {
   `('$input -> $expected', ({ input, expected }) => {
     expect(convert(input, { units: { keepOriginal: true } })).toBe(expected);
   });
+
+  it.each`
+    input
+    ${'It is 6 feet tall.'}
+    ${'He is 6 feet 2 inches tall, or 6\'2" in socks.'}
+    ${'Bake at 350°F, or 350 degrees Fahrenheit.'}
+    ${'a drop of 30-60 feet, or 30 to 60 feet'}
+    ${'between 5 and 10 miles'}
+    ${'a sheet of 8.5 x 11 inches, 8.5" x 11", or 10 ft x 12 ft x 8 ft'}
+    ${'a 6-foot fence and a 9 inch dish'}
+    ${'It weighs 180 pounds, 3 ounces and 12 stone.'}
+    ${'It holds 1/2 gallon, 2 quarts, 3 pints, 4 fluid ounces and 5 cubic feet.'}
+    ${'It covers 20 square feet, 2 square miles and 10 acres.'}
+    ${'It goes 60 miles per hour, or 60 mph.'}
+    ${'It runs at 32 psi with 300 horsepower, 100 foot-pounds and 1000 BTU.'}
+    ${'It does 30 mpg.'}
+  `('running it again on "$input" changes nothing', ({ input }) => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert(input, options);
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each(MEASURES.map((measure) => [measure.id, measure.words[0]!]))(
+    'running it again on %s changes nothing',
+    (id, unit) => {
+      const options = { units: { keepOriginal: true }, rules: { [id]: true } };
+      const input = `It is 7 ${unit} here.`;
+      const once = convert(input, options);
+      expect(once).not.toBe(input);
+      expect(convert(once, options)).toBe(once);
+    },
+  );
 });
 
 describe('measurements that are imperial worldwide', () => {
@@ -249,6 +382,11 @@ describe('a text that already gives the metric value', () => {
     ${'6 feet (1.8 m) tall'}                         | ${'1.8 m tall'}         | ${'mid-sentence'}
     ${'90 feet (30m)'}                               | ${'30m'}                | ${'the author spacing is kept'}
     ${'10 miles (16 km) away'}                       | ${'16 km away'}         | ${'any unit'}
+    ${'6 feet (1.8 metres)'}                         | ${'1.8 metres'}         | ${'written out'}
+    ${'2000 square feet (190 square metres)'}        | ${'190 square metres'}  | ${'any form a conversion writes'}
+    ${'60 mph (97 kilometres per hour)'}             | ${'97 kilometres per hour'} | ${'the same'}
+    ${'30 mpg (7.8 L/100km)'}                        | ${'7.8 L/100km'}        | ${'fuel economy too'}
+    ${'10 by 12 feet (3 by 3.7 m)'}                  | ${'3 by 3.7 m'}         | ${'dimensions too'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -257,6 +395,46 @@ describe('a text that already gives the metric value', () => {
     input                            | expected                            | why
     ${'6 feet (about two paces)'}    | ${'1.8 metres (about two paces)'}   | ${'not a measurement, so it converts as normal'}
     ${'6 feet (see the diagram)'}    | ${'1.8 metres (see the diagram)'}   | ${'the same'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('an imperial original in brackets after its metric value', () => {
+  it.each`
+    unchanged                                                  | why
+    ${'It is 1.8 metres (6 feet) tall.'}                       | ${'what keepOriginal writes'}
+    ${'It is 1.8 meters (6 ft) tall.'}                         | ${'any spelling or symbol'}
+    ${'It is 1.88 metres (6 feet 2 inches) tall.'}             | ${'feet and inches'}
+    ${`It is 1.88 m (6'2") tall.`}                             | ${'feet and inches in symbols'}
+    ${'It is 1.8 m (5 ft 11 in) tall.'}                        | ${'abbreviated'}
+    ${'a 1.8 metre (6-foot) fence'}                            | ${'attributive'}
+    ${'a 2 metre (about 6 feet) fence'}                        | ${'a rounded restatement'}
+    ${'a 2-metre (roughly 6-foot) fence'}                      | ${'the same'}
+    ${'a drop of 9.1-18 metres (30-60 feet)'}                  | ${'ranges'}
+    ${'between 8 and 16 kilometres (5 and 10 miles)'}          | ${'a range joined by and'}
+    ${'a sheet of 22 x 28 centimetres (8.5 x 11 inches)'}      | ${'dimensions'}
+    ${'a sheet of 22 x 28 cm (8.5" x 11")'}                    | ${'dimensions with a unit on each side'}
+    ${'Bake at 175°C (350°F).'}                                | ${'temperatures'}
+    ${'Bake at 175 degrees Celsius (350 degrees Fahrenheit).'} | ${'temperatures written out'}
+    ${'It covers 190 square metres (2000 square feet).'}       | ${'area'}
+    ${'It goes 97 kilometres per hour (60 miles per hour).'}   | ${'speed'}
+    ${'It does 7.8 L/100km (30 mpg).'}                         | ${'fuel economy'}
+    ${'It does 5.9 L/100km (40 miles per gallon).'}            | ${'fuel economy written out, not a length'}
+    ${'It turns at 140 N·m (100 lb-ft).'}                      | ${'torque, not a weight joined to a length'}
+    ${'It is 1.8 metres\n(6 feet) tall.'}                      | ${'a wrapped line'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                     | expected                                                   | why
+    ${'It weighs 2 metres (6 pounds).'}                       | ${'It weighs 2 metres (2.7 kilograms).'}                   | ${'a different dimension restates nothing'}
+    ${'The rope is 2 metres long (the old one was 10 feet).'} | ${'The rope is 2 metres long (the old one was 3 metres).'} | ${'the bracket does not follow the metric value'}
+    ${'It is 2 metres (the old one was 10 feet).'}            | ${'It is 2 metres (the old one was 3 metres).'}            | ${'the bracket holds more than a measurement'}
+    ${'It is 2 metres (10 feet for the old one).'}            | ${'It is 2 metres (3 metres for the old one).'}            | ${'the same'}
+    ${'Room 2 (6 feet) is free.'}                             | ${'Room 2 (1.8 metres) is free.'}                          | ${'a number without a metric unit'}
+    ${'a 3 m (50 lb 3 oz) beam'}                              | ${'a 3 m (23 kg 85 g) beam'}                               | ${'every piece of a weight converts after a length'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -362,6 +540,11 @@ describe('Fahrenheit decades', () => {
     ${'highs in the low-70s'}                      | ${'highs between 21 and 23°C'}
     ${'warm, in the 70’s'}                         | ${'warm, between 21 and 26°C'}
     ${'heat in the 110s'}                          | ${'heat between 43 and 48°C'}
+    ${'Highs in the upper 80s°F'}                  | ${'Highs between 31 and 32°C'}
+    ${'Highs in the 80s °F'}                       | ${'Highs between 27 and 32°C'}
+    ${'highs in the upper 80s Fahrenheit'}         | ${'highs between 31 and 32°C'}
+    ${'the 70s and 80s ℉'}                         | ${'21 to 32°C'}
+    ${'Days in the 70s °F.'}                       | ${'Days between 21 and 26°C.'}
   `('$input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -380,6 +563,7 @@ describe('Fahrenheit decades', () => {
     ${'She was in her 70s and the weather was mild.'} | ${'her, not the'}
     ${'Interest rates in the 80s hit records.'}      | ${'no temperature context'}
     ${'a 1.70s delay in the forecast'}               | ${'part of a decimal'}
+    ${'Ford trucks from the 70s F series'}           | ${'a bare F is a letter, not a marker'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });

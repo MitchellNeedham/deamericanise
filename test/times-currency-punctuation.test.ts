@@ -31,6 +31,49 @@ describe('times', () => {
     expect(times('Starts at 3:00 PM. Ends later.')).toBe('Starts at 3:00pm. Ends later.');
   });
 
+  // The last stop of `P.M.` is also the sentence's when nothing else ends it.
+  it.each`
+    input                                                     | expected
+    ${'It starts at 3 P.M. Bring snacks.'}                    | ${'It starts at 3pm. Bring snacks.'}
+    ${'The program starts at 3:00 P.M.'}                      | ${'The program starts at 3:00pm.'}
+    ${'The program starts at 3:00 P.M.\n'}                    | ${'The program starts at 3:00pm.\n'}
+    ${'It starts at 3 p.m.\nBring snacks.'}                   | ${'It starts at 3pm.\nBring snacks.'}
+    ${'It was 3 p.m. I left.'}                                | ${'It was 3pm. I left.'}
+    ${'It starts at 3 p.m. "Bring snacks," she said.'}        | ${'It starts at 3pm. "Bring snacks," she said.'}
+    ${'It starts at 3 p.m. (Bring snacks.)'}                  | ${'It starts at 3pm. (Bring snacks.)'}
+    ${'"It starts at 3 p.m." Bring snacks.'}                  | ${'"It starts at 3pm." Bring snacks.'}
+    ${'(It starts at 3 p.m.) Bring snacks.'}                  | ${'(It starts at 3pm.) Bring snacks.'}
+    ${'We meet tomorrow (at 3 p.m.)'}                         | ${'We meet tomorrow (at 3pm.)'}
+    ${'The doors open at\n7 p.m.'}                            | ${'The doors open at\n7pm.'}
+    ${'Doors open at 7 p.m.\n\nthe bar shuts later.'}         | ${'Doors open at 7pm.\n\nthe bar shuts later.'}
+    ${'- Doors open at 7 p.m.\n- The bar shuts at 11 p.m.'}   | ${'- Doors open at 7pm.\n- The bar shuts at 11pm.'}
+    ${'1. Doors open at 7 p.m.\n2. The bar shuts at 11 p.m.'} | ${'1. Doors open at 7pm.\n2. The bar shuts at 11pm.'}
+  `('keeps the sentence stop: $input', ({ input, expected }) => {
+    expect(times(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                       | expected
+    ${'It ends at 5 a.m. tomorrow.'}            | ${'It ends at 5am tomorrow.'}
+    ${'It starts at 3 p.m., then breaks.'}      | ${'It starts at 3pm, then breaks.'}
+    ${'It starts at 3 p.m.; bring snacks.'}     | ${'It starts at 3pm; bring snacks.'}
+    ${'Does it start at 3 p.m.?'}               | ${'Does it start at 3pm?'}
+    ${'We meet (at 3 p.m.) and eat.'}           | ${'We meet (at 3pm) and eat.'}
+    ${'We meet tomorrow (at 3 p.m.).'}          | ${'We meet tomorrow (at 3pm).'}
+    ${'It starts at 3 p.m. (local time).'}      | ${'It starts at 3pm (local time).'}
+    ${'It starts at 3 p.m.\nand ends at 5.'}    | ${'It starts at 3pm\nand ends at 5.'}
+    ${'The show airs at 8 p.m. Eastern.'}       | ${'The show airs at 8pm Eastern.'}
+    ${'The show airs at 8 p.m. ET on Fox.'}     | ${'The show airs at 8pm ET on Fox.'}
+    ${'The show airs at 8 p.m. (ET).'}          | ${'The show airs at 8pm (ET).'}
+    ${'The vote is at 3 p.m. Tuesday.'}         | ${'The vote is at 3pm Tuesday.'}
+    ${'The vote is at 3 p.m. Tues. in Ohio.'}   | ${'The vote is at 3pm Tues. in Ohio.'}
+    ${'The vote is at 3 p.m. March 5.'}         | ${'The vote is at 3pm March 5.'}
+    ${'DOORS OPEN AT 7 P.M. SHARP'}             | ${'DOORS OPEN AT 7pm SHARP'}
+    ${'- 9 a.m.\n- 5 p.m.'}                     | ${'- 9am\n- 5pm'}
+  `('needs no sentence stop: $input', ({ input, expected }) => {
+    expect(times(input)).toBe(expected);
+  });
+
   it.each`
     input           | expected
     ${'3:00 PM'}    | ${'15:00'}
@@ -43,6 +86,12 @@ describe('times', () => {
     ${'1:05:30 PM'} | ${'13:05:30'}
   `('with to24Hour on, $input -> $expected', ({ input, expected }) => {
     expect(times(input, { times: { to24Hour: true } })).toBe(expected);
+  });
+
+  it('keeps the sentence stop on the 24-hour clock too', () => {
+    const to24Hour = { times: { to24Hour: true } };
+    expect(times('It starts at 3 P.M. Bring snacks.', to24Hour)).toBe('It starts at 15:00. Bring snacks.');
+    expect(times('It ends at 5 a.m. tomorrow.', to24Hour)).toBe('It ends at 05:00 tomorrow.');
   });
 
   it.each`

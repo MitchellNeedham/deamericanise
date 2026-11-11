@@ -233,6 +233,16 @@ Measurements that are imperial worldwide are left alone: screens, wheels, pipes,
 `the 40 yard line` or `the 147-pound division`. `units: { respectConventions: false }`
 converts all of them.
 
+Pounds of money are left alone, because British prose spells amounts out. A money word
+such as `cost`, `paid`, `earns`, `worth` or `a fine of` claims the amount straight after
+it, across at most a pronoun or a hedge: `It cost him nearly 500 pounds`. So do
+`sterling`, a rate (`30,000 pounds a year`), pence (`5 pounds 50`) and a thing priced in
+pounds (`a 10-pound note`). A money word reaches only its own amount, so
+`It cost $20 for 5 pounds of beef` still converts. A `£` reaches the whole sentence, but a
+weight word in the measurement's own phrase (`lost`, `weighs`, `of beef`, `a 5-pound bag`)
+outranks it. `lb` and `lbs` are never money, and `respectConventions: false` does not
+convert money.
+
 **Dates.** `3/14/2024` becomes `2024-03-14` without needing to be told anything, because
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
 surrounding text is American enough to trust; see below. Output is ISO by default, with `dmy` and `long` available.
@@ -648,6 +658,8 @@ there each root needs the rules in its own styles.
 - A line that ends in a number and a line that opens with a unit word are read as one
   measurement, so `Track 7` above `Miles Davis` becomes `Track 11 kilometres Davis`. A
   blank line or a list marker between them keeps them apart.
+- Pounds with nothing beside them to say money or weight, as in `It's 5 pounds.`, are read
+  as a weight.
 - Currency amounts are never converted. Rates move; the output would be wrong by the time
   anyone read it.
 - Grade-to-year mapping assumes the Australian and British numbering, which does not line

@@ -9,13 +9,17 @@ import {
   categoriesOn,
   DATE_FORMATS,
   domOptions,
+  failureMessage,
   FUEL_ECONOMY,
   loadSettings,
+  migrateSites,
   PRECISIONS,
   ruleOnByDefault,
   saveSettings,
+  saveSite,
   withRule,
   type Settings,
+  type SettingsChanges,
 } from './settings.js';
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -41,12 +45,24 @@ const fromMode = (preset: Preset) => resolveOptions({ preset }).categories;
 let latest: Settings;
 let savedTimer: ReturnType<typeof setTimeout> | undefined;
 
-async function save(changes: Partial<Settings>): Promise<void> {
-  await saveSettings(changes);
-  saved.textContent = 'Saved.';
+/**
+ * Runs a write and says in the live region whether it was stored. When storage refuses it,
+ * the page is drawn again from storage, so no control keeps a value that was not stored.
+ */
+async function store(write: () => Promise<void>): Promise<void> {
   clearTimeout(savedTimer);
+  try {
+    await write();
+  } catch (error) {
+    saved.textContent = failureMessage(error);
+    render(await loadSettings());
+    return;
+  }
+  saved.textContent = 'Saved.';
   savedTimer = setTimeout(() => (saved.textContent = ''), 1500);
 }
+
+const save = (changes: SettingsChanges): Promise<void> => store(() => saveSettings(changes));
 
 function text(tag: string, content: string, className?: string): HTMLElement {
   const node = document.createElement(tag);
@@ -169,7 +185,7 @@ async function setOption(field: Field, value: Value): Promise<void> {
   if (value === fallback) delete options[field.key];
   else options[field.key] = value;
 
-  const changes: Partial<Settings> = { [field.group]: options };
+  const changes: SettingsChanges = { [field.group]: options };
   if (field.rule) {
     changes.rules = { ...current.rules };
     delete changes.rules[field.rule];
@@ -260,7 +276,7 @@ function openTune(category: Category): void {
 
 async function resetCategory(category: Category): Promise<void> {
   const current = await loadSettings();
-  const changes: Partial<Settings> = {};
+  const changes: SettingsChanges = {};
   for (const field of FIELDS[category] ?? []) changes[field.group] = {};
   changes.rules = Object.fromEntries(
     Object.entries(current.rules).filter(
@@ -307,15 +323,17 @@ function render(settings: Settings): void {
   );
   element('no-rules').hidden = off.length > 0;
 
+  const hosts = Object.keys(settings.sites)
+    .filter((host) => settings.sites[host]!.enabled === false)
+    .sort();
   sites.replaceChildren(
-    ...settings.disabledSites.map((site) =>
-      switchedOff([document.createTextNode(site)], async () => {
-        const current = await loadSettings();
-        await save({ disabledSites: current.disabledSites.filter((s) => s !== site) });
-      }),
+    ...hosts.map((host) =>
+      switchedOff([document.createTextNode(host)], () =>
+        store(() => saveSite(host, { enabled: undefined })),
+      ),
     ),
   );
-  element('no-sites').hidden = settings.disabledSites.length > 0;
+  element('no-sites').hidden = hosts.length > 0;
 
   updateTune(settings);
 }
@@ -343,6 +361,8 @@ async function main(): Promise<void> {
     input.parentElement!.append(button);
   }
 
+  // A failed move loses nothing, because the old list is still read.
+  await migrateSites().catch(() => undefined);
   render(await loadSettings());
 
   dialect.addEventListener('change', () => void save({ dialect: dialect.value as Dialect }));

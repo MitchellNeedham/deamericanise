@@ -635,6 +635,11 @@ Limits:
   happen before the settings arrive. The page is rewritten as soon as they do.
 - A site is switched off by its hostname, frame by frame. A frame from another site embedded
   in a page you switched off is still rewritten.
+- At most 480 sites can be switched off. Browsers sync at most 512 items for an extension,
+  and each site switched off takes one, so the rest are kept for the other settings. At the
+  limit the toolbar button says so, and switching a site back on in the settings page makes
+  room. Any change the browser refuses to store is reported in the same way, and the switch
+  goes back to what is stored.
 - Text inside shadow DOM is left as it is.
 
 ## Releasing

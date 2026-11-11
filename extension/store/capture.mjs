@@ -23,7 +23,7 @@ const SETTINGS = {
   highlight: true,
   // Pages from 127.0.0.1 show the American original, and the same pages from HOST show the
   // rewrite.
-  disabledSites: ['127.0.0.1'],
+  'site:127.0.0.1': { enabled: false },
 };
 
 // ------- Serving the pages -------
@@ -215,7 +215,7 @@ try {
   await save(page, 'screenshot-3-popup.png');
 
   // Empty, or the site switched off for the comparison would show in the list.
-  await evaluate(options, `chrome.storage.sync.set({ disabledSites: [] })`);
+  await evaluate(options, `chrome.storage.sync.remove('site:127.0.0.1')`);
   const settings = await open(extensionPage('options.html'), 1280, 800);
   // Two sections share each row, so each split falls on an even section.
   const parts = [

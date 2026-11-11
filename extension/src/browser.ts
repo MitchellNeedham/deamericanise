@@ -7,6 +7,7 @@ export interface ExtensionApi {
     sync: {
       get(keys: string[] | null): Promise<Record<string, unknown>>;
       set(items: Record<string, unknown>): Promise<void>;
+      remove(keys: string | string[]): Promise<void>;
     };
     onChanged: {
       addListener(listener: (changes: Record<string, unknown>, area: string) => void): void;

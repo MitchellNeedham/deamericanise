@@ -92,6 +92,37 @@ function isOtherSense(ctx: RuleContext, alias: Alias, start: number, end: number
   return alias.isWord && alias.measure.otherSense?.(ctx.text, start, end) === true;
 }
 
+const OTHER_SENSES = new Map(
+  MEASURES.flatMap(({ words, otherSense }) =>
+    otherSense ? words.map((word) => [word.toLowerCase(), otherSense] as const) : [],
+  ),
+);
+
+/**
+ * The number that ends where a unit word starts, begun where the rules begin it: a range at
+ * its first number, and `1,500` or `two and a half` whole.
+ */
+const NUMBER_BEFORE_UNIT = new RegExp(
+  String.raw`(?<![\w.])(?:(?:${NUMERIC_PATTERN})${RANGE_JOIN})?(?:${NUMBER_PATTERN})${GAP}$`,
+  'i',
+);
+
+/** Far enough back to hold the longest range of numbers anyone writes before a unit. */
+const NUMBER_REACH = 64;
+
+/**
+ * Whether the measurement rules read the written-out unit `text.slice(unitStart, unitEnd)`
+ * in another sense over the quantity it ends, as they read `It cost 1,500 pounds` as money.
+ * Detection asks this, so it never counts as an imperial unit what the rules leave alone.
+ */
+export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: number): boolean {
+  const otherSense = OTHER_SENSES.get(text.slice(unitStart, unitEnd).toLowerCase());
+  if (!otherSense) return false;
+  const from = Math.max(0, unitStart - NUMBER_REACH);
+  const number = NUMBER_BEFORE_UNIT.exec(text.slice(from, unitStart));
+  return number !== null && otherSense(text, from + number.index, unitEnd);
+}
+
 /**
  * A singular unit is modifying the noun after it only when a determiner opens the phrase:
  * `a 9 inch dish` describes the dish, so it takes the singular. `one quart small onions`

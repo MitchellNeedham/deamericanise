@@ -96,13 +96,125 @@ const TRUCK: Guard[] = [
   { forbidBefore: /\b(?:pick-?up|dump|fork-?lift|food|monster|tow|ice[\s-]cream)[\s-]+$/i },
 ];
 
-const PANTS_IDIOM =
-  /(?:\bsmart(?:y|ie)[\s-]+|\bfancy-|\bseat[\s-]+of[\s-]+(?:the|your|my|his|her|its|our|their|one['’]s)[\s-]+)$/i;
+const PANTS_OWNER = String.raw`(?:the|your|my|his|her|its|our|their|one['’]s)`;
 
-/** `scared the pants off me` needs both sides, so each guard checks one and either may pass. */
+/** Idioms British English says with `pants`, and garments it calls pants too. */
+const PANTS_IDIOM = new RegExp(
+  String.raw`(?:\bsmart(?:y|ie)[\s-]+|\bfancy-|\b(?:seat[\s-]+of|ants[\s-]+in)[\s-]+${PANTS_OWNER}[\s-]+` +
+    String.raw`|\b(?:yoga|hot|training|nappy|diaper|period|incontinence|big[\s-]+(?:boy|girl))[\s-]+)$`,
+  'i',
+);
+
+const PANTS_ON_FIRE = String.raw`^\s+on\s+fire\b`;
+
+const PANTS_DETERMINER = anyOf([
+  'the', 'a', 'an', 'this', 'that', 'my', 'your', 'his', 'her', 'its', 'our', 'their', 'each',
+  'every', 'another', 'any', 'no',
+]);
+
+const PANTS_PRONOUN = anyOf([
+  'he', 'she', 'it', 'who', 'someone', 'somebody', 'anyone', 'anybody', 'everyone', 'everybody',
+  'nobody', String.raw`no[\s-]one`,
+]);
+
+/** Adverbs that sit between a subject and its verb: `the dog often pants`. */
+const PANTS_MID_ADVERB = String.raw`(?:\s+(?:[a-z]+ly|${anyOf([
+  'still', 'just', 'often', 'always', 'never', 'also', 'even', 'then', 'now', 'sometimes',
+  'already', 'soon',
+])}))?`;
+
+/** Nouns that pant, so a determiner in front of one makes it the subject. */
+const PANTS_PANTER = anyOf([
+  'dog', 'puppy', 'pup', 'hound', 'mutt', 'pooch', 'cat', 'kitten', 'horse', 'pony', 'mare',
+  'stallion', 'colt', 'foal', 'deer', 'hart', 'stag', 'doe', 'fox', 'wolf', 'lion', 'tiger',
+  'bear', 'cow', 'bull', 'ox', 'pig', 'sheep', 'goat', 'animal', 'pet', 'beast', 'creature',
+  'bird', 'man', 'woman', 'child', 'runner', 'athlete', 'cyclist', 'hiker', 'climber', 'swimmer',
+  'patient', 'soul', 'lab', 'labrador', 'retriever', 'terrier', 'spaniel', 'collie', 'shepherd',
+  'poodle', 'beagle', 'bulldog', 'greyhound', 'pug',
+]);
+
+/** After `a`, `every` or `this`, these count or time something rather than name a subject. */
+const PANTS_NOT_SUBJECT = anyOf([
+  'few', 'couple', 'dozen', 'lot', 'bunch', 'bit', 'pair', 'set', 'number', 'range', 'day',
+  'night', 'morning', 'evening', 'week', 'weekend', 'month', 'year', 'season', 'summer', 'winter',
+  'spring', 'fall', 'autumn', 'time',
+]);
+
+/**
+ * A singular subject that reads `pants` as its verb whatever follows: a subject pronoun, a
+ * singular determiner and its noun (`a pants` is not English, so `a dog pants` is the verb),
+ * or a determiner and a noun that pants.
+ */
+const PANTS_SUBJECT = [
+  String.raw`\b(?:${PANTS_PRONOUN})`,
+  String.raw`\b(?:a|an|each|every|another|this)\s+(?!(?:${PANTS_NOT_SUBJECT})\b)[a-z]+(?<![^s]s)`,
+  String.raw`\b(?:${PANTS_DETERMINER}|[a-z]+['’]s)\s+(?:[a-z-]+\s+)?(?:${PANTS_PANTER})` +
+    String.raw`(?:\s+(?:that|who|which))?`,
+]
+  .map((subject) => String.raw`${subject}${PANTS_MID_ADVERB}\s+$`)
+  .join('|');
+
+const PANTS_CLAUSE_OPENER = anyOf([
+  'and', 'but', 'or', 'so', 'then', 'as', 'when', 'whenever', 'while', 'if', 'because', 'since',
+  'until', 'though', 'although', 'once', 'where', 'that',
+]);
+
+/**
+ * A determiner and a word or two opening a clause, as `The dog` opens `The dog pants`. Just as
+ * often a garment (`The black pants in the photo`), so only a manner adverb after makes it the
+ * verb.
+ */
+const PANTS_CLAUSE_SUBJECT =
+  String.raw`(?:^|[.!?;:,(]\s*|["“‘]|\b(?:${PANTS_CLAUSE_OPENER})\s+)` +
+  String.raw`(?:${PANTS_DETERMINER})\s+[a-z-]+(?:\s+[a-z-]+)?\s+$`;
+
+/** `-ly` words that sit before a verb or are not adverbs, so they follow a garment as readily. */
+const PANTS_NOT_MANNER = anyOf([
+  'only', 'really', 'usually', 'actually', 'generally', 'typically', 'normally', 'probably',
+  'certainly', 'definitely', 'clearly', 'apparently', 'obviously', 'nearly', 'mostly', 'easily',
+  'simply', 'finally', 'likely', 'barely', 'hardly', 'merely', 'truly', 'surely', 'especially',
+  'mainly', 'entirely', 'completely', 'totally', 'fully', 'largely', 'partly', 'slightly', 'badly',
+  'recently', 'currently', 'apply', 'supply', 'reply', 'rely', 'fly', 'family', 'ugly', 'jelly',
+  'belly', 'silly', 'holy',
+]);
+
+/** How a verb is followed and a garment is not. */
+const PANTS_MANNER =
+  String.raw`^\s+(?:(?!(?:${PANTS_NOT_MANNER})\b)[a-z]+ly|hard(?:er)?|fast(?:er)?|loud(?:er)?` +
+  String.raw`|a\s+lot(?!\s+of)|(?:so|too|very)\s+much|for\s+(?:breath|air))\b`;
+
+/**
+ * What follows a verb: an adverb, a preposition, a conjunction or the end of the clause.
+ * `off` stays out, or `his pants off` would fail every guard.
+ */
+const PANTS_VERB_FOLLOWER = String.raw`${PANTS_MANNER}|^\s*(?:[.!?,;:)\]]|$)|^\s+(?:[a-z]+ly|${anyOf([
+  'for', 'after', 'with', 'in', 'from', 'like', 'at', 'on', 'under', 'through', 'during', 'near',
+  'by', 'into', 'to', 'before', 'beside', 'behind', 'against', 'without', 'around', 'along',
+  'across', 'towards?', 'up', 'down', 'out', 'over', 'past', 'and', 'or', 'but', 'then', 'so',
+  'while', 'when', 'whenever', 'until', 'as', 'because', 'if', 'all', 'every', 'each', 'again',
+  'away', 'more', 'less', 'too', 'still', 'nonstop',
+])})\b`;
+
+const PANTS_THE = String.raw`\bthe\s+$`;
+
+/**
+ * Three readings need both sides of `pants` to refuse it: `the pants off`, a subject before
+ * with a verb's follower after, and a clause-opening subject with a manner adverb after. A row
+ * passes when any guard does, so each guard forbids one side of every reading.
+ */
 const PANTS: Guard[] = [
-  { forbidBefore: new RegExp(`${PANTS_IDIOM.source}|\\bthe\\s+$`, 'i') },
-  { forbidBefore: PANTS_IDIOM, forbidAfter: /^\s+off\b/i },
+  {
+    forbidBefore: new RegExp(`${PANTS_IDIOM.source}|${PANTS_SUBJECT}|${PANTS_CLAUSE_SUBJECT}`, 'i'),
+    forbidAfter: new RegExp(String.raw`${PANTS_ON_FIRE}|^\s+off\b`, 'i'),
+  },
+  {
+    forbidBefore: new RegExp(`${PANTS_IDIOM.source}|${PANTS_THE}`, 'i'),
+    forbidAfter: new RegExp(`${PANTS_ON_FIRE}|${PANTS_VERB_FOLLOWER}`, 'i'),
+  },
+  {
+    forbidBefore: new RegExp(`${PANTS_IDIOM.source}|${PANTS_THE}|${PANTS_SUBJECT}`, 'i'),
+    forbidAfter: new RegExp(`${PANTS_ON_FIRE}|${PANTS_MANNER}`, 'i'),
+  },
 ];
 
 /** Capitalised words that start a sentence in front of a highway rather than name it. */

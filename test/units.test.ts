@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deamericanise, deamericaniseText } from '../src/index.js';
+import type { Change } from '../src/index.js';
+import { resolveChanges } from '../src/engine/apply.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
 import { NUMERIC_PATTERN } from '../src/rules/units/number.js';
 
@@ -172,6 +174,67 @@ describe('Fahrenheit ranges', () => {
   });
 });
 
+describe('Fahrenheit written as a bare F', () => {
+  it.each`
+    input                                       | expected                                    | why
+    ${'Cook until the chicken reaches 165F.'}   | ${'Cook until the chicken reaches 73.9°C.'} | ${'glued to the number'}
+    ${'Bake at 350 F for 20 minutes.'}          | ${'Bake at 175°C for 20 minutes.'}          | ${'after a space'}
+    ${'Roast at 425F until golden.'}            | ${'Roast at 220°C until golden.'}           | ${'an oven setting lands on fives'}
+    ${'Highs of 95F are forecast.'}             | ${'Highs of 35°C are forecast.'}            | ${'two figures, in a forecast'}
+    ${'A fever of 102.5F needs a doctor.'}      | ${'A fever of 39.2°C needs a doctor.'}      | ${'a decimal'}
+    ${'Overnight lows of -10F.'}                | ${'Overnight lows of -23.3°C.'}             | ${'a negative'}
+    ${'Bake at 350-375F.'}                      | ${'Bake at 175-190°C.'}                     | ${'a range'}
+    ${'Bake at 350F-375F.'}                     | ${'Bake at 175°C-190°C.'}                   | ${'a range with both ends marked'}
+    ${'Set the oven to 350F/gas 4.'}            | ${'Set the oven to 175°C/gas 4.'}           | ${'beside a gas mark'}
+    ${'Turn the heat down by 25F.'}             | ${'Turn the heat down by 14°C.'}            | ${'a difference'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                              | why
+    ${'Apartment 3F'}                                      | ${'a flat'}
+    ${'Apartment 3F has no heat.'}                         | ${'one figure, even in a sentence about heat'}
+    ${'The heating on floor 5F is broken.'}                | ${'a floor'}
+    ${'I sat in seat 23F.'}                                | ${'a seat, with no word about heat'}
+    ${'She wears a 34F.'}                                  | ${'a size'}
+    ${'The Boeing 777F carries 102 tonnes.'}               | ${'a model'}
+    ${'Ford recalled the 2024 F-150 after heat damage.'}   | ${'a name after a year'}
+    ${'The heat map uses #1F1F1F and #33F.'}               | ${'hex colours'}
+    ${'Mask the byte with 0x1F before heating.'}           | ${'a hex literal'}
+    ${'Sketch with a 2F pencil.'}                          | ${'a pencil grade'}
+    ${'Bake part B4F.'}                                    | ${'a part number'}
+    ${'// 3F ends the header before the oven data'}        | ${'a hex byte in a code comment'}
+    ${'The A330-200F flies in hot weather.'}               | ${'a hyphenated designation'}
+    ${'Cook it at 350 f.'}                                 | ${'a lower case f'}
+    ${'Scale it by 100f before baking.'}                   | ${'a float literal'}
+    ${'Preheat the oven to 180C/350F/gas 4.'}              | ${'the courtesy figure after Celsius'}
+    ${'Bake at 350F (180C).'}                              | ${'the courtesy figure before Celsius'}
+    ${'It was 75F today.'}                                 | ${'no word about heat in the sentence'}
+    ${'Bake well.\nApartment 3F'}                          | ${'the word about heat is in another sentence'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                              | expected
+    ${'Cook until the chicken reaches 165°F.'}         | ${'Cook until the chicken reaches 73.9°C.'}
+    ${'Cook until the chicken reaches 165 degrees F.'} | ${'Cook until the chicken reaches 73.9 degrees Celsius.'}
+    ${'Bake at 350 deg F.'}                            | ${'Bake at 175°C.'}
+    ${'It was 70℉ out.'}                               | ${'It was 21.1°C out.'}
+    ${'It was 10 °F out.'}                             | ${'It was -12.2°C out.'}
+  `('converts the written unit in $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('runs twice on a kept original without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('Cook until the chicken reaches 165F.', options);
+    expect(once).toBe('Cook until the chicken reaches 73.9°C (165F).');
+    expect(convert(once, options)).toBe(once);
+  });
+});
+
 describe('speed, power and economy', () => {
   it.each`
     input                | expected
@@ -293,6 +356,83 @@ describe('measurements that are imperial worldwide', () => {
   });
 });
 
+describe('a conventional size is never half converted', () => {
+  it.each`
+    unchanged                               | why
+    ${'wheels of 15-17 inches'}             | ${'a range of wheel sizes'}
+    ${'15-17 inch wheels'}                  | ${'the noun after the range'}
+    ${'a 15 to 17 inch wheel'}              | ${'joined by "to"'}
+    ${'13-15 inch laptops'}                 | ${'screens'}
+    ${'wheels of 15½-17 inches'}            | ${'a vulgar fraction ends the first number'}
+    ${'bolts of ½-¾ inch'}                  | ${'a vulgar fraction at each end'}
+    ${'bolts from ½ to ¾ inch'}             | ${'the same, joined by "to"'}
+    ${'sockets of 3/8-1/2 inch'}            | ${'a fraction at each end'}
+    ${'sockets of 3/8-½ inch'}              | ${'two kinds of fraction'}
+    ${'a 15" x 17" panel'}                  | ${'a dimension with a unit on each side'}
+    ${'a 15 in. x 17 in. panel'}            | ${'the same, abbreviated'}
+    ${'a panel of 15" x 17"'}               | ${'the noun before the dimension'}
+    ${'bolts of 1/2 x 3/4 inch'}            | ${'fractions in a dimension'}
+    ${'a 2" x 4" x 8" panel'}               | ${'three dimensions'}
+    ${'panel of 2" x 4" x 8"'}              | ${'three dimensions after the noun'}
+    ${'wheels of 15½-17 inches (38-43 cm)'} | ${'a metric bracket after the range'}
+    ${'bolts of ½-¾ inch (13-19 mm)'}       | ${'the same'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                        | expected
+    ${'wheels of 15½-17 inches'} | ${'wheels of 39-43 centimetres'}
+    ${'bolts of ½-¾ inch'}       | ${'bolts of 1.3-1.9 centimetres'}
+    ${'sockets of 3/8-1/2 inch'} | ${'sockets of 0.95-1.3 centimetres'}
+    ${'a 15" x 17" panel'}       | ${'a 38 x 43 cm panel'}
+    ${'a panel of 15" x 17"'}    | ${'a panel of 38 x 43 cm'}
+    ${'a 2" x 4" x 8" panel'}    | ${'a 5.1 x 10 x 20 cm panel'}
+  `('converts all of $input when respectConventions is off', ({ input, expected }) => {
+    expect(convert(input, { units: { respectConventions: false } })).toBe(expected);
+  });
+
+  it('still converts a measurement that holds a conventional size whole', () => {
+    expect(convert('a 2 foot 6 inch pipe')).toMatch(/^a 76\.2 centimetres? pipe$/);
+  });
+
+  it('converts a measurement beside a conventional size', () => {
+    expect(convert('15-17 inch wheels and 6 feet of pipe')).toBe(
+      '15-17 inch wheels and 1.8 metres of pipe',
+    );
+  });
+});
+
+describe('a held span in change resolution', () => {
+  const at = (start: number, end: number, extra: Partial<Change> = {}): Change => ({
+    start,
+    end,
+    before: 'x'.repeat(end - start),
+    after: 'y',
+    ruleId: 'test',
+    category: 'units',
+    confidence: 'moderate',
+    priority: 30,
+    ...extra,
+  });
+  const held = at(10, 20, { after: 'x'.repeat(10), hold: true, priority: 0 });
+
+  it('is never returned', () => {
+    expect(resolveChanges([held], [])).toEqual([]);
+  });
+
+  it('drops a change that would rewrite only part of it, whatever its priority', () => {
+    expect(resolveChanges([held, at(15, 20, { priority: 99 })], [])).toEqual([]);
+    expect(resolveChanges([held, at(5, 12, { priority: 99 })], [])).toEqual([]);
+  });
+
+  it('keeps a change that rewrites all of it, or none of it', () => {
+    const whole = at(8, 22);
+    const beside = at(0, 5);
+    expect(resolveChanges([held, whole, beside], [])).toEqual([beside, whole]);
+  });
+});
+
 describe('units can be switched off', () => {
   it('leaves everything alone when units are disabled', () => {
     expect(convert('6 feet and 350°F', { units: false })).toBe('6 feet and 350°F');
@@ -397,6 +537,74 @@ describe('a text that already gives the metric value', () => {
     ${'6 feet (see the diagram)'}    | ${'1.8 metres (see the diagram)'}   | ${'the same'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a metric bracket goes only when it restates the conversion', () => {
+  it.each`
+    input                                  | expected                  | why
+    ${'6 feet (1.8 metres)'}               | ${'1.8 metres'}           | ${'the same figure'}
+    ${'It is 6 feet\n(1.8 m) tall.'}       | ${'It is 1.8 m tall.'}    | ${'the bracket wraps onto the next line'}
+    ${'It is 6 feet\r\n(1.8 m) tall.'}     | ${'It is 1.8 m tall.'}    | ${'a Windows line break'}
+    ${'It is 6 feet (2 m) tall.'}          | ${'It is 2 m tall.'}      | ${'rounded to one figure'}
+    ${'It is 6 feet (180 cm) tall.'}       | ${'It is 180 cm tall.'}   | ${'another unit of the same dimension'}
+    ${'It is 6 feet 2 inches (1.88 m).'}   | ${'It is 1.88 m.'}        | ${'feet and inches'}
+    ${'Cut it into 1/4 inch (5 mm) dice.'} | ${'Cut it into 5 mm dice.'} | ${'a small figure rounded to its last digit'}
+    ${'1 mile (1,600 m)'}                  | ${'1,600 m'}              | ${'a grouped figure'}
+    ${'1 pound (500 g) of butter'}         | ${'500 g of butter'}      | ${'a cook rounding'}
+    ${'1 ounce (25 g) of butter'}          | ${'25 g of butter'}       | ${'the same'}
+    ${'1 gallon (4.5 L) of water'}         | ${'4.5 L of water'}       | ${'an imperial gallon'}
+    ${'1 pint (568 ml) of milk'}           | ${'568 ml of milk'}       | ${'an imperial pint'}
+    ${'It does 30 mpg (9.4 L/100km).'}     | ${'It does 9.4 L/100km.'} | ${'a UK mpg'}
+    ${'It does 30 mpg (13 km/L).'}         | ${'It does 13 km/L.'}     | ${'the inverse measure of economy'}
+    ${'Bake at 250°F (130°C).'}            | ${'Bake at 130°C.'}       | ${'an oven table'}
+    ${'Bake at 350-375°F (175-190°C).'}    | ${'Bake at 175-190°C.'}   | ${'a range of temperatures'}
+    ${'It was -40°F (-40°C).'}             | ${'It was -40°C.'}        | ${'a negative temperature'}
+    ${'It dropped 20°F (11°C).'}           | ${'It dropped 11°C.'}     | ${'a change in temperature'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                                 | why
+    ${'It is 6 feet (2 kg) tall.'}         | ${'It is 1.8 metres (2 kg) tall.'}       | ${'a weight restates no height'}
+    ${'Bake at 350°F (2 kg).'}             | ${'Bake at 175°C (2 kg).'}               | ${'nor a temperature'}
+    ${'It does 30 mpg (2 km).'}            | ${'It does 7.8 L/100km (2 km).'}         | ${'nor fuel economy'}
+    ${'It is 6 feet (5 metres) tall.'}     | ${'It is 1.8 metres (5 metres) tall.'}   | ${'a different figure'}
+    ${'It is 6 feet (3 m) tall.'}          | ${'It is 1.8 metres (3 m) tall.'}        | ${'further apart than rounding'}
+    ${'It is 6 feet (1.8 km) tall.'}       | ${'It is 1.8 metres (1.8 km) tall.'}     | ${'the wrong unit'}
+    ${'It is 5 miles (8 m) away.'}         | ${'It is 8 kilometres (8 m) away.'}      | ${'the same'}
+    ${'Bake at 350°F (350°C).'}            | ${'Bake at 175°C (350°C).'}              | ${'the figure left unconverted'}
+    ${'Bake at 350°F (160°C).'}            | ${'Bake at 175°C (160°C).'}              | ${'a fan oven setting'}
+    ${'a 10 x 12 foot (3 m) room'}         | ${'a 3 x 3.7 metre (3 m) room'}          | ${'fewer figures'}
+    ${'a 10 x 12 foot (3-3.7 m) room'}     | ${'a 3 x 3.7 metre (3-3.7 m) room'}      | ${'a range is not two sides'}
+    ${'It is 6 feet\n\n(1.8 m) tall.'}     | ${'It is 1.8 metres\n\n(1.8 m) tall.'}   | ${'a blank line ends the measurement'}
+    ${'It is 6 feet\n- (1.8 m) tall.'}     | ${'It is 1.8 metres\n- (1.8 m) tall.'}   | ${'so does a list item'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    options                                  | input                              | expected
+    ${{ precision: 0 }}                      | ${'It is 6 feet (1.8 m) tall.'}    | ${'It is 1.8 m tall.'}
+    ${{ precision: 0 }}                      | ${'It is 1 inch (2.5 cm) wide.'}   | ${'It is 2.5 cm wide.'}
+    ${{ precision: 'exact' }}                | ${'It is 6 feet (1.8 m) tall.'}    | ${'It is 1.8 m tall.'}
+    ${{ fuelEconomy: 'km-per-l' }}           | ${'It does 30 mpg (7.8 L/100km).'} | ${'It does 7.8 L/100km.'}
+  `('with $options: $input -> $expected', ({ options, input, expected }) => {
+    expect(convert(input, { units: options })).toBe(expected);
+  });
+
+  it.each(
+    MEASURES
+      // Tons are skipped in any document that says tonnes.
+      .filter((measure) => !measure.ambiguousWhen?.test(measure.convert(7).plural))
+      .flatMap((measure) =>
+        [measure.words[0]!, measure.abbrevs[0]].flatMap((unit) => (unit ? [[measure.id, unit]] : [])),
+      ),
+  )('%s: 7 %s collapses into its own conversion', (id, unit) => {
+    const options = { rules: { [id]: true } };
+    const metric = convert(`7 ${unit}`, options);
+    expect(convert(`It is 7 ${unit} (${metric}) here.`, options)).toBe(`It is ${metric} here.`);
   });
 });
 
@@ -512,6 +720,93 @@ describe('numbers written out in words', () => {
     ${'5-10 feet'}    | ${'1.5-3 metres'}   | ${'a hyphen between digits is still a range'}
     ${'5 to 10 miles'} | ${'8 to 16 kilometres'} | ${'as is "to"'}
     ${'10 x 12 feet'} | ${'3 x 3.7 metres'} | ${'and dimensions still pair up'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a fraction word that is also an ordinal', () => {
+  const cups = (input: string) => convert(input, { rules: { 'units.volume.cup': true } });
+
+  it.each`
+    unchanged                          | why
+    ${'the third mile marker'}         | ${'"the" makes it an ordinal'}
+    ${'the third mile'}                | ${'the same, at the end of the text'}
+    ${'every third mile'}              | ${'"every" as well'}
+    ${'his third pound'}               | ${'a possessive as well'}
+    ${'every third pound of meat'}     | ${'the same, before "of"'}
+    ${'the fourth inch'}               | ${'"fourth" too'}
+    ${'the eighth inch'}               | ${'"eighth" too'}
+    ${'the sixteenth inch'}            | ${'"sixteenth" too'}
+    ${'the third-mile marker'}         | ${'hyphenated'}
+    ${'third mile'}                    | ${'with nothing before it'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    unchanged                          | why
+    ${'their fourth cup of coffee'}    | ${'an ordinal cup'}
+    ${'the third cup of coffee'}       | ${'the same'}
+  `('leaves "$unchanged" alone with cups switched on ($why)', ({ unchanged }) => {
+    expect(cups(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                              | expected                   | why
+    ${'a third of a mile'}             | ${'540 metres'}            | ${'"a" counts it'}
+    ${'a third mile'}                  | ${'540 metres'}            | ${'the same, without "of"'}
+    ${'one-third mile'}                | ${'540 metres'}            | ${'"one" counts it'}
+    ${'one third mile'}                | ${'540 metres'}            | ${'the same, with a space'}
+    ${'the one-third mile marker'}     | ${'the 540 metre marker'}  | ${'a count after "the" is still a fraction'}
+    ${'a third-mile loop'}             | ${'a 540 metre loop'}      | ${'attributive'}
+    ${'the last third of a mile'}      | ${'the last 540 metres'}   | ${'"of a" makes even a bare one a fraction'}
+    ${'one-fourth pound of butter'}    | ${'110 grams of butter'}   | ${'"fourth" is a fraction word'}
+    ${'a fourth of a pound'}           | ${'110 grams'}             | ${'the same, with "of a"'}
+    ${'three fourths of a mile'}       | ${'1.2 kilometres'}        | ${'a plural'}
+    ${'a fourth-inch gap'}             | ${'a 6.4 millimetre gap'}  | ${'attributive'}
+    ${'an eighth inch'}                | ${'3.2 millimetres'}       | ${'"an" counts it'}
+    ${'three and a third miles'}       | ${'5.4 kilometres'}        | ${'after a whole number'}
+    ${'the last quarter mile'}         | ${'the last 400 metres'}   | ${'"quarter" is never an ordinal'}
+    ${'half mile'}                     | ${'800 metres'}            | ${'nor is "half"'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                              | expected                   | why
+    ${'two thirds of a cup'}           | ${'160 millilitres'}       | ${'a counted plural'}
+    ${'three-fourths cup'}             | ${'180 millilitres'}       | ${'"fourths"'}
+    ${'one and three-fourths cups'}    | ${'410 millilitres'}       | ${'after a whole number'}
+    ${'two and a fourth cups'}         | ${'530 millilitres'}       | ${'the same, with "a"'}
+  `('$input -> $expected with cups switched on ($why)', ({ input, expected }) => {
+    expect(cups(input)).toBe(expected);
+  });
+});
+
+describe('a fraction after a counted unit', () => {
+  it.each`
+    input                                       | expected                     | why
+    ${'two pounds and a half of sugar'}         | ${'1.1 kilograms of sugar'}  | ${'a word number'}
+    ${'2 pounds and a half of sugar'}           | ${'1.1 kilograms of sugar'}  | ${'digits'}
+    ${'two miles and a half'}                   | ${'4 kilometres'}            | ${'at the end of the text'}
+    ${'five miles and a half away'}             | ${'8.9 kilometres away'}     | ${'before a direction'}
+    ${'three feet and a half'}                  | ${'1.1 metres'}              | ${'feet'}
+    ${'two pounds and a quarter'}               | ${'1 kilogram'}              | ${'a quarter'}
+    ${'two gallons and a third'}                | ${'8.8 litres'}              | ${'a third'}
+    ${'a pound and a fourth'}                   | ${'570 grams'}               | ${'a fourth, after "a"'}
+    ${'two pounds and three quarters of sugar'} | ${'1.2 kilograms of sugar'}  | ${'a counted fraction'}
+    ${'about a mile and a half'}                | ${'about 2.4 kilometres'}    | ${'"a" still counts one'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                              | why
+    ${'two pounds and a half hour later'}  | ${'910 grams and a half hour later'}  | ${'the half belongs to the hour'}
+    ${'two pounds\nand a half'}            | ${'910 grams\nand a half'}            | ${'the fraction is on the next line'}
+    ${'1 1/2 pounds and a half'}           | ${'680 grams and a half'}             | ${'the 2 of 1 1/2 is not a count'}
+    ${'between 5 and 10 miles and a half'} | ${'between 8 and 16 kilometres and a half'} | ${'nor is the end of a range'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });

@@ -43,18 +43,27 @@ const CARDINALS: Record<string, number> = {
 };
 
 const DENOMINATORS: Record<string, number> = {
-  half: 2, halves: 2, quarter: 4, quarters: 4, third: 3, thirds: 3,
+  half: 2, halves: 2, quarter: 4, quarters: 4, third: 3, thirds: 3, fourth: 4, fourths: 4,
   eighth: 8, eighths: 8, sixteenth: 16, sixteenths: 16,
 };
+
+// Every other denominator is an ordinal too, so it needs a count to be a fraction:
+// `a third mile` and `one-third mile`, but `the third mile`.
+const UNCOUNTED = ['half', 'halves', 'quarter', 'quarters'];
 
 // Longest first, so `three-quarters` is not read as the cardinal `three`.
 const CARD = Object.keys(CARDINALS).sort((a, b) => b.length - a.length).join('|');
 const FRAC = Object.keys(DENOMINATORS).sort((a, b) => b.length - a.length).join('|');
+const BARE_FRAC = [...UNCOUNTED].sort((a, b) => b.length - a.length).join('|');
 
 /** A spelled-out fraction with its count: `a quarter`, `three-quarters`, `one half`. */
 export const COUNTED_FRACTION = String.raw`(?:an?${INLINE_SPACE}+|(?:${CARD})${SPACE_OR_HYPHEN})(?:${FRAC})`;
 
-/** A spelled-out fraction, counted or not: `half`, `a quarter`, `three-quarters`. */
+/**
+ * A spelled-out fraction, counted or not: `half`, `a quarter`, `three-quarters`. A bare
+ * ordinal such as `third` is a fraction only where the words after it make it one, as
+ * `of a mile` does.
+ */
 export const FRACTION_WORDS = String.raw`(?:${COUNTED_FRACTION}|(?:${FRAC}))`;
 
 // The tail of a longer number that a line break cut off, such as `half feet` after `two and
@@ -75,8 +84,11 @@ const WORD_NUMBER = [
   unlessTail(NOT_AFTER_AND, String.raw`(?:${CARD})${SPACE_OR_HYPHEN}(?:${FRAC})`),
   String.raw`(?:${CARD})`,
   unlessTail(NOT_AFTER_AND, String.raw`an?${INLINE_SPACE}+(?:${FRAC})`),
-  unlessTail(NOT_AFTER_COUNT, String.raw`(?:${FRAC})`),
+  unlessTail(NOT_AFTER_COUNT, String.raw`(?:${BARE_FRAC})`),
 ].join('|');
+
+/** A whole number in digits or one word: `2`, `1,200`, `two`. */
+export const WHOLE_NUMBER = String.raw`(?:${DIGITS}|${CARD})`;
 
 /**
  * Digits only. Ranges and dimensions use this rather than the full pattern, because a

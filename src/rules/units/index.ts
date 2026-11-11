@@ -6,6 +6,7 @@ import {
   type Measure,
   type MetricValue,
 } from './definitions.js';
+import { FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
 import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
@@ -13,6 +14,7 @@ import {
   NUMBER_PATTERN,
   NUMERIC_PATTERN,
   SOFT_SPACE,
+  WHOLE_NUMBER,
   formatNumber,
   formatTemperature,
   isOvenSetting,
@@ -137,30 +139,63 @@ function change(
   };
 }
 
+/**
+ * A measurement left as written because it is a conventional size. Another rule can match a
+ * piece of it, such as the `¾ inch` in `bolts of ½-¾ inch`, and the hold keeps that piece
+ * as written too.
+ */
+function hold(start: number, matched: string, ruleId: string, priority: number): Change {
+  return { ...change(start, matched, matched, ruleId, priority), hold: true };
+}
+
 function withOriginal(ctx: RuleContext, body: string, original: string): string {
   return ctx.options.units.keepOriginal ? `${body} (${original})` : body;
 }
 
+
+/** A metric unit's forms, and what a value in it comes to in its dimension's base unit. */
+type MetricUnit = [forms: string, toBase: (value: number) => number];
+
+const times = (factor: number) => (value: number) => value * factor;
+const BASE = times(1);
 
 /**
  * Metric units by dimension, in every form the unit rules write them and in the American
  * spellings. Each key names a capture group, which is how a match reports its dimension.
  */
 const METRIC_UNITS = {
-  temperature: String.raw`degrees?\s+(?:Celsius|C)\b|°\s*C`,
-  speed: String.raw`(?:kilometres?|kilometers?)\s+per\s+hour|km/h`,
-  torque: String.raw`newton[\s-]+(?:metres?|meters?)|N·m|Nm`,
-  area: String.raw`square\s+(?:kilometres?|kilometers?|metres?|meters?)|hectares?|km²|km2|m²|m2|ha`,
-  economy: String.raw`L/100\s*km|km/L`,
-  length:
-    String.raw`kilometres?|kilometers?|centimetres?|centimeters?|millimetres?|millimeters?|` +
-    String.raw`metres?|meters?|km|cm|mm|m`,
-  volume: String.raw`millilitres?|milliliters?|litres?|liters?|mL|ml|L|l`,
-  mass: String.raw`kilograms?|tonnes?|grams?|kg|mg|g|t`,
-  pressure: String.raw`kilopascals?|kPa`,
-  power: String.raw`kilowatts?|kW`,
-  energy: String.raw`kilojoules?|kJ`,
-} satisfies Record<string, string>;
+  temperature: [[String.raw`degrees?\s+(?:Celsius|C)\b|°\s*C`, BASE]],
+  speed: [[String.raw`(?:kilometres?|kilometers?)\s+per\s+hour|km/h`, BASE]],
+  torque: [[String.raw`newton[\s-]+(?:metres?|meters?)|N·m|Nm`, BASE]],
+  area: [
+    [String.raw`square\s+(?:kilometres?|kilometers?)|km²|km2`, times(1e6)],
+    [String.raw`square\s+(?:metres?|meters?)|m²|m2`, BASE],
+    [String.raw`hectares?|ha`, times(1e4)],
+  ],
+  economy: [
+    [String.raw`L/100\s*km`, BASE],
+    [String.raw`km/L`, (kmPerLitre) => 100 / kmPerLitre],
+  ],
+  length: [
+    [String.raw`kilometres?|kilometers?|km`, times(1000)],
+    [String.raw`centimetres?|centimeters?|cm`, times(0.01)],
+    [String.raw`millimetres?|millimeters?|mm`, times(0.001)],
+    [String.raw`metres?|meters?|m`, BASE],
+  ],
+  volume: [
+    [String.raw`millilitres?|milliliters?|mL|ml`, times(0.001)],
+    [String.raw`litres?|liters?|L|l`, BASE],
+  ],
+  mass: [
+    [String.raw`kilograms?|kg`, times(1000)],
+    [String.raw`tonnes?|t`, times(1e6)],
+    [String.raw`grams?|g`, BASE],
+    [String.raw`mg`, times(0.001)],
+  ],
+  pressure: [[String.raw`kilopascals?|kPa`, BASE]],
+  power: [[String.raw`kilowatts?|kW`, BASE]],
+  energy: [[String.raw`kilojoules?|kJ`, BASE]],
+} satisfies Record<string, MetricUnit[]>;
 
 type Dimension = keyof typeof METRIC_UNITS;
 
@@ -168,7 +203,7 @@ const METRIC_NUMBER = String.raw`[-−]?\d[\d,]*(?:\.\d+)?`;
 const METRIC_VALUE =
   String.raw`${METRIC_NUMBER}(?:\s*(?:-|–|—|to|and|x|×|by)\s*${METRIC_NUMBER})*\s*-?\s*` +
   `(?:${Object.entries(METRIC_UNITS)
-    .map(([dimension, units]) => `(?<${dimension}>${units})`)
+    .map(([dimension, units]) => `(?<${dimension}>${units.map(([forms]) => forms).join('|')})`)
     .join('|')})`;
 
 /**
@@ -185,6 +220,78 @@ function dimensionOf(match: RegExpMatchArray | null): Dimension | undefined {
   return Object.keys(groups).find((dimension) => groups[dimension] !== undefined) as
     | Dimension
     | undefined;
+}
+
+const METRIC_FORMS = Object.entries(METRIC_UNITS).flatMap(([dimension, units]) =>
+  units.map(([forms, toBase]) => ({
+    dimension: dimension as Dimension,
+    pattern: new RegExp(`^(?:${forms})$`),
+    toBase,
+  })),
+);
+
+/** A minus sign straight after a number is the dash of a range: `9-18 m`. */
+const METRIC_FIGURE = /(?:(?<![\d.]\s*)[-−])?\d[\d,]*(?:\.\d+)?/g;
+
+interface MetricReading {
+  dimension: Dimension;
+  /** Each figure as the span its written precision allows, in the dimension's base unit. */
+  spans: Array<[low: number, high: number]>;
+  /** `3 x 3.7 m` gives the sides of one thing, where `3-3.7 m` is a range. */
+  sides: boolean;
+}
+
+/** `9-18 m` reads as a length of 8.5-9.5 m and 17.5-18.5 m. */
+function readMetric(text: string): MetricReading | undefined {
+  const match = METRIC_INNER.exec(text);
+  const dimension = dimensionOf(match);
+  if (dimension === undefined) return undefined;
+  const unit = match!.groups![dimension]!;
+  const form = METRIC_FORMS.find((f) => f.dimension === dimension && f.pattern.test(unit));
+  if (form === undefined) return undefined;
+  const figures = text.slice(0, text.lastIndexOf(unit));
+  const spans = [...figures.matchAll(METRIC_FIGURE)].map(([figure]): [number, number] => {
+    const value = Number(figure.replace(/,/g, '').replace('−', '-'));
+    const half = 0.5 * 10 ** -(figure.split('.')[1]?.length ?? 0);
+    const ends = [form.toBase(value - half), form.toBase(value + half)];
+    return [Math.min(...ends), Math.max(...ends)];
+  });
+  return { dimension, spans, sides: /x|×|by/.test(figures) };
+}
+
+/**
+ * Authors round a restatement and some use a unit of another country (an imperial pint or
+ * gallon, a UK mpg), which can put it a fifth away from the American conversion.
+ */
+const RESTATEMENT_SLACK = 0.25;
+
+/**
+ * An absolute temperature has no zero to take a fraction of. Published oven tables sit up
+ * to 10 °C from the oven setting this rounds to. A fan oven's setting, 20 °C lower, is not
+ * a restatement.
+ */
+const TEMPERATURE_SLACK = 10;
+
+/**
+ * The bracket gives the same measurement as the conversion: the same dimension, as many
+ * figures joined the same way, and each figure close to the converted one once both are
+ * read to the precision they are written to.
+ */
+function restatesConversion(
+  bracket: MetricReading,
+  converted: MetricReading,
+  absoluteTemperature: boolean,
+): boolean {
+  if (bracket.dimension !== converted.dimension) return false;
+  if (bracket.spans.length !== converted.spans.length) return false;
+  if (bracket.sides !== converted.sides) return false;
+  return bracket.spans.every(([low, high], i) => {
+    const [convertedLow, convertedHigh] = converted.spans[i]!;
+    const slack = absoluteTemperature
+      ? TEMPERATURE_SLACK
+      : RESTATEMENT_SLACK * Math.max(Math.abs(convertedLow), Math.abs(convertedHigh));
+    return low <= convertedHigh + slack && high >= convertedLow - slack;
+  });
 }
 
 /**
@@ -280,14 +387,26 @@ function metricSpelling(text: string): string {
   );
 }
 
+const BRACKET_AFTER = new RegExp(String.raw`^${SOFT_SPACE}\(([^()]{1,40})\)`);
+
 /**
  * `30-60 feet (9-18 m)` already carries its own conversion, so converting the imperial
  * half produces `9.1-18 metres (9-18 m)`. Swallow the parenthetical instead and keep the
- * author's own figure, which is the one they rounded on purpose.
+ * author's own figure, which is the one they rounded on purpose. A bracket that says
+ * anything else, as `6 feet (2 kg)` and `6 feet (5 m)` do, stays and nothing is lost.
  */
-function redundantMetric(ctx: RuleContext, end: number): { end: number; after: string } | null {
-  const match = /^[ \t]*\(([^()]{1,40})\)/.exec(ctx.text.slice(end));
-  if (!match || !METRIC_INNER.test(match[1]!)) return null;
+function redundantMetric(
+  ctx: RuleContext,
+  end: number,
+  body: string,
+  ruleId: string,
+): { end: number; after: string } | null {
+  const match = BRACKET_AFTER.exec(ctx.text.slice(end));
+  if (!match) return null;
+  const bracket = readMetric(match[1]!);
+  const converted = readMetric(body);
+  if (!bracket || !converted) return null;
+  if (!restatesConversion(bracket, converted, ruleId === ABSOLUTE_ID)) return null;
   return { end: end + match[0].length, after: metricSpelling(match[1]!.trim()) };
 }
 
@@ -305,7 +424,7 @@ function pushMeasurement(
   priority: number,
 ): void {
   if (restatesMetric(ctx, start, start + matched.length)) return;
-  const redundant = redundantMetric(ctx, start + matched.length);
+  const redundant = redundantMetric(ctx, start + matched.length, body, ruleId);
   if (redundant) {
     changes.push({
       start,
@@ -392,8 +511,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       String.raw`${S}+an?(?=\s)${SOFT_SPACE}(${words})(?![\w-])`,
     'gi',
   );
+  // A count straight after `/` or `-` is the tail of `1 1/2` or `twenty-two`, not a number.
   const andAFraction = new RegExp(
-    String.raw`(?<![\w.])an?(?=\s)${SOFT_SPACE}(${words})${S}+and${S}+(${COUNTED_FRACTION})(?![\w-])`,
+    String.raw`${START}(an?(?=\s)|(?<![-−/])${WHOLE_NUMBER})${SOFT_SPACE}(${words})` +
+      String.raw`${S}+and${S}+(${COUNTED_FRACTION})(?![\w-])`,
     'gi',
   );
 
@@ -413,9 +534,12 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     // A noun straight after claims the words before it: `half a pound cake` is half a cake,
     // and `a mile and a half hour later` is half an hour.
     if (MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) return;
-    if (isConventional(ctx, entry.measure, start, start + matched.length)) return;
     if (isOtherSense(ctx, entry, start, start + matched.length)) return;
     if (isAmbiguousHere(entry.measure, ctx.text)) return;
+    if (isConventional(ctx, entry.measure, start, start + matched.length)) {
+      changes.push(hold(start, matched, entry.measure.id, 30));
+      return;
+    }
 
     const target = entry.measure.convert(value);
     const { precision, maxDecimals } = ctx.options.units;
@@ -438,10 +562,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const high = parseNumber(match[2]!);
         if (!entry || low === null || high === null || high === 0) continue;
         const start = match.index;
-        if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
         if (isOtherSense(ctx, entry, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[3]!, match[0])) continue;
+        if (isConventional(ctx, entry.measure, start, start + match[0].length)) {
+          changes.push(hold(start, match[0], entry.measure.id, 35));
+          continue;
+        }
 
         // Both ends share the unit chosen for the larger one, so the range stays readable.
         const target = entry.measure.convert(high);
@@ -481,7 +608,6 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         if (values.some((v) => v === null)) continue;
 
         const start = match.index;
-        if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
         if (isOtherSense(ctx, entry, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[4]!, match[0])) continue;
@@ -489,6 +615,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const numbers = values as number[];
         const largest = numbers.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a));
         if (largest === 0) continue;
+        if (isConventional(ctx, entry.measure, start, start + match[0].length)) {
+          changes.push(hold(start, match[0], entry.measure.id, 38));
+          continue;
+        }
 
         const target = entry.measure.convert(largest);
         const perSourceUnit = target.value / largest;
@@ -522,10 +652,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const value = parseNumber(match[1]!);
         if (!entry || value === null) continue;
         const start = match.index;
-        if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
         if (isOtherSense(ctx, entry, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[2]!, match[0])) continue;
+        if (isConventional(ctx, entry.measure, start, start + match[0].length)) {
+          changes.push(hold(start, match[0], entry.measure.id, 30));
+          continue;
+        }
 
         const target = entry.measure.convert(value);
         const { precision, maxDecimals } = ctx.options.units;
@@ -556,9 +689,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       }
       andAFraction.lastIndex = 0;
       for (const match of ctx.text.matchAll(andAFraction)) {
-        const fraction = parseNumber(match[2]!);
-        const value = fraction === null ? null : 1 + fraction;
-        pushWrapped(ctx, changes, match.index, match[0], value, match[1]!);
+        const whole = parseNumber(match[1]!);
+        const fraction = parseNumber(match[3]!);
+        const value = whole === null || fraction === null ? null : whole + fraction;
+        pushWrapped(ctx, changes, match.index, match[0], value, match[2]!);
       }
       return changes;
     },
@@ -566,20 +700,6 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
   return [dimensionRule, rangeRule, singleRule];
 }
-
-/** `°F`, `℉`, `degrees Fahrenheit` and the like. A bare `F` is too often a letter to count. */
-const FAHRENHEIT = String.raw`°\s*F\b|℉|°\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|degrees?\s+F\b|deg\.?\s*F\b`;
-const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
-
-/**
- * One temperature, or a range of them with the unit written once: `350-375°F`,
- * `350 to 375°F`, `between 60 and 70°F`. `and` joins a range only after `between`.
- */
-const FAHRENHEIT_PATTERN = new RegExp(
-  String.raw`(?<![\w.])(?:(${DEGREES})(\s*(?:-|\u2013|\u2014|to)\s*|(?<=\bbetween\s+${DEGREES})\s+and\s+))?` +
-    String.raw`(${DEGREES})\s*(${FAHRENHEIT})`,
-  'gi',
-);
 
 /**
  * A change in temperature, told by the words just before it: a verb of change, `by`,
@@ -640,8 +760,7 @@ function formatEnds(ctx: RuleContext, values: number[], raw: string[]): string[]
 
 function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
   const readings: FahrenheitReading[] = [];
-  FAHRENHEIT_PATTERN.lastIndex = 0;
-  for (const match of ctx.text.matchAll(FAHRENHEIT_PATTERN)) {
+  for (const match of fahrenheitTemperatures(ctx.text)) {
     const raw = match[1] === undefined ? [match[3]!] : [match[1], match[3]!];
     const parsed = raw.map(parseNumber);
     if (parsed.some((v) => v === null)) continue;
@@ -668,7 +787,7 @@ function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
       numbers = formatEnds(ctx, values.map((v) => ((v - 32) * 5) / 9), raw);
     }
 
-    const spelled = /degrees?/i.test(match[4]!);
+    const spelled = /degrees?/i.test(match[4] ?? '');
     const single = numbers.length === 1 && Math.abs(Number(numbers[0])) === 1;
     const suffix = spelled ? ` ${single ? 'degree' : 'degrees'} Celsius` : '°C';
     readings.push({

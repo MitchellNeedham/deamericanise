@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DIALECTS, deamericaniseText } from '../src/index.js';
-import type { Dialect } from '../src/index.js';
+import type { Dialect, LexEntry, RuleContext } from '../src/index.js';
+import { compileLexicon, findLexiconMatches } from '../src/engine/lexicon.js';
 
 // The dialect overlays are vocabulary, so they need the localise preset.
 const say = (dialect: Dialect) => (input: string) =>
@@ -48,6 +49,80 @@ describe('words only some dialects change', () => {
     ${'a bell pepper'} | ${'en-GB'} | ${'a pepper'}
   `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
     expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+});
+
+describe('a dialect row outranks the shared row for the same word', () => {
+  it.each`
+    input                                | dialect    | expected
+    ${'a field trip'}                    | ${'en-GB'} | ${'a school trip'}
+    ${'Field trips are fun.'}            | ${'en-GB'} | ${'School trips are fun.'}
+    ${'an apartment building'}           | ${'en-GB'} | ${'a block of flats'}
+    ${'two apartment buildings'}         | ${'en-GB'} | ${'two blocks of flats'}
+    ${'Drop it in the nearest mailbox.'} | ${'en-GB'} | ${'Drop it in the nearest postbox.'}
+    ${'public mailboxes'}                | ${'en-GB'} | ${'public postboxes'}
+    ${'a field trip'}                    | ${'en-IE'} | ${'a school trip'}
+    ${'an apartment building'}           | ${'en-IE'} | ${'a block of flats'}
+    ${'a field trip'}                    | ${'en-ZA'} | ${'a school trip'}
+    ${'an apartment building'}           | ${'en-ZA'} | ${'a block of flats'}
+    ${'any mailbox'}                     | ${'en-ZA'} | ${'any postbox'}
+    ${'a field trip'}                    | ${'en-AU'} | ${'an excursion'}
+    ${'an apartment building'}           | ${'en-NZ'} | ${'an apartment block'}
+  `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
+    expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+});
+
+describe('the shared row is the fallback when the dialect row does not apply', () => {
+  it.each`
+    input                        | dialect    | expected
+    ${'the mailbox'}             | ${'en-GB'} | ${'the letterbox'}
+    ${'Check your mailbox.'}     | ${'en-GB'} | ${'Check your letterbox.'}
+    ${'the mailboxes'}           | ${'en-IE'} | ${'the letterboxes'}
+    ${'the mailbox'}             | ${'en-ZA'} | ${'the letterbox'}
+    ${'a university field trip'} | ${'en-GB'} | ${'a university excursion'}
+    ${'a geology field trip'}    | ${'en-IE'} | ${'a geology excursion'}
+    ${'a school field trip'}     | ${'en-GB'} | ${'a school excursion'}
+    ${'the grocery store'}       | ${'en-ZA'} | ${'the supermarket'}
+  `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
+    expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+
+  it('uses the shared row when the dialect rule is switched off', () => {
+    const options = { dialect: 'en-GB', preset: 'localise', rules: { 'dialect.en-GB': false } } as const;
+    expect(deamericaniseText('a field trip', options)).toBe('an excursion');
+  });
+});
+
+describe('the order the lexicon tries rows for one word in', () => {
+  const widget = (to: string, extra: Partial<LexEntry> = {}): LexEntry => ({
+    from: 'widget',
+    to,
+    ruleId: `test.${to}`,
+    category: 'vocabulary',
+    confidence: 'safe',
+    ...extra,
+  });
+  const swap = (text: string, ...layers: LexEntry[][]): string[] =>
+    findLexiconMatches({ text, american: true } as RuleContext, compileLexicon(...layers), () => true)
+      .map((change) => change.after);
+
+  it('tries a later layer first, whatever the priority', () => {
+    expect(swap('a widget', [widget('shared', { priority: 90 })], [widget('dialect')])).toEqual(['dialect']);
+  });
+
+  it('tries a higher priority first within a layer', () => {
+    expect(swap('a widget', [widget('plain'), widget('gated', { priority: 20 })])).toEqual(['gated']);
+  });
+
+  it('keeps the listed order between equal priorities', () => {
+    expect(swap('a widget', [widget('first'), widget('second')])).toEqual(['first']);
+  });
+
+  it('falls back to an earlier layer when the later row is refused by its context', () => {
+    const layers = [[widget('shared')], [widget('dialect', { requireBefore: /\bblue\s+$/ })]];
+    expect(swap('a widget', ...layers)).toEqual(['shared']);
+    expect(swap('a blue widget', ...layers)).toEqual(['dialect']);
   });
 });
 
@@ -248,5 +323,66 @@ describe('overlay words in phrases that already read right', () => {
     ${'an apartment complex'}                               | ${'an apartment complex'}                               | ${'en-NZ'}
   `('$dialect: $input -> $expected', ({ input, expected, dialect }) => {
     expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+});
+
+// Every dialect with a `pants` row.
+const TROUSER_DIALECTS: Dialect[] = ['en-GB', 'en-IE', 'en-ZA'];
+
+describe('pants the verb stays pants', () => {
+  it.each([
+    'The dog pants heavily after a run.',
+    'The dog pants after a run.',
+    'The dog pants.',
+    'He pants for breath.',
+    'She pants and gasps.',
+    'A dog pants to cool down.',
+    'My dog pants a lot at night.',
+    'I think my dog pants too much.',
+    "My neighbour's dog pants constantly.",
+    'a dog that pants all night',
+    'The exhausted collie often pants in the heat.',
+    'When the boxer pants loudly, let it rest.',
+    'As the deer pants for the water brooks, so my soul pants for you.',
+  ])('leaves "%s" alone', (input) => {
+    for (const dialect of TROUSER_DIALECTS) expect(say(dialect)(input), dialect).toBe(input);
+  });
+});
+
+describe('pants in phrases British English says too', () => {
+  it.each`
+    input                           | expected
+    ${'He had ants in his pants.'}  | ${'He had ants in his pants.'}
+    ${'ants-in-her-pants energy'}   | ${'ants-in-her-pants energy'}
+    ${'She wore yoga pants.'}       | ${'She wore yoga pants.'}
+    ${'a pair of hot pants'}        | ${'a pair of hot pants'}
+    ${'potty training pants'}       | ${'potty training pants'}
+    ${'diaper pants'}               | ${'nappy pants'}
+    ${'big-girl pants'}             | ${'big-girl pants'}
+    ${'period pants'}               | ${'period pants'}
+    ${'incontinence pants'}         | ${'incontinence pants'}
+    ${'Liar, liar, pants on fire!'} | ${'Liar, liar, pants on fire!'}
+  `('$input -> $expected', ({ input, expected }) => {
+    for (const dialect of TROUSER_DIALECTS) expect(say(dialect)(input), dialect).toBe(expected);
+  });
+});
+
+describe('pants the garment still become trousers', () => {
+  it.each`
+    input                                           | expected
+    ${'a pair of pants'}                            | ${'a pair of trousers'}
+    ${'his pants were wet'}                         | ${'his trousers were wet'}
+    ${'I bought the blue pants.'}                   | ${'I bought the blue trousers.'}
+    ${'The man wore pants.'}                        | ${'The man wore trousers.'}
+    ${'He ironed his best pants carefully.'}        | ${'He ironed his best trousers carefully.'}
+    ${'The best pants for hiking are light.'}       | ${'The best trousers for hiking are light.'}
+    ${'The black pants in the photo are sold out.'} | ${'The black trousers in the photo are sold out.'}
+    ${'My new pants really fit.'}                   | ${'My new trousers really fit.'}
+    ${'A man in pants.'}                            | ${'A man in trousers.'}
+    ${'These are my every day pants.'}              | ${'These are my every day trousers.'}
+    ${'The Best Pants for Travel'}                  | ${'The Best Trousers for Travel'}
+    ${'She wears the pants in the family.'}         | ${'She wears the trousers in the family.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    for (const dialect of TROUSER_DIALECTS) expect(say(dialect)(input), dialect).toBe(expected);
   });
 });

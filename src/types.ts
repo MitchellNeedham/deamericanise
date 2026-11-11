@@ -38,6 +38,13 @@ export interface Change {
    * neither, since either one alone leaves `a eraser` or `an rubber`.
    */
   agreesWith?: { start: number; end: number };
+  /**
+   * Set only by a rule, never on a change in a result: the rule left this span as written
+   * on purpose, as with a conventional size. It is never applied, and a change that would
+   * rewrite part of it but not all of it is dropped, so `15-17 inch wheels` is never left
+   * half converted.
+   */
+  hold?: true;
 }
 
 /** Evidence that the input really is American, used to gate the ambiguous rules. */
@@ -198,7 +205,11 @@ export interface LexEntry {
   forbidAfter?: RegExp;
   /** Only fire when the document looks American. */
   needsAmerican?: boolean;
-  /** Overlap tie-break. Gated entries outrank plain ones, which outrank suffix patterns. */
+  /**
+   * Overlap tie-break. Gated entries outrank plain ones, which outrank suffix patterns.
+   * Rows for the same word are tried dialect pack first, then shared lists, and by
+   * priority within each.
+   */
   priority?: number;
 }
 

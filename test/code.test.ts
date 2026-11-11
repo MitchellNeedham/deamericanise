@@ -93,6 +93,20 @@ describe('identifiers inside comments survive', () => {
   });
 });
 
+describe('a comment that ends on an initialism', () => {
+  it.each`
+    language    | source                                         | expected
+    ${'ts'}     | ${'// She has a Ph. D.\nconst x = 1;'}         | ${'// She has a PhD.\nconst x = 1;'}
+    ${'ts'}     | ${'const x = 1; // She has a Ph. D.'}          | ${'const x = 1; // She has a PhD.'}
+    ${'python'} | ${'# She has a Ph. D. It took years.'}         | ${'# She has a PhD. It took years.'}
+    ${'ts'}     | ${'/* She has a Ph. D. */'}                    | ${'/* She has a PhD. */'}
+    ${'ts'}     | ${'/**\n * She has a Ph. D.\n * It took years.\n */'} | ${'/**\n * She has a PhD.\n * It took years.\n */'}
+    ${'ts'}     | ${'// She has a Ph. D. in physics.'}           | ${'// She has a PhD in physics.'}
+  `('keeps the sentence stop where it ends one: $source', ({ language, source, expected }) => {
+    expect(deamericaniseCode(source, { language, preset: 'localise' }).text).toBe(expected);
+  });
+});
+
 describe('picking the handler from a filename', () => {
   it.each`
     filename            | source                    | expected
@@ -110,6 +124,57 @@ describe('picking the handler from a filename', () => {
     const source = 'The color is red.\n\n```js\nconst color = 1;\n```\n';
     expect(deamericaniseFile('README.md', source).text)
       .toBe('The colour is red.\n\n```js\nconst color = 1;\n```\n');
+  });
+});
+
+describe('a language option overrides the filename', () => {
+  it.each`
+    filename           | language        | source                              | expected
+    ${'stdin'}         | ${'python'}     | ${'x = "gray" # the color'}         | ${'x = "gray" # the colour'}
+    ${'notes.txt'}     | ${'python'}     | ${'x = "gray" # the color'}         | ${'x = "gray" # the colour'}
+    ${'settings.json'} | ${'ruby'}       | ${'x = "gray" # the color'}         | ${'x = "gray" # the colour'}
+    ${'stdin'}         | ${'shell'}      | ${'x="gray" # the color'}           | ${'x="gray" # the colour'}
+    ${'stdin'}         | ${'golang'}     | ${'x := "gray" // the color'}       | ${'x := "gray" // the colour'}
+    ${'stdin'}         | ${'typescript'} | ${'x = "gray"; // the color'}       | ${'x = "gray"; // the colour'}
+    ${'stdin'}         | ${'Dockerfile'} | ${'ENV X=gray # the color'}         | ${'ENV X=gray # the colour'}
+    ${'a.ts'}          | ${'md'}         | ${'x = "gray"; // the color'}       | ${'x = "grey"; // the colour'}
+    ${'a.ts'}          | ${'MD'}         | ${'x = "gray"; // the color'}       | ${'x = "grey"; // the colour'}
+    ${'a.ts'}          | ${'.txt'}       | ${'x = "gray"; // the color'}       | ${'x = "grey"; // the colour'}
+    ${'stdin'}         | ${'ts'}         | ${'x = "gray"; // the color'}       | ${'x = "gray"; // the colour'}
+    ${'stdin'}         | ${'.ts'}        | ${'x = "gray"; // the color'}       | ${'x = "gray"; // the colour'}
+    ${'a.py'}          | ${'ts'}         | ${'x = "gray"; // the color'}       | ${'x = "gray"; // the colour'}
+    ${'NOTES'}         | ${'md'}         | ${'The color.'}                     | ${'The colour.'}
+  `('$filename with language $language reads "$source" as "$expected"', ({ filename, language, source, expected }) => {
+    expect(deamericaniseFile(filename, source, { language }).text).toBe(expected);
+  });
+
+  it.each(['settings.json', 'stdin', 'a.ts', 'README.md'])(
+    'throws for a language it does not know, whatever the filename (%s)',
+    (filename) => {
+      expect(() => deamericaniseFile(filename, 'The color.', { language: 'nosuchlang' })).toThrow(UnknownLanguageError);
+    },
+  );
+});
+
+describe('json reads only the comments', () => {
+  it.each`
+    source                                          | expected
+    ${'{ "color": "gray" }'}                        | ${'{ "color": "gray" }'}
+    ${'{ "url": "http://example.com/color" }'}      | ${'{ "url": "http://example.com/color" }'}
+    ${'{ "color": "gray" } // the color'}           | ${'{ "color": "gray" } // the colour'}
+    ${'{ /* the color */ "color": "gray" }'}        | ${'{ /* the colour */ "color": "gray" }'}
+  `('$source -> $expected', ({ source, expected }) => {
+    expect(deamericaniseFile('settings.json', source, { language: 'json' }).text).toBe(expected);
+    expect(deamericaniseCode(source, { language: 'json' }).text).toBe(expected);
+  });
+
+  it('reads a .json file as prose when no language is given', () => {
+    expect(deamericaniseFile('settings.json', '{ "color": "gray" }').text).toBe('{ "colour": "grey" }');
+  });
+
+  it('keeps jsonc and json5 on the same lexer', () => {
+    expect(deamericaniseFile('tsconfig.jsonc', '{ "color": 1 } // the color').text).toBe('{ "color": 1 } // the colour');
+    expect(deamericaniseFile('a.json5', "{ color: 'gray' } // the color").text).toBe("{ color: 'gray' } // the colour");
   });
 });
 
@@ -134,5 +199,15 @@ describe('change offsets point into the original file', () => {
     const [article, word] = deamericaniseCode(source, { language: 'ts', preset: 'localise' }).changes;
     expect(source.slice(word!.start, word!.end)).toBe('eraser');
     expect(article?.agreesWith).toEqual({ start: word!.start, end: word!.end });
+  });
+
+  it('points an article fix at a converted measurement in the same file', () => {
+    const source = 'const a = 1;\n// Build an 8 foot fence.\n';
+    const result = deamericaniseCode(source, { language: 'ts' });
+    const [article, measurement] = result.changes;
+    expect(result.text).toBe('const a = 1;\n// Build a 2.4 metre fence.\n');
+    expect(source.slice(article!.start, article!.end)).toBe('an');
+    expect(source.slice(measurement!.start, measurement!.end)).toBe('8 foot');
+    expect(article?.agreesWith).toEqual({ start: measurement!.start, end: measurement!.end });
   });
 });

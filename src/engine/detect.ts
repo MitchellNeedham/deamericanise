@@ -1,4 +1,5 @@
 import type { AmericanSignals } from '../types.js';
+import { fahrenheitTemperatures } from '../rules/units/fahrenheit.js';
 
 /** What a marker adds to the confidence unless it names its own weight. */
 const ORDINARY = 0.15;
@@ -89,6 +90,11 @@ const COMMONWEALTH_INGREDIENT =
 
 const US_INGREDIENTS = unlessNear(MEASURED_US_INGREDIENT, COMMONWEALTH_INGREDIENT, 30, /\n/);
 
+/** Every temperature the Fahrenheit rules convert, and the scale named on its own. */
+const FAHRENHEIT: Pick<RegExp, 'test'> = {
+  test: (text) => !fahrenheitTemperatures(text).next().done || /\bFahrenheit\b/i.test(text),
+};
+
 /**
  * Spellings and habits that only Americans have. Used to decide whether `03/04/2024`
  * means March or April, and whether a bare `$` is US dollars. Each counts once however
@@ -102,7 +108,7 @@ const MARKERS: Array<[label: string, pattern: Pick<RegExp, 'test'>, weight?: num
   ['doubled-l dropped', /\b(?:canceled|traveled|labeled|modeled|fueled|totaled)\b/i],
   ['aluminum', /\baluminum\b/i],
   ['gray', /\bgray(?:s|er|est|ish|scale)?\b/i],
-  ['Fahrenheit', /(?:°\s*F\b|\bFahrenheit\b)/i],
+  ['Fahrenheit', FAHRENHEIT],
   ['Fahrenheit oven setting', FAHRENHEIT_OVEN, RECIPE],
   // The number may be written out, as older prose and most recipes do.
   [

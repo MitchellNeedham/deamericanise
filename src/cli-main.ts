@@ -5,7 +5,7 @@ import { CATEGORIES, CONFIDENCES, PRESETS } from './config.js';
 import { DIALECTS } from './dialects/index.js';
 import { PROSE_EXTENSIONS, languageNames, lexerFor } from './lexers/index.js';
 import { ruleIds } from './rules/catalogue.js';
-import { deamericaniseFile } from './code.js';
+import { deamericaniseFile, isKnownLanguage } from './code.js';
 import type { Category, Change, Confidence, Dialect, Options, Preset, Precision } from './types.js';
 
 /** Replaced at build time from package.json, which CI stamps from the release tag. */
@@ -56,7 +56,8 @@ Units
 Files
       --language <id>    Force a language: ts, python, ruby, sql, md, ... (needed for stdin)
                          A named file of unknown type, such as settings.json, is skipped
-                         unless this is given. --language md reads it as prose.
+                         unless this is given. --language md reads it as prose, and
+                         --language json reads only its comments.
       --docstrings       Also rewrite Python docstrings
       --no-code-guard    Rewrite comment lines that look like commented-out code too
       --list-languages   Print every language name --language accepts
@@ -209,7 +210,7 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
   if (values['list-languages']) {
-    for (const name of languageNames()) print(`${name}\n`);
+    for (const name of [...languageNames(), ...PROSE_EXTENSIONS].sort()) print(`${name}\n`);
     return 0;
   }
   if (values['list-rules']) {
@@ -223,6 +224,9 @@ export async function main(argv: string[]): Promise<number> {
   const wantsLocalise = Boolean(values.localise || values.localize);
   const preset = (values.preset ?? (wantsLocalise ? 'localise' : 'read')) as Preset;
   if (!PRESETS.includes(preset)) fail(`unknown preset "${preset}". Known: ${PRESETS.join(', ')}`);
+
+  const language = values.language;
+  if (language !== undefined && !isKnownLanguage(language)) fail(`unknown language "${language}". Try --list-languages.`);
 
   const only = list(values.only) as Category[];
   const off = list(values.off) as Category[];
@@ -263,7 +267,11 @@ export async function main(argv: string[]): Promise<number> {
     unitsKeep: list(values['units-keep']),
     ...(values['no-code-guard'] ? { protectCommentedCode: false } : {}),
   };
-  const fileOptions = { ...options, ...(values.docstrings ? { docstrings: true } : {}) };
+  const fileOptions = {
+    ...options,
+    ...(values.docstrings ? { docstrings: true } : {}),
+    ...(language !== undefined ? { language } : {}),
+  };
 
   const targets: string[] = [];
   for (const path of positionals) {
@@ -284,8 +292,7 @@ export async function main(argv: string[]): Promise<number> {
       return 0;
     }
     const source = await readStdin();
-    const name = values.language ? `stdin.${values.language.replace(/^\./, '')}` : 'stdin.txt';
-    const result = deamericaniseFile(name, source, fileOptions);
+    const result = deamericaniseFile('stdin.txt', source, fileOptions);
     changed = result.changes.length > 0;
 
     if (values.json) print(`${JSON.stringify(result.changes, null, 2)}\n`);
@@ -298,10 +305,9 @@ export async function main(argv: string[]): Promise<number> {
 
   for (const path of targets) {
     const source = readFileSync(path, 'utf8');
-    const name = values.language ? `forced.${values.language.replace(/^\./, '')}` : path;
     let result;
     try {
-      result = deamericaniseFile(name, source, fileOptions);
+      result = deamericaniseFile(path, source, fileOptions);
     } catch (error) {
       process.stderr.write(`deamericanise: skipping ${path}: ${(error as Error).message}\n`);
       continue;

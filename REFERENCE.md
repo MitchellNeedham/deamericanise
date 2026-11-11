@@ -73,6 +73,13 @@ included. To read one anyway, force the language:
 deamericanise --language md NOTES
 ```
 
+`--language` takes any name `--list-languages` prints: a lexer, or a prose type such as `md`
+or `txt`. It applies to stdin and to every file read, named or walked. Any other value stops
+the run before anything is read, with `unknown language "..."` on stderr and exit status 2.
+`--language json` reads only comments, so plain JSON, which has none, comes back untouched
+and a commented file such as `tsconfig.json` has just its comments rewritten. A `.json`
+file is still skipped unless it is forced this way.
+
 `LICENSE`, `COPYING` and `AUTHORS` are not on the list. A licence has to stay verbatim, and
 a list of names is no place for spelling rules.
 
@@ -109,6 +116,16 @@ extension, which is what the CLI uses. It reads any file it has no lexer for as 
 included, so choose the files before calling it. The CLI does that with the test described
 under [Command line](#command-line).
 
+A `language` option overrides the filename, as `--language` does. A prose type such as `md`
+reads the source as prose, any other value has to name a lexer, and an unknown one throws
+`UnknownLanguageError` whatever the filename:
+
+```ts
+deamericaniseFile('stdin', source, { language: 'python' });  // comments only
+deamericaniseFile('a.ts', source, { language: 'md' });       // prose
+deamericaniseFile('a.json', source, { language: 'nosuch' }); // throws UnknownLanguageError
+```
+
 ## Dialects
 
 Dialects only affect vocabulary, so they need `localise`. `en-AU` is the default. The shared rules do the heavy lifting; the overlays cover the
@@ -123,7 +140,14 @@ words that genuinely differ.
 | `cotton candy` | fairy floss | candy floss | candy floss |
 | `apartment` | apartment | flat | flat |
 | `soccer` | soccer | football | football |
+| `field trip` | excursion | school trip | excursion |
 | `call 911` | call 000 | call 999 | call 111 |
+
+Where an overlay and the shared rules both have a word, the overlay's row is tried first,
+which is how `field trip` becomes a school trip in `en-GB` and an excursion in `en-AU`.
+The shared row is the fallback when the overlay's row is switched off or its context does
+not fit: an `en-GB` `mailbox` is a postbox only when it is one for posting letters (`the
+nearest mailbox`), and otherwise the letterbox the other dialects say.
 
 `en-IE` and `en-ZA` follow British usage with local emergency numbers and a few words of
 their own. `en-CA` is the hybrid: it keeps `colour`, `centre` and `defence` but also keeps
@@ -174,7 +198,9 @@ not; `in the fall of 2024` becomes autumn but `prices will fall` does not; `bake
 cookies` becomes biscuits but `Accept all cookies`, `This site uses cookies` and a lone
 `Cookies` link do not. Phrases the rest of the world already says keep their words:
 `fortune cookie`, `food truck`, `my way or the highway`, `Highway 101`, `seat of your
-pants`. In British English a `fire truck` is a fire engine and a `pickup truck` stays one.
+pants`, `ants in his pants`, `yoga pants`. In British English a `fire truck` is a fire engine
+and a `pickup truck` stays one. The verb stays too: `the dog pants heavily` keeps its `pants`,
+while `his pants were wet` becomes `his trousers were wet`.
 
 **Units.** Length, area, mass, volume, temperature, speed, pressure, power, torque and
 fuel economy. The volume measures are the US ones, which are not the imperial ones.
@@ -193,7 +219,11 @@ alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 
 Numbers written out in words are read too, fractions and all: `two and a half feet` becomes
 `76 centimetres` and `a quarter mile away` becomes `400 metres away`. So do `half a mile`,
-`a quarter of a mile` and `a mile and a half`, which put the unit inside the number.
+`a quarter of a mile`, `a mile and a half` and `two pounds and a half`, which put the unit
+inside the number. `third`, `fourth`, `eighth` and `sixteenth` are ordinals as well, so they
+read as a fraction only with a count before them or `of a` after them: `one-third mile`,
+`a third mile` and `the last third of a mile` convert, while `the third mile` and
+`every third mile` are left alone. `half` and `quarter` need neither.
 
 A number never continues onto the next line, so the `14` that ends `Step 14` is never taken
 as the whole part of a `1/2 gallon` that opens the next line. The rest of a measurement can
@@ -210,6 +240,13 @@ or a noun such as `drop` after it. `fell to 20°F` names the new temperature and
 as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule of their own,
 `units.temperature.difference`, so they can be switched off apart from temperatures.
 
+Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F` or `degrees Fahrenheit`. A bare `F`,
+as in `165F` or `350 F`, is more often a letter, so it counts only as an upper case `F`
+after a number of two or three figures, in a sentence about heat (an oven, cooking, the
+weather, a fever or a temperature) that gives no Celsius value. `Cook until the chicken
+reaches 165F` becomes `73.9°C`, while `Apartment 3F`, `seat 23F`, `the Boeing 777F`,
+`#33F`, `F-150` and the courtesy figure in `180C/350F/gas 4` stay as they are.
+
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
 source and never claims more accuracy than was written down. `exact` and a fixed number of
@@ -222,7 +259,12 @@ deamericaniseText('6 feet', { units: { keepOriginal: true } });        // '1.8 m
 ```
 
 A measurement that already gives both values is converted once, not twice. `6 feet (1.8 m)`
-becomes `1.8 m`, keeping the figure the author rounded. `1.8 metres (6 feet)` is left as
+becomes `1.8 m`, keeping the figure the author rounded. That needs a bracket that restates
+the conversion: the same dimension, and each figure within a quarter of the converted one
+(10 °C for a temperature) once both are read to the figures they are written to. So
+`1 pound (500 g)` and an imperial `1 pint (568 ml)` collapse, while `6 feet (2 kg)` and
+`6 feet (5 m)` convert as normal and keep their bracket. The bracket may start on the next
+line, but not after a blank line. `1.8 metres (6 feet)` is left as
 it is, because the bracket only restates the metric value in front of it. That is the
 form `keepOriginal` writes, so running it again changes nothing. The bracket can open
 with a word such as `about`, but it has to hold nothing else, and the dimension has to
@@ -230,8 +272,10 @@ match: `2 metres (6 pounds)` still converts.
 
 Measurements that are imperial worldwide are left alone: screens, wheels, pipes, vinyl.
 `a 15 inch laptop` stays a 15 inch laptop. So does a unit that is part of a name, such as
-`the 40 yard line` or `the 147-pound division`. `units: { respectConventions: false }`
-converts all of them.
+`the 40 yard line` or `the 147-pound division`. A range or dimension of them stays whole,
+so `bolts of ½-¾ inch` and `a 15" x 17" panel` are left exactly as written, with no
+piece of them converted on its own. `units: { respectConventions: false }` converts all
+of them.
 
 Pounds of money are left alone, because British prose spells amounts out. A money word
 such as `cost`, `paid`, `earns`, `worth` or `a fine of` claims the amount straight after
@@ -265,6 +309,12 @@ Amounts are never converted, because exchange rates move; a bare
 be asked for. `U.S.` becomes `US`, and punctuation that is not part of a quotation moves
 outside the closing quote.
 
+An initialism keeps its last stop when that stop also ends the sentence, as a time does,
+so `She moved to the U.S. It was cold.` becomes `She moved to the US. It was cold.` A
+capital after an initialism is more often the rest of a name, so `the U.S. Army` becomes
+`the US Army`: only a word that opens sentences and never names anything, such as `It`,
+`The`, `In` or `However`, counts as a new sentence.
+
 Full stops on titles follow the contraction rule rather than a list of titles: a
 contraction that already ends in the word's own last letter drops the stop, so `Mr.`,
 `Dr.`, `Sgt.` and `Lt.` become `Mr`, `Dr`, `Sgt` and `Lt`. A truncation keeps it, so
@@ -272,7 +322,17 @@ contraction that already ends in the word's own last letter drops the stop, so `
 alone.
 
 **Articles.** Replacements drag their article along: `an eraser` becomes `a rubber`, and
-`a popsicle` becomes `an icy pole`.
+`a popsicle` becomes `an icy pole`. A converted number takes the article it is said with,
+so `an 8 foot fence` becomes `a 2.4 metre fence` and `a 60 foot tree` becomes
+`an 18 metre tree`. Eight, eleven and eighteen take `an`, and so does any figure whose
+spoken form starts with one of them, such as `80`, `8.5`, `11,000` or `18 million`. A
+temperature below zero takes `a`, for minus. A currency sign is said after its amount, so
+`US$8` takes `an` as `$8` does. A date's day drops its leading zero
+(`a 05/03/2024 deadline`) and a year is said in pairs (`an 1812-03-14 letter`). Where the
+usual readings disagree, the article is left as it was: `1100` to `1199` and `1800` to
+`1899` (one thousand eight hundred, or eighteen hundred), and a 24-hour time with a
+leading zero other than `08:00` (`05:00` is oh five hundred to some readers and five to
+others).
 
 ## Deciding whether the text is American
 
@@ -305,6 +365,10 @@ since Australia and New Zealand cook in metric cups. A measured ingredient under
 only Americans use, such as `1 cup all-purpose flour` or `2 tablespoons cornstarch`,
 counts like any other vocabulary, unless the local name sits beside it, as it does in
 `1 cup plain flour (all-purpose flour)`.
+
+A temperature counts as `Fahrenheit` in exactly the forms the unit rules convert, so
+`165 degrees F` counts, `Cook until the chicken reaches 165F` counts, and `Apartment 3F`
+does not. The word `Fahrenheit` on its own counts too.
 
 Ambiguous dates ask a narrower question first, because a document writes its dates one way
 round: a sibling date that states its own order, whether by a day above 12 or by a named
@@ -404,7 +468,7 @@ and something may be asserting on it. `docstrings: true` includes them.
 
 `lexerFor` accepts an id, an extension, a filename or a common alias, so `ruby`, `rb`,
 `shell`, `golang`, `c++` and `Dockerfile` all resolve. `languageNames()` lists the lot,
-and so does `--list-languages`.
+and `--list-languages` prints them with the prose types added.
 
 ### Commented-out code
 
@@ -655,6 +719,8 @@ there each root needs the rules in its own styles.
   the start of the next, or `two and a` then `half feet`, is not read as one. The fraction
   converts on its own and the written-out number is left as written. A web page is read the
   way it is usually laid out, with a line break in its source counting as a space.
+- `a third mile` is read as a fraction, though it can also mean one more mile after two.
+  The same goes for `a fourth`, `an eighth` and `a sixteenth`.
 - A line that ends in a number and a line that opens with a unit word are read as one
   measurement, so `Track 7` above `Miles Davis` becomes `Track 11 kilometres Davis`. A
   blank line or a list marker between them keeps them apart.

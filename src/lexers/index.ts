@@ -15,7 +15,7 @@ export const LEXERS: LexerSpec[] = [
   },
   {
     id: 'c-like',
-    aliases: ['cpp','c++','csharp','c#','objective-c','objc','golang','kotlin','sass','stylesheet'],
+    aliases: ['cpp','c++','csharp','c#','objective-c','objc','golang','kotlin','sass','stylesheet','json'],
     extensions: [
       'c', 'h', 'cc', 'cpp', 'cxx', 'hpp', 'hh', 'cs', 'java', 'go', 'swift', 'kt', 'kts',
       'scala', 'dart', 'groovy', 'gradle', 'proto', 'sol', 'glsl', 'hlsl', 'm', 'mm', 'zig',

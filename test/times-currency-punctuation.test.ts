@@ -151,9 +151,65 @@ describe('punctuation', () => {
     ${'Lt. Chen'}              | ${'Lt Chen'}
     ${'St. Kilda'}             | ${'St Kilda'}
     ${'the U.S. market'}       | ${'the US market'}
-    ${'the U.K. and U.S.A.'}   | ${'the UK and USA'}
+    ${'the U.K. and U.S.A.'}   | ${'the UK and USA.'}
     ${'a Ph.D. in physics'}    | ${'a PhD in physics'}
   `('$input -> $expected', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  // The last stop of an initialism is also the sentence's when nothing else ends it.
+  it.each`
+    input                                                 | expected
+    ${'She moved to the U.S. It was cold.'}               | ${'She moved to the US. It was cold.'}
+    ${'She moved to the U.K. It was cold.'}               | ${'She moved to the UK. It was cold.'}
+    ${'She moved to the U.S.A. It was cold.'}             | ${'She moved to the USA. It was cold.'}
+    ${'He has a Ph.D. It took years.'}                    | ${'He has a PhD. It took years.'}
+    ${'He has a Ph. D. It took years.'}                   | ${'He has a PhD. It took years.'}
+    ${'We met in the P.M. It was late.'}                  | ${'We met in the pm. It was late.'}
+    ${'She moved to the U.S.'}                            | ${'She moved to the US.'}
+    ${'She moved to the U.S.\n'}                          | ${'She moved to the US.\n'}
+    ${'She moved to the U.S.\nIt was cold.'}              | ${'She moved to the US.\nIt was cold.'}
+    ${'She moved to the U.K.\n\nthe rest stayed.'}        | ${'She moved to the UK.\n\nthe rest stayed.'}
+    ${'- She moved to the U.S.\n- He moved to the U.K.'}  | ${'- She moved to the US.\n- He moved to the UK.'}
+    ${'She moved to the U.S. A year later she left.'}     | ${'She moved to the US. A year later she left.'}
+    ${"She moved to the U.S. It's cold there."}           | ${"She moved to the US. It's cold there."}
+    ${'She moved to the U.S. However, it was cold.'}      | ${'She moved to the US. However, it was cold.'}
+    ${'Born in the U.S. I moved at ten.'}                 | ${'Born in the US. I moved at ten.'}
+    ${'She moved to the U.S. (It was cold.)'}             | ${'She moved to the US. (It was cold.)'}
+    ${'She moved to the U.K. "It is cold" was all.'}      | ${'She moved to the UK. "It is cold" was all.'}
+    ${'(She moved to the U.S.) It was cold.'}             | ${'(She moved to the US.) It was cold.'}
+    ${'"She moved to the U.S." It was cold.'}             | ${'"She moved to the US." It was cold.'}
+    ${'"She moved to the U.K." It was cold.'}             | ${'"She moved to the UK." It was cold.'}
+    ${"'He has a Ph.D.' It took years."}                  | ${"'He has a PhD.' It took years."}
+    ${'We live in Europe (mostly the U.S.A.)'}            | ${'We live in Europe (mostly the USA.)'}
+  `('keeps the sentence stop: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                          | expected
+    ${'the U.S. government'}                       | ${'the US government'}
+    ${'in the U.S., then'}                         | ${'in the US, then'}
+    ${'She moved to the U.S.; it was cold.'}       | ${'She moved to the US; it was cold.'}
+    ${'She moved to the U.S.\nand then Canada.'}   | ${'She moved to the US\nand then Canada.'}
+    ${'She joined the U.S. Army in 2001.'}         | ${'She joined the US Army in 2001.'}
+    ${'the U.S. Department of Energy'}             | ${'the US Department of Energy'}
+    ${'the U.K. Parliament sat.'}                  | ${'the UK Parliament sat.'}
+    ${'the U.S. EPA and the U.K. NHS'}             | ${'the US EPA and the UK NHS'}
+    ${'THE U.S. ARMY'}                             | ${'THE US ARMY'}
+    ${'the U.S. A-10 fleet'}                       | ${'the US A-10 fleet'}
+    ${'She arrived in the U.S. Monday.'}           | ${'She arrived in the US Monday.'}
+    ${'She arrived in the U.K. March 5.'}          | ${'She arrived in the UK March 5.'}
+    ${'She flew to the U.S. Pacific coast.'}       | ${'She flew to the US Pacific coast.'}
+    ${'the U.S. Eastern seaboard'}                 | ${'the US Eastern seaboard'}
+    ${'He said "the U.S." and left.'}              | ${'He said "the US" and left.'}
+    ${'We met (in the U.K.) and left.'}            | ${'We met (in the UK) and left.'}
+    ${'We live in Europe (mostly the U.K.).'}      | ${'We live in Europe (mostly the UK).'}
+    ${"the U.S.'s policy"}                         | ${"the US's policy"}
+    ${'He has two Ph.D.s.'}                        | ${'He has two PhDs.'}
+    ${'U.S.'}                                      | ${'US'}
+    ${'- U.S.\n- U.K.'}                            | ${'- US\n- UK'}
+  `('needs no sentence stop: $input', ({ input, expected }) => {
     expect(punctuation(input)).toBe(expected);
   });
 
@@ -176,6 +232,8 @@ describe('punctuation', () => {
     ${'etc. and so on'}  | ${'et cetera, cut short'}
     ${'Mr Smith'}        | ${'already correct'}
     ${'e.g. this'}       | ${'not a title'}
+    ${'17 U.S.C. 105'}   | ${'a longer initialism'}
+    ${'Washington, D.C. It is cold.'} | ${'D.C. is not rewritten, so its stop stays'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(punctuation(unchanged)).toBe(unchanged);
   });

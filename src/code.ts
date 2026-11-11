@@ -58,10 +58,27 @@ function proseOptions({ language, docstrings, ...rest }: CodeOptions): Options {
   return rest;
 }
 
-/** Picks prose or comment-only handling from the filename. */
+function isProseLanguage(language: string): boolean {
+  return PROSE_EXTENSIONS.has(language.replace(/^\./, '').toLowerCase());
+}
+
+/** Whether `deamericaniseFile` accepts this as `language`: a prose type or a name `lexerFor` knows. */
+export function isKnownLanguage(language: string): boolean {
+  return isProseLanguage(language) || Boolean(lexerFor(language));
+}
+
+/**
+ * Picks prose or comment-only handling from the filename. A `language` option overrides the
+ * filename: a prose type such as `md` reads the source as prose, and anything else must name
+ * a lexer or this throws `UnknownLanguageError`.
+ */
 export function deamericaniseFile(filename: string, source: string, options: CodeOptions = {}): Result {
+  if (options.language !== undefined) {
+    if (isProseLanguage(options.language)) return deamericanise(source, proseOptions(options));
+    return deamericaniseCode(source, options);
+  }
   const extension = filename.split('.').pop()?.toLowerCase() ?? '';
   const isProse = PROSE_EXTENSIONS.has(extension) || !lexerFor(filename);
   if (isProse) return deamericanise(source, proseOptions(options));
-  return deamericaniseCode(source, { ...options, language: options.language ?? filename });
+  return deamericaniseCode(source, { ...options, language: filename });
 }

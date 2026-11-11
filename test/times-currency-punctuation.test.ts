@@ -157,6 +157,43 @@ describe('punctuation', () => {
     expect(punctuation(input)).toBe(expected);
   });
 
+  // Only a time makes `P.M.` the meridiem. Without one it stands for something else.
+  it.each`
+    input                                              | expected
+    ${'The P.M. said no.'}                             | ${'The PM said no.'}
+    ${'The British P.M. visited Washington.'}          | ${'The British PM visited Washington.'}
+    ${'Tune in on the A.M. dial.'}                     | ${'Tune in on the AM dial.'}
+    ${'Two P.M.s have resigned.'}                      | ${'Two PMs have resigned.'}
+    ${"the P.M.'s office"}                             | ${"the PM's office"}
+    ${'In 2019 P.M. Johnson resigned.'}                | ${'In 2019 PM Johnson resigned.'}
+    ${'They called him a rotten P.M. and left.'}       | ${'They called him a rotten PM and left.'}
+    ${'the P.M., then the cabinet'}                    | ${'the PM, then the cabinet'}
+  `('keeps the capitals with no time: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                              | expected
+    ${'It starts at 3 P.M. today.'}                    | ${'It starts at 3 pm today.'}
+    ${'It starts at 3:30 P.M. today.'}                 | ${'It starts at 3:30 pm today.'}
+    ${'It runs from 3 to 4 A.M. today.'}               | ${'It runs from 3 to 4 am today.'}
+    ${'It starts at ten P.M. today.'}                  | ${'It starts at ten pm today.'}
+    ${'It starts at Ten P.M. today.'}                  | ${'It starts at Ten pm today.'}
+    ${'It starts at ten forty-five P.M. today.'}       | ${'It starts at ten forty-five pm today.'}
+  `('lowercases a time while times are off: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected
+    ${'It starts at 3 P.M.'}               | ${'It starts at 3pm.'}
+    ${'It starts at 9 A.M. sharp.'}        | ${'It starts at 9am sharp.'}
+    ${'We met in the P.M. It was late.'}   | ${'We met in the PM. It was late.'}
+    ${'The P.M. said no.'}                 | ${'The PM said no.'}
+  `('under localise: $input', ({ input, expected }) => {
+    expect(deamericaniseText(input, { preset: 'localise' })).toBe(expected);
+  });
+
   // The last stop of an initialism is also the sentence's when nothing else ends it.
   it.each`
     input                                                 | expected
@@ -165,7 +202,7 @@ describe('punctuation', () => {
     ${'She moved to the U.S.A. It was cold.'}             | ${'She moved to the USA. It was cold.'}
     ${'He has a Ph.D. It took years.'}                    | ${'He has a PhD. It took years.'}
     ${'He has a Ph. D. It took years.'}                   | ${'He has a PhD. It took years.'}
-    ${'We met in the P.M. It was late.'}                  | ${'We met in the pm. It was late.'}
+    ${'We met in the P.M. It was late.'}                  | ${'We met in the PM. It was late.'}
     ${'She moved to the U.S.'}                            | ${'She moved to the US.'}
     ${'She moved to the U.S.\n'}                          | ${'She moved to the US.\n'}
     ${'She moved to the U.S.\nIt was cold.'}              | ${'She moved to the US.\nIt was cold.'}

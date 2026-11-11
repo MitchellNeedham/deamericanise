@@ -422,8 +422,9 @@ const NOT_FILED_TRASH: Guard = {
 };
 
 /**
- * A capitalised `Trash` in the middle of a sentence is the folder's label. One that opens
- * its sentence has no word before it, so nothing there for the email words to match either.
+ * A capitalised `Trash` partway through a sentence is the folder's label. One that opens its
+ * sentence passes the second guard, which wants no word before it in the sentence and so
+ * none of the words the first guard refuses there either.
  */
 const TRASH_GATES: Guard[] = [
   { ...NOT_FILED_TRASH, forbidMatch: /^\p{Lu}\p{Ll}/u },

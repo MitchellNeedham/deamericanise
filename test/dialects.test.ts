@@ -61,13 +61,27 @@ describe('a dialect row outranks the shared row for the same word', () => {
     ${'two apartment buildings'}         | ${'en-GB'} | ${'two blocks of flats'}
     ${'Drop it in the nearest mailbox.'} | ${'en-GB'} | ${'Drop it in the nearest postbox.'}
     ${'public mailboxes'}                | ${'en-GB'} | ${'public postboxes'}
-    ${'a field trip'}                    | ${'en-IE'} | ${'a school trip'}
+    ${'a field trip'}                    | ${'en-IE'} | ${'a school tour'}
     ${'an apartment building'}           | ${'en-IE'} | ${'a block of flats'}
     ${'a field trip'}                    | ${'en-ZA'} | ${'a school trip'}
     ${'an apartment building'}           | ${'en-ZA'} | ${'a block of flats'}
     ${'any mailbox'}                     | ${'en-ZA'} | ${'any postbox'}
     ${'a field trip'}                    | ${'en-AU'} | ${'an excursion'}
     ${'an apartment building'}           | ${'en-NZ'} | ${'an apartment block'}
+  `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
+    expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+});
+
+describe('an Irish field trip is a school tour', () => {
+  it.each`
+    input                               | dialect    | expected
+    ${'Our class went on a field trip.'} | ${'en-IE'} | ${'Our class went on a school tour.'}
+    ${'Two field trips were planned.'}   | ${'en-IE'} | ${'Two school tours were planned.'}
+    ${'A school field trip.'}            | ${'en-IE'} | ${'A school excursion.'}
+    ${'Our class went on a field trip.'} | ${'en-GB'} | ${'Our class went on a school trip.'}
+    ${'Two field trips were planned.'}   | ${'en-ZA'} | ${'Two school trips were planned.'}
+    ${'Call 911 now.'}                   | ${'en-IE'} | ${'Call 112 now.'}
   `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
     expect(say(dialect as Dialect)(input)).toBe(expected);
   });

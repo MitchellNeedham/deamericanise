@@ -446,8 +446,10 @@ const NZ: Row[] = [
 ];
 
 const IE: Row[] = [
-  ...GB.filter(([from]) => from !== '911'),
+  ...GB.filter(([from]) => from !== '911' && from !== 'field trip' && from !== 'field trips'),
   ['911', '112'],
+  ['field trip', 'school tour'],
+  ['field trips', 'school tours'],
 ];
 
 const ZA: Row[] = [

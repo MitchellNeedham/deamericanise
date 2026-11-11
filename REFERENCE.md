@@ -158,8 +158,9 @@ nearest mailbox`), and otherwise the letterbox the other dialects say. A mailbox
 email or voicemail is neither, so it stays a mailbox in every dialect.
 
 `en-IE` and `en-ZA` follow British usage with local emergency numbers and a few words of
-their own. `en-CA` is the hybrid: it keeps `colour`, `centre` and `defence` but also keeps
-`-ize`, `aluminum`, `math`, `tire` and `gas`.
+their own, such as the Irish `school tour` for a field trip. `en-CA` is the hybrid: it
+keeps `colour`, `centre` and `defence` but also keeps `-ize`, `aluminum`, `math`, `tire`
+and `gas`.
 
 `en-GB` leaves miles, mph, pints and stone alone, because Britain still uses them, and a
 weight in stone and pounds stays whole. Turn a unit back on by id if you disagree:

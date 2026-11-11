@@ -6,6 +6,7 @@ import {
   type Measure,
   type MetricValue,
 } from './definitions.js';
+import { FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
 import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
@@ -559,20 +560,6 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   return [dimensionRule, rangeRule, singleRule];
 }
 
-/** `°F`, `℉`, `degrees Fahrenheit` and the like. A bare `F` is too often a letter to count. */
-const FAHRENHEIT = String.raw`°\s*F\b|℉|°\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|degrees?\s+F\b|deg\.?\s*F\b`;
-const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
-
-/**
- * One temperature, or a range of them with the unit written once: `350-375°F`,
- * `350 to 375°F`, `between 60 and 70°F`. `and` joins a range only after `between`.
- */
-const FAHRENHEIT_PATTERN = new RegExp(
-  String.raw`(?<![\w.])(?:(${DEGREES})(\s*(?:-|\u2013|\u2014|to)\s*|(?<=\bbetween\s+${DEGREES})\s+and\s+))?` +
-    String.raw`(${DEGREES})\s*(${FAHRENHEIT})`,
-  'gi',
-);
-
 /**
  * A change in temperature, told by the words just before it: a verb of change, `by`,
  * `up`, `down` or `a drop of`, with at most a hedge such as `nearly` in between. A verb
@@ -632,8 +619,7 @@ function formatEnds(ctx: RuleContext, values: number[], raw: string[]): string[]
 
 function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
   const readings: FahrenheitReading[] = [];
-  FAHRENHEIT_PATTERN.lastIndex = 0;
-  for (const match of ctx.text.matchAll(FAHRENHEIT_PATTERN)) {
+  for (const match of fahrenheitTemperatures(ctx.text)) {
     const raw = match[1] === undefined ? [match[3]!] : [match[1], match[3]!];
     const parsed = raw.map(parseNumber);
     if (parsed.some((v) => v === null)) continue;
@@ -660,7 +646,7 @@ function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
       numbers = formatEnds(ctx, values.map((v) => ((v - 32) * 5) / 9), raw);
     }
 
-    const spelled = /degrees?/i.test(match[4]!);
+    const spelled = /degrees?/i.test(match[4] ?? '');
     const single = numbers.length === 1 && Math.abs(Number(numbers[0])) === 1;
     const suffix = spelled ? ` ${single ? 'degree' : 'degrees'} Celsius` : '°C';
     readings.push({

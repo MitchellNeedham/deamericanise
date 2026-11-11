@@ -123,7 +123,14 @@ words that genuinely differ.
 | `cotton candy` | fairy floss | candy floss | candy floss |
 | `apartment` | apartment | flat | flat |
 | `soccer` | soccer | football | football |
+| `field trip` | excursion | school trip | excursion |
 | `call 911` | call 000 | call 999 | call 111 |
+
+Where an overlay and the shared rules both have a word, the overlay's row is tried first,
+which is how `field trip` becomes a school trip in `en-GB` and an excursion in `en-AU`.
+The shared row is the fallback when the overlay's row is switched off or its context does
+not fit: an `en-GB` `mailbox` is a postbox only when it is one for posting letters (`the
+nearest mailbox`), and otherwise the letterbox the other dialects say.
 
 `en-IE` and `en-ZA` follow British usage with local emergency numbers and a few words of
 their own. `en-CA` is the hybrid: it keeps `colour`, `centre` and `defence` but also keeps

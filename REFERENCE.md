@@ -509,7 +509,23 @@ rewriter.onRewrite(() =>
 ::highlight(deamericanised) { background-color: rgb(47 128 237 / 22%); }
 ```
 
-Shadow DOM is not entered. Text inside a web component's shadow root stays as it is.
+**Shadow DOM.** The text a web component renders into its own shadow root is rewritten
+too, along with the attributes in it. By default the rewriter finds open roots through
+`element.shadowRoot`. The `shadowRoot` option takes a lookup of your own, such as one that
+also finds closed roots in a browser extension, and `shadowRoot: () => null` stays out of
+shadow DOM altogether. Inside a root, the host's `lang`, `translate`, `notranslate` and
+`contenteditable` still apply, so a component on a `lang="fr"` element is left alone. A
+shadow root starts a run of text of its own, so no change reaches across its edge or across
+a `<slot>`.
+
+`watch()` finds a root when its host is added to the page, and looks for new roots again at
+`DOMContentLoaded` and `load`. Nothing in the page reports a root attached after `load` to
+an element already there, which is what a custom element defined late does. Its text stays
+as it is until `setOptions` reads the page again.
+
+`highlights()` includes the changes inside shadow roots. Chrome paints them with the page's
+own `::highlight()` rules. Firefox does not apply the page's rules inside a shadow root, so
+there each root needs the rules in its own styles.
 
 ## Options
 
@@ -635,7 +651,11 @@ Limits:
   happen before the settings arrive. The page is rewritten as soon as they do.
 - A site is switched off by its hostname, frame by frame. A frame from another site embedded
   in a page you switched off is still rewritten.
-- Text inside shadow DOM is left as it is.
+- Web components are rewritten, closed shadow roots included. A component defined after the
+  page has loaded, whose tag was already on the page, keeps its American text.
+- Changes inside a web component are highlighted in Chrome and Edge but not in Firefox.
+  Pointing at one shows its description in Chrome and Edge 128 or later, and in Firefox 150
+  or later.
 
 ## Releasing
 

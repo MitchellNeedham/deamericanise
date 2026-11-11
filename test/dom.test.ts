@@ -83,6 +83,15 @@ describe('runs of text', () => {
     expect(rewrite('<p>\n  It is 6 feet\n  <b>2</b>\n  inches wide.\n</p>')).toBe(
       '<p>\n  It is 1.88 metres<b></b> wide.\n</p>',
     );
+    expect(rewrite('<p>\n  Add 1\n  1/2 gallons, then walk two and a\n  half miles.\n</p>')).toBe(
+      '<p>\n  Add 5.7 litres, then walk 4 kilometres.\n</p>',
+    );
+  });
+
+  it('keeps the line breaks a replacement repeats from the source', () => {
+    expect(rewrite('<p>Plots are $40\n  for the year.</p>', { assumeAmerican: true })).toBe(
+      '<p>Plots are US$40\n  for the year.</p>',
+    );
   });
 
   it('skips a change that would move text into or out of a link', () => {

@@ -164,6 +164,12 @@ Dimensions move as a set, because converting half of a pair is worse than leavin
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 `22 x 28 centimetres`, both ends sharing the unit chosen for the larger.
 
+Numbers written out in words are read too, fractions and all: `two and a half feet` becomes
+`76 centimetres` and `a quarter mile away` becomes `400 metres away`. So do `half a mile`,
+`a quarter of a mile` and `a mile and a half`, which put the unit inside the number. A
+measurement is read within one line, so the `14` that ends `Step 14` is never taken as the
+whole part of a `1/2 gallon` that opens the next line.
+
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
 source and never claims more accuracy than was written down. `exact` and a fixed number of
@@ -547,6 +553,9 @@ Shadow DOM is not entered. Text inside a web component's shadow root stays as it
   survives. Turn it off with `protectIdentifiers: false`.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`
   or `keepOriginal` where the numbers matter.
+- A measurement that a hard wrap splits, such as `6` at the end of one line and `feet` at
+  the start of the next, is left as written. A web page is read the way it is usually laid
+  out, with a line break in its source counting as a space.
 - Currency amounts are never converted. Rates move; the output would be wrong by the time
   anyone read it.
 - Grade-to-year mapping assumes the Australian and British numbering, which does not line

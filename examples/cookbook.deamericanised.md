@@ -1,5 +1,5 @@
 > Generated from [cookbook.md](./cookbook.md) by [deamericanise](https://www.npmjs.com/package/deamericanise).
-> Preset `localise`, dialect `en-AU`, 23 changes. Every change is in **bold**.
+> Preset `localise`, dialect `en-AU`, 25 changes. Every change is in **bold**.
 >
 > A recipe you would cook from, so the vocabulary moves as well as the measures.
 
@@ -11,7 +11,7 @@ Soak a small loaf of bread; press out every drop of water, work into this one cu
 
 ## Nut Honey Cake
 
-Mix two cups of brown sugar, two cups of honey, six egg yolks and beat them thoroughly. Sift together three cups of flour, one-quarter teaspoon of salt, three teaspoons of ground cinnamon, one-half teaspoon each of ground cloves, ground nutmeg and allspice, and one and one-half teaspoons of soda; add one cup of chopped raisins, **14 grams** of citron cut in small pieces, **14 grams** of candied orange peel cut in small pieces, **230 grams** of almonds coarsely chopped. Beat the whites of three eggs very stiff and add them last. Pour the dough to the depth of about half an inch into well-buttered tins and bake in a slow oven for one-half hour. *ICINGS AND FILLINGS FOR CAKES*
+Mix two cups of brown sugar, two cups of honey, six egg yolks and beat them thoroughly. Sift together three cups of flour, one-quarter teaspoon of salt, three teaspoons of ground cinnamon, one-half teaspoon each of ground cloves, ground nutmeg and allspice, and one and one-half teaspoons of soda; add one cup of chopped raisins, **14 grams** of citron cut in small pieces, **14 grams** of candied orange peel cut in small pieces, **230 grams** of almonds coarsely chopped. Beat the whites of three eggs very stiff and add them last. Pour the dough to the depth of about **1.3 centimetres** into well-buttered tins and bake in a slow oven for one-half hour. *ICINGS AND FILLINGS FOR CAKES*
 
 ## Fruit Wheels
 
@@ -19,7 +19,7 @@ Sift together two cups of flour, two teaspoons of baking-powder, one-half teaspo
 
 ## Fruit Cake (Wedding Cake)
 
-Take **450 grams** of butter and **450 grams** of sugar rubbed to a cream, yolks of twelve eggs, one tablespoon of cinnamon, one teaspoon of allspice, one-half teaspoon of mace, one-half teaspoon of cloves, one-fourth of a pound of almonds pounded, **910 grams** of raisins (seeded and chopped), **1.4 kilograms** of currants (carefully cleaned), **450 grams** of citron (shredded very fine), and one-quarter of a pound of orange peel (chopped very fine). Soak all this prepared fruit in **470 millilitres** of brandy overnight. Add all to the dough and put in the stiffly-beaten whites last. Bake in a very slow oven for several hours, in cake pans lined with buttered paper. When cold wrap in cloths dipped in brandy and put in earthen jars. If baked in gas oven have light very low. Keep oven the same temperature for four or five hours.
+Take **450 grams** of butter and **450 grams** of sugar rubbed to a cream, yolks of twelve eggs, one tablespoon of cinnamon, one teaspoon of allspice, one-half teaspoon of mace, one-half teaspoon of cloves, one-fourth of a pound of almonds pounded, **910 grams** of raisins (seeded and chopped), **1.4 kilograms** of currants (carefully cleaned), **450 grams** of citron (shredded very fine), and **110 grams** of orange peel (chopped very fine). Soak all this prepared fruit in **470 millilitres** of brandy overnight. Add all to the dough and put in the stiffly-beaten whites last. Bake in a very slow oven for several hours, in cake pans lined with buttered paper. When cold wrap in cloths dipped in brandy and put in earthen jars. If baked in gas oven have light very low. Keep oven the same temperature for four or five hours.
 
 ## Sour Milk Biscuits
 
@@ -51,6 +51,7 @@ published before 1929, and distributed by Project Gutenberg.
 | 9 | `one-half ounce` | `14 grams` | `units.mass.ounce` | moderate |
 | 9 | `one-half ounce` | `14 grams` | `units.mass.ounce` | moderate |
 | 9 | `one-half pound` | `230 grams` | `units.mass.pound` | moderate |
+| 9 | `half an inch` | `1.3 centimetres` | `units.length.inch` | moderate |
 | 13 | `one-half inch` | `1.3 centimetres` | `units.length.inch` | moderate |
 | 13 | `one-inch` | `2.5 centimetres` | `units.length.inch` | moderate |
 | 13 | `one inch` | `2.5 centimetres` | `units.length.inch` | moderate |
@@ -59,6 +60,7 @@ published before 1929, and distributed by Project Gutenberg.
 | 17 | `two pounds` | `910 grams` | `units.mass.pound` | moderate |
 | 17 | `three pounds` | `1.4 kilograms` | `units.mass.pound` | moderate |
 | 17 | `one pound` | `450 grams` | `units.mass.pound` | moderate |
+| 17 | `one-quarter of a pound` | `110 grams` | `units.mass.pound` | moderate |
 | 17 | `one pint` | `470 millilitres` | `units.volume.pint` | moderate |
 | 21 | `one-half inch` | `1.3 centimetres` | `units.length.inch` | moderate |
 | 29 | `one quart` | `950 millilitres` | `units.volume.quart` | moderate |

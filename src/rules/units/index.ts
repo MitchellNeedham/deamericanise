@@ -133,6 +133,15 @@ function change(
   };
 }
 
+/**
+ * A measurement left as written because it is a conventional size. Another rule can match a
+ * piece of it, such as the `¾ inch` in `bolts of ½-¾ inch`, and the hold keeps that piece
+ * as written too.
+ */
+function hold(start: number, matched: string, ruleId: string, priority: number): Change {
+  return { ...change(start, matched, matched, ruleId, priority), hold: true };
+}
+
 function withOriginal(ctx: RuleContext, body: string, original: string): string {
   return ctx.options.units.keepOriginal ? `${body} (${original})` : body;
 }
@@ -409,8 +418,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     // A noun straight after claims the words before it: `half a pound cake` is half a cake,
     // and `a mile and a half hour later` is half an hour.
     if (MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) return;
-    if (isConventional(ctx, entry.measure, start, start + matched.length)) return;
     if (isAmbiguousHere(entry.measure, ctx.text)) return;
+    if (isConventional(ctx, entry.measure, start, start + matched.length)) {
+      changes.push(hold(start, matched, entry.measure.id, 30));
+      return;
+    }
 
     const target = entry.measure.convert(value);
     const { precision, maxDecimals } = ctx.options.units;
@@ -433,9 +445,12 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const high = parseNumber(match[2]!);
         if (!entry || low === null || high === null || high === 0) continue;
         const start = match.index;
-        if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[3]!, match[0])) continue;
+        if (isConventional(ctx, entry.measure, start, start + match[0].length)) {
+          changes.push(hold(start, match[0], entry.measure.id, 35));
+          continue;
+        }
 
         // Both ends share the unit chosen for the larger one, so the range stays readable.
         const target = entry.measure.convert(high);
@@ -475,13 +490,16 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         if (values.some((v) => v === null)) continue;
 
         const start = match.index;
-        if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[4]!, match[0])) continue;
 
         const numbers = values as number[];
         const largest = numbers.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a));
         if (largest === 0) continue;
+        if (isConventional(ctx, entry.measure, start, start + match[0].length)) {
+          changes.push(hold(start, match[0], entry.measure.id, 38));
+          continue;
+        }
 
         const target = entry.measure.convert(largest);
         const perSourceUnit = target.value / largest;
@@ -515,9 +533,12 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const value = parseNumber(match[1]!);
         if (!entry || value === null) continue;
         const start = match.index;
-        if (isConventional(ctx, entry.measure, start, start + match[0].length)) continue;
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[2]!, match[0])) continue;
+        if (isConventional(ctx, entry.measure, start, start + match[0].length)) {
+          changes.push(hold(start, match[0], entry.measure.id, 30));
+          continue;
+        }
 
         const target = entry.measure.convert(value);
         const { precision, maxDecimals } = ctx.options.units;

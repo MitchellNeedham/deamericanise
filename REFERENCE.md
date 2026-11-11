@@ -147,7 +147,8 @@ Where an overlay and the shared rules both have a word, the overlay's row is tri
 which is how `field trip` becomes a school trip in `en-GB` and an excursion in `en-AU`.
 The shared row is the fallback when the overlay's row is switched off or its context does
 not fit: an `en-GB` `mailbox` is a postbox only when it is one for posting letters (`the
-nearest mailbox`), and otherwise the letterbox the other dialects say.
+nearest mailbox`), and otherwise the letterbox the other dialects say. A mailbox that holds
+email or voicemail is neither, so it stays a mailbox in every dialect.
 
 `en-IE` and `en-ZA` follow British usage with local emergency numbers and a few words of
 their own. `en-CA` is the hybrid: it keeps `colour`, `centre` and `defence` but also keeps
@@ -196,7 +197,9 @@ nappy, `zip code` to postcode, `parking lot` to car park, `windshield` to windsc
 where the word has an innocent sense: `buying gas` becomes petrol but `a gas giant` does
 not; `in the fall of 2024` becomes autumn but `prices will fall` does not; `bake the
 cookies` becomes biscuits but `Accept all cookies`, `This site uses cookies` and a lone
-`Cookies` link do not. Phrases the rest of the world already says keep their words:
+`Cookies` link do not; `Check the mailbox for the parcel` becomes a letterbox but `Your
+mailbox is full`, `a shared mailbox in Outlook`, `a voicemail mailbox` and a lone `Mailbox`
+label do not. Phrases the rest of the world already says keep their words:
 `fortune cookie`, `food truck`, `my way or the highway`, `Highway 101`, `seat of your
 pants`, `ants in his pants`, `yoga pants`. In British English a `fire truck` is a fire engine
 and a `pickup truck` stays one. The verb stays too: `the dog pants heavily` keeps its `pants`,
@@ -733,6 +736,10 @@ there each root needs the rules in its own styles.
 - A web cookie is told from a baked one by the words in its own sentence. A short line
   with a second word but nothing about the web in it, such as `About cookies`, still
   becomes biscuits.
+- An email mailbox is told from a letterbox the same way, by the words in its own
+  sentence. `Set up your voicemail. Your mailbox has not been set up.` still gives a
+  letterbox, because the second sentence says nothing about voicemail. A bare `The mailbox
+  is full.` reads as a bounce notice and stays a mailbox, though it can be a letterbox.
 - `localise` rewrites emergency numbers, which is right for a translated recipe and wrong
   for a news story about America. It is `risky`-tagged; `--confidence safe,moderate` drops
   it, and so does `--rule 'dialect.*=false'`.

@@ -11,6 +11,7 @@ import {
   NUMERIC_PATTERN,
   formatNumber,
   formatTemperature,
+  isOvenSetting,
   parseNumber,
   significantFigures,
 } from './number.js';
@@ -361,47 +362,143 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   return [dimensionRule, rangeRule, singleRule];
 }
 
-function temperatureRule(): Rule {
-  const pattern = new RegExp(
-    String.raw`(?<![\w.])([-−]?\d+(?:\.\d+)?)\s*` +
-      String.raw`(°\s*F\b|℉|°\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|degrees?\s+F\b|deg\.?\s*F\b)`,
-    'gi',
-  );
+/** `°F`, `℉`, `degrees Fahrenheit` and the like. A bare `F` is too often a letter to count. */
+const FAHRENHEIT = String.raw`°\s*F\b|℉|°\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|degrees?\s+F\b|deg\.?\s*F\b`;
+const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
 
-  return {
-    id: 'units.temperature.fahrenheit',
-    category: 'units',
-    confidence: 'moderate',
-    priority: 35,
-    find(ctx) {
-      const changes: Change[] = [];
-      pattern.lastIndex = 0;
-      for (const match of ctx.text.matchAll(pattern)) {
-        const fahrenheit = parseNumber(match[1]!);
-        if (fahrenheit === null) continue;
-        const number = formatTemperature(
-          ((fahrenheit - 32) * 5) / 9,
-          ctx.options.units.precision,
-          fahrenheit,
-          ctx.options.units.maxDecimals,
-        );
-        const spelled = /degrees?/i.test(match[2]!);
-        const suffix = spelled
-          ? `${Number(number) === 1 || Number(number) === -1 ? ' degree' : ' degrees'} Celsius`
-          : '°C';
-        pushMeasurement(
-          ctx,
-          changes,
-          match.index,
-          match[0],
-          `${number}${suffix}`,
-          'units.temperature.fahrenheit',
-          35,
-        );
-      }
-      return changes;
-    },
-  };
+/**
+ * One temperature, or a range of them with the unit written once: `350-375°F`,
+ * `350 to 375°F`, `between 60 and 70°F`. `and` joins a range only after `between`.
+ */
+const FAHRENHEIT_PATTERN = new RegExp(
+  String.raw`(?<![\w.])(?:(${DEGREES})(\s*(?:-|\u2013|\u2014|to)\s*|(?<=\bbetween\s+${DEGREES})\s+and\s+))?` +
+    String.raw`(${DEGREES})\s*(${FAHRENHEIT})`,
+  'gi',
+);
+
+/**
+ * A change in temperature, told by the words just before it: a verb of change, `by`,
+ * `up`, `down` or `a drop of`, with at most a hedge such as `nearly` in between. A verb
+ * followed by `to` or `from` names the new temperature, so it does not count.
+ * Bare `fall` is left out because it is also the season.
+ */
+const CHANGE_BEFORE = new RegExp(
+  String.raw`\b(?:drop(?:s|ped|ping)?|fell|falls|fallen|falling|r(?:ise[sn]?|ising|ose)|` +
+    String.raw`climb(?:s|ed|ing)?|jump(?:s|ed|ing)?|dip(?:s|ped|ping)?|plung(?:e[sd]?|ing)|` +
+    String.raw`plummet(?:s|ed|ing)?|soar(?:s|ed|ing)?|spik(?:e[sd]|ing)|surg(?:e[sd]?|ing)|` +
+    String.raw`increas(?:e[sd]?|ing)|decreas(?:e[sd]?|ing)|by|up|down|` +
+    String.raw`(?:drop|rise|fall|increase|decrease|change|swing|difference|jump|dip)s?\s+of)` +
+    String.raw`(?:\s+(?:about|around|roughly|nearly|almost|some|another|a\s+further|just|only))?\s+$`,
+  'i',
+);
+
+/**
+ * A change in temperature, told by the words just after it: a comparative, a noun of
+ * change, or a distance from a norm. `above` and `below` mean a difference only here;
+ * before the number they set a threshold. `fall` is left out because `a 60°F fall day`
+ * is the season.
+ */
+const CHANGE_AFTER = new RegExp(
+  String.raw`^\s+(?:warmer|cooler|hotter|colder|higher|lower|` +
+    String.raw`(?:temperature\s+)?(?:drop|rise|increase|decrease|change|swing|difference|jump|dip)s?|` +
+    String.raw`(?:above|below)\s+(?:the\s+)?(?:seasonal\s+)?(?:normal|average|norm|freezing))\b`,
+  'i',
+);
+
+/** `10°F below zero` is a negative temperature, not a distance from zero. */
+const FROM_ZERO = /^\s+(above|below)\s+zero\b/i;
+
+const ABSOLUTE_ID = 'units.temperature.fahrenheit';
+const DIFFERENCE_ID = 'units.temperature.difference';
+
+interface FahrenheitReading {
+  start: number;
+  /** The source text, including any `below zero` folded into the value. */
+  matched: string;
+  body: string;
+  ruleId: typeof ABSOLUTE_ID | typeof DIFFERENCE_ID;
+}
+
+/**
+ * The ends of a range at one precision, matching the more precise end of the source.
+ * A narrow range takes extra figures where it would otherwise print both ends the same.
+ */
+function formatEnds(ctx: RuleContext, values: number[], raw: string[]): string[] {
+  const { precision, maxDecimals } = ctx.options.units;
+  const figures = Math.max(...raw.map(significantFigures));
+  let texts = values.map((v) => formatNumber(v, precision, figures, maxDecimals));
+  for (let extra = 1; extra <= 2 && texts.length === 2 && texts[0] === texts[1]; extra++) {
+    texts = values.map((v) => formatNumber(v, precision, figures + extra, maxDecimals));
+  }
+  return texts;
+}
+
+function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
+  const readings: FahrenheitReading[] = [];
+  FAHRENHEIT_PATTERN.lastIndex = 0;
+  for (const match of ctx.text.matchAll(FAHRENHEIT_PATTERN)) {
+    const raw = match[1] === undefined ? [match[3]!] : [match[1], match[3]!];
+    const parsed = raw.map(parseNumber);
+    if (parsed.some((v) => v === null)) continue;
+    let values = parsed as number[];
+
+    const start = match.index;
+    let end = start + match[0].length;
+    const before = ctx.text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
+    const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
+    const zero = FROM_ZERO.exec(after);
+    if (zero) {
+      end += zero[0].length;
+      if (zero[1]!.toLowerCase() === 'below') values = values.map((v) => -Math.abs(v));
+    }
+    const difference = !zero && (CHANGE_BEFORE.test(before) || CHANGE_AFTER.test(after));
+
+    let numbers: string[];
+    if (difference) {
+      numbers = formatEnds(ctx, values.map((v) => (v * 5) / 9), raw);
+    } else if (values.length === 1 || values.every(isOvenSetting)) {
+      const { precision, maxDecimals } = ctx.options.units;
+      numbers = values.map((v) => formatTemperature(((v - 32) * 5) / 9, precision, v, maxDecimals));
+    } else {
+      numbers = formatEnds(ctx, values.map((v) => ((v - 32) * 5) / 9), raw);
+    }
+
+    const spelled = /degrees?/i.test(match[4]!);
+    const single = numbers.length === 1 && Math.abs(Number(numbers[0])) === 1;
+    const suffix = spelled ? ` ${single ? 'degree' : 'degrees'} Celsius` : '°C';
+    readings.push({
+      start,
+      matched: ctx.text.slice(start, end),
+      body: numbers.join(match[2] ?? '') + suffix,
+      ruleId: difference ? DIFFERENCE_ID : ABSOLUTE_ID,
+    });
+  }
+  return readings;
+}
+
+/**
+ * A temperature and a change in temperature convert differently: `20°F` is -6.7°C, but
+ * `a 20°F drop` is an 11°C drop. Both rules read the same matches and each converts only
+ * its own kind, so switching one off leaves that kind in Fahrenheit, never misread as
+ * the other.
+ */
+function temperatureRules(): Rule[] {
+  return [ABSOLUTE_ID, DIFFERENCE_ID].map(
+    (id): Rule => ({
+      id,
+      category: 'units',
+      confidence: 'moderate',
+      priority: 35,
+      find(ctx) {
+        const changes: Change[] = [];
+        for (const reading of fahrenheitReadings(ctx)) {
+          if (reading.ruleId !== id) continue;
+          pushMeasurement(ctx, changes, reading.start, reading.matched, reading.body, id, 35);
+        }
+        return changes;
+      },
+    }),
+  );
 }
 
 /**
@@ -418,7 +515,7 @@ function temperatureDecadeRule(): Rule {
   const DECADE = String.raw`(low|mid|middle|high|upper|lower)?[\s-]*(1[01]0|\d0)['\u2019]?s`;
   const pattern = new RegExp(
     String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
-      String.raw`(?:\s*(?:and|to|-|\u2013)\s*${DECADE})?(?!\w)`,
+      String.raw`(?:\s*(?:and|to|-|\u2013)\s*${DECADE})?(?!\w)(\s*(?:${FAHRENHEIT}|Fahrenheit\b))?`,
     'gi',
   );
 
@@ -456,7 +553,8 @@ function temperatureDecadeRule(): Rule {
         const after = ctx.text.slice(end, end + 90);
 
         if (A_DECADE.test(before)) continue;
-        if (!TEMPERATURE_NEARBY.test(before) && !TEMPERATURE_NEARBY.test(after)) continue;
+        const marked = match[6] !== undefined;
+        if (!marked && !TEMPERATURE_NEARBY.test(before) && !TEMPERATURE_NEARBY.test(after)) continue;
 
         const firstBand = SPREAD[(match[2] ?? '').toLowerCase()] ?? [0, 9];
         // With a second decade the range runs from the bottom of the first to the top of
@@ -596,7 +694,7 @@ export function unitRules(options: ResolvedOptions, dialectKeep: string[]): Rule
   const skip = new Set([...dialectKeep, ...options.unitsKeep]);
   return [
     feetInchesRule(),
-    temperatureRule(),
+    ...temperatureRules(),
     temperatureDecadeRule(),
     coinSizeRule(),
     fuelEconomyRule(),

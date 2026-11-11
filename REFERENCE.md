@@ -164,6 +164,14 @@ Dimensions move as a set, because converting half of a pair is worse than leavin
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 `22 x 28 centimetres`, both ends sharing the unit chosen for the larger.
 
+Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
+`Bake at 175-190°C`. A change in temperature has no 32° offset to take off, so
+`dropped 20°F` becomes `dropped 11°C` and `10°F warmer` becomes `5.6°C warmer`. The words
+beside the number tell the two apart: a verb of change or `by` before it, a comparative
+or a noun such as `drop` after it. `fell to 20°F` names the new temperature and converts
+as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule of their own,
+`units.temperature.difference`, so they can be switched off apart from temperatures.
+
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
 source and never claims more accuracy than was written down. `exact` and a fixed number of
@@ -563,7 +571,7 @@ and explained on hover, beside a report of the changes and the American-ness sco
 Dropping a source file uses `deamericaniseFile`, so a `.ts` file has only its comments
 rewritten.
 
-A collapsible panel lists all 83 rules grouped by family, each with a tick box and a
+A collapsible panel lists all 84 rules grouped by family, each with a tick box and a
 count of how many changes it made to the text on the left. Unticking forces a rule off;
 leaving it ticked means the mode and confidence settings still govern it, so the count is
 the honest answer to what actually ran.

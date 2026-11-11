@@ -1,7 +1,9 @@
 import { DomRewriter } from '../../src/dom/index.js';
 import { api } from './browser.js';
-import { Highlighter } from './highlight.js';
+import { Highlighter, type RuleSwitch } from './highlight.js';
 import {
+  catalogue,
+  DEFAULTS,
   domOptions,
   isEnabledOn,
   loadSettings,
@@ -14,8 +16,15 @@ let rewriter: DomRewriter | null = null;
 let highlighter: Highlighter | null = null;
 let applied = '';
 const host = location.hostname;
+let current: Settings = DEFAULTS;
+
+const rules: RuleSwitch = {
+  canSwitchOff: (ruleId) => catalogue(current.dialect).get(ruleId)?.switchable !== false,
+  switchOff: (ruleId) => void switchOffRule(ruleId),
+};
 
 function apply(settings: Settings): void {
+  current = settings;
   if (!isEnabledOn(settings, host)) {
     highlighter?.stop();
     highlighter = null;
@@ -36,7 +45,7 @@ function apply(settings: Settings): void {
   applied = key;
 
   if (settings.highlight) {
-    highlighter ??= new Highlighter(rewriter, (ruleId) => void switchOffRule(ruleId));
+    highlighter ??= new Highlighter(rewriter, rules);
   } else {
     highlighter?.stop();
     highlighter = null;

@@ -22,6 +22,10 @@
   }
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -182,6 +186,16 @@ button.link {
   font-size: 14px;
 }
 
+.choice.category {
+  grid-template-columns: auto 1fr auto;
+}
+
+.choice > .tune-open {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+
 .switched-off {
   list-style: none;
   margin: 0;
@@ -197,6 +211,154 @@ button.link {
   padding: 6px 10px;
   background: var(--panel);
   border-radius: 6px;
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.notice {
+  padding: 8px 12px;
+  background: var(--panel);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.rule-id {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ------- Fine-tune dialogue ------- */
+
+body:has(.tune[open]) {
+  overflow: hidden;
+}
+
+.tune {
+  box-sizing: border-box;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(760px, calc(100dvh - 32px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 16px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 25%);
+}
+
+.tune[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.tune::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.tune-head,
+.tune-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+}
+
+.tune-head {
+  border-bottom: 1px solid var(--line);
+}
+
+.tune-head h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.tune-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 0;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tune-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 18px;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.tune-options:empty {
+  display: none;
+}
+
+.tune-options,
+.tune-rules,
+.tune-rule-list {
+  display: grid;
+  gap: 10px;
+}
+
+.tune-rules h3 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.tune-options:not(:empty) + .tune-rules {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.field select {
+  justify-self: start;
+  max-width: 100%;
+}
+
+.field small {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.tune-foot {
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 600px) {
+  .tune {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .tune-body {
+    flex: 1;
+  }
 }
 
 .saved {

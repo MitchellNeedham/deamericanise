@@ -3,6 +3,12 @@ import type { Change } from '../../src/types.js';
 
 const LISTENING: AddEventListenerOptions = { capture: true, passive: true };
 
+/** Switches off the rule behind a change from its description. */
+export interface RuleSwitch {
+  canSwitchOff(ruleId: string): boolean;
+  switchOff(ruleId: string): void;
+}
+
 /** Must match the selectors in highlight.css. */
 function nameOf(change: Change): string {
   return `deamericanise-${change.category}-${change.confidence}`;
@@ -23,9 +29,9 @@ export class Highlighter {
 
   constructor(
     private readonly rewriter: DomRewriter,
-    switchOff: (ruleId: string) => void,
+    rules: RuleSwitch,
   ) {
-    this.tip = new Tip(switchOff);
+    this.tip = new Tip(rules);
     this.unsubscribe = rewriter.onRewrite(this.scheduleRefresh);
     document.addEventListener('mousemove', this.onMove, LISTENING);
     document.addEventListener('mouseout', this.onOut, LISTENING);
@@ -148,8 +154,6 @@ const DARK = {
 /** Long enough to move the pointer across the gap between a change and its description. */
 const HIDE_DELAY = 300;
 
-/** Article agreement runs after the rule switches, so switching it off changes nothing. */
-const ALWAYS_ON = new Set(['grammar.article-agreement']);
 
 /**
  * The description of one change. It sits in a closed shadow root so the page's styles
@@ -163,7 +167,7 @@ class Tip {
   private hovered = false;
   private hideTimer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private readonly switchOff: (ruleId: string) => void) {}
+  constructor(private readonly rules: RuleSwitch) {}
 
   get showing(): boolean {
     return this.shown !== null;
@@ -275,7 +279,7 @@ class Tip {
       `text-decoration: underline; cursor: pointer;`;
     button.addEventListener('click', () => {
       this.hide();
-      this.switchOff(change.ruleId);
+      this.rules.switchOff(change.ruleId);
     });
 
     this.card.replaceChildren(
@@ -284,7 +288,7 @@ class Tip {
       code(change.after),
       line(`${change.ruleId} · ${change.confidence}`),
       ...(change.note ? [line(change.note)] : []),
-      ...(ALWAYS_ON.has(change.ruleId) ? [] : [button]),
+      ...(this.rules.canSwitchOff(change.ruleId) ? [button] : []),
     );
   }
 }

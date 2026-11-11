@@ -605,10 +605,16 @@ Pages that were already open need a reload before the extension can rewrite them
 
 The toolbar button shows how many changes the current page has, switches the extension
 off for that site, and switches highlighting on and off. The settings page has the dialect,
-the mode, a switch for each category, the confidence tiers, `units.keepOriginal`, the
-`verdict`, highlighting, and the lists of rules and sites switched off. A category switched
-by hand beats the mode, and stays that way when the mode changes, until you choose
-**Follow the mode**.
+the mode, a switch for each category, the confidence tiers, the `verdict`, highlighting,
+and the lists of rules and sites switched off. A category switched by hand beats the mode,
+and stays that way when the mode changes, until you choose **Follow the mode**.
+
+**Fine-tune** on a category opens its options and a switch for each of its rules, labelled
+from `ruleCatalogue()`. Units have `keepOriginal`, `precision` and `fuelEconomy`, dates have
+`format` and `reorderLongDates`, and times have `to24Hour`. An option you leave alone
+follows the mode. A rule switched on there still needs its category on and its tier
+ticked, unlike `rules` in the package. Currency and Other have one rule each, so their
+category switch is the only one.
 
 Highlighting is off by default. When it is on, each change gets a background in its
 category's colour and an underline that is solid for safe, dashed for moderate and dotted

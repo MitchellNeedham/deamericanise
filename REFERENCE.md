@@ -73,7 +73,7 @@ deamericaniseText('The color of the theater.');
 
 const result = deamericanise('They canceled it on 3/14/2024.');
 result.text;     // 'They cancelled it on 2024-03-14.'
-result.changes;  // [{ start, end, before, after, ruleId, category, confidence, note? }]
+result.changes;  // [{ start, end, before, after, ruleId, category, confidence, note?, agreesWith? }]
 result.signals;  // how American the input looked, and why
 
 deamericaniseCode('const color = "color"; // set the color', { language: 'ts' }).text;
@@ -82,6 +82,12 @@ deamericaniseCode('const color = "color"; // set the color', { language: 'ts' })
 
 Every change carries offsets into the input, so you can build your own diff, editor
 decoration or review UI from `result.changes` without re-running anything.
+
+An article fix also carries `agreesWith`, the `start` and `end` of the replacement it was
+fixed to suit, which is in the same list. Under `localise`, `an eraser` gives two changes:
+`an` to `a` with `agreesWith: { start: 3, end: 9 }`, and `eraser` to `rubber` at 3 to 9.
+Apply the two together or not at all, because either one alone leaves `a eraser` or
+`an rubber`.
 
 `deamericaniseFile(filename, source)` picks prose or comment-only handling from the
 extension, which is what the CLI uses.
@@ -392,8 +398,11 @@ export default [
 ```
 
 The rule reports each Americanism in a comment at its exact position and offers a fix for
-just that word, so `--fix` never rewrites more than it flagged. `deamericanise.configs.recommended`
-is there if you want the defaults.
+just that word, so `--fix` never rewrites more than it flagged. An article fixed to suit a
+replacement is reported with it, as one problem whose one fix covers both words, so a quick
+fix in the editor never leaves `a eraser` or `an rubber`. The editor shows
+`"an eraser" is American English. Use "a rubber".` `deamericanise.configs.recommended` is
+there if you want the defaults.
 
 ### Prettier
 

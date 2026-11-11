@@ -46,6 +46,17 @@ describe('articles follow the replacement', () => {
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(deamericaniseText(input, { preset: 'localise' })).toBe(expected);
   });
+
+  it('records which replacement the article fix agrees with', () => {
+    const [article, word] = deamericanise('Use an eraser.', { preset: 'localise' }).changes;
+    expect(word).toMatchObject({ before: 'eraser', start: 7, end: 13 });
+    expect(article).toMatchObject({ before: 'an', after: 'a', agreesWith: { start: 7, end: 13 } });
+  });
+
+  it('links nothing else', () => {
+    const { changes } = deamericanise('Use an eraser on the gray sidewalk.', { preset: 'localise' });
+    expect(changes.filter((c) => c.agreesWith).map((c) => c.before)).toEqual(['an']);
+  });
 });
 
 describe('the change list', () => {

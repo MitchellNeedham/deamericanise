@@ -1,5 +1,6 @@
+import { agreesWith } from '../engine/articles.js';
 import { deamericanise } from '../transform.js';
-import type { Options } from '../types.js';
+import type { Change, Options } from '../types.js';
 
 interface Comment {
   type: 'Line' | 'Block' | string;
@@ -62,19 +63,30 @@ const rule = {
       Program(): void {
         for (const comment of sourceCode.getAllComments()) {
           if (!comment.range) continue;
-          const result = deamericanise(comment.value, { protectIdentifiers: true, ...options });
+          const { changes } = deamericanise(comment.value, { protectIdentifiers: true, ...options });
           const base = comment.range[0] + MARKER_LENGTH;
+          const rangeOf = (change: Change): [number, number] => [base + change.start, base + change.end];
 
-          for (const change of result.changes) {
-            const range: [number, number] = [base + change.start, base + change.end];
+          for (const change of changes) {
+            // Reported with the replacement it agrees with, so no quick fix applies one alone.
+            if (change.agreesWith) continue;
+            const article = changes.find((a) => agreesWith(a, change));
+            const parts = article ? [article, change] : [change];
+
             context.report({
               loc: {
-                start: sourceCode.getLocFromIndex(range[0]),
-                end: sourceCode.getLocFromIndex(range[1]),
+                start: sourceCode.getLocFromIndex(rangeOf(parts[0]!)[0]),
+                end: sourceCode.getLocFromIndex(rangeOf(change)[1]),
               },
               messageId: 'americanism',
-              data: { before: change.before, after: change.after },
-              fix: (fixer) => fixer.replaceTextRange(range, change.after),
+              data: {
+                before: parts.map((c) => c.before).join(' '),
+                after: parts.map((c) => c.after).join(' '),
+              },
+              fix: (fixer) => {
+                const fixes = parts.map((c) => fixer.replaceTextRange(rangeOf(c), c.after));
+                return fixes.length === 1 ? fixes[0] : fixes;
+              },
             });
           }
         }

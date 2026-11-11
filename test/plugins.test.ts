@@ -79,9 +79,23 @@ describe('the ESLint plugin', () => {
   const source = 'const a = 1; // the color\n';
 
   interface Report {
-    loc: { start: { line: number; column: number } };
+    loc: { start: { line: number; column: number }; end: { line: number; column: number } };
     data: Record<string, string>;
     fix?: (fixer: unknown) => unknown;
+  }
+
+  interface Fix {
+    range: [number, number];
+    text: string;
+  }
+
+  /** Applies one report's fix on its own, the way an editor's quick fix does. */
+  function quickFix(code: string, report: Report): string {
+    const fixer = { replaceTextRange: (range: [number, number], text: string): Fix => ({ range, text }) };
+    const fixes = [report.fix?.(fixer) ?? []].flat() as Fix[];
+    return fixes
+      .sort((a, b) => b.range[0] - a.range[0])
+      .reduce((out, { range, text }) => out.slice(0, range[0]) + text + out.slice(range[1]), code);
   }
 
   function lint(code: string, ruleOptions: unknown[] = []): Report[] {
@@ -122,6 +136,25 @@ describe('the ESLint plugin', () => {
     }) as { range: [number, number]; value: string };
     expect(source.slice(applied.range[0], applied.range[1])).toBe('color');
     expect(applied.value).toBe('colour');
+  });
+
+  describe('an article fix and the word it agrees with', () => {
+    const code = 'const a = 1; // Use an eraser.\n';
+    const reports = lint(code, [{ preset: 'localise' }]);
+
+    it('are one problem', () => {
+      expect(reports).toHaveLength(1);
+      expect(reports[0]?.data).toEqual({ before: 'an eraser', after: 'a rubber' });
+    });
+
+    it('point at the span from the article to the end of the word', () => {
+      const { start, end } = reports[0]!.loc;
+      expect(code.slice(start.column, end.column)).toBe('an eraser');
+    });
+
+    it('share one fix', () => {
+      expect(quickFix(code, reports[0]!)).toBe('const a = 1; // Use a rubber.\n');
+    });
   });
 
   it('takes rule options', () => {

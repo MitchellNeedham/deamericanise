@@ -32,6 +32,12 @@ export interface Change {
   note?: string;
   /** Overlap tie-break; higher wins. Set by the rule, not usually read by callers. */
   priority?: number;
+  /**
+   * Set only on an article fix (`grammar.article-agreement`): the `start` and `end` of the
+   * replacement it agrees with, which is in the same list of changes. Apply both or
+   * neither, since either one alone leaves `a eraser` or `an rubber`.
+   */
+  agreesWith?: { start: number; end: number };
 }
 
 /** Evidence that the input really is American, used to gate the ambiguous rules. */

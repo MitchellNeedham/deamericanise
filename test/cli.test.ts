@@ -1,7 +1,10 @@
+import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Readable } from 'node:stream';
+import { build } from 'tsup';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { main } from '../src/cli-main.js';
 
 // The CLI must report the version the package was built with, never a literal of its own.
@@ -28,11 +31,19 @@ afterEach(() => vi.restoreAllMocks());
 const stdout = () => out.join('');
 const stderr = () => err.join('');
 
-function withFile(name: string, contents: string): string {
+function withDirectory(files: Record<string, string>): string {
   const directory = mkdtempSync(join(tmpdir(), 'deamericanise-'));
-  const path = join(directory, name);
-  writeFileSync(path, contents, 'utf8');
-  return path;
+  for (const [name, contents] of Object.entries(files)) writeFileSync(join(directory, name), contents, 'utf8');
+  return directory;
+}
+
+function withFile(name: string, contents: string): string {
+  return join(withDirectory({ [name]: contents }), name);
+}
+
+function withStdin(text: string): void {
+  const stream = Object.assign(Readable.from([Buffer.from(text)]), { isTTY: false });
+  vi.spyOn(process, 'stdin', 'get').mockReturnValue(stream as unknown as typeof process.stdin);
 }
 
 describe('informational flags', () => {
@@ -144,5 +155,132 @@ describe('bad input', () => {
     await expect(main(args as string[])).rejects.toThrow('exited');
     expect(stderr()).toContain(message);
     exit.mockRestore();
+  });
+});
+
+describe('choosing which files to read', () => {
+  const json = '{ "color": "gray" }\n';
+
+  it('skips a named file of unknown type and says so on stderr', async () => {
+    const path = withFile('settings.json', json);
+    expect(await main([path])).toBe(0);
+    expect(stdout()).toBe('');
+    expect(stderr()).toContain(`skipping ${path}`);
+    expect(stderr()).toContain('--language md');
+  });
+
+  it('never writes a skipped file', async () => {
+    const path = withFile('settings.json', json);
+    expect(await main(['--write', path])).toBe(0);
+    expect(readFileSync(path, 'utf8')).toBe(json);
+    expect(stdout()).toBe('');
+  });
+
+  it.each`
+    prose              | code | why
+    ${'The color.'}    | ${1} | ${'the prose file needs a change'}
+    ${'The colour.'}   | ${0} | ${'the skipped file does not count'}
+  `('--check exits $code beside a skipped file when $why', async ({ prose, code }) => {
+    const skipped = withFile('settings.json', json);
+    const read = withFile('a.md', prose as string);
+    expect(await main(['--check', skipped, read])).toBe(code);
+    expect(stderr()).toContain(`skipping ${skipped}`);
+  });
+
+  it('reads nothing from stdin when every named file is skipped', async () => {
+    withStdin('The color.');
+    expect(await main(['--check', withFile('settings.json', json)])).toBe(0);
+    expect(await main([withFile('settings.json', json)])).toBe(0);
+    expect(stdout()).toBe('');
+  });
+
+  it.each(['README', 'CHANGELOG', 'CHANGES', 'HISTORY', 'NEWS', 'CONTRIBUTING', 'readme'])(
+    'reads %s as prose by name',
+    async (name) => {
+      expect(await main([withFile(name, 'The color.')])).toBe(0);
+      expect(stdout()).toBe('The colour.');
+    },
+  );
+
+  it.each(['LICENSE', 'LICENCE', 'COPYING', 'AUTHORS', 'script', 'yarn.lock', 'data.csv'])(
+    'skips %s',
+    async (name) => {
+      const path = withFile(name, 'The color.');
+      expect(await main(['--write', path])).toBe(0);
+      expect(readFileSync(path, 'utf8')).toBe('The color.');
+      expect(stderr()).toContain(`skipping ${path}`);
+    },
+  );
+
+  it('reads a named file of unknown type as prose with --language md', async () => {
+    const path = withFile('NOTES', 'The color.');
+    expect(await main(['--language', 'md', path])).toBe(0);
+    expect(stdout()).toBe('The colour.');
+    expect(stderr()).toBe('');
+  });
+
+  it('walks past unknown files in a directory without a word', async () => {
+    const directory = withDirectory({ 'a.md': 'The color.', CHANGELOG: 'The color.', 'settings.json': json });
+    expect(await main(['--write', directory])).toBe(0);
+    expect(readFileSync(join(directory, 'a.md'), 'utf8')).toBe('The colour.');
+    expect(readFileSync(join(directory, 'CHANGELOG'), 'utf8')).toBe('The colour.');
+    expect(readFileSync(join(directory, 'settings.json'), 'utf8')).toBe(json);
+    expect(stderr()).toBe('');
+  });
+
+  it('still reads stdin with --language', async () => {
+    withStdin('The color.');
+    expect(await main(['--language', 'md'])).toBe(0);
+    expect(stdout()).toBe('The colour.');
+  });
+});
+
+describe('a reader that stops early', () => {
+  let cli: string;
+
+  beforeAll(async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'deamericanise-cli-'));
+    await build({
+      config: false,
+      entry: { cli: 'src/cli.ts' },
+      outDir: directory,
+      format: 'esm',
+      outExtension: () => ({ js: '.mjs' }),
+      define: { __VERSION__: JSON.stringify(version) },
+      silent: true,
+    });
+    cli = join(directory, 'cli.mjs');
+  }, 30_000);
+
+  /** Runs the built CLI and closes its stdout after the first chunk, as `head` does. */
+  async function closedEarly(args: string[]): Promise<{ code: number | null; errors: string }> {
+    const child = spawn(process.execPath, [cli, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let errors = '';
+    child.stderr.on('data', (chunk: Buffer) => (errors += chunk.toString()));
+    child.stdout.once('data', () => child.stdout.destroy());
+    const code = await new Promise<number | null>((resolve) => child.on('close', resolve));
+    return { code, errors };
+  }
+
+  // Every case prints well over a pipe buffer, so the CLI is still writing when the reader leaves.
+
+  it('exits 0 with nothing on stderr when the run succeeds', async () => {
+    const source = withFile('big.ts', 'const x = 1;\n'.repeat(100_000));
+    expect(await closedEarly([source])).toEqual({ code: 0, errors: '' });
+  });
+
+  it('keeps the status --check settles on', async () => {
+    const source = withFile('big.md', 'The color.\n'.repeat(20_000));
+    expect(await closedEarly(['--check', '--diff', source])).toEqual({
+      code: 1,
+      errors: 'deamericanise: changes are needed. Run with --diff to see them.\n',
+    });
+  });
+
+  it('still rewrites every file under --write', async () => {
+    const names = Array.from({ length: 1_000 }, (_, i) => `${'long-name-'.repeat(20)}${i}.md`);
+    const directory = withDirectory(Object.fromEntries(names.map((name) => [name, 'The color.'])));
+    expect(await closedEarly(['--write', directory])).toEqual({ code: 0, errors: '' });
+    for (const name of names) expect(readFileSync(join(directory, name), 'utf8')).toBe('The colour.');
   });
 });

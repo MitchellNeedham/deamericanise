@@ -1,5 +1,5 @@
 import { readFileSync, statSync, writeFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { basename, join, relative } from 'node:path';
 import { parseArgs } from 'node:util';
 import { CATEGORIES, CONFIDENCES, PRESETS } from './config.js';
 import { DIALECTS } from './dialects/index.js';
@@ -14,6 +14,12 @@ declare const __VERSION__: string;
 const SKIP_DIRECTORIES = new Set([
   'node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.cache', 'vendor', 'target',
 ]);
+
+/**
+ * Prose files that conventionally have no extension. Licence texts and lists of names are
+ * left out: a licence must stay verbatim, and a surname is not a misspelling.
+ */
+const PROSE_FILENAMES = new Set(['readme', 'changelog', 'changes', 'history', 'news', 'contributing']);
 
 const HELP = `deamericanise - rewrite American English into the version the rest of the world reads
 
@@ -49,6 +55,8 @@ Units
 
 Files
       --language <id>    Force a language: ts, python, ruby, sql, md, ... (needed for stdin)
+                         A named file of unknown type, such as settings.json, is skipped
+                         unless this is given. --language md reads it as prose.
       --docstrings       Also rewrite Python docstrings
       --no-code-guard    Rewrite comment lines that look like commented-out code too
       --list-languages   Print every language name --language accepts
@@ -60,6 +68,11 @@ Other
   -v, --version
 `;
 
+/** Writes to stdout until the reader has gone, as `head` does after its first lines. */
+function print(text: string): void {
+  if (!process.stdout.errored) process.stdout.write(text);
+}
+
 function fail(message: string): never {
   process.stderr.write(`deamericanise: ${message}\n`);
   process.exit(2);
@@ -69,18 +82,20 @@ function list(value: string | undefined): string[] {
   return value ? value.split(',').map((s) => s.trim()).filter(Boolean) : [];
 }
 
+/** Whether a file has a lexer or reads as prose, from its name alone. */
+function isKnownFile(path: string): boolean {
+  const name = basename(path).toLowerCase();
+  const extension = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : '';
+  return Boolean(lexerFor(name)) || PROSE_EXTENSIONS.has(extension) || PROSE_FILENAMES.has(name);
+}
+
 function walk(path: string, into: string[]): void {
-  if (statSync(path).isFile()) {
-    into.push(path);
-    return;
-  }
   for (const entry of readdirSync(path, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (SKIP_DIRECTORIES.has(entry.name) || entry.name.startsWith('.')) continue;
       walk(join(path, entry.name), into);
-    } else if (entry.isFile()) {
-      const extension = entry.name.split('.').pop()?.toLowerCase() ?? '';
-      if (lexerFor(entry.name) || PROSE_EXTENSIONS.has(extension)) into.push(join(path, entry.name));
+    } else if (entry.isFile() && isKnownFile(entry.name)) {
+      into.push(join(path, entry.name));
     }
   }
 }
@@ -99,12 +114,12 @@ const dim = paint('2', '22');
 function printDiff(label: string, before: string, after: string): void {
   const beforeLines = before.split('\n');
   const afterLines = after.split('\n');
-  process.stdout.write(`${dim(`--- ${label}`)}\n`);
+  print(`${dim(`--- ${label}`)}\n`);
   for (let i = 0; i < Math.max(beforeLines.length, afterLines.length); i++) {
     if (beforeLines[i] === afterLines[i]) continue;
     const number = String(i + 1).padStart(5);
-    if (beforeLines[i] !== undefined) process.stdout.write(`${dim(number)} ${red(`- ${beforeLines[i]}`)}\n`);
-    if (afterLines[i] !== undefined) process.stdout.write(`${dim(number)} ${green(`+ ${afterLines[i]}`)}\n`);
+    if (beforeLines[i] !== undefined) print(`${dim(number)} ${red(`- ${beforeLines[i]}`)}\n`);
+    if (afterLines[i] !== undefined) print(`${dim(number)} ${green(`+ ${afterLines[i]}`)}\n`);
   }
 }
 
@@ -115,13 +130,13 @@ function lineOf(text: string, offset: number): number {
 }
 
 function printExplanation(label: string, source: string, changes: Change[]): void {
-  process.stdout.write(`${dim(`--- ${label}`)}\n`);
+  print(`${dim(`--- ${label}`)}\n`);
   for (const change of changes) {
     const where = `${label}:${lineOf(source, change.start)}`;
-    process.stdout.write(
+    print(
       `  ${where}  ${red(change.before)} -> ${green(change.after)}  ${dim(`[${change.ruleId}, ${change.confidence}]`)}\n`,
     );
-    if (change.note) process.stdout.write(`      ${dim(change.note)}\n`);
+    if (change.note) print(`      ${dim(change.note)}\n`);
   }
 }
 
@@ -182,23 +197,23 @@ export async function main(argv: string[]): Promise<number> {
   const { values, positionals } = parsed;
 
   if (values.help) {
-    process.stdout.write(HELP);
+    print(HELP);
     return 0;
   }
   if (values.version) {
-    process.stdout.write(`${__VERSION__}\n`);
+    print(`${__VERSION__}\n`);
     return 0;
   }
   if (values['list-dialects']) {
-    for (const pack of Object.values(DIALECTS)) process.stdout.write(`${pack.id}\t${pack.label}\n`);
+    for (const pack of Object.values(DIALECTS)) print(`${pack.id}\t${pack.label}\n`);
     return 0;
   }
   if (values['list-languages']) {
-    for (const name of languageNames()) process.stdout.write(`${name}\n`);
+    for (const name of languageNames()) print(`${name}\n`);
     return 0;
   }
   if (values['list-rules']) {
-    for (const id of ruleIds((values.dialect as Dialect) ?? 'en-AU')) process.stdout.write(`${id}\n`);
+    for (const id of ruleIds((values.dialect as Dialect) ?? 'en-AU')) print(`${id}\n`);
     return 0;
   }
 
@@ -253,7 +268,9 @@ export async function main(argv: string[]): Promise<number> {
   const targets: string[] = [];
   for (const path of positionals) {
     try {
-      walk(path, targets);
+      if (!statSync(path).isFile()) walk(path, targets);
+      else if (values.language || isKnownFile(path)) targets.push(path);
+      else process.stderr.write(`deamericanise: skipping ${path}: unknown file type. Use --language md to read it as prose.\n`);
     } catch {
       fail(`cannot read ${path}`);
     }
@@ -261,9 +278,9 @@ export async function main(argv: string[]): Promise<number> {
 
   let changed = false;
 
-  if (targets.length === 0) {
+  if (positionals.length === 0) {
     if (process.stdin.isTTY) {
-      process.stdout.write(HELP);
+      print(HELP);
       return 0;
     }
     const source = await readStdin();
@@ -271,10 +288,10 @@ export async function main(argv: string[]): Promise<number> {
     const result = deamericaniseFile(name, source, fileOptions);
     changed = result.changes.length > 0;
 
-    if (values.json) process.stdout.write(`${JSON.stringify(result.changes, null, 2)}\n`);
+    if (values.json) print(`${JSON.stringify(result.changes, null, 2)}\n`);
     else if (values.explain) printExplanation('stdin', source, result.changes);
     else if (values.diff) printDiff('stdin', source, result.text);
-    else if (!values.check) process.stdout.write(result.text);
+    else if (!values.check) print(result.text);
 
     return values.check && changed ? 1 : 0;
   }
@@ -297,7 +314,7 @@ export async function main(argv: string[]): Promise<number> {
     // Every other mode has nothing to say about a file that needs no work.
     if (values.json) {
       if (untouched) continue;
-      process.stdout.write(`${JSON.stringify({ file: label, changes: result.changes }, null, 2)}\n`);
+      print(`${JSON.stringify({ file: label, changes: result.changes }, null, 2)}\n`);
     } else if (values.explain) {
       if (untouched) continue;
       printExplanation(label, source, result.changes);
@@ -308,9 +325,9 @@ export async function main(argv: string[]): Promise<number> {
       if (untouched) continue;
       writeFileSync(path, result.text, 'utf8');
       const n = result.changes.length;
-      process.stdout.write(`${label}: ${n} change${n === 1 ? '' : 's'}\n`);
+      print(`${label}: ${n} change${n === 1 ? '' : 's'}\n`);
     } else if (!values.check) {
-      process.stdout.write(result.text);
+      print(result.text);
     }
   }
 

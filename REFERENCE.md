@@ -61,6 +61,21 @@ $ echo 'A flat tire on the sidewalk, 10 miles away.' | deamericanise -l --langua
   stdin:1  10 miles -> 16 kilometres  [units.length.mile, moderate]
 ```
 
+A directory is walked for the files it knows: source in any language `--list-languages`
+prints, and prose (`.md`, `.txt`, `.rst` and the like, plus `README`, `CHANGELOG`,
+`CHANGES`, `HISTORY`, `NEWS` and `CONTRIBUTING` with no extension). A file named on the
+command line has to pass the same test, so a glob such as `deamericanise --write *` never
+rewrites `settings.json` or `yarn.lock` as prose. Each named file that fails is skipped
+with a line on stderr, and it does not change the exit status in any mode, `--check`
+included. To read one anyway, force the language:
+
+```sh
+deamericanise --language md NOTES
+```
+
+`LICENSE`, `COPYING` and `AUTHORS` are not on the list. A licence has to stay verbatim, and
+a list of names is no place for spelling rules.
+
 Run `deamericanise --help` for the full list of flags.
 
 ## Library
@@ -90,7 +105,9 @@ Apply the two together or not at all, because either one alone leaves `a eraser`
 `an rubber`.
 
 `deamericaniseFile(filename, source)` picks prose or comment-only handling from the
-extension, which is what the CLI uses.
+extension, which is what the CLI uses. It reads any file it has no lexer for as prose, JSON
+included, so choose the files before calling it. The CLI does that with the test described
+under [Command line](#command-line).
 
 ## Dialects
 

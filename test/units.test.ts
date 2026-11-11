@@ -374,6 +374,7 @@ describe('a conventional size is never half converted', () => {
     ${'bolts of 1/2 x 3/4 inch'}            | ${'fractions in a dimension'}
     ${'a 2" x 4" x 8" panel'}               | ${'three dimensions'}
     ${'panel of 2" x 4" x 8"'}              | ${'three dimensions after the noun'}
+    ${'a 2 ft x 6 in pipe'}                 | ${'a conventional unit beside another unit'}
     ${'wheels of 15½-17 inches (38-43 cm)'} | ${'a metric bracket after the range'}
     ${'bolts of ½-¾ inch (13-19 mm)'}       | ${'the same'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
@@ -388,6 +389,7 @@ describe('a conventional size is never half converted', () => {
     ${'a 15" x 17" panel'}       | ${'a 38 x 43 cm panel'}
     ${'a panel of 15" x 17"'}    | ${'a panel of 38 x 43 cm'}
     ${'a 2" x 4" x 8" panel'}    | ${'a 5.1 x 10 x 20 cm panel'}
+    ${'a 2 ft x 6 in pipe'}      | ${'a 61 x 15 cm pipe'}
   `('converts all of $input when respectConventions is off', ({ input, expected }) => {
     expect(convert(input, { units: { respectConventions: false } })).toBe(expected);
   });
@@ -462,6 +464,45 @@ describe('dimensions move together', () => {
     ${'a 2 x 4 stud'}          | ${'no unit at all'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a dimension with a different unit on each side', () => {
+  it.each`
+    input                               | expected                              | why
+    ${'the board is 2 feet x 6 inches'} | ${'the board is 61 x 15 centimetres'} | ${'each side in its own unit'}
+    ${'the sheet is 4 ft x 8 in.'}      | ${'the sheet is 1.2 x 0.2 m'}         | ${'all in the unit for the largest'}
+    ${'the deck is 10 ft x 12 in'}      | ${'the deck is 3 x 0.3 m'}            | ${'"in" after a side with a unit is the unit'}
+    ${'10 ft by 6 in'}                  | ${'3 by 0.15 m'}                      | ${'the same, joined by "by"'}
+    ${'3 ft x 2 ft x 6 in'}             | ${'91 x 61 x 15 cm'}                  | ${'three sides'}
+    ${'5 x 10 ft x 6 in'}               | ${'1.5 x 3 x 0.15 m'}                 | ${'a side with no unit takes the next one'}
+    ${'1 mile x 500 feet'}              | ${'1.6 x 0.15 kilometres'}            | ${'the longest side, not the largest number'}
+    ${'a 10 foot x 12 inch board'}      | ${'a 3 x 0.3 metre board'}            | ${'attributive, so it stays singular'}
+    ${'2 feet x 6 inches (61 x 15 cm)'} | ${'61 x 15 cm'}                       | ${'a bracket that restates it'}
+    ${'8.5" x 11"'}                     | ${'22 x 28 cm'}                       | ${'one unit on each side still pairs up'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('reads sides that measure different things as separate measurements', () => {
+    expect(convert('2 feet x 6 pounds')).toBe('61 centimetres x 2.7 kilograms');
+  });
+
+  it.each`
+    unchanged                     | why
+    ${'10 ft x 12 x 6 in'}        | ${'the middle side could be in either unit'}
+    ${'10 x 12 in'}               | ${'"in" with no other unit may be the preposition'}
+    ${'6 in by 5 in the morning'} | ${'the same on every side'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    rule
+    ${'units.length.foot'}
+    ${'units.length.inch'}
+  `('leaves it whole when $rule is off', ({ rule }) => {
+    expect(convert('2 feet x 6 inches', { rules: { [rule]: false } })).toBe('2 feet x 6 inches');
   });
 });
 

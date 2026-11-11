@@ -823,6 +823,91 @@ describe('tons, when the document says which kind', () => {
   });
 });
 
+describe('pounds of money are not weights', () => {
+  it.each`
+    unchanged                                                  | why
+    ${'It cost 500 pounds.'}                                   | ${'a money verb governs the amount'}
+    ${'It cost 500 pounds sterling.'}                          | ${'sterling'}
+    ${'It cost 500 pounds in London.'}                         | ${'a money verb, with more after'}
+    ${'It cost him nearly 500 pounds.'}                        | ${'a pronoun and a hedge between'}
+    ${'We paid a total of 500 pounds.'}                        | ${'an article with a filler after it'}
+    ${'I paid 10 pounds for it.'}                              | ${'paid'}
+    ${'He owes me 50 pounds.'}                                 | ${'owes'}
+    ${'Can you lend me 20 pounds?'}                            | ${'lend'}
+    ${'She won 100 pounds on the lottery.'}                    | ${'won'}
+    ${'We raised 2,000 pounds for charity.'}                   | ${'raised'}
+    ${'He has saved 500 pounds.'}                              | ${'saved'}
+    ${'He bet 50 pounds on the horse.'}                        | ${'bet'}
+    ${'He was fined 200 pounds.'}                              | ${'fined'}
+    ${"It's worth 300 pounds."}                                | ${'worth'}
+    ${'The painting sold for 2,000 pounds.'}                   | ${'sold for'}
+    ${'I bought it for 10 pounds.'}                            | ${'bought it for'}
+    ${'He was given a fine of 200 pounds.'}                    | ${'a money noun and a linking word'}
+    ${'a fine of up to 200 pounds'}                            | ${'the same, with a hedge'}
+    ${'They fine you 50 pounds.'}                              | ${'fine as a verb'}
+    ${'The fare is 3 pounds.'}                                 | ${'fare'}
+    ${'The tickets are 20 pounds.'}                            | ${'tickets'}
+    ${'a salary of 45,000 pounds'}                             | ${'salary'}
+    ${'The budget is 500 pounds.'}                             | ${'budget'}
+    ${'The prize is 1,000 pounds.'}                            | ${'prize'}
+    ${'Price: 20 pounds'}                                      | ${'a money noun and a colon'}
+    ${'She earns 30,000 pounds a year.'}                       | ${'a rate of pay'}
+    ${'Rent is 900 pounds a month.'}                           | ${'a rent'}
+    ${'I get paid 12 pounds an hour.'}                         | ${'an hourly rate'}
+    ${'fees of up to 9,250 pounds per year'}                   | ${'a rate with per'}
+    ${'It was 5 pounds 50.'}                                   | ${'pence after the pounds'}
+    ${"That's 3 pounds 99p."}                                  | ${'pence with p'}
+    ${"It's two pounds fifty."}                                | ${'pence in words'}
+    ${'It costs 3 pounds and 50 pence.'}                       | ${'pence written out'}
+    ${"5 pounds' worth of sweets"}                             | ${'worth after the unit'}
+    ${'I spent 10 pounds of my own money.'}                    | ${'of names money'}
+    ${'50 pounds in cash'}                                     | ${'cash'}
+    ${'a 5-pound note'}                                        | ${'a thing priced in pounds'}
+    ${'a ten-pound note'}                                      | ${'the same, in words'}
+    ${'two 10-pound notes'}                                    | ${'the same, plural'}
+    ${'a 100-pound fine'}                                      | ${'a fine'}
+    ${'a 20-pound voucher'}                                    | ${'a voucher'}
+    ${'It cost £5 pounds.'}                                    | ${'a £ on the number itself'}
+    ${'Prices range from £5 to 20 pounds.'}                    | ${'a £ on the range'}
+    ${'Tickets are £10 for adults and 5 pounds for children.'} | ${'a £ in the sentence'}
+    ${'The house sold for a million pounds.'}                  | ${'a scale word is not read as a number'}
+    ${'She paid 2 million pounds.'}                            | ${'the same'}
+    ${'It cost a hundred pounds.'}                             | ${'the same'}
+    ${'It only costs a few pounds.'}                           | ${'no number at all'}
+    ${'It costs $4 per pound.'}                                | ${'a price per weight has no number before the unit'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                       | expected                                                     | why
+    ${'He lost 20 pounds.'}                                     | ${'He lost 9.1 kilograms.'}                                  | ${'no money in sight'}
+    ${'It weighs 500 pounds.'}                                  | ${'It weighs 230 kilograms.'}                                | ${'the same'}
+    ${'a 5-pound bag of flour'}                                 | ${'a 2.3 kilogram bag of flour'}                             | ${'the same'}
+    ${'It cost $20 for 5 pounds of beef.'}                      | ${'It cost $20 for 2.3 kilograms of beef.'}                  | ${'cost already has its amount'}
+    ${'It cost $20 for 5 pounds.'}                              | ${'It cost $20 for 2.3 kilograms.'}                          | ${'the same, with nothing after'}
+    ${'I paid 10 pounds for 5 pounds of beef.'}                 | ${'I paid 10 pounds for 2.3 kilograms of beef.'}             | ${'each amount has its own money word or none'}
+    ${'He weighs 180 pounds and earns 30,000 pounds a year.'}   | ${'He weighs 82 kilograms and earns 30,000 pounds a year.'}  | ${'the same'}
+    ${'The cost of 10 pounds of potatoes rose.'}                | ${'The cost of 4.5 kilograms of potatoes rose.'}             | ${'of potatoes outranks cost'}
+    ${'Aim to lose 2 pounds a week.'}                           | ${'Aim to lose 910 grams a week.'}                           | ${'a weight verb outranks a rate'}
+    ${'1 pound 85% lean ground beef'}                           | ${'450 grams 85% lean ground beef'}                          | ${'a number after the unit is not pence'}
+    ${'won a 20-pound salmon'}                                  | ${'won a 9.1 kilogram salmon'}                               | ${'the article belongs to the salmon'}
+    ${'It cost £20 for 5 pounds of beef.'}                      | ${'It cost £20 for 2.3 kilograms of beef.'}                  | ${'of beef outranks the £'}
+    ${'It cost £3 and weighed 5 pounds.'}                       | ${'It cost £3 and weighed 2.3 kilograms.'}                   | ${'weighed outranks the £'}
+    ${'The 20-pound turkey cost £40.'}                          | ${'The 9.1 kilogram turkey cost £40.'}                       | ${'a size outranks the £'}
+    ${'Beef is £4 a pound, so 3 pounds comes to £12.'}          | ${'Beef is £4 a pound, so 1.4 kilograms comes to £12.'}      | ${'a price by the pound'}
+    ${'It cost £3. The bag held 5 pounds.'}                     | ${'It cost £3. The bag held 2.3 kilograms.'}                 | ${'the £ is in another sentence'}
+    ${'Prices are £4 for 2 lb.'}                                | ${'Prices are £4 for 910 g.'}                                | ${'an abbreviation is never money'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('leaves money alone when respectConventions is off', () => {
+    const options = { units: { respectConventions: false } };
+    expect(convert('It cost 500 pounds.', options)).toBe('It cost 500 pounds.');
+  });
+});
+
 describe('Fahrenheit decades', () => {
   it.each`
     input                                          | expected

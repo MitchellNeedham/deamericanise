@@ -279,6 +279,19 @@ describe('what is left alone', () => {
     expect(rewrite('<p lang="en">the color</p>', {}, 'de')).toBe('<p lang="en">the colour</p>');
   });
 
+  it('leaves a cookie banner alone and still localises the recipe beside it', () => {
+    const banner =
+      '<div role="dialog"><h2>Cookies</h2>' +
+      '<p>We use cookies to improve your experience on our site.</p>' +
+      '<div><button>Accept all cookies</button></div><div><button>Cookie settings</button></div>' +
+      '<div><a href="#" title="Read our cookie policy">Cookie Policy</a></div></div>';
+    const recipe = '<h1>Chocolate Chip Cookies</h1><p>Line a cookie sheet and bake the cookies.</p>';
+    expect(rewrite(banner + recipe, { preset: 'localise', dialect: 'en-GB' })).toBe(
+      banner +
+        '<h1>Chocolate Chip Biscuits</h1><p>Line a baking tray and bake the biscuits.</p>',
+    );
+  });
+
   it('leaves a document in design mode alone', () => {
     const doc = page('<p>the color</p>');
     doc.designMode = 'on';

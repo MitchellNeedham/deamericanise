@@ -92,6 +92,8 @@ const FOOD: Row[] = [
   ['broiler', 'grill'],
   ['skillet', 'frying pan'],
   ['skillets', 'frying pans'],
+  ['cookie sheet', 'baking tray'],
+  ['cookie sheets', 'baking trays'],
   ['silverware', 'cutlery'],
   ['soda pop', 'soft drink'],
   ['grocery store', 'supermarket'],
@@ -132,6 +134,7 @@ const HOUSEHOLD: Row[] = [
   ['shopping cart', 'trolley'],
   ['shopping carts', 'trolleys'],
   ['apartment building', 'apartment block'],
+  ['apartment buildings', 'apartment blocks'],
   ['baby carriage', 'pram'],
 ];
 

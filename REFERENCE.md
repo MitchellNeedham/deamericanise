@@ -170,7 +170,11 @@ together with `--confidence safe,moderate`.
 nappy, `zip code` to postcode, `parking lot` to car park, `windshield` to windscreen,
 `ground beef` to mince, `5th grade` to Year 5, and about two hundred more. Context-gated
 where the word has an innocent sense: `buying gas` becomes petrol but `a gas giant` does
-not; `in the fall of 2024` becomes autumn but `prices will fall` does not.
+not; `in the fall of 2024` becomes autumn but `prices will fall` does not; `bake the
+cookies` becomes biscuits but `Accept all cookies`, `This site uses cookies` and a lone
+`Cookies` link do not. Phrases the rest of the world already says keep their words:
+`fortune cookie`, `food truck`, `my way or the highway`, `Highway 101`, `seat of your
+pants`. In British English a `fire truck` is a fire engine and a `pickup truck` stays one.
 
 **Units.** Length, area, mass, volume, temperature, speed, pressure, power, torque and
 fuel economy. The volume measures are the US ones, which are not the imperial ones.
@@ -599,6 +603,9 @@ Shadow DOM is not entered. Text inside a web component's shadow root stays as it
   anyone read it.
 - Grade-to-year mapping assumes the Australian and British numbering, which does not line
   up with every system.
+- A web cookie is told from a baked one by the words in its own sentence. A short line
+  with a second word but nothing about the web in it, such as `About cookies`, still
+  becomes biscuits.
 - `localise` rewrites emergency numbers, which is right for a translated recipe and wrong
   for a news story about America. It is `risky`-tagged; `--confidence safe,moderate` drops
   it, and so does `--rule 'dialect.*=false'`.

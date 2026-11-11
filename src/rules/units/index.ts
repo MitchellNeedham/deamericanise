@@ -1,3 +1,4 @@
+import { buildGate, type Gate } from '../../config.js';
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import {
   MEASURES,
@@ -171,7 +172,7 @@ function change(
 }
 
 /**
- * A measurement left as written because it is a conventional size. Another rule can match a
+ * A measurement left as written, such as a conventional size. Another rule can match a
  * piece of it, such as the `¾ inch` in `bolts of ½-¾ inch`, and the hold keeps that piece
  * as written too.
  */
@@ -260,6 +261,22 @@ const METRIC_FORMS = Object.entries(METRIC_UNITS).flatMap(([dimension, units]) =
     toBase,
   })),
 );
+
+/**
+ * What one of each measure's units comes to in a unit they share, so `2 feet x 6 inches`
+ * reads as one length. Undefined when they measure different things, as feet and pounds do.
+ */
+function commonScale(measures: Measure[]): Map<Measure, number> | undefined {
+  if (measures.length === 1) return new Map([[measures[0]!, 1]]);
+  const bases = measures.map((measure) => {
+    const metric = measure.convert(1);
+    const form = METRIC_FORMS.find((f) => f.pattern.test(metric.symbol));
+    return form && { dimension: form.dimension, value: form.toBase(metric.value) };
+  });
+  const dimension = bases[0]?.dimension;
+  if (bases.some((base) => base === undefined || base.dimension !== dimension)) return undefined;
+  return new Map(measures.map((measure, i) => [measure, bases[i]!.value]));
+}
 
 /** A minus sign straight after a number is the dash of a range: `9-18 m`. */
 const METRIC_FIGURE = /(?:(?<![\d.]\s*)[-−])?\d[\d,]*(?:\.\d+)?/g;
@@ -528,12 +545,12 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   );
 
   // An optional unit after an inner number, so `8.5" x 11"` and `10 ft x 12 ft` both match.
-  const INNER_UNIT = String.raw`(?:${GAP}(?:${alternation}))?`;
+  const INNER_UNIT = String.raw`(?:${GAP}(${alternation}))?`;
   const dimensions = new RegExp(
     String.raw`${START}(${NUMERIC_PATTERN})${INNER_UNIT}${DIMENSION_JOIN}(${NUMERIC_PATTERN})` +
       String.raw`(?:${INNER_UNIT}${DIMENSION_JOIN}(${NUMERIC_PATTERN}))?` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
-    'gi',
+    'dgi',
   );
 
   // Written-out units only, because an abbreviation can be a word: `a gal and a half`.
@@ -621,7 +638,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   /**
    * `8.5 x 11 inches` and `10 x 12 x 8 feet` are one measurement, not two or three.
    * Converting half of a dimension pair produces nonsense, so they move together and
-   * share the unit chosen for the largest of them.
+   * share the unit chosen for the largest of them. Each side is read in its own unit, so
+   * `2 feet x 6 inches` comes to `61 x 15 centimetres`.
    */
   const dimensionRule: Rule = {
     id: 'units.dimensions',
@@ -630,38 +648,73 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     priority: 38,
     find(ctx: RuleContext) {
       const changes: Change[] = [];
+      let gate: Gate | undefined;
+      const switchedOff = (measure: Measure) =>
+        !(gate ??= buildGate(ctx.options)).rule(measure.id, 'units', MEASUREMENT_CONFIDENCE);
       dimensions.lastIndex = 0;
       for (const match of ctx.text.matchAll(dimensions)) {
-        const entry = resolve(match[4]!);
-        if (!entry) continue;
-        const raw = [match[1], match[2], match[3]].filter((v): v is string => v !== undefined);
-        const values = raw.map(parseNumber);
-        if (values.some((v) => v === null)) continue;
-
         const start = match.index;
-        if (isOtherSense(ctx, entry, start, start + match[0].length)) continue;
-        if (isAmbiguousHere(entry.measure, ctx.text)) continue;
-        if (isBareInch(match[4]!, match[0])) continue;
+        const end = start + match[0].length;
+        // The groups holding each side's number and the unit written straight after it.
+        const groups: Array<[number, number]> =
+          match[5] === undefined ? [[1, 2], [3, 6]] : [[1, 2], [3, 4], [5, 6]];
+        const sides = groups.map(([number, unit]) => {
+          const alias = match[unit];
+          const upToUnit = alias === undefined ? '' : ctx.text.slice(start, match.indices![unit]![1]);
+          return {
+            raw: match[number]!,
+            value: parseNumber(match[number]!),
+            alias,
+            entry: alias === undefined ? undefined : resolve(alias),
+            bareInch: alias !== undefined && isBareInch(alias, upToUnit),
+          };
+        });
+        if (sides.some((s) => s.value === null || (s.alias !== undefined && !s.entry))) continue;
+        const last = sides[sides.length - 1]!;
+        const entry = last.entry!;
 
-        const numbers = values as number[];
-        const largest = numbers.reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a));
-        if (largest === 0) continue;
-        if (isConventional(ctx, entry.measure, start, start + match[0].length)) {
+        // A side with no unit of its own takes the next one written, as in `10 x 12 feet`.
+        const units: Alias[] = [];
+        for (let i = sides.length - 1; i >= 0; i--) units[i] = sides[i]!.entry ?? units[i + 1]!;
+        const measures = [...new Set(units.map((u) => u.measure))];
+
+        if (units.some((u) => isOtherSense(ctx, u, start, end))) continue;
+        if (measures.some((m) => isAmbiguousHere(m, ctx.text))) continue;
+        // Beside an earlier side with a unit of its own, as in `10 ft x 12 in`, `in` is the unit.
+        if (last.bareInch && !sides.some((s) => s !== last && s.entry && !s.bareInch)) continue;
+
+        const scale = commonScale(measures);
+        if (!scale) continue;
+        const inBase = sides.map((s, i) => s.value! * scale.get(units[i]!.measure)!);
+        const largest = inBase.reduce((a, v, i) => (Math.abs(v) > Math.abs(inBase[a]!) ? i : a), 0);
+        if (inBase[largest] === 0) continue;
+
+        // The change goes under one unit's id, so the gate cannot stop the other units. The
+        // hold goes under this rule's id, which the gate has already let through.
+        if (measures.length > 1 && measures.some(switchedOff)) {
+          changes.push(hold(start, match[0], 'units.dimensions', 38));
+          continue;
+        }
+        // `10 ft x 12 x 6 in` could mean the `12` in either unit.
+        const unclear = sides.some(
+          (s, i) => !s.entry && i > 0 && units[i - 1]!.measure !== units[i]!.measure,
+        );
+        if (unclear || measures.some((m) => isConventional(ctx, m, start, end))) {
           changes.push(hold(start, match[0], entry.measure.id, 38));
           continue;
         }
 
-        const target = entry.measure.convert(largest);
-        const perSourceUnit = target.value / largest;
-        const figures = Math.max(...raw.map(significantFigures));
+        const target = units[largest]!.measure.convert(sides[largest]!.value!);
+        const perBase = target.value / inBase[largest]!;
+        const figures = Math.max(...sides.map((s) => significantFigures(s.raw)));
         const { precision, maxDecimals } = ctx.options.units;
         const separator = /\bby\b/i.test(match[0]) ? ' by ' : match[0].includes('×') ? ' × ' : ' x ';
         const unit = entry.isWord
           ? ` ${entry.isSingular ? target.singular : target.plural}`
           : ` ${target.symbol}`;
         const body =
-          numbers
-            .map((v) => formatNumber(v * perSourceUnit, precision, figures, maxDecimals))
+          inBase
+            .map((v) => formatNumber(v * perBase, precision, figures, maxDecimals))
             .join(separator) + unit;
 
         pushMeasurement(ctx, changes, start, match[0], body, entry.measure.id, 38);

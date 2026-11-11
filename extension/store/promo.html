@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Promo tile</title>
+  <style>
+    body {
+      margin: 0;
+      width: 440px;
+      height: 280px;
+      overflow: hidden;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 18px;
+      background: #1d5c4f;
+      color: #ffffff;
+      font-family: "Noto Sans", system-ui, sans-serif;
+    }
+    .name { display: flex; align-items: center; gap: 14px; font-size: 34px; font-weight: 700; letter-spacing: -0.01em; }
+    .name img { width: 56px; height: 56px; border-radius: 13px; box-shadow: 0 0 0 2px rgb(255 255 255 / 35%); }
+    .example {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 18px;
+      border-radius: 12px;
+      background: #fffdf9;
+      color: #26231f;
+      font: 26px/1.2 Charter, "Bitstream Charter", Georgia, "Noto Serif", serif;
+    }
+    .example s { color: #8a8178; text-decoration-thickness: 2px; }
+    .example b {
+      font-weight: 400;
+      background: rgb(47 128 237 / 22%);
+      text-decoration: underline solid rgb(47 128 237) 2px;
+      text-underline-offset: 3px;
+    }
+    .arrow { color: #f4a940; font-family: "Noto Sans", sans-serif; font-weight: 700; }
+    .tagline { font-size: 18px; color: rgb(255 255 255 / 85%); }
+  </style>
+</head>
+<body>
+  <div class="name"><img src="../icons/icon.svg" alt="">deamericanise</div>
+  <div class="example"><s>color</s><span class="arrow">→</span><b>colour</b></div>
+  <div class="tagline">The web, in your English</div>
+</body>
+</html>

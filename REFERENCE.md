@@ -642,6 +642,12 @@ release for the tag, creating the release if it does not exist yet. The Chrome z
 one for Edge too. Uploading to the Chrome Web Store, Microsoft Edge Add-ons and Firefox
 Add-ons is manual.
 
+The store screenshots and the 440×280 promo tile are in `extension/store/images`, at sizes
+all three stores accept. They show an invented American recipe page,
+`extension/store/sample.html`. To make them again after the extension changes, run
+`npm run build:extension` and then `node extension/store/capture.mjs`, which needs Google
+Chrome.
+
 Firefox Add-ons asks for the source of any bundled code. Upload the source archive GitHub
 makes for the same tag, and give `npm ci && npm run build:extension` as the build steps.
 

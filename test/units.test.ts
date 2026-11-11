@@ -377,8 +377,11 @@ describe('a range opens only on a number that can be its first end', () => {
     ${'between 60 and 70°F'}                  | ${'between 16 and 21°C'}                      | ${'joined by "and"'}
     ${'The water dropped from 10 to 5 feet.'} | ${'The water dropped from 3 to 1.5 metres.'}  | ${'a falling range'}
     ${'100-10 feet'}                          | ${'30-3 metres'}                              | ${'a first number exactly ten times the second'}
+    ${'Visibility fell from 10 to 0.5 miles.'} | ${'Visibility fell from 16,000 to 800 metres.'} | ${'a steeper fall opened by "from"'}
+    ${'Temperatures fell from 50 to 4°F.'}    | ${'Temperatures fell from 10 to -16°C.'}      | ${'the same, in Fahrenheit'}
+    ${'between 30 and 2 feet'}                | ${'between 910 and 61 centimetres'}           | ${'the same, opened by "between"'}
     ${'from -50 to 2°F'}                      | ${'from -46 to -17°C'}                        | ${'a negative first number'}
-    ${'from 20 to 0°F'}                       | ${'from -6.7 to -18°C'}                       | ${'a second number of zero'}
+    ${'Lows of 10 to 0°F tonight.'}           | ${'Lows of -12 to -18°C tonight.'}            | ${'a second number of zero'}
     ${'Bought 2024-03-14 1/2 gallon'}         | ${'Bought 2024-03-14 1.9 litres'}             | ${'a fraction after a date'}
   `('still converts $why', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);

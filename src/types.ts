@@ -198,7 +198,11 @@ export interface LexEntry {
   forbidAfter?: RegExp;
   /** Only fire when the document looks American. */
   needsAmerican?: boolean;
-  /** Overlap tie-break. Gated entries outrank plain ones, which outrank suffix patterns. */
+  /**
+   * Overlap tie-break. Gated entries outrank plain ones, which outrank suffix patterns.
+   * Rows for the same word are tried dialect pack first, then shared lists, and by
+   * priority within each.
+   */
   priority?: number;
 }
 

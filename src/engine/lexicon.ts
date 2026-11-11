@@ -29,17 +29,44 @@ function toPattern(from: string): string {
     .join('[\\s\\u00a0]+');
 }
 
+const DEFAULT_PRIORITY = 10;
+
+interface Candidate {
+  entry: LexEntry;
+  layer: number;
+}
+
+/** Later layer first, then higher priority. Ties keep their listed order, as the sort is stable. */
+function byPrecedence(a: Candidate, b: Candidate): number {
+  return (
+    b.layer - a.layer ||
+    (b.entry.priority ?? DEFAULT_PRIORITY) - (a.entry.priority ?? DEFAULT_PRIORITY)
+  );
+}
+
 /**
  * Builds a single alternation over every entry, longest first so the longest phrase at a
  * given position wins. One pass beats several hundred individual regexes.
+ *
+ * Each layer overrides the layers before it on the same key, so a dialect pack passed
+ * after the shared lists wins wherever both have a row. Its rows are tried first, and an
+ * earlier layer's row is the fallback when every later row is switched off or refused by
+ * its context gate. Within a layer, a higher `priority` is tried first.
  */
-export function compileLexicon(entries: LexEntry[]): CompiledLexicon {
+export function compileLexicon(...layers: LexEntry[][]): CompiledLexicon {
+  const grouped = new Map<string, Candidate[]>();
+  layers.forEach((entries, layer) => {
+    for (const entry of entries) {
+      const key = normaliseKey(entry.from);
+      const existing = grouped.get(key);
+      if (existing) existing.push({ entry, layer });
+      else grouped.set(key, [{ entry, layer }]);
+    }
+  });
+
   const byKey = new Map<string, LexEntry[]>();
-  for (const entry of entries) {
-    const key = normaliseKey(entry.from);
-    const existing = byKey.get(key);
-    if (existing) existing.push(entry);
-    else byKey.set(key, [entry]);
+  for (const [key, candidates] of grouped) {
+    byKey.set(key, candidates.sort(byPrecedence).map(({ entry }) => entry));
   }
 
   const alternatives = [...byKey.keys()]
@@ -120,7 +147,7 @@ function firstApplicable(
       ruleId: entry.ruleId,
       category: entry.category,
       confidence: entry.confidence,
-      priority: entry.priority ?? 10,
+      priority: entry.priority ?? DEFAULT_PRIORITY,
       ...(entry.note ? { note: entry.note } : {}),
     };
   }

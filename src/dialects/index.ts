@@ -136,6 +136,25 @@ const HIGHWAY: Guard[] = [
 const APARTMENT: Guard[] = [{ forbidBefore: /\bserviced\s+$/i, forbidAfter: /^\s+complex(?:es)?\b/i }];
 
 /**
+ * A postbox is only the kind for posting letters. A mailbox at home is a letterbox, which
+ * is what the shared vocabulary says when this refuses.
+ */
+const MAILBOX: Guard[] = [
+  { requireBefore: /\b(?:public|blue|usps|collection|corner|nearest|nearby|any)\s+$/i },
+];
+
+/**
+ * A university or science field trip is not a school trip, and a `school field trip` would
+ * say school twice. The shared word stands for both.
+ */
+const FIELD_TRIP: Guard[] = [
+  {
+    forbidBefore:
+      /\b(?:[a-z]+olog(?:y|ical)|university|college|undergraduate|graduate|postgraduate|research|science|scientific|geography|geographical|botany|botanical|marine|environmental|school|class)\s+$/i,
+  },
+];
+
+/**
  * Guards for words that also appear inside a phrase the rest of the world already says.
  * `candy floss` is not American, so `candy` must not fire inside it. A row with several
  * guards fires when any one of them lets it through.
@@ -152,6 +171,10 @@ const GATES: Record<string, Guard[]> = {
   highways: HIGHWAY,
   apartment: APARTMENT,
   apartments: APARTMENT,
+  mailbox: MAILBOX,
+  mailboxes: MAILBOX,
+  'field trip': FIELD_TRIP,
+  'field trips': FIELD_TRIP,
 };
 
 function rows(id: Dialect, list: Row[], confidence: Confidence = 'moderate'): LexEntry[] {
@@ -319,7 +342,6 @@ const ZA: Row[] = [
   ['traffic light', 'robot'],
   ['traffic lights', 'robots'],
   ['pickup truck', 'bakkie'],
-  ['grocery store', 'cafe'],
 ];
 
 /**

@@ -1,5 +1,5 @@
 import { readFileSync, statSync, writeFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { basename, join, relative } from 'node:path';
 import { parseArgs } from 'node:util';
 import { CATEGORIES, CONFIDENCES, PRESETS } from './config.js';
 import { DIALECTS } from './dialects/index.js';
@@ -14,6 +14,12 @@ declare const __VERSION__: string;
 const SKIP_DIRECTORIES = new Set([
   'node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.cache', 'vendor', 'target',
 ]);
+
+/**
+ * Prose files that conventionally have no extension. Licence texts and lists of names are
+ * left out: a licence must stay verbatim, and a surname is not a misspelling.
+ */
+const PROSE_FILENAMES = new Set(['readme', 'changelog', 'changes', 'history', 'news', 'contributing']);
 
 const HELP = `deamericanise - rewrite American English into the version the rest of the world reads
 
@@ -49,6 +55,8 @@ Units
 
 Files
       --language <id>    Force a language: ts, python, ruby, sql, md, ... (needed for stdin)
+                         A named file of unknown type, such as settings.json, is skipped
+                         unless this is given. --language md reads it as prose.
       --docstrings       Also rewrite Python docstrings
       --no-code-guard    Rewrite comment lines that look like commented-out code too
       --list-languages   Print every language name --language accepts
@@ -69,18 +77,20 @@ function list(value: string | undefined): string[] {
   return value ? value.split(',').map((s) => s.trim()).filter(Boolean) : [];
 }
 
+/** Whether a file has a lexer or reads as prose, from its name alone. */
+function isKnownFile(path: string): boolean {
+  const name = basename(path).toLowerCase();
+  const extension = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : '';
+  return Boolean(lexerFor(name)) || PROSE_EXTENSIONS.has(extension) || PROSE_FILENAMES.has(name);
+}
+
 function walk(path: string, into: string[]): void {
-  if (statSync(path).isFile()) {
-    into.push(path);
-    return;
-  }
   for (const entry of readdirSync(path, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (SKIP_DIRECTORIES.has(entry.name) || entry.name.startsWith('.')) continue;
       walk(join(path, entry.name), into);
-    } else if (entry.isFile()) {
-      const extension = entry.name.split('.').pop()?.toLowerCase() ?? '';
-      if (lexerFor(entry.name) || PROSE_EXTENSIONS.has(extension)) into.push(join(path, entry.name));
+    } else if (entry.isFile() && isKnownFile(entry.name)) {
+      into.push(join(path, entry.name));
     }
   }
 }
@@ -253,7 +263,9 @@ export async function main(argv: string[]): Promise<number> {
   const targets: string[] = [];
   for (const path of positionals) {
     try {
-      walk(path, targets);
+      if (!statSync(path).isFile()) walk(path, targets);
+      else if (values.language || isKnownFile(path)) targets.push(path);
+      else process.stderr.write(`deamericanise: skipping ${path}: unknown file type. Use --language md to read it as prose.\n`);
     } catch {
       fail(`cannot read ${path}`);
     }
@@ -261,7 +273,7 @@ export async function main(argv: string[]): Promise<number> {
 
   let changed = false;
 
-  if (targets.length === 0) {
+  if (positionals.length === 0) {
     if (process.stdin.isTTY) {
       process.stdout.write(HELP);
       return 0;

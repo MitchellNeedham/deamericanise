@@ -36,6 +36,9 @@ describe('ruleCatalogue', () => {
       ruleCatalogue(dialect).find((r) => r.id === id)!.offByDefault;
     expect(offIn('en-GB', 'units.length.mile')).toBe(true);
     expect(offIn('en-AU', 'units.length.mile')).toBe(false);
+    expect(offIn('en-GB', 'units.mass.stone-pounds')).toBe(true);
+    expect(offIn('en-GB', 'units.mass.pounds-ounces')).toBe(false);
+    expect(offIn('en-AU', 'units.mass.stone-pounds')).toBe(false);
     expect(offIn('en-CA', 'spelling.ise')).toBe(true);
     expect(offIn('en-CA', 'vocabulary.food')).toBe(true);
     expect(offIn('en-CA', 'spelling.our')).toBe(false);

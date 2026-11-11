@@ -15,6 +15,11 @@ export interface Measure {
   words: string[];
   /** Abbreviations. Matched case-sensitively where case carries meaning. */
   abbrevs: string[];
+  /**
+   * Abbreviations read only inside a compound such as `11st 4lb`, where nothing else can
+   * be meant. On their own they are other words: `1st` is an ordinal.
+   */
+  compoundAbbrevs?: string[];
   convert(value: number): MetricValue;
   /**
    * Contexts where the imperial unit is the worldwide convention: screens are sold in
@@ -201,6 +206,7 @@ export const MEASURES: Measure[] = [
     keep: 'stone',
     words: ['stone'],
     abbrevs: [],
+    compoundAbbrevs: ['st'],
     convert: (v) => metricMass(v * 6350.29318),
   },
   {
@@ -318,5 +324,29 @@ export const MEASURES: Measure[] = [
     // torque silently becomes a weight.
     abbrevs: ['ft-lb', 'ft-lbs', 'ft lb', 'ft lbs', 'lb-ft', 'lb ft', 'lbft', 'lb.ft'],
     convert: (v) => m(v * 1.3558179483, 'N·m', 'newton metre', 'newton metres'),
+  },
+];
+
+/** One measurement written in descending units of one dimension, as `11 stone 4 pounds` is. */
+export interface Compound {
+  id: string;
+  /** Largest first. The first two must be present and the rest may follow. */
+  measures: Measure[];
+  /** How many of each measure after the first make one of the measure before it. */
+  per: number[];
+}
+
+const measure = (id: string): Measure => MEASURES.find((each) => each.id === id)!;
+
+export const COMPOUNDS: Compound[] = [
+  {
+    id: 'units.mass.stone-pounds',
+    measures: [measure('units.mass.stone'), measure('units.mass.pound'), measure('units.mass.ounce')],
+    per: [14, 16],
+  },
+  {
+    id: 'units.mass.pounds-ounces',
+    measures: [measure('units.mass.pound'), measure('units.mass.ounce')],
+    per: [16],
   },
 ];

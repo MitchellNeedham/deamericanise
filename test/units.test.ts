@@ -41,6 +41,81 @@ describe('feet and inches together', () => {
   });
 });
 
+describe('a weight in two units is one weight', () => {
+  it.each`
+    input                                    | expected
+    ${'The baby weighed 7 pounds 8 ounces.'} | ${'The baby weighed 3.4 kilograms.'}
+    ${'I weigh 11 stone 4 pounds.'}          | ${'I weigh 71.7 kilograms.'}
+    ${'The baby weighed 7 lb 8 oz.'}         | ${'The baby weighed 3.4 kg.'}
+    ${'7lbs 8oz'}                            | ${'3.4 kg'}
+    ${'11st 4lb'}                            | ${'71.7 kg'}
+    ${'11 st 4 lbs'}                         | ${'71.7 kg'}
+    ${'7 pounds and 8 ounces'}               | ${'3.4 kilograms'}
+    ${'11 stone and 4 pounds'}               | ${'71.7 kilograms'}
+    ${'11 stone 4 pounds 8 ounces'}          | ${'71.9 kilograms'}
+    ${'11st 4lb 8oz'}                        | ${'71.9 kg'}
+    ${'7 pounds 8 1/2 ounces'}               | ${'3.42 kilograms'}
+    ${'seven pounds eight ounces'}           | ${'3.4 kilograms'}
+    ${'1 lb 2 oz'}                           | ${'510 g'}
+    ${'a 7 pound 8 ounce baby'}              | ${'a 3.4 kilogram baby'}
+    ${'a 7-pound 8-ounce baby'}              | ${'a 3.4 kilogram baby'}
+    ${'an 11 stone 4 pound man'}             | ${'a 71.7 kilogram man'}
+    ${'the 7 pounds 8 ounces of flour'}      | ${'the 3.4 kilograms of flour'}
+    ${'7 pounds\n8 ounces'}                  | ${'3.4 kilograms'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                       | expected                         | why
+    ${'5 pounds'}               | ${'2.3 kilograms'}               | ${'pounds on their own'}
+    ${'12 ounces'}              | ${'340 grams'}                   | ${'ounces on their own'}
+    ${'6 feet 3 pounds'}        | ${'1.8 metres 1.4 kilograms'}    | ${'two dimensions are two measurements'}
+    ${'the 147-pound division'} | ${'the 147-pound division'}      | ${'a weight class'}
+    ${'lose the 1st 4 lb'}      | ${'lose the 1st 1.8 kg'}         | ${'1st is an ordinal'}
+    ${'the 21st 4 lb'}          | ${'the 21st 1.8 kg'}             | ${'so is 21st'}
+    ${'7 pounds\n\n8 ounces'}   | ${'3.2 kilograms\n\n230 grams'}  | ${'a blank line between them'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                | options                     | why
+    ${'I weigh 11 stone 4 pounds.'}          | ${{ dialect: 'en-GB' }}     | ${'Britain keeps stone'}
+    ${'I weigh 11st 4lb.'}                   | ${{ dialect: 'en-GB' }}     | ${'abbreviated'}
+    ${'I weigh 11 stone 4 pounds 8 ounces.'} | ${{ dialect: 'en-GB' }}     | ${'with ounces'}
+    ${'I weigh 11 stone.'}                   | ${{ dialect: 'en-GB' }}     | ${'stone on its own'}
+    ${'7 pounds 8 ounces'}                   | ${{ unitsKeep: ['pound'] }} | ${'the larger unit is kept'}
+    ${'7 pounds 8 ounces'}                   | ${{ unitsKeep: ['ounce'] }} | ${'the smaller unit is kept'}
+    ${'11 stone 4 pounds'}                   | ${{ unitsKeep: ['pound'] }} | ${'pounds kept after stone'}
+    ${'Babies weigh 7-8 lb 4 oz.'}           | ${{}}                       | ${'the end of a range'}
+    ${'between 10 and 11 stone 4 pounds'}    | ${{}}                       | ${'a range joined by and'}
+  `('leaves "$unchanged" whole ($why)', ({ unchanged, options }) => {
+    expect(convert(unchanged, options)).toBe(unchanged);
+  });
+
+  it.each`
+    rules
+    ${{ 'units.mass.stone': true }}
+    ${{ 'units.mass.stone-pounds': true }}
+  `('converts stone and pounds in en-GB with $rules', ({ rules }) => {
+    expect(convert('I weigh 11 stone 4 pounds.', { dialect: 'en-GB', rules })).toBe(
+      'I weigh 71.7 kilograms.',
+    );
+  });
+
+  it('converts pounds and ounces in en-GB, which keeps only stone', () => {
+    expect(convert('7 pounds 8 ounces', { dialect: 'en-GB' })).toBe('3.4 kilograms');
+  });
+
+  it('keeps the original and collapses a metric restatement', () => {
+    expect(convert('7 pounds 8 ounces', { units: { keepOriginal: true } })).toBe(
+      '3.4 kilograms (7 pounds 8 ounces)',
+    );
+    expect(convert('7 lb 8 oz (3.4 kg)')).toBe('3.4 kg');
+  });
+});
+
 describe('mass and volume', () => {
   it.each`
     input                | expected
@@ -299,6 +374,7 @@ describe('keeping the original', () => {
     ${'a sheet of 8.5 x 11 inches, 8.5" x 11", or 10 ft x 12 ft x 8 ft'}
     ${'a 6-foot fence and a 9 inch dish'}
     ${'It weighs 180 pounds, 3 ounces and 12 stone.'}
+    ${'She weighed 7 pounds 8 ounces, or 7 lb 8 oz, and he weighs 11st 4lb.'}
     ${'It holds 1/2 gallon, 2 quarts, 3 pints, 4 fluid ounces and 5 cubic feet.'}
     ${'It covers 20 square feet, 2 square miles and 10 acres.'}
     ${'It goes 60 miles per hour, or 60 mph.'}
@@ -616,6 +692,7 @@ describe('an imperial original in brackets after its metric value', () => {
     ${'It is 1.88 metres (6 feet 2 inches) tall.'}             | ${'feet and inches'}
     ${`It is 1.88 m (6'2") tall.`}                             | ${'feet and inches in symbols'}
     ${'It is 1.8 m (5 ft 11 in) tall.'}                        | ${'abbreviated'}
+    ${'It weighs 71.7 kg (11st 4lb).'}                         | ${'stone and pounds'}
     ${'a 1.8 metre (6-foot) fence'}                            | ${'attributive'}
     ${'a 2 metre (about 6 feet) fence'}                        | ${'a rounded restatement'}
     ${'a 2-metre (roughly 6-foot) fence'}                      | ${'the same'}
@@ -642,7 +719,7 @@ describe('an imperial original in brackets after its metric value', () => {
     ${'It is 2 metres (the old one was 10 feet).'}            | ${'It is 2 metres (the old one was 3 metres).'}            | ${'the bracket holds more than a measurement'}
     ${'It is 2 metres (10 feet for the old one).'}            | ${'It is 2 metres (3 metres for the old one).'}            | ${'the same'}
     ${'Room 2 (6 feet) is free.'}                             | ${'Room 2 (1.8 metres) is free.'}                          | ${'a number without a metric unit'}
-    ${'a 3 m (50 lb 3 oz) beam'}                              | ${'a 3 m (23 kg 85 g) beam'}                               | ${'every piece of a weight converts after a length'}
+    ${'a 3 m (50 lb 3 oz) beam'}                              | ${'a 3 m (22.8 kg) beam'}                                  | ${'a weight converts after a length'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });

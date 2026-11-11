@@ -1,5 +1,6 @@
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import {
+  COMPOUNDS,
   MEASURES,
   SINGULAR_WORDS,
   metricLength,
@@ -53,16 +54,19 @@ function alternate(aliases: string[]): string {
     .join('|');
 }
 
+function isKept(measure: Measure, skip: Set<string>, forced: Record<string, boolean>): boolean {
+  // Turning the rule on by id overrides both a dialect that keeps the unit and a
+  // measure that is kept everywhere by default.
+  return (skip.has(measure.keep) || measure.keptByDefault === true) && forced[measure.id] !== true;
+}
+
 function buildIndex(
   skip: Set<string>,
   forced: Record<string, boolean>,
 ): { alternation: string; words: string; byAlias: Map<string, Alias> } {
   const byAlias = new Map<string, Alias>();
   for (const measure of MEASURES) {
-    // Turning the rule on by id overrides both a dialect that keeps the unit and a
-    // measure that is kept everywhere by default.
-    const kept = skip.has(measure.keep) || measure.keptByDefault === true;
-    if (kept && forced[measure.id] !== true) continue;
+    if (isKept(measure, skip, forced)) continue;
     for (const w of measure.words) {
       byAlias.set(w.toLowerCase(), { measure, isWord: true, isSingular: SINGULAR_WORDS.has(w) });
     }
@@ -311,7 +315,8 @@ const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
 for (const measure of MEASURES) {
   const dimension = dimensionOf(METRIC_INNER.exec(`1 ${measure.convert(1).symbol}`));
   if (dimension === undefined) continue;
-  (IMPERIAL_UNITS[dimension] ??= []).push(...[...measure.words, ...measure.abbrevs].map(escape));
+  const forms = [...measure.words, ...measure.abbrevs, ...(measure.compoundAbbrevs ?? [])];
+  (IMPERIAL_UNITS[dimension] ??= []).push(...forms.map(escape));
 }
 
 /** Each dimension's units as one pattern, for naming the dimension of a unit already read. */
@@ -477,6 +482,89 @@ function feetInchesRule(): Rule {
       return changes;
     },
   };
+}
+
+const NOT_SECOND = new RegExp(NOT_SECOND_OF_PAIR, 'y');
+
+/** `1st`, `21st` and `101st` are ordinals. `11st` is not. */
+const ORDINAL = /^(?:\d*[02-9])?1st(?![a-z])/i;
+
+/**
+ * `7 pounds 8 ounces`, `11st 4lb` and `11 stone 4 pounds 8 ounces` are each one weight, as
+ * `6 feet 2 inches` is one height. A weight that cannot be converted whole is held whole:
+ * one in a unit that is kept, and one that ends a range or dimension, as in `7-8 lb 4 oz`.
+ */
+function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule[] {
+  // A written-out number never starts inside another, such as the `two` of `twenty-two`.
+  const START = String.raw`(?<![\w.])(?<![A-Za-z]-)(?:(?=\d)|(?<!\b(?:${WHOLE_NUMBER})[-\s]+))`;
+  const SMALLER = String.raw`(?![-−])(?:${NUMERIC_PATTERN}|${WHOLE_NUMBER})`;
+  const AND = softGap(String.raw`(?:and(?=\s))?`);
+  const unitOf = (m: Measure) =>
+    String.raw`(${alternate([...m.words, ...m.abbrevs, ...(m.compoundAbbrevs ?? [])])})(?![A-Za-z])`;
+
+  return COMPOUNDS.map((compound): Rule => {
+    const [largest, next, ...rest] = compound.measures.map(unitOf);
+    const part = (unit: string) => String.raw`${AND}(${SMALLER})${GAP}${unit}`;
+    const optional = rest.reduceRight((inner, unit) => `(?:${part(unit)}${inner})?`, '');
+    const pattern = new RegExp(
+      String.raw`${START}(${WHOLE_NUMBER})${GAP}${largest}${part(next!)}${optional}`,
+      'gi',
+    );
+
+    return {
+      id: compound.id,
+      category: 'units',
+      confidence: 'moderate',
+      priority: 40,
+      find(ctx) {
+        const changes: Change[] = [];
+        for (const match of ctx.text.matchAll(pattern)) {
+          if (ORDINAL.test(match[0])) continue;
+          const parts = compound.measures
+            .map((measure, i) => ({ measure, raw: match[2 * i + 1], unit: match[2 * i + 2] ?? '' }))
+            .filter((p) => p.raw !== undefined);
+          const values = parts.map((p) => parseNumber(p.raw!));
+          if (values.some((v) => v === null)) continue;
+
+          const start = match.index;
+          NOT_SECOND.lastIndex = start;
+          const kept =
+            forced[compound.id] !== true && parts.some((p) => isKept(p.measure, skip, forced));
+          if (kept || !NOT_SECOND.test(ctx.text)) {
+            changes.push(hold(start, match[0], compound.id, 40));
+            continue;
+          }
+
+          let size = 1;
+          const total = (values as number[]).reduce((sum, value, i) => {
+            if (i > 0) size /= compound.per[i - 1]!;
+            return sum + value * size;
+          }, 0);
+          const target = compound.measures[0]!.convert(total);
+          const { precision, maxDecimals } = ctx.options.units;
+          // Several components together claim three figures, as feet and inches do.
+          const number = formatNumber(target.value, precision, 3, maxDecimals);
+
+          const isWord = (p: (typeof parts)[number]) =>
+            p.measure.words.some((w) => w === p.unit.toLowerCase());
+          const last = parts[parts.length - 1]!;
+          const end = start + match[0].length;
+          const attributive =
+            isWord(last) &&
+            SINGULAR_WORDS.has(last.unit.toLowerCase()) &&
+            DETERMINER_BEFORE.test(ctx.text.slice(Math.max(0, start - 24), start)) &&
+            MODIFIES_A_NOUN.test(ctx.text.slice(end));
+          const unit = !parts.some(isWord)
+            ? target.symbol
+            : attributive
+              ? target.singular
+              : unitWord(target, Number(number.replace(/,/g, '')));
+          pushMeasurement(ctx, changes, start, match[0], `${number} ${unit}`, compound.id, 40);
+        }
+        return changes;
+      },
+    };
+  });
 }
 
 function measurementRules(skip: Set<string>, forced: Record<string, boolean>): Rule[] {
@@ -1011,6 +1099,7 @@ export function unitRules(options: ResolvedOptions, dialectKeep: string[]): Rule
   const skip = new Set([...dialectKeep, ...options.unitsKeep]);
   return [
     feetInchesRule(),
+    ...compoundRules(skip, options.rules),
     ...temperatureRules(),
     temperatureDecadeRule(),
     coinSizeRule(),

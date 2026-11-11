@@ -48,5 +48,11 @@ export function applyChanges(text: string, changes: Change[]): string {
 /** Shifts offsets so changes found in a slice can be reported against the whole document. */
 export function offsetChanges(changes: Change[], delta: number): Change[] {
   if (delta === 0) return changes;
-  return changes.map((c) => ({ ...c, start: c.start + delta, end: c.end + delta }));
+  return changes.map((c) => {
+    const shifted = { ...c, start: c.start + delta, end: c.end + delta };
+    if (c.agreesWith) {
+      shifted.agreesWith = { start: c.agreesWith.start + delta, end: c.agreesWith.end + delta };
+    }
+    return shifted;
+  });
 }

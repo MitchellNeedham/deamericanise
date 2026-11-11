@@ -1,4 +1,5 @@
 import type { Change, Rule, RuleContext } from '../types.js';
+import { CLOSING, endsSentence } from './sentence.js';
 
 /**
  * Outside America the full stop marks a *truncation*, not an abbreviation. A contraction
@@ -10,11 +11,27 @@ import type { Change, Rule, RuleContext } from '../types.js';
  */
 const CONTRACTIONS = ['Mr', 'Mrs', 'Ms', 'Dr', 'St', 'Jr', 'Sr', 'Fr', 'Sgt', 'Lt', 'Ltd', 'Mme', 'Mlle'];
 
+/**
+ * Words that can open a sentence but never continue a name. A capital after an initialism
+ * is more often the rest of a name, as in `the U.S. Army`, so only these start a new sentence.
+ */
+const OPENERS = [
+  'A', 'An', 'The', 'This', 'That', 'These', 'Those', 'There', 'Here',
+  'I', 'It', 'Its', 'He', 'His', 'She', 'Her', 'We', 'Our', 'They', 'Their', 'You', 'Your', 'My',
+  'Some', 'Many', 'Most', 'Each', 'Every', 'Both', 'No', 'Not', 'Never', 'Yes',
+  'And', 'But', 'Or', 'So', 'Yet', 'If', 'When', 'While', 'Although', 'Though', 'Because',
+  'As', 'Once', 'Unless', 'In', 'On', 'At', 'For', 'From', 'With', 'Without', 'By', 'After',
+  'Before', 'Since', 'Until', 'During', 'Despite', 'What', 'Why', 'How', 'Who', 'Which', 'Where',
+  'Then', 'Now', 'Later', 'However', 'Meanwhile', 'Instead', 'Also', 'Even',
+];
+// A word joined to a hyphen, digit or stop belongs to a name, as in `A-10`, `I-95` or `A.I.`.
+const OPENER = new RegExp(String.raw`(?:${OPENERS.join('|')})(?![\p{L}\p{N}.‐‑-])`, 'uy');
+
 function abbreviationRule(): Rule {
   const titles = new RegExp(String.raw`\b(${CONTRACTIONS.join('|')})\.(?=\s+[A-Z])`, 'g');
   const initialisms: Array<[RegExp, string]> = [
     [/\bU\.S\.A\./g, 'USA'],
-    [/\bU\.S\.(?=\s|$|[,;:)])/g, 'US'],
+    [new RegExp(String.raw`\bU\.S\.(?=\s|$|[,;:]|${CLOSING})`, 'g'), 'US'],
     [/\bU\.K\./g, 'UK'],
     [/\bPh\.\s?D\./g, 'PhD'],
     [/\bA\.M\./g, 'am'],
@@ -45,11 +62,13 @@ function abbreviationRule(): Rule {
 
       for (const [pattern, replacement] of initialisms) {
         for (const match of ctx.text.matchAll(pattern)) {
+          const start = match.index;
+          const end = start + match[0].length;
           changes.push({
-            start: match.index,
-            end: match.index + match[0].length,
+            start,
+            end,
             before: match[0],
-            after: replacement,
+            after: endsSentence(ctx.text, start, end, OPENER) ? `${replacement}.` : replacement,
             ruleId: 'punctuation.abbreviations',
             category: 'punctuation',
             confidence: 'safe',

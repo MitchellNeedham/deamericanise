@@ -93,6 +93,20 @@ describe('identifiers inside comments survive', () => {
   });
 });
 
+describe('a comment that ends on an initialism', () => {
+  it.each`
+    language    | source                                         | expected
+    ${'ts'}     | ${'// She has a Ph. D.\nconst x = 1;'}         | ${'// She has a PhD.\nconst x = 1;'}
+    ${'ts'}     | ${'const x = 1; // She has a Ph. D.'}          | ${'const x = 1; // She has a PhD.'}
+    ${'python'} | ${'# She has a Ph. D. It took years.'}         | ${'# She has a PhD. It took years.'}
+    ${'ts'}     | ${'/* She has a Ph. D. */'}                    | ${'/* She has a PhD. */'}
+    ${'ts'}     | ${'/**\n * She has a Ph. D.\n * It took years.\n */'} | ${'/**\n * She has a PhD.\n * It took years.\n */'}
+    ${'ts'}     | ${'// She has a Ph. D. in physics.'}           | ${'// She has a PhD in physics.'}
+  `('keeps the sentence stop where it ends one: $source', ({ language, source, expected }) => {
+    expect(deamericaniseCode(source, { language, preset: 'localise' }).text).toBe(expected);
+  });
+});
+
 describe('picking the handler from a filename', () => {
   it.each`
     filename            | source                    | expected

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { build } from 'tsup';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { main } from '../src/cli-main.js';
 
 // The CLI must report the version the package was built with, never a literal of its own.
@@ -236,7 +236,9 @@ describe('choosing which files to read', () => {
 });
 
 describe('a reader that stops early', () => {
-  it('ends quietly with status 0 when the pipe closes', { timeout: 30_000 }, async () => {
+  let cli: string;
+
+  beforeAll(async () => {
     const directory = mkdtempSync(join(tmpdir(), 'deamericanise-cli-'));
     await build({
       config: false,
@@ -247,17 +249,38 @@ describe('a reader that stops early', () => {
       define: { __VERSION__: JSON.stringify(version) },
       silent: true,
     });
+    cli = join(directory, 'cli.mjs');
+  }, 30_000);
 
-    // Bigger than a pipe buffer, so the CLI is still writing when the reader leaves.
-    const source = withFile('big.ts', 'const x = 1;\n'.repeat(100_000));
-    const child = spawn(process.execPath, [join(directory, 'cli.mjs'), source], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+  /** Runs the built CLI and closes its stdout after the first chunk, as `head` does. */
+  async function closedEarly(args: string[]): Promise<{ code: number | null; errors: string }> {
+    const child = spawn(process.execPath, [cli, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     let errors = '';
     child.stderr.on('data', (chunk: Buffer) => (errors += chunk.toString()));
     child.stdout.once('data', () => child.stdout.destroy());
-    const code = await new Promise((resolve) => child.on('close', resolve));
+    const code = await new Promise<number | null>((resolve) => child.on('close', resolve));
+    return { code, errors };
+  }
 
-    expect({ code, errors }).toEqual({ code: 0, errors: '' });
+  // Every case prints well over a pipe buffer, so the CLI is still writing when the reader leaves.
+
+  it('exits 0 with nothing on stderr when the run succeeds', async () => {
+    const source = withFile('big.ts', 'const x = 1;\n'.repeat(100_000));
+    expect(await closedEarly([source])).toEqual({ code: 0, errors: '' });
+  });
+
+  it('keeps the status --check settles on', async () => {
+    const source = withFile('big.md', 'The color.\n'.repeat(20_000));
+    expect(await closedEarly(['--check', '--diff', source])).toEqual({
+      code: 1,
+      errors: 'deamericanise: changes are needed. Run with --diff to see them.\n',
+    });
+  });
+
+  it('still rewrites every file under --write', async () => {
+    const names = Array.from({ length: 1_000 }, (_, i) => `${'long-name-'.repeat(20)}${i}.md`);
+    const directory = withDirectory(Object.fromEntries(names.map((name) => [name, 'The color.'])));
+    expect(await closedEarly(['--write', directory])).toEqual({ code: 0, errors: '' });
+    for (const name of names) expect(readFileSync(join(directory, name), 'utf8')).toBe('The colour.');
   });
 });

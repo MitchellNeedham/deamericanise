@@ -228,8 +228,10 @@ alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 `22 x 28 centimetres`, both ends sharing the unit chosen for the larger. Each side is read
 in its own unit, so `2 feet x 6 inches` becomes `61 x 15 centimetres` and `10 ft x 12 in`
 becomes `3 x 0.3 m`, where the `in` is the unit because the side before it has one. Sides
-that measure different things, as in `2 feet x 6 pounds`, convert as two measurements. A
-dimension is left as written when a side with no unit sits between two different units
+that measure different things, as in `2 feet x 6 pounds`, convert as two measurements.
+Only a length has sides. Before any other unit a bare number is a count, and the quantity
+after it converts on its own: `2 x 4 oz cans` becomes `2 x 110 g cans`, and
+`2 x 4 lb 8 oz bags` becomes `2 x 2.04 kg bags`. A dimension is left as written when a side with no unit sits between two different units
 (`10 ft x 12 x 6 in`), or when the rule for one of its units is switched off.
 
 A weight in two units is one weight, as a height in feet and inches is one height:

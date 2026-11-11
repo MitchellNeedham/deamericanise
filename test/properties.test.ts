@@ -575,7 +575,9 @@ const structure: fc.Arbitrary<Structure> = fc.oneof(
   slug.map((w) => ({ text: `${w}.${w}@example.com`, block: false })),
   words.map((ws) => ({ text: `\`${ws.join(' ')}\``, block: false })),
   slug.map((w) => ({ text: `<span class="${w}">`, block: false })),
-  words.map((ws) => ({ text: `\`\`\`\n${ws.join('\n')}\n\`\`\``, block: true })),
+  fc
+    .tuple(fc.constantFrom('```', '~~~', '````'), words)
+    .map(([fence, ws]) => ({ text: `${fence}\n${ws.join('\n')}\n${fence}`, block: true })),
 );
 
 type Piece = { prose: string } | { structure: Structure };

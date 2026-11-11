@@ -197,8 +197,10 @@ try {
     { format: 'png', clip: { x: 0, y: 0, width: 280, height, scale: 2 } },
     popup,
   );
-  // Closes the description the first screenshot left open.
+  // Closes the description the first screenshot left open. Longer than HIDE_DELAY in highlight.ts.
+  await send('Page.bringToFront', {}, page);
   await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 }, page);
+  await sleep(400);
   await evaluate(page, `(() => {
     const frame = document.createElement('div');
     frame.style.cssText = 'position: fixed; top: 10px; right: 24px; border-radius: 10px; overflow: hidden; ' +
@@ -215,14 +217,25 @@ try {
   // Empty, or the site switched off for the comparison would show in the list.
   await evaluate(options, `chrome.storage.sync.set({ disabledSites: [] })`);
   const settings = await open(extensionPage('options.html'), 1280, 800);
-  // Zoomed out just enough to fit the whole page, so the store shows every setting.
-  const zoom = await evaluate(settings, `(() => {
-    const zoom = Math.min(1, Math.floor((innerHeight / document.documentElement.scrollHeight) * 100) / 100);
-    document.documentElement.style.zoom = String(zoom);
-    return zoom;
-  })()`);
-  console.log(`settings at ${Math.round(zoom * 100)}% zoom`);
-  await save(settings, 'screenshot-4-settings.png');
+  // Two sections share each row, so each split falls on an even section.
+  const parts = [
+    ['screenshot-4-settings.png', 0, 4],
+    ['screenshot-5-settings-more.png', 4, Infinity],
+  ];
+  for (const [name, from, to] of parts) {
+    // Zoomed out just enough to fit, so the store shows every setting.
+    const zoom = await evaluate(settings, `(() => {
+      [...document.querySelectorAll('.options > section')].forEach((section, i) => {
+        section.style.display = i < ${from} || i >= ${to} ? 'none' : '';
+      });
+      document.documentElement.style.zoom = '1';
+      const zoom = Math.min(1, Math.floor((innerHeight / document.documentElement.scrollHeight) * 100) / 100);
+      document.documentElement.style.zoom = String(zoom);
+      return zoom;
+    })()`);
+    console.log(`${name} at ${Math.round(zoom * 100)}% zoom`);
+    await save(settings, name);
+  }
 
   const promo = await open(original('promo.html'), 440, 280);
   await save(promo, 'promo-440x280.png');

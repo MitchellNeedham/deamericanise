@@ -75,12 +75,15 @@ describe('a dialect row outranks the shared row for the same word', () => {
 
 describe('the shared row is the fallback when the dialect row does not apply', () => {
   it.each`
-    input                     | dialect    | expected
-    ${'the mailbox'}          | ${'en-GB'} | ${'the letterbox'}
-    ${'Check your mailbox.'}  | ${'en-GB'} | ${'Check your letterbox.'}
-    ${'the mailboxes'}        | ${'en-IE'} | ${'the letterboxes'}
-    ${'the mailbox'}          | ${'en-ZA'} | ${'the letterbox'}
-    ${'the grocery store'}    | ${'en-ZA'} | ${'the supermarket'}
+    input                        | dialect    | expected
+    ${'the mailbox'}             | ${'en-GB'} | ${'the letterbox'}
+    ${'Check your mailbox.'}     | ${'en-GB'} | ${'Check your letterbox.'}
+    ${'the mailboxes'}           | ${'en-IE'} | ${'the letterboxes'}
+    ${'the mailbox'}             | ${'en-ZA'} | ${'the letterbox'}
+    ${'a university field trip'} | ${'en-GB'} | ${'a university excursion'}
+    ${'a geology field trip'}    | ${'en-IE'} | ${'a geology excursion'}
+    ${'a school field trip'}     | ${'en-GB'} | ${'a school excursion'}
+    ${'the grocery store'}       | ${'en-ZA'} | ${'the supermarket'}
   `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
     expect(say(dialect as Dialect)(input)).toBe(expected);
   });

@@ -111,6 +111,11 @@ button.link {
   word-break: break-all;
 }
 
+/* Chrome sets an extension page's body to 75%, and the rest of the popup follows it. */
+.popup .notice {
+  font-size: inherit;
+}
+
 /* ------- Options page ------- */
 
 .options {

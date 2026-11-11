@@ -18,6 +18,12 @@ export type UnitSettings = Pick<UnitOptions, 'keepOriginal' | 'precision' | 'fue
 export type DateSettings = Pick<DateOptions, 'format' | 'reorderLongDates'>;
 export type TimeSettings = Pick<TimeOptions, 'to24Hour'>;
 
+/** What one site has set for itself. Each site is stored under its own key, `site:<hostname>`. */
+export interface SiteSettings {
+  /** False when the extension leaves the site alone. */
+  enabled?: boolean;
+}
+
 export interface Settings {
   dialect: Dialect;
   preset: Preset;
@@ -32,9 +38,12 @@ export interface Settings {
   highlight: boolean;
   /** Rules switched on or off by hand. Each one differs from the dialect's default. */
   rules: Record<string, boolean>;
-  /** Hostnames the extension leaves alone. */
-  disabledSites: string[];
+  /** Settings of each site that has any, by hostname. */
+  sites: Record<string, SiteSettings>;
 }
+
+/** The settings stored under keys of their own, as `saveSettings` takes them. */
+export type SettingsChanges = Partial<Omit<Settings, 'sites'>>;
 
 export const VERDICTS: Verdict[] = ['detect', 'lang', 'american'];
 export const PRECISIONS: Precision[] = ['natural', 'exact', 0, 1, 2];
@@ -52,16 +61,32 @@ export const DEFAULTS: Settings = {
   verdict: 'detect',
   highlight: false,
   rules: {},
-  disabledSites: [],
+  sites: {},
 };
+
+const SITE = 'site:';
+/** The single list of sites switched off that older versions kept. */
+const OLD_SITES = 'disabledSites';
+
+/**
+ * The most sites with a key of their own. Browsers allow 512 items in `storage.sync`, and the
+ * rest are kept for the settings' own keys.
+ */
+export const MAX_SITES = 480;
+
+const siteKey = (host: string): string => SITE + host;
+const isSiteKey = (key: string): boolean => key.startsWith(SITE);
+
+const record = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+const hostList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((s): s is string => typeof s === 'string') : [];
 
 /** Anything stored by an older version, or edited by hand, falls back to the default. */
 function clean(stored: Record<string, unknown>): Settings {
   const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
     allowed.includes(value as T) ? (value as T) : fallback;
   const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
-  const record = (value: unknown): Record<string, unknown> =>
-    value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const switches = (value: unknown): [string, boolean][] =>
     Object.entries(record(value)).filter(
       (entry): entry is [string, boolean] => typeof entry[1] === 'boolean',
@@ -82,6 +107,16 @@ function clean(stored: Record<string, unknown>): Settings {
   const confidence = list(stored.confidence).filter((c): c is Confidence =>
     CONFIDENCES.includes(c as Confidence),
   );
+
+  // Hostnames come from pages, so `__proto__` must stay an ordinary key.
+  const sites: Record<string, SiteSettings> = Object.create(null);
+  for (const [key, value] of Object.entries(stored)) {
+    if (!isSiteKey(key)) continue;
+    const site = fields<SiteSettings>(value, { enabled: BOOLEAN });
+    if (Object.keys(site).length > 0) sites[key.slice(SITE.length)] = site;
+  }
+  for (const host of hostList(stored[OLD_SITES])) sites[host] = { ...sites[host], enabled: false };
+
   return {
     dialect: pick(stored.dialect, Object.keys(DIALECTS) as Dialect[], DEFAULTS.dialect),
     preset: pick(stored.preset, PRESETS, DEFAULTS.preset),
@@ -99,7 +134,7 @@ function clean(stored: Record<string, unknown>): Settings {
     verdict: pick(stored.verdict, VERDICTS, DEFAULTS.verdict),
     highlight: flag(stored.highlight, DEFAULTS.highlight),
     rules: Object.fromEntries(switches(stored.rules)),
-    disabledSites: list(stored.disabledSites).filter((s): s is string => typeof s === 'string'),
+    sites,
   };
 }
 
@@ -107,8 +142,83 @@ export async function loadSettings(): Promise<Settings> {
   return clean(await api.storage.sync.get(null));
 }
 
-export async function saveSettings(changes: Partial<Settings>): Promise<void> {
+/** Stores settings. Rejects with the browser's error when storage refuses them. */
+export async function saveSettings(changes: SettingsChanges): Promise<void> {
   await api.storage.sync.set(changes);
+}
+
+/** Thrown by `saveSite` when `MAX_SITES` sites already have a key of their own. */
+export class SitesFullError extends Error {
+  constructor() {
+    super(`${MAX_SITES} sites already have settings of their own.`);
+    this.name = 'SitesFullError';
+  }
+}
+
+/**
+ * Changes one site's settings. A field set to `undefined` is cleared, and a site left with
+ * nothing set loses its key. Fields this version does not know are kept. Rejects with the
+ * browser's error, or with `SitesFullError`, when the change cannot be stored.
+ */
+export async function saveSite(host: string, changes: SiteSettings): Promise<void> {
+  const key = siteKey(host);
+  const stored = await api.storage.sync.get(null);
+  const site = { ...record(stored[key]) };
+  for (const [field, value] of Object.entries(changes)) {
+    if (value === undefined) delete site[field];
+    else site[field] = value;
+  }
+
+  const old = hostList(stored[OLD_SITES]);
+  if (site.enabled !== false && old.includes(host)) {
+    await api.storage.sync.set({ [OLD_SITES]: old.filter((h) => h !== host) });
+  }
+  if (Object.keys(site).length === 0) {
+    if (key in stored) await api.storage.sync.remove(key);
+    return;
+  }
+  if (!(key in stored) && Object.keys(stored).filter(isSiteKey).length >= MAX_SITES) {
+    throw new SitesFullError();
+  }
+  await api.storage.sync.set({ [key]: site });
+}
+
+/**
+ * Moves the sites in the list older versions kept to keys of their own, in one write that
+ * also empties the list. Once it has run there is nothing left to move, and two browsers
+ * running it at once write the same values. When the sites would not fit under `MAX_SITES` it
+ * does nothing, and `loadSettings` goes on reading the list.
+ */
+export async function migrateSites(): Promise<void> {
+  const stored = await api.storage.sync.get(null);
+  const old = hostList(stored[OLD_SITES]);
+  if (old.length === 0) return;
+
+  const writes: Record<string, unknown> = { [OLD_SITES]: [] };
+  for (const host of old) writes[siteKey(host)] = { ...record(stored[siteKey(host)]), enabled: false };
+  const keys = new Set([...Object.keys(stored), ...Object.keys(writes)].filter(isSiteKey));
+  if (keys.size > MAX_SITES) return;
+  await api.storage.sync.set(writes);
+}
+
+/** Whether a change in storage can alter the settings of a page on `host`. */
+export function affectsHost(changes: Record<string, unknown>, host: string): boolean {
+  return Object.keys(changes).some((key) => !isSiteKey(key) || key === siteKey(host));
+}
+
+/** A sentence for the reader saying why a change was not stored. */
+export function failureMessage(error: unknown): string {
+  if (error instanceof SitesFullError) {
+    return `Not saved: synced settings have room for ${MAX_SITES} sites switched off. Switch one back on in Settings to make room.`;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (/WRITE_OPERATIONS/.test(message)) {
+    return 'Not saved: there were too many changes in the last minute. Try again shortly.';
+  }
+  if (/quota/i.test(message)) {
+    return 'Not saved: synced storage is full. Switch a site back on in Settings to make room.';
+  }
+  return `Not saved: ${message}`;
 }
 
 const catalogues = new Map<Dialect, Map<string, RuleInfo>>();
@@ -179,7 +289,7 @@ export function domOptions(settings: Settings): DomOptions {
 }
 
 export function isEnabledOn(settings: Settings, host: string): boolean {
-  return !settings.disabledSites.includes(host);
+  return settings.sites[host]?.enabled !== false;
 }
 
 /** Asks the content script in a tab how it is doing. */

@@ -1,5 +1,15 @@
 import { api } from './browser.js';
-import { loadSettings, saveSettings, type Status, type StatusRequest } from './settings.js';
+import {
+  failureMessage,
+  isEnabledOn,
+  loadSettings,
+  migrateSites,
+  saveSettings,
+  saveSite,
+  type Settings,
+  type Status,
+  type StatusRequest,
+} from './settings.js';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -38,6 +48,28 @@ async function settle(tab: number, enabled: boolean): Promise<Status | null> {
   return status(tab);
 }
 
+/**
+ * Stores what a switch was set to. When storage refuses it, says why and sets the switch to
+ * what storage holds. Resolves to whether it was stored.
+ */
+async function store(
+  input: HTMLInputElement,
+  write: () => Promise<void>,
+  stored: (settings: Settings) => boolean,
+): Promise<boolean> {
+  const failed = $('failed');
+  try {
+    await write();
+  } catch (error) {
+    failed.textContent = failureMessage(error);
+    failed.hidden = false;
+    input.checked = stored(await loadSettings());
+    return false;
+  }
+  failed.hidden = true;
+  return true;
+}
+
 async function main(): Promise<void> {
   $('settings').addEventListener('click', () => {
     void api.runtime.openOptionsPage().then(() => window.close());
@@ -50,16 +82,28 @@ async function main(): Promise<void> {
     return;
   }
   show(current);
+  // A failed move loses nothing, because the old list is still read.
+  await migrateSites().catch(() => undefined);
 
   const highlight = $<HTMLInputElement>('highlight');
   highlight.checked = (await loadSettings()).highlight;
-  highlight.addEventListener('change', () => void saveSettings({ highlight: highlight.checked }));
+  highlight.addEventListener('change', () => {
+    void store(
+      highlight,
+      () => saveSettings({ highlight: highlight.checked }),
+      (settings) => settings.highlight,
+    );
+  });
 
-  $<HTMLInputElement>('enabled').addEventListener('change', async (event) => {
-    const enabled = (event.target as HTMLInputElement).checked;
-    const settings = await loadSettings();
-    const others = settings.disabledSites.filter((site) => site !== current.host);
-    await saveSettings({ disabledSites: enabled ? others : [...others, current.host] });
+  const rewrite = $<HTMLInputElement>('enabled');
+  rewrite.addEventListener('change', async () => {
+    const enabled = rewrite.checked;
+    const saved = await store(
+      rewrite,
+      () => saveSite(current.host, { enabled: enabled ? undefined : false }),
+      (settings) => isEnabledOn(settings, current.host),
+    );
+    if (!saved) return;
     const after = await settle(tab, enabled);
     if (after) show(after);
   });

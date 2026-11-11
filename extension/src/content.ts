@@ -2,6 +2,7 @@ import { DomRewriter, type DomOptions } from '../../src/dom/index.js';
 import { api } from './browser.js';
 import { Highlighter, type RuleSwitch } from './highlight.js';
 import {
+  affectsHost,
   catalogue,
   DEFAULTS,
   domOptions,
@@ -62,8 +63,8 @@ function apply(settings: Settings): void {
 
 void loadSettings().then(apply);
 
-api.storage.onChanged.addListener((_, area) => {
-  if (area === 'sync') void loadSettings().then(apply);
+api.storage.onChanged.addListener((changes, area) => {
+  if (area === 'sync' && affectsHost(changes, host)) void loadSettings().then(apply);
 });
 
 api.runtime.onMessage.addListener((message, _, respond) => {

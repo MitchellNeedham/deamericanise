@@ -153,8 +153,8 @@ nearest mailbox`), and otherwise the letterbox the other dialects say.
 their own. `en-CA` is the hybrid: it keeps `colour`, `centre` and `defence` but also keeps
 `-ize`, `aluminum`, `math`, `tire` and `gas`.
 
-`en-GB` leaves miles, mph, pints and stone alone, because Britain still uses them. Turn a
-unit back on by id if you disagree:
+`en-GB` leaves miles, mph, pints and stone alone, because Britain still uses them, and a
+weight in stone and pounds stays whole. Turn a unit back on by id if you disagree:
 
 ```ts
 deamericaniseText('10 miles', { dialect: 'en-GB', rules: { 'units.length.mile': true } });
@@ -216,6 +216,15 @@ fuel economy. The volume measures are the US ones, which are not the imperial on
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 `22 x 28 centimetres`, both ends sharing the unit chosen for the larger.
+
+A weight in two units is one weight, as a height in feet and inches is one height:
+`7 pounds 8 ounces` becomes `3.4 kilograms`, `11st 4lb` becomes `71.7 kg`, and
+`11 stone 4 pounds 8 ounces` becomes `71.9 kilograms`. Together the parts claim three
+significant figures. Where a unit of the weight is kept, by the dialect or by `unitsKeep`,
+the whole weight is left as written, so an `en-GB` `11 stone 4 pounds` never becomes
+`11 stone 1.8 kilograms`. Turning on `units.mass.stone` or `units.mass.stone-pounds`
+converts it. A weight at the end of a range, as in `7-8 lb 4 oz`, is left as written too.
+`st` is read only in such a weight, because `1st` on its own is an ordinal.
 
 Numbers written out in words are read too, fractions and all: `two and a half feet` becomes
 `76 centimetres` and `a quarter mile away` becomes `400 metres away`. So do `half a mile`,
@@ -726,6 +735,8 @@ there each root needs the rules in its own styles.
   blank line or a list marker between them keeps them apart.
 - Pounds with nothing beside them to say money or weight, as in `It's 5 pounds.`, are read
   as a weight.
+- A weight with a comma between its parts, as in `7 pounds, 8 ounces`, converts as two
+  weights, because a comma also separates a list such as `180 pounds, 3 ounces and 12 stone`.
 - Currency amounts are never converted. Rates move; the output would be wrong by the time
   anyone read it.
 - Grade-to-year mapping assumes the Australian and British numbering, which does not line

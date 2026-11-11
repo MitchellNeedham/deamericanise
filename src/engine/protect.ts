@@ -73,11 +73,71 @@ const CODE_SPAN = new RegExp(
   'g',
 );
 
+/**
+ * A line that starts with a run of three or more backticks or tildes, split into its quote
+ * markers, its list markers (or the `*` that starts each line of a block comment), its
+ * indentation, the run, and the rest of the line.
+ */
+const FENCE_LINE = /^((?:[ \t]*>)*)((?:[ \t]*(?:[-+*]|\d{1,9}[.)])(?=[ \t]))*)([ \t]*)(`{3,}|~{3,})([^\r\n]*)/;
+
+interface OpenFence {
+  /** Where the opening run starts. */
+  start: number;
+  run: string;
+  quotes: string;
+  /** The quote and list markers before the run. */
+  prefix: string;
+  /** The indentation between the markers and the run. */
+  indent: number;
+  /** The column the run starts at. */
+  column: number;
+}
+
+/** Whether a fence line closes the open fence: a bare run of its character, at least as long. */
+function closesFence(line: RegExpExecArray, open: OpenFence): boolean {
+  const [, quotes = '', markers = '', indent = '', run = '', rest = ''] = line;
+  if (run[0] !== open.run[0] || run.length < open.run.length || !/^[ \t]*$/.test(rest)) return false;
+  if (quotes + markers === open.prefix) return indent.length <= open.indent + 3;
+  return quotes === open.quotes && markers === '' && quotes.length + indent.length <= open.column + 3;
+}
+
+/**
+ * Fenced code blocks as CommonMark reads them: a line that starts with three or more backticks
+ * or tildes, closed by a line of the same character at least as long, or by the end of the text
+ * if nothing closes it. A backtick fence's info string holds no backtick, so ```a``` is a code
+ * span wherever it sits.
+ *
+ * The list items and quotes a fence sits in are read from its own lines. The opening run may sit
+ * any distance in, since a fence in a nested list item sits four or more spaces in. The closing
+ * run may sit at most three columns further in than the opening one, which is CommonMark's limit
+ * counted from the fence, and needs the same quote markers. It either repeats the opening line's
+ * markers, as each line of a block comment repeats its `*`, or drops the list markers and is
+ * measured from the start of the line, as a list item's lines are.
+ */
+function collectFencedCode(text: string, into: Range[]): void {
+  let open: OpenFence | undefined;
+  let offset = 0;
+  for (const line of text.split('\n')) {
+    const fence = FENCE_LINE.exec(line);
+    if (fence && open && closesFence(fence, open)) {
+      into.push({ start: open.start, end: offset + line.length });
+      open = undefined;
+    } else if (fence && !open) {
+      const [, quotes = '', markers = '', indent = '', run = '', rest = ''] = fence;
+      if (!(run.startsWith('`') && rest.includes('`'))) {
+        const column = quotes.length + markers.length + indent.length;
+        open = { start: offset + column, run, quotes, prefix: quotes + markers, indent: indent.length, column };
+      }
+    }
+    offset += line.length + 1;
+  }
+  if (open) into.push({ start: open.start, end: text.length });
+}
+
 const STRUCTURAL: RegExp[] = [
   /\bhttps?:\/\/\S+/g,
   /\bwww\.\S+/g,
   /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
-  /`{3}[\s\S]*?`{3}/g,
   CODE_SPAN,
   /<[a-zA-Z/][^>\n]*>/g,
 ];
@@ -143,6 +203,7 @@ function collect(text: string, patterns: RegExp[], into: Range[]): void {
 export function protectedRanges(text: string, options: ProtectOptions): Range[] {
   const ranges: Range[] = [];
   collect(text, [IGNORE_BLOCK, IGNORE_LINE, ...STRUCTURAL], ranges);
+  collectFencedCode(text, ranges);
   if (options.properNouns) collect(text, PROPER_NOUNS, ranges);
   if (options.identifiers) {
     collect(text, IDENTIFIERS, ranges);

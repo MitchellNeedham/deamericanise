@@ -104,6 +104,17 @@ describe('inline code inside a comment', () => {
   });
 });
 
+describe('a fenced example inside a block comment', () => {
+  it.each`
+    source                                                                                   | expected                                                                                  | why
+    ${'/**\n * Prints:\n * ```text\n * the color\n * ```\n * The color is red.\n */'}         | ${'/**\n * Prints:\n * ```text\n * the color\n * ```\n * The colour is red.\n */'}         | ${'the closing line repeats the star'}
+    ${'/*\n * ~~~\n * the color\n * ~~~\n * The color is red.\n */'}                          | ${'/*\n * ~~~\n * the color\n * ~~~\n * The colour is red.\n */'}                          | ${'a tilde fence'}
+    ${'/**\n *\n *     ```text\n *     the color\n *     ```\n *\n * The color is red.\n */'}  | ${'/**\n *\n *     ```text\n *     the color\n *     ```\n *\n * The colour is red.\n */'}  | ${'a fence indented past the star'}
+  `('$why', ({ source, expected }) => {
+    expect(rewrite('ts', source)).toBe(expected);
+  });
+});
+
 describe('a comment that ends on an initialism', () => {
   it.each`
     language    | source                                         | expected

@@ -647,10 +647,10 @@ one for Edge too. Uploading to the Chrome Web Store, Microsoft Edge Add-ons and 
 Add-ons is manual.
 
 The store screenshots and the 440×280 promo tile are in `extension/store/images`, at sizes
-all three stores accept. They show an invented American recipe page,
-`extension/store/sample.html`. To make them again after the extension changes, run
-`npm run build:extension` and then `node extension/store/capture.mjs`, which needs Google
-Chrome.
+all three stores accept, along with the 300×300 logo Edge asks for. The screenshots show an
+invented American recipe page, `extension/store/sample.html`. To make them again after the
+extension changes, run `npm run build:extension` and then `node extension/store/capture.mjs`,
+which needs Google Chrome.
 
 The privacy policy the stores link to is `site/privacy.html`, which GitHub Pages publishes
 with the demo at <https://mitchellneedham.github.io/deamericanise/privacy.html>.

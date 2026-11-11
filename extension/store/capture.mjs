@@ -226,6 +226,12 @@ try {
 
   const promo = await open(original('promo.html'), 440, 280);
   await save(promo, 'promo-440x280.png');
+
+  // Edge Add-ons asks for a square logo of at least 128 pixels and recommends 300.
+  const logo = await open(`http://127.0.0.1:${port}/icons/icon.svg`, 300, 300);
+  // Keeps the corners outside the rounded square transparent.
+  await send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } }, logo);
+  await save(logo, 'logo-300x300.png');
 } finally {
   if (chrome.exitCode === null) {
     // Closing over the pipe lets Chrome's helper processes finish writing to the profile.

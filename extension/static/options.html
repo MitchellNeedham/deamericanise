@@ -30,6 +30,43 @@
     </section>
 
     <section>
+      <h2>What it changes</h2>
+      <p class="muted">The mode sets which of these are on. A switch you change here stays that way in either mode.</p>
+      <div class="choice"><input type="checkbox" id="category-spelling" name="category" value="spelling">
+        <label for="category-spelling">Spelling</label>
+        <small>Such as colour for color and travelled for traveled.</small>
+        <button type="button" class="link" data-follow="spelling" hidden>Follow the mode</button></div>
+      <div class="choice"><input type="checkbox" id="category-vocabulary" name="category" value="vocabulary">
+        <label for="category-vocabulary">Vocabulary</label>
+        <small>Local words, such as capsicum for bell pepper and lift for elevator.</small>
+        <button type="button" class="link" data-follow="vocabulary" hidden>Follow the mode</button></div>
+      <div class="choice"><input type="checkbox" id="category-units" name="category" value="units">
+        <label for="category-units">Units</label>
+        <small>Metric for feet, pounds, gallons and degrees Fahrenheit.</small>
+        <button type="button" class="link" data-follow="units" hidden>Follow the mode</button></div>
+      <div class="choice"><input type="checkbox" id="category-dates" name="category" value="dates">
+        <label for="category-dates">Dates</label>
+        <small>A date nobody can misread, such as 2024-03-14 for 3/14/2024.</small>
+        <button type="button" class="link" data-follow="dates" hidden>Follow the mode</button></div>
+      <div class="choice"><input type="checkbox" id="category-times" name="category" value="times">
+        <label for="category-times">Times</label>
+        <small>Such as 3:00pm for 3:00 P.M.</small>
+        <button type="button" class="link" data-follow="times" hidden>Follow the mode</button></div>
+      <div class="choice"><input type="checkbox" id="category-currency" name="category" value="currency">
+        <label for="category-currency">Currency</label>
+        <small>US$500 for a bare $500 on an American page. Amounts are never converted.</small>
+        <button type="button" class="link" data-follow="currency" hidden>Follow the mode</button></div>
+      <div class="choice"><input type="checkbox" id="category-punctuation" name="category" value="punctuation">
+        <label for="category-punctuation">Punctuation</label>
+        <small>House style, such as US for U.S. and Mr for Mr.</small>
+        <button type="button" class="link" data-follow="punctuation" hidden>Follow the mode</button></div>
+      <div class="choice"><input type="checkbox" id="category-misc" name="category" value="misc">
+        <label for="category-misc">Other</label>
+        <small>Paper sizes, such as A4 for US Letter.</small>
+        <button type="button" class="link" data-follow="misc" hidden>Follow the mode</button></div>
+    </section>
+
+    <section>
       <h2>Confidence</h2>
       <p class="muted">Leave at least one ticked.</p>
       <label class="choice"><input type="checkbox" name="confidence" value="safe">
@@ -41,6 +78,13 @@
       <label class="choice"><input type="checkbox" name="confidence" value="risky">
         <span>Risky</span>
         <small>A guess about what a word means, such as tyre or cheque.</small></label>
+    </section>
+
+    <section>
+      <h2>Converted measurements</h2>
+      <label class="choice"><input type="checkbox" id="keep-original-units">
+        <span>Keep the original</span>
+        <small>Such as 1.8 metres (6 feet).</small></label>
     </section>
 
     <section>
@@ -69,9 +113,15 @@
     </section>
 
     <section>
+      <h2>Rules switched off</h2>
+      <p class="muted" id="no-rules">None. With highlighting on, point at a change and choose Switch off this rule.</p>
+      <ul class="switched-off" id="rules"></ul>
+    </section>
+
+    <section>
       <h2>Sites left alone</h2>
       <p class="muted" id="no-sites">None. Switch a site off from the toolbar button.</p>
-      <ul class="sites" id="sites"></ul>
+      <ul class="switched-off" id="sites"></ul>
     </section>
 
     <p class="saved" id="saved" aria-live="polite"></p>

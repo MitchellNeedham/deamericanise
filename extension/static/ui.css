@@ -176,7 +176,13 @@ button.link {
   color: var(--muted);
 }
 
-.sites {
+.choice > button {
+  grid-column: 2;
+  justify-self: start;
+  font-size: 14px;
+}
+
+.switched-off {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -184,7 +190,7 @@ button.link {
   gap: 4px;
 }
 
-.sites li {
+.switched-off li {
   display: flex;
   justify-content: space-between;
   gap: 12px;

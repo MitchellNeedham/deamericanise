@@ -84,7 +84,8 @@ import { deamericaniseDom } from 'deamericanise/dom';      // deamericaniseDom(d
 
 `extension/` is an extension for Chrome, Edge and Firefox that rewrites the pages you visit
 as they load, before the text is painted. Everything runs on your machine. Switch on
-highlighting from the toolbar button to see each change and the rule that made it.
+highlighting from the toolbar button to see each change and the rule that made it, and to
+switch that rule off. The settings page switches whole categories on or off.
 
 ```sh
 npm run build:extension   # writes extension/dist/chrome and extension/dist/firefox

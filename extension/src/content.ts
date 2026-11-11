@@ -1,7 +1,14 @@
 import { DomRewriter } from '../../src/dom/index.js';
 import { api } from './browser.js';
 import { Highlighter } from './highlight.js';
-import { domOptions, isEnabledOn, loadSettings, type Settings, type Status } from './settings.js';
+import {
+  domOptions,
+  isEnabledOn,
+  loadSettings,
+  switchOffRule,
+  type Settings,
+  type Status,
+} from './settings.js';
 
 let rewriter: DomRewriter | null = null;
 let highlighter: Highlighter | null = null;
@@ -29,7 +36,7 @@ function apply(settings: Settings): void {
   applied = key;
 
   if (settings.highlight) {
-    highlighter ??= new Highlighter(rewriter);
+    highlighter ??= new Highlighter(rewriter, (ruleId) => void switchOffRule(ruleId));
   } else {
     highlighter?.stop();
     highlighter = null;

@@ -594,14 +594,18 @@ Pages that were already open need a reload before the extension can rewrite them
 
 The toolbar button shows how many changes the current page has, switches the extension
 off for that site, and switches highlighting on and off. The settings page has the dialect,
-the mode, the confidence tiers, the `verdict`, highlighting and the list of sites switched
-off.
+the mode, a switch for each category, the confidence tiers, `units.keepOriginal`, the
+`verdict`, highlighting, and the lists of rules and sites switched off. A category switched
+by hand beats the mode, and stays that way when the mode changes, until you choose
+**Follow the mode**.
 
 Highlighting is off by default. When it is on, each change gets a background in its
 category's colour and an underline that is solid for safe, dashed for moderate and dotted
-for risky. Point at a change to see what it replaced, the rule and its confidence. The
-highlights are painted with the CSS Custom Highlight API, so the page's elements stay as
-they were. Changes to `title`, `alt` and `placeholder` are not highlighted, and there is no
+for risky. Point at a change to see what it replaced, the rule and its confidence. Move the
+pointer onto that description and choose **Switch off this rule** to stop the rule on every
+site. An article fixed to suit a replacement, such as `an` to `a`, follows that replacement
+and has no switch of its own. The highlights are painted with the CSS Custom Highlight
+API, so the page's elements stay as they were. Changes to `title`, `alt` and `placeholder` are not highlighted, and there is no
 description on a touch screen. Settings sync between browsers signed in to
 the same account, and changes apply to open pages straight away.
 

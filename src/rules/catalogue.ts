@@ -5,7 +5,7 @@ import type { Category, Confidence, Dialect, ResolvedOptions } from '../types.js
 import { patternRules } from './index.js';
 import { spellingEntries } from './spelling/index.js';
 import { MEASUREMENT_CONFIDENCE } from './units/index.js';
-import { MEASURES } from './units/definitions.js';
+import { COMPOUNDS, MEASURES } from './units/definitions.js';
 import { baseVocabulary } from './vocabulary.js';
 
 /** A rule as someone choosing which rules to run needs to see it. */
@@ -83,7 +83,9 @@ const LABELS: Record<string, [label: string, example: string]> = {
   'units.length.yard': ['Yards', '91 metres for 100 yards'],
   'units.mass.ounce': ['Ounces', '230 grams for 8 ounces'],
   'units.mass.pound': ['Pounds', '82 kilograms for 180 pounds'],
+  'units.mass.pounds-ounces': ['Pounds and ounces', '3.4 kilograms for 7 pounds 8 ounces'],
   'units.mass.stone': ['Stone', '76 kilograms for 12 stone'],
+  'units.mass.stone-pounds': ['Stone and pounds', '71.7 kilograms for 11 stone 4 pounds'],
   'units.mass.ton': ['Tons', '1.8 tonnes for 2 tons'],
   'units.measurement': ['Single measurements', '1.8 metres for 6 feet'],
   'units.power.horsepower': ['Horsepower', '220 kilowatts for 300 horsepower'],
@@ -133,6 +135,7 @@ export function ruleCatalogue(dialect: Dialect = 'en-AU'): RuleInfo[] {
       throw new Error(`Rule ${id} is in both ${known.category} and ${category}.`);
     }
     known.confidence.add(confidence);
+    known.kept ||= kept;
   };
 
   for (const entry of [...spellingEntries(), ...baseVocabulary(), ...pack.vocabulary]) {
@@ -144,6 +147,13 @@ export function ruleCatalogue(dialect: Dialect = 'en-AU'): RuleInfo[] {
   for (const measure of MEASURES) {
     const kept = measure.keptByDefault === true || pack.unitsKeep.includes(measure.keep);
     add(measure.id, 'units', MEASUREMENT_CONFIDENCE, kept);
+  }
+  // A compound in a kept unit is held whole, so it converts only when turned on by id.
+  for (const compound of COMPOUNDS) {
+    const kept = compound.measures.some(
+      (measure) => measure.keptByDefault === true || pack.unitsKeep.includes(measure.keep),
+    );
+    add(compound.id, 'units', MEASUREMENT_CONFIDENCE, kept);
   }
   add(ARTICLE_AGREEMENT.ruleId, ARTICLE_AGREEMENT.category, ARTICLE_AGREEMENT.confidence);
 

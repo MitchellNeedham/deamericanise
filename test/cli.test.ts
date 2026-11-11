@@ -6,6 +6,7 @@ import { Readable } from 'node:stream';
 import { build } from 'tsup';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { main } from '../src/cli-main.js';
+import { DIALECTS } from '../src/dialects/index.js';
 
 // The CLI must report the version the package was built with, never a literal of its own.
 const version = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version;
@@ -321,6 +322,68 @@ describe('--language', () => {
     const names = stdout().trimEnd().split('\n');
     for (const name of ['md', 'markdown', 'txt', 'json', 'jsonc', 'python', 'ruby', 'ts']) expect(names).toContain(name);
     expect(names).toEqual([...names].sort());
+  });
+});
+
+describe('--rule and --units-keep', () => {
+  function exits(): void {
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`exited ${code}`);
+    }) as never);
+  }
+
+  it.each`
+    args                                                       | id
+    ${['--rule', 'spelling.ourr=false']}                       | ${'spelling.ourr'}
+    ${['--rule', 'spellingg.*=false']}                         | ${'spellingg.*'}
+    ${['--rule', 'spelling.our.*=false']}                      | ${'spelling.our.*'}
+    ${['--rule', 'units.length=false']}                        | ${'units.length'}
+    ${['--rule', 'spelling.our', '--rule', 'nope=true']}       | ${'nope'}
+    ${['--dialect', 'en-CA', '--rule', 'dialect.en-US=false']} | ${'dialect.en-US'}
+  `('rejects $args with exit 2 before reading anything', async ({ args, id }) => {
+    exits();
+    const path = withFile('a.md', 'The color.');
+    await expect(main(['--write', ...(args as string[]), path])).rejects.toThrow('exited 2');
+    expect(stderr()).toBe(`deamericanise: unknown rule "${id}". Try --list-rules.\n`);
+    expect(readFileSync(path, 'utf8')).toBe('The color.');
+    expect(stdout()).toBe('');
+  });
+
+  it.each(['furlong', 'inchs', 'fahrenheit', 'units.length.inch', 'mile,furlong'])(
+    'rejects --units-keep %s with exit 2, listing the known units',
+    async (value) => {
+      exits();
+      withStdin('6 inches');
+      await expect(main(['--language', 'md', '--units-keep', value])).rejects.toThrow('exited 2');
+      const name = value.split(',').at(-1)!;
+      expect(stderr()).toMatch(new RegExp(`^deamericanise: unknown unit "${name}"\\. Known: inch, foot, .*\\bpint\\b.*\\n$`));
+      expect(stdout()).toBe('');
+    },
+  );
+
+  it.each`
+    args                                                             | input                             | expected
+    ${['--rule', 'spelling.our=false']}                              | ${'the color center'}             | ${'the color centre'}
+    ${['--rule', 'spelling.*=false']}                                | ${'the color center'}             | ${'the color center'}
+    ${['--rule', 'spelling.our=true', '--confidence', 'risky']}      | ${'the color center'}             | ${'the colour center'}
+    ${['--dialect', 'en-AU', '-l', '--rule', 'dialect.en-GB=false']} | ${'the sidewalk'}                 | ${'the footpath'}
+    ${['--units-keep', 'mile,pint,inch']}                            | ${'6 inches, 2 miles and 1 pint'} | ${'6 inches, 2 miles and 1 pint'}
+    ${['--units-keep', 'inches']}                                    | ${'6 inches and 2 feet'}          | ${'6 inches and 61 centimetres'}
+    ${['--units-keep', 'in']}                                        | ${'6 inches'}                     | ${'6 inches'}
+    ${['--units-keep', 'Fl Oz, sq ft']}                              | ${'8 fl oz on 100 square feet'}   | ${'8 fl oz on 100 square feet'}
+    ${['--units-keep', 'MPH']}                                       | ${'60 mph'}                       | ${'60 mph'}
+  `('accepts $args and turns "$input" into "$expected"', async ({ args, input, expected }) => {
+    const path = withFile('a.md', input as string);
+    expect(await main([...(args as string[]), path])).toBe(0);
+    expect(stdout()).toBe(expected);
+    expect(stderr()).toBe('');
+  });
+
+  it.each(Object.keys(DIALECTS))("accepts --rule 'dialect.*=false' under %s", async (dialect) => {
+    const path = withFile('a.md', 'the sidewalk');
+    expect(await main(['--dialect', dialect, '-l', '--rule', 'dialect.*=false', path])).toBe(0);
+    expect(stdout()).toBe('the sidewalk');
+    expect(stderr()).toBe('');
   });
 });
 

@@ -1,10 +1,11 @@
 import { readFileSync, statSync, writeFileSync, readdirSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { parseArgs } from 'node:util';
-import { CATEGORIES, CONFIDENCES, PRESETS } from './config.js';
+import { CATEGORIES, CONFIDENCES, PRESETS, matchesRuleId } from './config.js';
 import { DIALECTS } from './dialects/index.js';
 import { PROSE_EXTENSIONS, languageNames, lexerFor } from './lexers/index.js';
 import { ruleIds } from './rules/catalogue.js';
+import { MEASURES } from './rules/units/definitions.js';
 import { deamericaniseFile, isKnownLanguage } from './code.js';
 import type { Category, Change, Confidence, Dialect, Options, Preset, Precision } from './types.js';
 
@@ -81,6 +82,14 @@ function fail(message: string): never {
 
 function list(value: string | undefined): string[] {
   return value ? value.split(',').map((s) => s.trim()).filter(Boolean) : [];
+}
+
+/** The `unitsKeep` key of the unit a name such as `inch`, `inches` or `in` stands for. */
+function unitKey(name: string): string | undefined {
+  const lower = name.toLowerCase();
+  return MEASURES.find((measure) =>
+    [measure.keep, ...measure.words, ...measure.abbrevs].some((form) => form.toLowerCase() === lower),
+  )?.keep;
 }
 
 /** Whether a file has a lexer or reads as prose, from its name alone. */
@@ -244,11 +253,21 @@ export async function main(argv: string[]): Promise<number> {
   }
 
   const rules: Record<string, boolean> = {};
-  for (const entry of values.rule ?? []) {
+  const ruleEntries = values.rule ?? [];
+  // Every dialect's ids, so one command line runs under them all: en-CA has no dialect.* rule.
+  const knownRules = ruleEntries.length ? (Object.keys(DIALECTS) as Dialect[]).flatMap((d) => ruleIds(d)) : [];
+  for (const entry of ruleEntries) {
     const [id, value = 'false'] = entry.split('=');
     if (!id) fail('--rule expects <id>=<true|false>');
+    if (!knownRules.some((ruleId) => matchesRuleId(id, ruleId))) fail(`unknown rule "${id}". Try --list-rules.`);
     rules[id] = value !== 'false' && value !== '0' && value !== 'off';
   }
+
+  const unitsKeep = list(values['units-keep']).map((name) => {
+    const key = unitKey(name);
+    if (key === undefined) fail(`unknown unit "${name}". Known: ${MEASURES.map((m) => m.keep).join(', ')}`);
+    return key;
+  });
 
   const precision = parsePrecision(values.precision);
   const options: Options = {
@@ -264,7 +283,7 @@ export async function main(argv: string[]): Promise<number> {
       keepOriginal: values['keep-original'] ?? false,
       ...(precision !== undefined ? { precision } : {}),
     },
-    unitsKeep: list(values['units-keep']),
+    unitsKeep,
     ...(values['no-code-guard'] ? { protectCommentedCode: false } : {}),
   };
   const fileOptions = {

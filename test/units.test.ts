@@ -990,6 +990,71 @@ describe('a written-out number of two words', () => {
   });
 });
 
+describe('a written-out number with hundred or thousand', () => {
+  it.each`
+    input                                         | expected                     | why
+    ${'one hundred and twenty feet'}              | ${'37 metres'}               | ${'with "and"'}
+    ${'one hundred twenty feet'}                  | ${'37 metres'}               | ${'without "and"'}
+    ${'two hundred and fifty pounds of flour'}    | ${'110 kilograms of flour'}  | ${'before "of"'}
+    ${'five thousand and twenty feet'}            | ${'1.5 kilometres'}          | ${'thousand'}
+    ${'one hundred and twenty-five miles'}        | ${'200 kilometres'}          | ${'a cardinal of two words after "and"'}
+    ${'one hundred twenty two feet'}              | ${'37 metres'}               | ${'the same, spaced, without "and"'}
+    ${'a hundred miles'}                          | ${'160 kilometres'}          | ${'counted by "a"'}
+    ${'a thousand feet'}                          | ${'300 metres'}              | ${'the same, for thousand'}
+    ${'two thousand five hundred feet'}           | ${'760 metres'}              | ${'hundreds after thousands'}
+    ${'two thousand five hundred and fifty feet'} | ${'780 metres'}              | ${'and a cardinal after both'}
+    ${'twenty-two hundred feet'}                  | ${'670 metres'}              | ${'a count of two words'}
+    ${'Two Hundred Miles'}                        | ${'320 kilometres'}          | ${'in capitals'}
+    ${'He weighs two hundred pounds.'}            | ${'He weighs 91 kilograms.'} | ${'a weight with no money in sight'}
+    ${'a hundred-foot tree'}                      | ${'a 30 metre tree'}         | ${'attributive'}
+    ${'a two-hundred-foot cliff'}                 | ${'a 61 metre cliff'}        | ${'attributive, hyphenated throughout'}
+    ${'a hundred and twenty-foot drop'}           | ${'a 37 metre drop'}         | ${'"and" makes the hyphenated cardinal part of the number'}
+    ${'a hundred\nmiles'}                         | ${'160 kilometres'}          | ${'the unit may wrap onto the next line'}
+    ${'a hundred miles and a half'}               | ${'160 kilometres'}          | ${'with the fraction after the unit'}
+    ${'two hundred pounds eight ounces'}          | ${'90.9 kilograms'}          | ${'a weight in two units'}
+    ${'twenty-two pounds of beef'}                | ${'10 kilograms of beef'}    | ${'a cardinal of two words on its own still reads'}
+    ${'two and a half feet'}                      | ${'76 centimetres'}          | ${'as does "and a half"'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                     | why
+    ${'hundreds of miles'}                        | ${'a plural is not a number'}
+    ${'a few hundred feet'}                       | ${'no count before the multiplier'}
+    ${'between one hundred and two hundred miles'} | ${'"and" joins a range here, which is never half converted'}
+    ${'one hundred to two hundred miles'}         | ${'the same, with "to"'}
+    ${'twenty-two hundred hours'}                 | ${'a time'}
+    ${'one hundred and a half feet'}              | ${'a fraction is never what follows the multiplier'}
+    ${'one hundred and twenty and a half feet'}   | ${'nor after the cardinal that follows it'}
+    ${'two thousand and five hundred feet'}       | ${'"and" before a second multiplier'}
+    ${'a hundred thousand miles'}                 | ${'a multiplier counted by a multiplier'}
+    ${'one thousand, two hundred feet'}           | ${'a comma between the parts'}
+    ${'two hundred two-foot boards'}              | ${'two hundred boards or one length'}
+    ${'one hundred twenty-foot drop'}             | ${'the same, for a tens word'}
+    ${'one hundred\ntwenty feet'}                 | ${'the cardinal is cut off from its multiplier'}
+    ${'one hundred and\ntwenty feet'}             | ${'the same, after "and"'}
+    ${'It cost two hundred and fifty pounds.'}    | ${'money, read whole'}
+    ${'She earns forty thousand pounds a year.'}  | ${'a rate of pay'}
+    ${'a hundred-pound note'}                     | ${'a thing priced in pounds'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    words                          | value
+    ${'a hundred'}                 | ${100}
+    ${'one hundred and twenty'}    | ${120}
+    ${'one hundred twenty-two'}    | ${122}
+    ${'two thousand five hundred'} | ${2500}
+    ${'five thousand and twenty'}  | ${5020}
+    ${'twenty-two hundred'}        | ${2200}
+    ${'hundred'}                   | ${null}
+  `('reads "$words" as $value', ({ words, value }) => {
+    expect(parseNumber(words)).toBe(value);
+  });
+});
+
 describe('a fraction word that is also an ordinal', () => {
   const cups = (input: string) => convert(input, { rules: { 'units.volume.cup': true } });
 
@@ -1137,7 +1202,7 @@ describe('pounds of money are not weights', () => {
     ${'Tickets are £10 for adults and 5 pounds for children.'} | ${'a £ in the sentence'}
     ${'The house sold for a million pounds.'}                  | ${'a scale word is not read as a number'}
     ${'She paid 2 million pounds.'}                            | ${'the same'}
-    ${'It cost a hundred pounds.'}                             | ${'the same'}
+    ${'It cost a hundred pounds.'}                             | ${'a hundred, read whole, is still money'}
     ${'It only costs a few pounds.'}                           | ${'no number at all'}
     ${'It costs $4 per pound.'}                                | ${'a price per weight has no number before the unit'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {

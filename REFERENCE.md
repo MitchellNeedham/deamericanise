@@ -255,6 +255,14 @@ starts inside a hyphenated word or straight after a tens word, so a compound tha
 read whole is left as written. That covers `catch-twenty-two miles`, and
 `twenty five-pound bags`, which may be twenty bags or one weight.
 
+`hundred` and `thousand` multiply the count before them (`a`, `an` or a cardinal of one or
+two words), and a cardinal may follow, with or without `and`: `a hundred miles` becomes
+`160 kilometres`, `one hundred and twenty feet` becomes `37 metres`, and
+`two thousand five hundred feet` and `twenty-two hundred feet` convert too. A number never
+starts after `hundred` or `thousand` with at most a comma, `and` or `to` between, so
+`hundreds of miles`, `a few hundred feet`, `between one hundred and two hundred miles` and
+`a hundred thousand miles` are left as written. `It cost a hundred pounds.` is still money.
+
 A number never continues onto the next line, so the `14` that ends `Step 14` is never taken
 as the whole part of a `1/2 gallon` that opens the next line. The rest of a measurement can
 wrap: `6` at the end of one line and `feet` at the start of the next still convert, and so

@@ -582,6 +582,46 @@ describe('a dimension with a different unit on each side', () => {
   });
 });
 
+describe('a count before a weight or volume', () => {
+  it.each`
+    input                                      | expected                                       | why
+    ${'buy 2 x 4 oz cans'}                     | ${'buy 2 x 110 g cans'}                        | ${'two cans of 4 oz each'}
+    ${'a case of 6 x 12 fl oz bottles'}        | ${'a case of 6 x 350 mL bottles'}              | ${'a volume'}
+    ${'2 x 5 lb bags of flour'}                | ${'2 x 2.3 kg bags of flour'}                  | ${'a count at the start'}
+    ${'2 × 4 oz cans'}                         | ${'2 × 110 g cans'}                            | ${'the multiplication sign'}
+    ${'2 x 6 x 12 oz cans'}                    | ${'2 x 6 x 340 g cans'}                        | ${'two counts'}
+    ${'buy 2 x 4 ounce cans'}                  | ${'buy 2 x 110 gram cans'}                     | ${'the count opens the phrase, so it stays singular'}
+    ${'a case of 6 x 12 fluid ounce bottles'}  | ${'a case of 6 x 350 millilitre bottles'}      | ${'the same for a volume'}
+    ${'6 x 1 pound'}                           | ${'6 x 450 grams'}                             | ${'no noun after, so it is plural'}
+    ${'2 x 4 lb 8 oz bags'}                    | ${'2 x 2.04 kg bags'}                          | ${'a weight in two units'}
+    ${'3 x 100 sq ft rolls'}                   | ${'3 x 9.3 m² rolls'}                          | ${'an area'}
+    ${'2 lb x 3 lb'}                           | ${'910 g x 1.4 kg'}                            | ${'two weights are two measurements'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                    | expected
+    ${'10 x 12 feet'}        | ${'3 x 3.7 metres'}
+    ${'8.5" x 11"'}          | ${'22 x 28 cm'}
+    ${'2 feet x 6 inches'}   | ${'61 x 15 centimetres'}
+  `('still reads a length as a dimension: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                       | options                                     | why
+    ${'a 2 x 4 stud'}               | ${{}}                                       | ${'no unit at all'}
+    ${'a 15" x 17" panel'}          | ${{}}                                       | ${'a conventional size'}
+    ${'It cost 2 x 5 pounds.'}      | ${{}}                                       | ${'money, with the count in its amount'}
+    ${'Babies weigh 7-8 lb 4 oz.'}  | ${{}}                                       | ${'a weight at the end of a range'}
+    ${'buy 2 x 4 oz cans'}          | ${{ rules: { 'units.mass.ounce': false } }} | ${'the unit is switched off'}
+    ${'2 x 11 stone 4 pounds'}      | ${{ dialect: 'en-GB' }}                     | ${'a unit of the weight is kept'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged, options }) => {
+    expect(convert(unchanged, options)).toBe(unchanged);
+  });
+});
+
 describe('singular and plural follow the source', () => {
   it.each`
     input                  | expected                     | why

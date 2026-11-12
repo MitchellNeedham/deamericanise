@@ -457,7 +457,8 @@ non-breaking hyphen (U+2011) that typesetting puts in `5-10` or `6-foot` read th
 `-`. So a range written with either still becomes `1.5-3 metres`, `6 feet 2-1/2 inches`
 written with either is still one height, and `the 40-yard-line` written with either is still
 a conventional size. Neither is a minus sign, so a number straight after one is left as
-written.
+written, unless it follows a unit or a prefix as a hyphen-minus would (see below), so
+`5ft‐6ft` becomes `1.5 m‐1.8 m` with either.
 
 A fraction with a zero denominator, as in `5/0 inches`, is not a quantity, so it is left as
 written, and so is a height or weight it is part of, as in `5 feet 1/0 inches`.
@@ -470,9 +471,13 @@ or into a line that opens a list item, heading, quote or table row, so `Serves 4
 by `- 2 pounds beef` is a serving count and a bullet, not a range.
 
 A measurement never starts straight after a word and `-`, which join a name to its number, so
-`catch-22 feet` and `F-150 pounds` are left as written. A prefix is such a word too, so
-`a sub-2 pound tent` is left as written, as `a sub-two pound tent` is. A unit before the
-hyphen ends a quantity, so `5ft-6ft` and `5 ft-6 ft` still become `1.5 m-1.8 m`.
+`catch-22 feet`, `F-150 pounds` and `Route-66 miles` are left as written. A unit before the
+hyphen ends a quantity, so `5ft-6ft` and `5 ft-6 ft` still become `1.5 m-1.8 m`, and
+`two feet-three feet` becomes `61 centimetres-91 centimetres`. So does one of the prefixes
+`sub`, `under`, `over`, `near` and `mid`, which stays in front of the conversion:
+`a sub-2 pound tent` and `a sub-two pound tent` both become `a sub-910 gram tent`. Four
+figures from 1000 to 2999 after `mid-` are a year, so `In mid-2024 miles were driven.` is
+left as written.
 
 A run of `_` that opens emphasis is no part of a word, so a measurement in underscores
 converts as one in asterisks does: `It is _6 feet_ tall` becomes `It is _1.8 metres_ tall`
@@ -673,7 +678,26 @@ ceiling too, so `a 10-foot ceiling` converts, and so does `The plane is 200 feet
 A unit word with a capital is part of a name when the next word has one too, or when the
 next word that title case would capitalise does. So `Track 7 Miles Davis`,
 `a 1983 Foot Locker ad` and the title `It is 10 Miles to Town` are left as written, whatever
-`respectConventions` says, while `10 miles North of town` and `Walk 10 Miles` convert.
+`respectConventions` says, while `10 miles North of town` and `Walk 10 Miles` convert. A
+capitalised singular after a number above one is a name whatever follows, so
+`I watched 8 Mile last night.` is left as written, while `Walk 1 Mile` and `an 8 mile hike`
+convert.
+
+A number can be part of a name before it too. After `Model`, `Version`, `Route`, `Highway`,
+`Interstate`, `Flight`, `Episode`, `Chapter` or `Room` it is a designation whatever its unit,
+so `Route 66 miles from here.` is left as written, while `Season 2 pounds of pork.` and
+`Track 3 miles a day.` convert. After any other capitalised word that does not open the
+sentence, an abbreviation makes it one, since a quantity before an abbreviation rarely has a
+name in front of it: `A Boeing 747 mph record.` is left as written, while `About 5 mph.` and
+`Version 2 weighs 3 pounds.` convert. A labelled figure such as `Top Speed 155 mph` is left as
+written too. A day or a month is no name, so `On Monday 40 mph gusts hit the coast.` and
+`In March 40 mph winds are common.` convert, and nor is a figure grouped with a comma part of
+one, so `Mount Everest 29,032 ft. is the summit.` converts. A version number with two figures
+after its point, after any capitalised word and before `ft.` and a word that may open a noun
+but is no plural in lower case, is a version and a credit, so `Python 3.12 ft. new syntax.` is
+left as written, while `About 3.12 ft. of snow fell.` and `Cut 2.25 ft. lengths of pipe.`
+convert. The name is left as written with its number, so no other rule rewrites it into words
+that name nothing: `The Paycheck 5 lb bonus` stays as it is under `localise`.
 
 Pounds of money are left alone, because British prose spells amounts out. A money word
 such as `cost`, `paid`, `earns`, `worth` or `a fine of` claims the amount straight after

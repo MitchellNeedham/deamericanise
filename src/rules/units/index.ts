@@ -2,6 +2,7 @@ import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, Precision, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
 import { CLOSING, LIST_MARKER, OPENING, endsSentence, stopStays } from '../sentence.js';
+import { CALENDAR_WORD } from '../times.js';
 import {
   COMPOUNDS,
   MEASURES,
@@ -30,6 +31,7 @@ import {
   MEASUREMENT_START,
   NOT_IN_COMPOUND,
   NUMBER_PATTERN,
+  NUMBER_PREFIX,
   NUMBER_START,
   NUMERIC_FIRST,
   NUMERIC_LAST,
@@ -361,10 +363,86 @@ const CAPITALISED_NEXT = new RegExp(
  * as `Miles` is in `Track 7 Miles Davis`. A unit word follows its number, so a capital on it
  * is never the one that opens a sentence. Beside another capitalised word, or beside the
  * lower-case words of title case and then one, it names something, and title case counts:
- * `It is 10 Miles to Town` is a title.
+ * `It is 10 Miles to Town` is a title. A singular after `count`, the number straight before
+ * it, names something whatever follows when that number is more than one, as in `8 Mile`,
+ * since a singular there only describes a noun, and one that does is written in lower case,
+ * as in `an 8 mile hike`.
  */
-function isPartOfName(text: string, written: string, end: number): boolean {
-  return CAPITALISED.test(written) && CAPITALISED_NEXT.test(text.slice(end, end + CONTEXT_WINDOW));
+function isPartOfName(text: string, written: string, end: number, count?: number | null): boolean {
+  if (!CAPITALISED.test(written)) return false;
+  if (count != null && Math.abs(count) > 1 && SINGULAR_WORDS.has(written.toLowerCase())) return true;
+  return CAPITALISED_NEXT.test(text.slice(end, end + CONTEXT_WINDOW));
+}
+
+/**
+ * Words that take a designation after them, as `Route` does in `Route 66 miles`. `Season` and
+ * `Track` are not, since a sentence may open with either as a verb: `Season 2 pounds of pork.`
+ * and `Track 3 miles a day.`
+ */
+const DESIGNATIONS = [
+  'Model', 'Version', 'Route', 'Highway', 'Interstate', 'Flight', 'Episode', 'Chapter', 'Room',
+];
+
+/** A capitalised word and the space after it, ending where a number starts. */
+const WORD_BEFORE = new RegExp(String.raw`(?<=\b([A-Z][a-z]+)(?=\s)${SOFT_SPACE})`, 'dy');
+
+/** A day or a month, which dates the figure after it rather than naming it. */
+const CALENDAR = new RegExp(`^(?:${CALENDAR_WORD})$`);
+
+/** A figure grouped with commas, as `29,032` is, which counts rather than names. */
+const GROUPED = /\d{1,3}(?:,\d{3})+(?!\d)/y;
+
+/**
+ * Where a sentence opens: at the start of the text or a line, or of a list item there, or
+ * after a stop.
+ */
+const SENTENCE_OPENING = String.raw`(?:^|[\n\r])(?:[^\S\n\r]*${LIST_MARKER})?|[.!?…]${CLOSING}*\s`;
+
+/** Where a word opens a sentence, past any spaces and opening quotes or brackets. */
+const OPENS_SENTENCE = new RegExp(
+  String.raw`(?<=(?:${SENTENCE_OPENING})[^\S\n\r]*${OPENING}*)`,
+  'y',
+);
+
+/** A version number, with two figures or more after its point, as `3.12` and `20.04` have. */
+const VERSION = /^\d+\.\d{2,}$/;
+
+/** A plural in lower case next, which feet measure, as in `2.25 ft. lengths`. */
+const PLURAL_NEXT = /^\s+[a-z]*[a-rt-z]s(?![\w-])/;
+
+/**
+ * Where the name starts that the number `raw` at `start`, before the unit written `written`
+ * that ends at `end`, is part of, as `66` is in `Route 66 miles`, or null where it is part of
+ * none. After a word in `DESIGNATIONS` it is a designation whatever the unit. After another
+ * capitalised word an abbreviation makes it one too, as in `A Boeing 747 mph record`, unless
+ * that word opens the sentence, as `About` does in `About 5 mph`, since a quantity before an
+ * abbreviation rarely has a name in front of it. A version number after any capitalised word,
+ * before `ft.` and then a word that may open a noun but is no plural in lower case, is a
+ * version and a credit, as in `Python 3.12 ft. new syntax`. A day or a month is no name, as
+ * in `On Monday 40 mph gusts`, and a figure grouped with commas is part of none, as in
+ * `Mount Everest 29,032 ft.`. A rule holds the name with its number, since another rule may
+ * rewrite the word into one that names nothing, as `Thumbtack` becomes `Drawing pin`.
+ */
+function nameBefore(
+  text: string,
+  start: number,
+  raw: string,
+  written: string,
+  isWord: boolean,
+  end: number,
+): number | null {
+  WORD_BEFORE.lastIndex = start;
+  const before = WORD_BEFORE.exec(text);
+  if (before === null || CALENDAR.test(before[1]!)) return null;
+  GROUPED.lastIndex = start;
+  if (GROUPED.test(text)) return null;
+  const nameStart = before.indices![1]![0];
+  if (DESIGNATIONS.includes(before[1]!)) return nameStart;
+  const after = text.slice(end);
+  const credit = written.toLowerCase() === 'ft.' && VERSION.test(raw);
+  if (credit && MODIFIES_A_NOUN.test(after) && !PLURAL_NEXT.test(after)) return nameStart;
+  OPENS_SENTENCE.lastIndex = nameStart;
+  return !isWord && !OPENS_SENTENCE.test(text) ? nameStart : null;
 }
 
 const UNIT_WORDS = new Set(MEASURES.flatMap((measure) => measure.words.map((word) => word.toLowerCase())));
@@ -395,24 +473,31 @@ const NUMBER_REACH = 64;
  */
 export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: number): boolean {
   const unit = text.slice(unitStart, unitEnd);
-  if (UNIT_WORDS.has(unit.toLowerCase()) && isPartOfName(text, unit, unitEnd)) return true;
-  const otherSense = OTHER_SENSES.get(unit.toLowerCase());
-  if (!otherSense) return false;
+  const isWord = UNIT_WORDS.has(unit.toLowerCase());
   const from = Math.max(0, unitStart - NUMBER_REACH);
   const number = NUMBER_BEFORE_UNIT.exec(text.slice(from, unitStart));
+  const high = number === null ? null : parseNumber(number[3]!);
+  if (isWord && isPartOfName(text, unit, unitEnd, high)) return true;
   if (number === null) return false;
   const start = from + number.index;
-  const [first, high] = [parseNumber(number[1] ?? number[3]!), parseNumber(number[3]!)];
+  const first = parseNumber(number[1] ?? number[3]!);
   const range = number[1] === undefined || high === null ? undefined : { join: number[2]!, high };
   const listed = first === null ? [] : listedBefore(text, start, first, range);
-  return otherSense(contextText(text), listed[0]?.start ?? start, unitEnd);
+  const opening = listed[0]?.start ?? start;
+  if (nameBefore(text, opening, number[3]!, unit, isWord, unitEnd) !== null) return true;
+  const otherSense = OTHER_SENSES.get(unit.toLowerCase());
+  return otherSense !== undefined && otherSense(contextText(text), opening, unitEnd);
 }
 
 /**
- * A determiner opening the phrase, as in `a 9 inch dish`. A count opens it as a determiner
- * does, so `2 x 4 ounce cans` keeps the singular.
+ * A determiner opening the phrase, as in `a 9 inch dish`, and any prefix between, as in
+ * `a sub-1 pound tent`. A count opens it as a determiner does, so `2 x 4 ounce cans` keeps
+ * the singular.
  */
-const DETERMINER_BEFORE = /(?:\b(?:a|an|the|this|that|each|every|per|another)\s+|\d\s*[x×]\s*)$/i;
+const DETERMINER_BEFORE = new RegExp(
+  String.raw`(?:\b(?:a|an|the|this|that|each|every|per|another)\s+(?:${NUMBER_PREFIX})?|\d\s*[x×]\s*)$`,
+  'i',
+);
 
 /** The sizes a length gives, as in `6 feet long` and `a 6 foot long table`. */
 const SIZES = ['thick', 'wide', 'long', 'tall', 'deep', 'high'];
@@ -562,7 +647,7 @@ function countsSizedNoun(text: string, start: number, raw: string, gap: string, 
  * semicolon or colon, with only spaces and opening quotes or brackets between.
  */
 const YEAR_PREPOSITION_BEFORE = new RegExp(
-  String.raw`(?<=(?:(?:^|[\n\r])(?:[^\S\n\r]*${LIST_MARKER})?|[.!?…]${CLOSING}*\s|[,;:])` +
+  String.raw`(?<=(?:${SENTENCE_OPENING}|[,;:])` +
     String.raw`[^\S\n\r]*${OPENING}*` +
     String.raw`(in|by|since|until|before|after|during|from|between)\s+)`,
   'diy',
@@ -2296,10 +2381,15 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     }
     if (
       isOtherSense(ctx, entry, start, start + matched.length) ||
-      (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length)) ||
+      (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length, value)) ||
       (entry.isWord && mayBeYear(ctx.text, start, raw, gap, start + matched.length))
     ) {
       changes.push(hold(start, matched, entry.measure.id, 30));
+      return;
+    }
+    const named = nameBefore(ctx.text, start, raw, alias, entry.isWord, start + matched.length);
+    if (named !== null) {
+      changes.push(hold(named, ctx.text.slice(named, start + matched.length), entry.measure.id, 30));
       return;
     }
     const read = inSense(ctx, entry, start, start + matched.length);
@@ -2432,13 +2522,18 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         }
         if (
           isOtherSense(ctx, entry, start, end) ||
-          (entry.isWord && isPartOfName(ctx.text, alias, end)) ||
+          (entry.isWord && isPartOfName(ctx.text, alias, end, high)) ||
           // A unit after the first number makes it a quantity, as in `From 1500 feet to 2000 feet`.
           (entry.isWord &&
             inner === undefined &&
             mayBeYear(ctx.text, start, highRaw, gap, end, raws.slice(0, -1), entry.measure))
         ) {
           changes.push(hold(start, matched, entry.measure.id, 35));
+          continue;
+        }
+        const named = nameBefore(ctx.text, start, highRaw, alias, entry.isWord, end);
+        if (named !== null) {
+          changes.push(hold(named, ctx.text.slice(named, end), entry.measure.id, 35));
           continue;
         }
         const read = inSense(ctx, entry, start, end);
@@ -2532,8 +2627,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const last = sides[sides.length - 1]!;
         const entry = last.entry!;
         const before = ctx.text.slice(Math.max(0, start - 24), start);
-        if (entry.isWord && isPartOfName(ctx.text, last.alias!, end)) {
+        if (entry.isWord && isPartOfName(ctx.text, last.alias!, end, last.value)) {
           changes.push(hold(start, match[0], entry.measure.id, 38));
+          continue;
+        }
+        const named = nameBefore(ctx.text, start, last.raw, last.alias!, entry.isWord, end);
+        if (named !== null) {
+          changes.push(hold(named, ctx.text.slice(named, end), entry.measure.id, 38));
           continue;
         }
 
@@ -3092,7 +3192,7 @@ function fuelEconomyRule(): Rule {
   const id = 'units.economy.mpg';
   const MPG = String.raw`\d+(?:\.\d+)?`;
   const PLAIN_MPG = new RegExp(`^(?:${MPG})$`);
-  const UNIT = String.raw`${GAP}(?:${MPG_FORMS.join('|')})(?![A-Za-z])`;
+  const UNIT = String.raw`${GAP}(${MPG_FORMS.join('|')})(?![A-Za-z])`;
   const single = new RegExp(String.raw`${NUMBER_START}(${MPG})${UNIT}`, 'gi');
   // Must start where the range rule starts, so the two read the same ranges.
   const START = String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})${NOT_SECOND_OF_PAIR}|(?!${NUMERIC_FIRST}))`;
@@ -3101,6 +3201,7 @@ function fuelEconomyRule(): Rule {
     'gi',
   );
   const FROM_BEFORE = /\bfrom\s+$/i;
+  const isWordForm = (form: string) => /^miles/i.test(form);
 
   return {
     id,
@@ -3121,6 +3222,7 @@ function fuelEconomyRule(): Rule {
       range.lastIndex = 0;
       for (const match of ctx.text.matchAll(range)) {
         const [pair, lowRaw, join, highRaw] = [match[0], match[1]!, match[2]!, match[3]!];
+        const form = match[4]!;
         const pairStart = match.index;
         const low = parseNumber(lowRaw);
         const high = Number(highRaw);
@@ -3138,6 +3240,11 @@ function fuelEconomyRule(): Rule {
         const values = [...earlier.map((figure) => figure.value), low, high];
         if (reading === 'hold' || !raws.every((raw) => PLAIN_MPG.test(raw)) || values.includes(0)) {
           changes.push(hold(start, matched, id, 35));
+          continue;
+        }
+        const named = nameBefore(ctx.text, start, highRaw, form, isWordForm(form), end);
+        if (named !== null) {
+          changes.push(hold(named, ctx.text.slice(named, end), id, 35));
           continue;
         }
         const figures = Math.max(2, ...raws.map(significantFigures));
@@ -3163,6 +3270,12 @@ function fuelEconomyRule(): Rule {
         const mpg = Number(match[1]);
         if (!mpg || endsRange(ctx.text, match.index, match[1]!)) {
           changes.push(hold(match.index, match[0], id, 35));
+          continue;
+        }
+        const [form, end] = [match[2]!, match.index + match[0].length];
+        const named = nameBefore(ctx.text, match.index, match[1]!, form, isWordForm(form), end);
+        if (named !== null) {
+          changes.push(hold(named, ctx.text.slice(named, end), id, 35));
           continue;
         }
         const body = `${economy(mpg, Math.max(2, significantFigures(match[1]!)))} ${unit}`;

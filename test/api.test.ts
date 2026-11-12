@@ -531,7 +531,14 @@ describe('the imperial units marker', () => {
 
   const NOUNS = ['Bake 1 pound cake.', 'Send in 6 foot soldiers.', 'Count 8 inch worms.'];
 
-  const NAMES = ['Track 7 Miles Davis', 'From 1955 to 1959 Miles Davis led a quintet.'];
+  const NAMES = [
+    'Track 7 Miles Davis',
+    'From 1955 to 1959 Miles Davis led a quintet.',
+    'I watched 8 Mile last night.',
+    'A Boeing 747 mph record.',
+    'A Boeing 5, 6 and 7 mph run.',
+    'Route 66 miles from here.',
+  ];
 
   const IN_A_WORD = ['Set MAX_5 pounds as the limit.', 'Set max_5 miles as the limit.'];
 

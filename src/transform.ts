@@ -38,6 +38,7 @@ export function findChanges({ text, options, signals }: TransformInput): Change[
     identifiers: options.protectIdentifiers,
     commentedCode: options.protectCommentedCode,
     commentMarkers: options.commentMarkers,
+    markdownFences: options.markdownFences,
     extra: options.protect,
   });
 
@@ -47,7 +48,11 @@ export function findChanges({ text, options, signals }: TransformInput): Change[
 
 /** Rewrites a piece of prose. Use `deamericaniseCode` for source files. */
 export function deamericanise(text: string, options: Options = {}): Result {
-  const resolved = resolveOptions(options);
+  return transformProse(text, resolveOptions(options));
+}
+
+/** `deamericanise` for options already resolved, which can carry what only a caller knows. */
+export function transformProse(text: string, resolved: ResolvedOptions): Result {
   const signals =
     resolved.assumeAmerican === undefined
       ? detectAmerican(text)

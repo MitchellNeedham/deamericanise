@@ -9,7 +9,10 @@ import { IN_SENTENCE } from './sentence.js';
 
 type Row = [from: string, to: string];
 
-type Guard = Pick<LexEntry, 'requireBefore' | 'requireAfter' | 'forbidBefore' | 'forbidAfter'>;
+type Guard = Pick<
+  LexEntry,
+  'requireBefore' | 'requireAfter' | 'forbidBefore' | 'forbidAfter' | 'forbidMatch'
+>;
 
 function set(ruleId: string, confidence: Confidence, rows: Row[]): LexEntry[] {
   return rows.map(([from, to]) => ({
@@ -337,23 +340,28 @@ const MAIL_PART = [
   'usage', 'statistics', 'retention', 'archives?', 'archiving', 'search(?:es)?', 'clean-?up',
 ].join('|');
 
-/** Words that put a mailbox in email, voicemail or an account from anywhere in its sentence. */
-const MAIL_CONTEXT = [
-  'e-?mails?', 'e-?mail(?:ed|ing)', 'inbox(?:es)?', 'outbox', 'webmail', String.raw`voice[\s-]?mails?`,
+/** Words that put a mailbox or the trash in email from anywhere in its sentence. */
+const EMAIL_CONTEXT = [
+  'e-?mails?', 'e-?mail(?:ed|ing)', 'inbox(?:es)?', 'outbox', 'webmail',
   'outlook', 'exchange', 'gmail', 'hotmail', 'yahoo', 'icloud', 'aol', String.raw`proton\s?mail`,
   'thunderbird', String.raw`(?:microsoft|office)\s+365`, '[mo]365', 'imap', String.raw`pop\s?3`,
-  'smtp', 'mapi', 'activesync', 'quotas?', 'storage', 'exceed(?:s|ed|ing)?',
+  'smtp', 'mapi', 'activesync', 'messages?', 'attachments?',
+  'spam', 'phishing', 'undeliverable', String.raw`(?:automatic|auto)[\s-]?repl(?:y|ies)`,
+  String.raw`out[\s-]of[\s-](?:the[\s-])?office`, String.raw`mail[\s-](?:clients?|apps?|flow|enabled)`,
+  String.raw`[\w.+-]+@[\w-]+(?:\.[\w-]+)+`,
+].join('|');
+
+/** Words that put a mailbox in email, voicemail or an account from anywhere in its sentence. */
+const MAIL_CONTEXT = [
+  EMAIL_CONTEXT, String.raw`voice[\s-]?mails?`, 'quotas?', 'storage', 'exceed(?:s|ed|ing)?',
   String.raw`(?:size|storage|send(?:ing)?|receiv(?:e|ing))\s+limits?`,
   String.raw`\d+(?:[.,]\d+)?\s?(?:[kmgt]b|(?:kilo|mega|giga|tera)bytes?)`,
   'servers?', 'databases?', String.raw`(?<!\b(?:on|into)\s+)accounts?`, 'users?',
   'admin(?:istrator)?s?', 'passwords?', 'passcodes?', 'logins?', String.raw`log(?:ged|ging)?[\s-]?(?:in|on)`,
   String.raw`sign(?:ed|ing)?[\s-]?in`, 'sign-on', 'settings', 'permissions?', String.raw`full\s+access`,
   'delegat(?:e|es|ed|ing|ion)', 'migrat(?:e|es|ed|ing|ions?)', 'sync(?:s|ed|ing)?',
-  'synchroni[sz](?:e|es|ed|ing|ation)', 'domains?', 'organi[sz]ations?', 'messages?', 'attachments?',
-  'spam', 'phishing', 'undeliverable', String.raw`(?:automatic|auto)[\s-]?repl(?:y|ies)`,
-  String.raw`out[\s-]of[\s-](?:the[\s-])?office`, String.raw`mail[\s-](?:clients?|apps?|flow|enabled)`,
+  'synchroni[sz](?:e|es|ed|ing|ation)', 'domains?', 'organi[sz]ations?',
   'phones?', String.raw`dial(?:s|ed|ing|led|ling)?\s+(?:[*#+]|\d+|in(?:to)?\b)`,
-  String.raw`[\w.+-]+@[\w-]+(?:\.[\w-]+)+`,
   // Another mailbox in the sentence that is plainly the email kind.
   String.raw`(?:${MAIL_CMDLET})-mailbox\w*`, String.raw`(?:${MAIL_KIND})[\s-]+mailbox(?:es)?`,
   String.raw`mailbox(?:es)?[\s-]+(?:${MAIL_PART})`,
@@ -399,6 +407,48 @@ const MAILBOX_GATES: Guard[] = [
   { ...NOT_EMAIL_MAILBOX, requireAfter: new RegExp(`^${IN_SENTENCE}*?[a-z0-9]`, 'i') },
 ];
 
+/** Words that put the trash in an email client or file manager from anywhere in its sentence. */
+const FILES_CONTEXT = [
+  EMAIL_CONTEXT, 'files?', 'folders?', 'desktop', 'icons?', 'click(?:s|ed|ing)?',
+  'delet(?:e|es|ed|ing|ion)', 'restor(?:e|es|ed|ing)', String.raw`recycle\s+bin`,
+  String.raw`google\s+drive`, String.raw`one\s?drive`, 'dropbox', 'finder', String.raw`mac\s?os`,
+].join('|');
+
+/**
+ * Refuses the trash of an email client or file manager, which is a folder of that name in
+ * every dialect. Something dragged to the trash is a file; the trash itself dragged to the
+ * kerb is rubbish.
+ */
+const NOT_FILED_TRASH: Guard = {
+  forbidBefore: new RegExp(
+    String.raw`\bdrag(?:s|ged|ging)?\b${IN_SENTENCE}*\b(?:to|into|onto)\s+the\s+$` +
+      String.raw`|\b(?:${FILES_CONTEXT})\b${IN_SENTENCE}*$`,
+    'i',
+  ),
+  forbidAfter: new RegExp(String.raw`^\s+buttons?\b|^${IN_SENTENCE}*?\b(?:${FILES_CONTEXT})\b`, 'i'),
+};
+
+/**
+ * A capitalised `Trash` partway through a sentence is the folder's label. One that opens its
+ * sentence passes the second guard, which wants no word before it in the sentence and so
+ * none of the words the first guard refuses there either.
+ */
+const TRASH_GATES: Guard[] = [
+  { ...NOT_FILED_TRASH, forbidMatch: /^\p{Lu}\p{Ll}/u },
+  { ...NOT_FILED_TRASH, forbidBefore: new RegExp(`[a-z0-9]${IN_SENTENCE}*$`, 'i') },
+];
+
+/** A row with several guards fires when any one of them lets it through. */
+const GATES: Record<string, Guard[]> = {
+  trash: TRASH_GATES,
+  'trash can': TRASH_GATES,
+  'trash cans': TRASH_GATES,
+  // The name of Gmail's out-of-office setting.
+  vacation: [{ forbidAfter: /^[\s-]+(?:auto[\s-]?)?responders?\b/i }],
+  mailbox: MAILBOX_GATES,
+  mailboxes: MAILBOX_GATES,
+};
+
 export function baseVocabulary(): LexEntry[] {
   return [
     ...set('vocabulary.motoring', 'moderate', MOTORING).map((entry) =>
@@ -408,14 +458,12 @@ export function baseVocabulary(): LexEntry[] {
     ...set('vocabulary.food', 'moderate', FOOD),
     ...set('vocabulary.household', 'moderate', HOUSEHOLD),
     ...set('vocabulary.clothing', 'moderate', CLOTHING),
-    ...set('vocabulary.everyday', 'moderate', EVERYDAY).flatMap((entry) =>
-      entry.from.startsWith('mailbox') ? MAILBOX_GATES.map((gate) => ({ ...entry, ...gate })) : [entry],
-    ),
+    ...set('vocabulary.everyday', 'moderate', EVERYDAY),
     ...set('vocabulary.education', 'risky', EDUCATION).map((entry) =>
       // The replacement ends in `fees`, so a fee already after the word would be said twice.
       entry.from === 'tuition' ? { ...entry, forbidAfter: /^\s+fees?\b/i } : entry,
     ),
     ...GRADES,
     ...CONTEXTUAL.map((entry) => ({ ...entry, priority: 20 })),
-  ];
+  ].flatMap((entry) => (GATES[entry.from] ?? [{}]).map((gate) => ({ ...entry, ...gate })));
 }

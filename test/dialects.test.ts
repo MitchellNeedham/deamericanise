@@ -28,6 +28,59 @@ describe('the same sentence in each dialect', () => {
   });
 });
 
+const EMERGENCY_NUMBERS: Array<[Dialect, string]> = [
+  ['en-AU', '000'],
+  ['en-GB', '999'],
+  ['en-NZ', '111'],
+  ['en-IE', '112'],
+  ['en-ZA', '10111'],
+];
+
+describe('911 is the emergency number only where it is called', () => {
+  it.each`
+    input                                          | expected
+    ${'Call 911 now.'}                             | ${'Call 000 now.'}
+    ${'If cell service is available, dial 911.'}   | ${'If cell service is available, dial 000.'}
+    ${'She called 911 at once.'}                   | ${'She called 000 at once.'}
+    ${'He was calling 911 when the line dropped.'} | ${'He was calling 000 when the line dropped.'}
+    ${'They dialled 911.'}                         | ${'They dialled 000.'}
+    ${'They dialed 911.'}                          | ${'They dialled 000.'}
+    ${'Ring 911 if he falls.'}                     | ${'Ring 000 if he falls.'}
+    ${'Phone 911 first.'}                          | ${'Phone 000 first.'}
+    ${'Call or text 911.'}                         | ${'Call or text 000.'}
+    ${'Calls to 911 rose last year.'}              | ${'Calls to 000 rose last year.'}
+    ${'Text to 911 works here.'}                   | ${'Text to 000 works here.'}
+    ${'She made a 911 call.'}                      | ${'She made a 000 call.'}
+    ${'The 911 dispatcher answered.'}              | ${'The 000 dispatcher answered.'}
+    ${'911 operators are trained for this.'}       | ${'000 operators are trained for this.'}
+    ${'Contact 911 emergency services.'}           | ${'Contact 000 emergency services.'}
+  `('$input -> $expected, with the local number in each dialect', ({ input, expected }) => {
+    for (const [dialect, number] of EMERGENCY_NUMBERS) {
+      expect(say(dialect)(input), dialect).toBe(expected.replace('000', number));
+    }
+  });
+
+  it.each`
+    unchanged                                     | why
+    ${'It cost $1,911 to fix.'}                   | ${'part of an amount'}
+    ${'It cost 911 pounds.'}                      | ${'an amount of money'}
+    ${'He drives a Porsche 911.'}                 | ${'a car'}
+    ${'Room 911 is on the ninth floor.'}          | ${'a room'}
+    ${'Flight 911 landed late.'}                  | ${'a flight'}
+    ${'The ridge is 280 metres (911 feet) high.'} | ${'a measurement'}
+    ${'Call Room 911.'}                           | ${'a room, though it is called'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    for (const [dialect] of EMERGENCY_NUMBERS) expect(say(dialect)(unchanged), dialect).toBe(unchanged);
+  });
+
+  it('keeps the figure in a converted measurement on a second run', () => {
+    const options = { preset: 'localise', units: { keepOriginal: true } } as const;
+    const once = deamericaniseText('The ridge is 911 feet high.', options);
+    expect(once).toBe('The ridge is 278 metres (911 feet) high.');
+    expect(deamericaniseText(once, options)).toBe(once);
+  });
+});
+
 describe('words only some dialects change', () => {
   it.each`
     input             | dialect     | expected

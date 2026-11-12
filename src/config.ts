@@ -40,6 +40,7 @@ const PRESET_CATEGORIES: Record<Preset, Record<Category, boolean>> = {
 export function resolveOptions(options: Options = {}, defaults: Partial<Options> = {}): ResolvedOptions {
   const merged = { ...defaults, ...options };
   const preset = merged.preset ?? 'read';
+  if (!PRESETS.includes(preset)) throw new Error(`Unknown preset: ${preset}. Expected one of ${PRESETS.join(', ')}.`);
   const fromPreset = PRESET_CATEGORIES[preset];
   // An explicit category always wins over the preset that suggested it.
   const categories = Object.fromEntries(
@@ -63,6 +64,7 @@ export function resolveOptions(options: Options = {}, defaults: Partial<Options>
     protectIdentifiers: merged.protectIdentifiers ?? false,
     protectCommentedCode: merged.protectCommentedCode ?? merged.protectIdentifiers ?? false,
     commentMarkers: [],
+    markdownFences: true,
     unitsKeep: merged.unitsKeep ?? [],
     assumeAmerican: merged.assumeAmerican,
     minAmericanConfidence: merged.minAmericanConfidence ?? 0.5,

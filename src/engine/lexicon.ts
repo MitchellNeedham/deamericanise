@@ -91,6 +91,7 @@ function passesContext(entry: LexEntry, text: string, start: number, end: number
   if (entry.requireAfter && !entry.requireAfter.test(after)) return false;
   if (entry.forbidBefore && entry.forbidBefore.test(before)) return false;
   if (entry.forbidAfter && entry.forbidAfter.test(after)) return false;
+  if (entry.forbidMatch && entry.forbidMatch.test(text.slice(start, end))) return false;
   return true;
 }
 

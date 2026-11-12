@@ -246,6 +246,27 @@ const HIGHWAY: Guard[] = [
 
 const APARTMENT: Guard[] = [{ forbidBefore: /\bserviced\s+$/i, forbidAfter: /^\s+(?:complex(?:es)?|blocks?)\b/i }];
 
+/** Making the call, straight before the number: `call 911`, `dialled 911`, `calls to 911`. */
+const CALLING = anyOf([
+  'call(?:s|ed|ing)?', 'dial(?:s|l?ed|l?ing)?', 'ring(?:s|ing)?', 'rang', 'rung',
+  'phon(?:e|es|ed|ing)', 'text(?:s|ed|ing)?', String.raw`(?:call|text)s?\s+to`,
+]);
+
+/** The service the number names, straight after it: `a 911 call`, `911 dispatchers`. */
+const EMERGENCY_SERVICE = anyOf([
+  'call(?:s|ers?)?', 'operators?', 'dispatch(?:ers?)?', 'services?', 'cent(?:re|er)s?',
+  'emergenc(?:y|ies)', '(?:hot)?lines?',
+]);
+
+/**
+ * `911` is the emergency number only where the text calls it or names the service by it.
+ * Anywhere else it is a figure (`$1,911`, `911 feet`) or a name (`Porsche 911`, `Room 911`).
+ */
+const EMERGENCY_NUMBER: Guard[] = [
+  { requireBefore: new RegExp(String.raw`\b(?:${CALLING})\s+$`, 'i') },
+  { requireAfter: new RegExp(String.raw`^[\s-]+(?:${EMERGENCY_SERVICE})\b`, 'i') },
+];
+
 /**
  * A postbox is only the kind for posting letters. A mailbox at home is a letterbox, which
  * is what the shared vocabulary says when this refuses. An email mailbox is neither, and
@@ -275,6 +296,7 @@ const FIELD_TRIP: Guard[] = [
  * guards fires when any one of them lets it through.
  */
 const GATES: Record<string, Guard[]> = {
+  '911': EMERGENCY_NUMBER,
   candy: [{ forbidAfter: /^\s+floss\b/i }],
   candies: [{ forbidAfter: /^\s+floss\b/i }],
   cookie: COOKIE,

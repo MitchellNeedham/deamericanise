@@ -349,6 +349,62 @@ describe('--rule and --units-keep', () => {
     expect(stdout()).toBe('');
   });
 
+  it.each`
+    args                                                                | value           | entry
+    ${['--rule', 'spelling.our=flase']}                                 | ${'flase'}      | ${'spelling.our=flase'}
+    ${['--rule', 'spelling.our=']}                                      | ${''}           | ${'spelling.our='}
+    ${['--rule', 'spelling.*=nope']}                                    | ${'nope'}       | ${'spelling.*=nope'}
+    ${['--rule', 'spelling.our=2']}                                     | ${'2'}          | ${'spelling.our=2'}
+    ${['--rule', 'spelling.our=true=false']}                            | ${'true=false'} | ${'spelling.our=true=false'}
+    ${['--rule', 'spelling.our=false', '--rule', 'dates.long=disable']} | ${'disable'}    | ${'dates.long=disable'}
+  `('rejects the value in $args with exit 2 before reading anything', async ({ args, value, entry }) => {
+    exits();
+    const path = withFile('a.md', 'The color.');
+    await expect(main(['--write', ...(args as string[]), path])).rejects.toThrow('exited 2');
+    expect(stderr()).toBe(
+      `deamericanise: unknown rule value "${value}" in "${entry}". Known: true, on, 1, yes, false, off, 0, no\n`,
+    );
+    expect(readFileSync(path, 'utf8')).toBe('The color.');
+    expect(stdout()).toBe('');
+  });
+
+  it('rejects a bad --rule value before reading stdin', async () => {
+    exits();
+    const stdin = vi.fn();
+    vi.spyOn(process, 'stdin', 'get').mockImplementation(stdin);
+    await expect(main(['--language', 'md', '--rule', 'spelling.our=flase'])).rejects.toThrow('exited 2');
+    expect(stdin).not.toHaveBeenCalled();
+  });
+
+  it.each`
+    rule                       | expected
+    ${'spelling.our=false'}    | ${'the color centre'}
+    ${'spelling.our=0'}        | ${'the color centre'}
+    ${'spelling.our=off'}      | ${'the color centre'}
+    ${'spelling.our=no'}       | ${'the color centre'}
+    ${'spelling.our=False'}    | ${'the color centre'}
+    ${'spelling.our=OFF'}      | ${'the color centre'}
+    ${'spelling.our=No'}       | ${'the color centre'}
+    ${'spelling.our'}          | ${'the color centre'}
+    ${'spelling.our=true'}     | ${'the colour centre'}
+    ${'spelling.our=1'}        | ${'the colour centre'}
+    ${'spelling.*=FALSE'}      | ${'the color center'}
+  `('reads --rule $rule as on or off and turns "the color center" into $expected', async ({ rule, expected }) => {
+    const path = withFile('a.md', 'the color center');
+    expect(await main(['--rule', rule as string, path])).toBe(0);
+    expect(stdout()).toBe(expected);
+    expect(stderr()).toBe('');
+  });
+
+  it.each(['true', '1', 'on', 'yes', 'TRUE', 'On', 'YES'])(
+    'reads --rule spelling.our=%s as on, beating --confidence risky',
+    async (value) => {
+      const path = withFile('a.md', 'the color center');
+      expect(await main(['--confidence', 'risky', '--rule', `spelling.our=${value}`, path])).toBe(0);
+      expect(stdout()).toBe('the colour center');
+    },
+  );
+
   it.each(['furlong', 'inchs', 'fahrenheit', 'units.length.inch', 'mile,furlong'])(
     'rejects --units-keep %s with exit 2, listing the known units',
     async (value) => {

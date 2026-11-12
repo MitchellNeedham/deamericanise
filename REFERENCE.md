@@ -1018,8 +1018,13 @@ keeps putting back is left to it after three attempts.
   unwrapped with `nowrap`. Prose that keeps its white space in a proportional font, as chat
   apps show it, still converts, and so does a heading in a monospace font that wraps as
   usual. On a page set wholly in a monospace font, a label kept on one line with `nowrap` is
-  left alone too. The styles are read again once the page's stylesheets have loaded, and
-  attributes are still rewritten.
+  left alone too. Inside a sentence, a `span` or other inline element in such a font whose
+  `white-space` keeps every space (`pre`, `pre-wrap` or `break-spaces`) is inline code: it
+  ends the run, as `code` does, and the sentence around it still converts. A span that is only kept on one line
+  with `nowrap` still joins the sentence, so on a monospace page
+  `6 feet <span>2 inches</span>` held together that way converts as one measurement. The
+  styles are read again once the page's stylesheets have loaded, and attributes are still
+  rewritten.
 - Anything editable: `contenteditable`, and a document in design mode. Text that becomes
   editable after it was rewritten gets its original back.
 - Anything marked `translate="no"` or `class="notranslate"`, the markers sites already use
@@ -1120,7 +1125,8 @@ unit, throws an `Error` that names the value and the ones it accepts, such as `U
 preset: Localise. Expected one of read, localise.` For a unit, those are the unit keys. It
 throws even when there is no text to read, such as a source file with no comments or a page
 with no prose. Only the ids in `DIALECTS` are dialects, so a name every object has, such as
-`toString`, is rejected the same way.
+`toString`, is rejected the same way. A `DomRewriter` whose `setOptions` throws keeps the
+options it had and goes on following the page under them.
 
 ## Known limits
 
@@ -1154,9 +1160,9 @@ with no prose. Only the ids in `DIALECTS` are dialects, so a name every object h
   the start of the next, or `two and a` then `half feet`, is not read as one. The fraction
   converts on its own and the written-out number is left as written. A web page is read the
   way it is usually laid out, with a line break in its source counting as a space.
-- On a web page, only an element that starts a run of its own is checked for being drawn as
-  code. A `span` inside a sentence that is set in a monospace font, with no `code` element
-  or `role="code"` to mark it, is read as part of the sentence.
+- On a web page, a `span` inside a sentence that is set in a monospace font but wraps as
+  usual, keeps only its line breaks (`pre-line`) or is only kept on one line (`nowrap`),
+  with no `code` element or `role="code"` to mark it, is read as part of the sentence.
 - `a third mile` is read as a fraction, though it can also mean one more mile after two.
   The same goes for `a fourth`, `an eighth` and `a sixteenth`.
 - A word after a unit that is an adverb in one phrase and an adjective in another is always

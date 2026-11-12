@@ -34,6 +34,15 @@ describe('lines that read as code, across languages', () => {
     ${'rust'}       | ${'pub fn color() -> Color {'}
     ${'yaml'}       | ${'color: gray'}
     ${'shell'}      | ${'export COLOR=gray'}
+    ${'lisp'}       | ${'(setq color 1)'}
+    ${'lisp'}       | ${'(defun pick (color) color)'}
+    ${'lisp'}       | ${'(let* ((color 1))'}
+    ${'lisp'}       | ${'(when (gray-p color)'}
+    ${'lisp'}       | ${'  (pick color)))'}
+    ${'lisp'}       | ${'  ((color 1)'}
+    ${'clojure'}    | ${'(defn pick [color] color)'}
+    ${'clojure'}    | ${'(ns color.core)'}
+    ${'clojure'}    | ${'  [color]))'}
   `('$language: "$line"', ({ line }) => {
     expect(looksLikeCode(line as string)).toBe(true);
   });
@@ -52,6 +61,11 @@ describe('prose comments are not mistaken for code', () => {
     ${'Return the color to the caller when done.'}
     ${'See the note (below) about color.'}
     ${'This is 6 feet long and costs $50.'}
+    ${'(see the color chart)'}
+    ${'(When it is gray, center the dialog.)'}
+    ${'(defaults to gray)'}
+    ${'The color (gray (dark)).'}
+    ${'The gray color :))'}
   `('"$line"', ({ line }) => {
     expect(looksLikeCode(line as string)).toBe(false);
   });
@@ -81,6 +95,31 @@ describe('a whole file commented out is left alone', () => {
     ${'css'}     | ${'/* color: gray; */'}
   `('$language too', ({ language, source }) => {
     expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(source);
+  });
+});
+
+describe('commented-out Lisp is left alone', () => {
+  it.each`
+    language     | source
+    ${'lisp'}    | ${'; (setq color 1)'}
+    ${'lisp'}    | ${';; (setq color 1)'}
+    ${'lisp'}    | ${'; (defun pick (color) color)'}
+    ${'lisp'}    | ${'; (let ((color 1)) color)'}
+    ${'clojure'} | ${'; (def color "gray")'}
+    ${'lisp'}    | ${';; (when (gray-p color)\n;;   (pick color)))'}
+  `('$language leaves "$source" alone', ({ language, source }) => {
+    expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(source);
+  });
+
+  it.each`
+    language    | source                           | expected
+    ${'lisp'}   | ${'; Pick the color.'}           | ${'; Pick the colour.'}
+    ${'lisp'}   | ${';; Pick the color.'}          | ${';; Pick the colour.'}
+    ${'lisp'}   | ${'; (See the color chart.)'}    | ${'; (See the colour chart.)'}
+    ${'ts'}     | ${'// (see the color chart)'}    | ${'// (see the colour chart)'}
+    ${'ts'}     | ${'// Set the default color.'}   | ${'// Set the default colour.'}
+  `('$language still rewrites "$source"', ({ language, source, expected }) => {
+    expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(expected);
   });
 });
 

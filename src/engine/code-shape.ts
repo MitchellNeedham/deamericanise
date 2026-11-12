@@ -19,6 +19,16 @@ const SIGNALS: Array<[weight: number, pattern: RegExp]> = [
     3,
     /^\s*(?:const|let|var|function|func|fn|def|defn|defun|lambda|class|struct|enum|interface|impl|trait|namespace|package|import|export|require|include|using|public|private|protected|internal|static|final|abstract|async|extern|pub|val|sub|select|insert|update|create|alter|drop|from|where|join|group by|order by)\b/i,
   ],
+  // An s-expression opened by a declaration or special form, which puts the name after the
+  // bracket. Lower case only, so a parenthetical sentence such as `(When it is gray, ...)` is prose.
+  [
+    3,
+    /^\s*\((?:def|defn|defun|defmacro|defvar|defparameter|defconst|defconstant|defcustom|defstruct|defclass|defmethod|defonce|define|lambda|fn|let\*?|setq|setf|ns|require|progn|cond|when|unless)(?=[\s()[\]{}]|$)/,
+  ],
+  // Brackets that close or open two forms at once, as in `color))` and `((color`. Prose
+  // seldom nests one bracket straight inside another. A run after `:`, `;`, `=` or `-` is a
+  // face such as `:))`, which no Lisp writes.
+  [3, /(?<![:;=)\]}-])[)\]}]{2,}\s*$|(?<![:;=([{-])[([{]{2}/],
   // Something being assigned to: the heart of almost every statement.
   [3, /^\s*[A-Za-z_$@][\w$.[\]'"]*\s*(?:=|:=|<-|\+=|-=)\s*[^=\s]/],
   // A keyword followed by exactly one token, as in `return color`. Prose keeps going:

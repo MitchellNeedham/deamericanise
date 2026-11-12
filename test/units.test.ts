@@ -450,6 +450,84 @@ describe('temperature', () => {
   });
 });
 
+describe('a spelled-out temperature that describes a noun stays singular', () => {
+  it.each`
+    input                                   | expected                                   | why
+    ${'a 350 degree F oven'}                | ${'a 175 degree Celsius oven'}             | ${'degree F'}
+    ${'a 350 degree Fahrenheit oven'}       | ${'a 175 degree Celsius oven'}             | ${'degree Fahrenheit'}
+    ${'a 350-375 degree F oven'}            | ${'a 175-190 degree Celsius oven'}         | ${'a range'}
+    ${'a 10 degree F drop in a day'}        | ${'a 5.6 degree Celsius drop in a day'}    | ${'a change in temperature'}
+    ${'Bake at 350 degree F and stir.'}     | ${'Bake at 175 degrees Celsius and stir.'} | ${'no noun after it'}
+    ${'Bake at 350 degree F. Stir well.'}   | ${'Bake at 175 degrees Celsius. Stir well.'} | ${'a stop that ends the sentence'}
+    ${'a 350 degrees F oven'}               | ${'a 175 degrees Celsius oven'}            | ${'the plural stays plural'}
+    ${'Preheat to 350 degrees F.'}          | ${'Preheat to 175 degrees Celsius.'}       | ${'the plural with no noun'}
+    ${'It was 72 degrees Fahrenheit.'}      | ${'It was 22.2 degrees Celsius.'}          | ${'the same, spelled out'}
+    ${'a 350°F oven'}                       | ${'a 175°C oven'}                          | ${'a symbol has no number'}
+    ${'a 350-degree F oven'}                | ${'a 350-degree F oven'}                   | ${'a hyphen is not read'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('the stop of a Fahrenheit F', () => {
+  it.each`
+    input                                    | expected                                    | why
+    ${'Bake at 350°F.'}                      | ${'Bake at 175°C.'}                         | ${'the end of the text'}
+    ${'Heat it to 350°F. Then stir.'}        | ${'Heat it to 175°C. Then stir.'}           | ${'before a new sentence'}
+    ${'Bake at 350 degrees F. Stir well.'}   | ${'Bake at 175 degrees Celsius. Stir well.'} | ${'spelled out'}
+    ${'Roast at 425 deg F.\nThen rest it.'}  | ${'Roast at 220°C.\nThen rest it.'}         | ${'before a sentence on the next line'}
+    ${'Bake at 350F. Stir well.'}            | ${'Bake at 175°C. Stir well.'}              | ${'a bare F'}
+    ${'Highs in the 80s°F. Then rain.'}      | ${'Highs between 27 and 32°C. Then rain.'}  | ${'a decade'}
+  `('keeps the stop that also ends the sentence: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                          | expected                                          | why
+    ${'Bake at 350 degrees F. for 20 minutes.'}    | ${'Bake at 175 degrees Celsius for 20 minutes.'}  | ${'degrees F'}
+    ${'Bake at 350°F. for 20 minutes.'}            | ${'Bake at 175°C for 20 minutes.'}                | ${'a degree sign'}
+    ${'Bake at 350 deg F. for 20 minutes.'}        | ${'Bake at 175°C for 20 minutes.'}                | ${'deg F'}
+    ${'Bake at 350-375°F. for an hour.'}           | ${'Bake at 175-190°C for an hour.'}               | ${'a range'}
+    ${'Bake at 350F. for 20 minutes.'}             | ${'Bake at 175°C for 20 minutes.'}                | ${'a bare F'}
+    ${'Bake at 350 F. for 20 minutes.'}            | ${'Bake at 175°C for 20 minutes.'}                | ${'a spaced bare F'}
+    ${'Use a 350 degree F. oven for it.'}          | ${'Use a 175 degree Celsius oven for it.'}        | ${'before the noun it describes'}
+    ${'Highs in the 80s°F. for days on end.'}      | ${'Highs between 27 and 32°C for days on end.'}   | ${'a decade'}
+  `('drops the stop inside the sentence: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                     | expected                                  | why
+    ${'Bake at 350°F...'}                     | ${'Bake at 175°C...'}                     | ${'an ellipsis'}
+    ${'Bake at 350°F. 2 trays fit.'}          | ${'Bake at 175°C. 2 trays fit.'}          | ${'before a figure'}
+    ${'Bake at 350°F. (180°C) Then stir.'}    | ${'Bake at 175°C. (180°C) Then stir.'}    | ${'before a bracket the sentence may trail'}
+    ${'Set it to 350 F. for an hour.'}        | ${'Set it to 350 F. for an hour.'}        | ${'a bare F with no word about heat'}
+    ${'Bake it at 350 f. for an hour.'}       | ${'Bake it at 350 f. for an hour.'}       | ${'a lower case bare f'}
+  `('leaves the stop in the text: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged
+    ${'Bake at 175°C (350°F.).'}
+    ${'Bake at 175°C (350 degrees F.).'}
+    ${'Bake at 180°C/350°F. Stir well.'}
+  `('reads "$unchanged" as a restatement of the Celsius value before it', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                  | expected
+    ${'Bake at 350°F.'}                    | ${'Bake at 175°C (350°F).'}
+    ${'Bake at 350°F. for 20 minutes.'}    | ${'Bake at 175°C (350°F.) for 20 minutes.'}
+  `('keeps the original of $input and runs twice without converting it again', ({ input, expected }) => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert(input, options);
+    expect(once).toBe(expected);
+    expect(convert(once, options)).toBe(once);
+  });
+});
+
 describe('temperature differences', () => {
   it.each`
     input                                             | expected                                          | why
@@ -2416,6 +2494,13 @@ describe('a Celsius value in each form a Fahrenheit value is read in', () => {
     [' deg. F', ' deg. C'],
     ['degF', 'degC'],
     [' Fahrenheit', ' Celsius'],
+    [' degrees fahrenheit', ' degrees celsius'],
+    [' DEGREES FAHRENHEIT', ' DEGREES CELSIUS'],
+    [' Degrees F', ' Degrees C'],
+    [' DEG F', ' DEG C'],
+    ['°fahrenheit', '°celsius'],
+    [' fahrenheit', ' celsius'],
+    [' FAHRENHEIT', ' CELSIUS'],
   ];
 
   it('pairs every form of FAHRENHEIT with a Celsius form', () => {
@@ -2453,6 +2538,21 @@ describe('a Celsius value in each form a Fahrenheit value is read in', () => {
     ${'Bake at 175°C (350°F).'}                  | ${'Bake at 175°C (350°F).'}
     ${'Bake at 350°F (160°C).'}                  | ${'Bake at 175°C (160°C).'}
   `('reads centigrade too, and no further: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                       | expected
+    ${'Bake at 180 degrees celsius (350 degrees fahrenheit).'}  | ${'Bake at 180 degrees celsius (350 degrees fahrenheit).'}
+    ${'Bake at 350 degrees fahrenheit (180 degrees celsius).'}  | ${'Bake at 180 degrees celsius.'}
+    ${'Bake at 180 celsius/350 fahrenheit.'}                    | ${'Bake at 180 celsius/350 fahrenheit.'}
+    ${'Bake at 350 fahrenheit (180 CENTIGRADE).'}               | ${'Bake at 180 CENTIGRADE.'}
+    ${'Bake at 350 Fahrenheit (180 Degrees Celsius).'}          | ${'Bake at 180 Degrees Celsius.'}
+    ${'Bake at 350°F (180c).'}                                  | ${'Bake at 175°C (180c).'}
+    ${'Bake at 350°F (180°c).'}                                 | ${'Bake at 175°C (180°c).'}
+    ${'Bake at 350 degrees F (180 degrees c).'}                 | ${'Bake at 175 degrees Celsius (180 degrees c).'}
+    ${'It was 95 fahrenheit.'}                                  | ${'It was 35°C.'}
+  `('reads the words of a Celsius value in any case, and a lone C in upper case only: $input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 });
@@ -2940,8 +3040,22 @@ describe('Fahrenheit decades', () => {
     ${'highs in the upper 80s Fahrenheit'}         | ${'highs between 31 and 32°C'}
     ${'the 70s and 80s ℉'}                         | ${'21 to 32°C'}
     ${'Days in the 70s °F.'}                       | ${'Days between 21 and 26°C.'}
+    ${'temperatures in the 80s degrees'}           | ${'temperatures between 27 and 32°C'}
+    ${'highs in the upper 80s degrees today'}      | ${'highs between 31 and 32°C today'}
+    ${'temperatures in the 80s and 90s degrees'}   | ${'temperatures between 27 and 37°C'}
+    ${'highs in the 80s degrees F today'}          | ${'highs between 27 and 32°C today'}
   `('$input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+
+  it('takes a bare degrees after a decade as its unit whatever the verdict', () => {
+    expect(convert('temperatures in the 80s degrees', { assumeAmerican: true })).toBe(
+      'temperatures between 27 and 32°C',
+    );
+  });
+
+  it('leaves the degrees of a Celsius unit after a decade to that unit', () => {
+    expect(convert('temperatures in the 20s degrees Celsius')).toContain('degrees Celsius');
   });
 
   // The decade of the calendar is the far commoner reading, so these must all survive.

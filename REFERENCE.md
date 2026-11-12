@@ -336,7 +336,9 @@ before the first number makes a range of any two, so `fell from 10 to 0.5 miles`
 whole.
 
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
-`Bake at 175-190°C`. A change in temperature has no 32° offset to take off, so
+`Bake at 175-190°C`. A temperature range wraps and stops at a new block as the others do,
+so `Room 13` above a bullet `- 0°F overnight` is a room and a temperature. A change in
+temperature has no 32° offset to take off, so
 `dropped 20°F` becomes `dropped 11°C` and `10°F warmer` becomes `5.6°C warmer`. The words
 beside the number tell the two apart: a verb of change or `by` before it, a comparative
 or a noun such as `drop` after it. `fell to 20°F` names the new temperature and converts
@@ -346,7 +348,14 @@ as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule of their 
 Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F` or `degrees Fahrenheit`. A bare `F`,
 as in `165F` or `350 F`, is more often a letter, so it counts only as an upper case `F`
 after a number of two or three figures, in a sentence about heat (an oven, cooking, the
-weather, a fever or a temperature) that gives no Celsius value. `Cook until the chicken
+weather, a fever or a temperature) that gives no Celsius value. An American word the
+vocabulary rewrites into one of those, such as `cookie sheet`, `broiler` or `skillet`,
+counts too, whether or not the vocabulary runs. The sentence wraps across lines and ends
+at a blank line, a list item, a heading, or a stop before a capitalised word, but not at
+the stops of `10 min. at` or `6 p.m. were`. As the abbreviation rules decide, a title such
+as `Mr.` never ends one before a name, and an initialism such as `U.S.` ends one only
+before a word that cannot continue a name. A number, in figures or in words, never opens
+a sentence. `Cook until the chicken
 reaches 165F` becomes `73.9°C`, while `Apartment 3F`, `seat 23F`, `the Boeing 777F`,
 `#33F`, `F-150` and the courtesy figure in `180C/350F/gas 4` stay as they are.
 

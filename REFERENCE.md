@@ -421,9 +421,12 @@ converts as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule 
 
 Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F`, `degrees Fahrenheit` or
 `95 Fahrenheit`, with `º` or `˚` accepted for the degree sign, as phone keyboards type it.
-An `F` takes the stop after it as an abbreviation does, so `Bake at 350°F. for 20 minutes`
-becomes `Bake at 175°C for 20 minutes`, while a stop that also ends the sentence stays, and
-so does one before a figure or a bracket. A spelled-out value keeps the author's singular
+A bare letter `F`, as in `degrees F`, `deg F` or `350 F`, takes the stop after it as an
+abbreviation does, so `Bake at 350 degrees F. for 20 minutes` becomes
+`Bake at 175 degrees Celsius for 20 minutes`, while a stop that also ends the sentence
+stays, and so does one before a figure or a bracket. `°F` is a symbol, which takes no stop,
+so the stop in `- 350°F.` or `Bake at 350°F. for 20 minutes` is the sentence's own and
+stays. A spelled-out value keeps the author's singular
 where it describes the noun after it, so `a 350 degree F oven` becomes
 `a 175 degree Celsius oven`, while `Preheat to 350 degrees F` keeps the plural.
 The word alone does not count after a whole number of four figures, which reads as a year

@@ -398,6 +398,16 @@ describe('what is left alone', () => {
     expect(rewrite(input)).toBe(expected);
   });
 
+  it('leaves file names and paths alone in a file tree and a diff header', () => {
+    const tree =
+      '<nav><a href="#">src/colors.css</a> <span>color-picker.tsx</span> <span>behavior.ts</span> <span>gray.svg</span></nav>' +
+      '<ul><li><a href="#">Center.vue</a></li><li><a href="#">favorites.json</a></li></ul>' +
+      '<h2><a class="rd-diff-file-link" href="#">src/colors/gray.svg</a></h2>';
+    expect(rewrite(`${tree}<p>The color is gray.</p>`, { assumeAmerican: true })).toBe(
+      `${tree}<p>The colour is grey.</p>`,
+    );
+  });
+
   it('splits a run around skipped inline text', () => {
     expect(rewrite('<p>It is 6 feet <code>x</code> 2 inches.</p>')).toBe(
       '<p>It is 1.8 metres <code>x</code> 5.1 centimetres.</p>',

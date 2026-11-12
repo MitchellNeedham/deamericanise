@@ -527,9 +527,22 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   the end of the text. A prose file that is not Markdown, such as `.rst` or `.txt`, has no
   such fences, since a line of tildes there underlines a heading: three backticks protect
   everything up to the next three.
+- **File names and paths,** read from their shape rather than a list of extensions. A file
+  name is a name holding a letter, then a dot and an extension in one case with no space
+  either side, so `behavior.ts`, `Center.vue` and `GRAY.PNG` are held, and so is a domain or
+  a dotted name such as `theme.colors.gray`. A path is held whole when it starts at a root
+  (`/`, `./`, `../`, `~/` or a drive letter such as `C:\`), runs to three or more segments,
+  or ends in a file name, so `src/colors/center.ts` and `~/favorites` are held. Each rule
+  leaves a common prose shape alone: two words joined by a slash, such as `color/flavor` or
+  `src/colors`, are prose (write `./src/colors` or a code span to hold one); `The color.It`
+  is a missing space, since `It` is mixed case; `3.5mi` is a number, since `3` has no
+  letter; an initialism such as `U.S.` or `Ph.D.` is an initialism; and a unit straight
+  after a number, such as `300 lb.ft` or `32 ft/s/s`, is a measurement.
 - **Identifiers,** when `protectIdentifiers` is on (the default for source files):
   `normalizeInput`, `MAX_COLOR_VALUE`, `background-color`, `theme.colors.gray`,
-  `--color-scheme`, `getColor()`.
+  `--color-scheme`, `getColor()`. An initialism, where every part is one or two letters
+  followed by a stop, is not a dotted name, so `U.S.`, `Ph.D.` and `p.m.` in a comment are
+  rewritten as they are in prose.
 - **Anything you name:**
 
   ```ts
@@ -840,7 +853,7 @@ there each root needs the rules in its own styles.
 | `rules` | `{}` | Per-rule overrides; a trailing `*` matches a prefix |
 | `protect` | `[]` | Strings or patterns never to rewrite |
 | `protectProperNouns` | `true` | The built-in name list |
-| `protectIdentifiers` | `false` (`true` for code) | camelCase, snake_case, kebab API names, dotted paths |
+| `protectIdentifiers` | `false` (`true` for code) | camelCase, snake_case, kebab API names, dotted names |
 | `unitsKeep` | `[]` | Units to leave alone, by key |
 | `units.precision` | `'natural'` | `natural`, `exact`, or a number of decimal places |
 | `units.keepOriginal` | `false` | Write `1.8 metres (6 ft)` |
@@ -868,6 +881,10 @@ rejected the same way.
 - Identifier protection is deliberately over-eager in code: a hyphenated token containing
   `color`, `center` or `license` is treated as an API name, so `color-coded` in a comment
   survives. Turn it off with `protectIdentifiers: false`.
+- File names and paths are read from their shape, so a few prose shapes read as one: three
+  words joined by slashes (`color/flavor/size`) and a run-on sentence with a lower-case
+  word after the stop (`the color.it was`) are held. A file name straight after a number,
+  as in `Copy 2 color.ts`, reads as a measurement and is rewritten.
 - Outside the remark plugin, the paragraph an inline code span may wrap within is found
   from its lines: a blank line, or a line that opens a heading, quote, list item, fence,
   rule or table row, ends it. A span that wraps onto the next `>` line of a block quote is

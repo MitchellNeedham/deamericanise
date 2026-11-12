@@ -295,7 +295,9 @@ thing keeps the unit's own sense, as `The AC is in a 3-ton truck` and
 `Dissolve 2 oz of sugar in water` do. Only where nothing after the quantity names a thing do
 the words before the number count, across at most a noun such as `unit` and three function
 words, as in `AC units of 2 to 5 tons` and `Copper weight: 2 oz`, and then, for copper, the
-rest of the sentence. `tonnage` says nothing, since a ship's tonnage is a weight.
+rest of the sentence. A plural unit word describes no noun, so the word after it names no
+thing, and `AC units of 3 tons cool the hall.` becomes `AC units of 11 kilowatts cool the hall.`,
+while `The truck carries 3 tons of gravel.` stays a weight. `tonnage` says nothing, since a ship's tonnage is a weight.
 
 A unit of more than one word is read in the singular as well as the plural, so
 `half a pound per square inch` becomes `3.4 kilopascals` and `1 mile per hour` becomes

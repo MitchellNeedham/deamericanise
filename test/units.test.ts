@@ -509,24 +509,40 @@ describe('the stop of a Fahrenheit F', () => {
   });
 
   it.each`
+    input                                       | expected                                         | why
+    ${'Bake at 350°F. for 20 minutes.'}         | ${'Bake at 175°C for 20 minutes.'}               | ${'a degree sign'}
+    ${'Bake at 350℉. for 20 minutes.'}          | ${'Bake at 175°C for 20 minutes.'}               | ${'one sign'}
+    ${'Bake at 350ºF. for an hour.'}            | ${'Bake at 175°C for an hour.'}                  | ${'the masculine ordinal for the degree sign'}
+    ${'Bake at 350-375°F. for an hour.'}        | ${'Bake at 175-190°C for an hour.'}              | ${'a range'}
+    ${'Use a 350°F. oven for it.'}              | ${'Use a 175°C oven for it.'}                    | ${'before the noun it describes'}
+    ${'Highs in the 80s°F. for days'}           | ${'Highs between 27 and 32°C for days'}          | ${'a decade'}
+  `('drops the stop after a symbol only before a word in lower case: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
     input                                    | expected                                  | why
     ${'- 350°F.'}                            | ${'- 175°C.'}                             | ${'a label'}
     ${'- 350ºF.'}                            | ${'- 175°C.'}                             | ${'the masculine ordinal for the degree sign'}
     ${'- 350˚F.'}                            | ${'- 175°C.'}                             | ${'the ring above'}
-    ${'"Bake at 350°F." he said'}            | ${'"Bake at 175°C." he said'}             | ${'inside a quote'}
-    ${'Bake at 350°F. for 20 minutes.'}      | ${'Bake at 175°C. for 20 minutes.'}       | ${'before a word in lower case'}
-    ${'Bake at 350°F.'}                      | ${'Bake at 175°C.'}                       | ${'the end of the text'}
-    ${'It was 90°F. Then it rained.'}        | ${'It was 32.2°C. Then it rained.'}       | ${'before a new sentence'}
-    ${'Highs in the 80s°F. for days on end.'} | ${'Highs between 27 and 32°C. for days on end.'} | ${'a decade'}
     ${'- 350℉.'}                             | ${'- 175°C.'}                             | ${'one sign'}
-    ${'- 350 degrees Fahrenheit.'}           | ${'- 175 degrees Celsius.'}               | ${'the word'}
-  `('leaves the stop after a symbol or the word to the sentence: $input -> $expected ($why)', ({ input, expected }) => {
+    ${'"Bake at 350°F." he said'}            | ${'"Bake at 175°C." he said'}             | ${'a closing quote between'}
+    ${'Bake at 350°F.'}                      | ${'Bake at 175°C.'}                       | ${'the end of the text'}
+    ${'Heat it to 350°F. Then stir.'}        | ${'Heat it to 175°C. Then stir.'}         | ${'before a new sentence'}
+    ${'It was 90°F. Then it rained.'}        | ${'It was 32.2°C. Then it rained.'}       | ${'the same'}
+    ${'Highs in the 80s°F. Then rain.'}      | ${'Highs between 27 and 32°C. Then rain.'} | ${'a decade before a new sentence'}
+    ${'Bake at 350°F. 2 trays fit.'}         | ${'Bake at 175°C. 2 trays fit.'}          | ${'before a figure'}
+    ${'Bake at 350°F. (180°C) Then stir.'}   | ${'Bake at 175°C. (180°C) Then stir.'}    | ${'before a bracket'}
+    ${'Bake at 350°F (175°C).'}              | ${'Bake at 175°C.'}                       | ${'after its Celsius value'}
+    ${'- 350 degrees Fahrenheit.'}           | ${'- 175 degrees Celsius.'}               | ${'the word takes no stop'}
+  `('leaves the stop after a symbol or the word everywhere else: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 
   it.each`
     unchanged
     ${'Bake at 175°C (350°F.).'}
+    ${'Bake at 175°C (350℉.).'}
     ${'Bake at 175°C (350 degrees F.).'}
     ${'Bake at 180°C/350 degrees F. Stir well.'}
   `('reads "$unchanged" as a restatement of the Celsius value before it', ({ unchanged }) => {
@@ -536,6 +552,7 @@ describe('the stop of a Fahrenheit F', () => {
   it.each`
     input                                          | expected
     ${'Bake at 350°F.'}                            | ${'Bake at 175°C (350°F).'}
+    ${'Bake at 350°F. for 20 minutes.'}            | ${'Bake at 175°C (350°F.) for 20 minutes.'}
     ${'Preheat to 350 degrees F.'}                 | ${'Preheat to 175 degrees Celsius (350 degrees F).'}
     ${'Bake at 350 degrees F. for 20 minutes.'}    | ${'Bake at 175 degrees Celsius (350 degrees F.) for 20 minutes.'}
   `('keeps the original of $input and runs twice without converting it again', ({ input, expected }) => {

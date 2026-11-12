@@ -610,6 +610,7 @@ describe('analyse on recipes', () => {
     ${'Put the dish in a 350 degrees Fahrenheit oven.'}   | ${OVEN}
     ${'Put the dish in a 350F oven.'}                     | ${OVEN}
     ${'Put the dish in a 350 degree F. oven.'}            | ${OVEN}
+    ${'Put the dish in a 350°F. oven.'}                   | ${OVEN}
     ${'Bake at 350 till golden.'}                         | ${OVEN}
     ${'Bake at 350 til golden.'}                          | ${OVEN}
     ${'Preheat the oven to 350 before you start.'}        | ${OVEN}

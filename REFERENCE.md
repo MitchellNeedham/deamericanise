@@ -266,13 +266,17 @@ A weight in two units is one weight, as a height in feet and inches is one heigh
 `7 pounds 8 ounces` becomes `3.4 kilograms`, `11st 4lb` becomes `71.7 kg`, and
 `11 stone 4 pounds 8 ounces` becomes `71.9 kilograms`. The first part can be a fraction, a
 mixed number or a decimal, so `1 1/2 pounds 3 ounces` becomes `765 grams` and
-`2.5 feet 3 inches` becomes `83.8 centimetres`. Together the parts claim three
+`2.5 feet 3 inches` becomes `83.8 centimetres`. Any part can be a whole number in words, so
+`six feet two inches` becomes `1.88 metres`. After `foot` or `feet` the inch word can be
+left out where nothing that could be a noun follows, so `He is six foot two.` becomes
+`He is 1.88 metres.`, while `6 feet 2 cars` is two things. Together the parts claim three
 significant figures. Where a unit of the weight is kept, by the dialect or by `unitsKeep`,
 the whole weight is left as written, so an `en-GB` `11 stone 4 pounds` never becomes
 `11 stone 1.8 kilograms`. Turning on `units.mass.stone` or `units.mass.stone-pounds`
-converts it. A weight at the end of a range, as in `7-8 lb 4 oz`, is left as written too,
-and so is a height or weight that starts where no measurement can (see below), as in
-`At 7:30 feet 2 inches`.
+converts it. A weight or height at the end of a range, as in `7-8 lb 4 oz`,
+`5 to 6 feet 2 inches` or `five to seven pounds eight ounces`, is left as written too, since
+its first end could be in either unit. So is a height or weight that starts where no
+measurement can (see below), as in `At 7:30 feet 2 inches`.
 `st` is read only in such a weight, because `1st` on its own is an ordinal.
 
 Numbers written out in words are read too, fractions and all: `two and a half feet` becomes

@@ -253,8 +253,12 @@ preposition, a size, an adverb of place, slope or time, a pronoun, a conjunction
 or a date after the unit is no noun: `a quarter mile later` becomes `400 metres later`, and
 `a mile and a half back` becomes `2.4 kilometres back`. A count before an attributive
 measurement counts the noun, so `two quarter-pound burgers` becomes `two 110 gram burgers`.
+So does a count in words spaced before a length that a hyphen ties to its size, which leaves
+the unit one of itself: `two foot-long subs` becomes `two 30 centimetre long subs`. After a
+determiner that takes one of a noun, or in a list of sizes, the count is the number of units,
+so `a two foot-long sub` becomes `a 61 centimetre long sub`, as `a two-foot-long sub` does.
 A unit that starts a noun leaves the number counting it, so `Bake 1 pound cake`,
-`6 foot soldiers`, `foot traffic` and `8 inch worms` are left as written, while
+`6 foot soldiers`, `foot traffic`, `8 inch worms` and `5 yard sales` are left as written, while
 `a 2-pound cake` becomes `a 910 gram cake`.
 A length that gives the size of a noun describes it whatever its number, so
 `a 6 foot long table` becomes `a 1.8 metre long table`, `cut into 1/2 inch thick slices`
@@ -264,8 +268,10 @@ becomes `cut into 1.3 centimetre thick slices`, and `a 6-foot-tall fence` become
 
 A unit of more than one word is read in the singular as well as the plural, so
 `half a pound per square inch` becomes `3.4 kilopascals` and `1 mile per hour` becomes
-`1.6 kilometres per hour`. `an hour` before `ago`, `later`, `earlier`, `before` or `after`
-is a time, so `2 miles an hour ago` becomes `3.2 kilometres an hour ago`.
+`1.6 kilometres per hour`. In the singular it describes a noun as a one-word unit does, so
+`a 2 square mile park` becomes `a 5.2 square kilometre park` and `a 100 foot-pound wrench`
+becomes `a 140 newton metre wrench`. `an hour` before `ago`, `later`, `earlier`, `before` or
+`after` is a time, so `2 miles an hour ago` becomes `3.2 kilometres an hour ago`.
 
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
@@ -403,8 +409,18 @@ after a written-out month, with or without a day, are the year of a date, so
 `In May 2024 1/2 inch` convert the `1/2 inch` alone, and `In May 2000 feet` is left as
 written. A comma after a bare month frees the number, so `In May, 2000 feet` converts, and a
 shorter number is no year, so
-`In May 5-10 feet` is still a range. A range's first number is never more than ten times the
-size of the second, which makes it a year or a count. Where the first number cannot open the
+`In May 5-10 feet` is still a range. Four figures from 1000 to 2999 straight after `in`, `by`,
+`since`, `until`, `before`, `after` or `during` that opens a sentence or clause may be a
+year, so `In 2024 yard sales rose.` and `Last year, in 2024 miles were driven.` are left as
+written. The preposition opens one at the start of the text or a line, or of a list item
+there (`- `, `* `, `+ `, `1. ` or `2) `), or after a stop, comma, semicolon or colon, with
+only spaces and opening quotes or brackets between. Inside a
+clause the number is a quantity, so `The wreck lies in 1500 feet of water.` becomes
+`The wreck lies in 460 metres of water.` A comma in the number, a hyphen before the unit or
+an abbreviation for it makes a quantity too, as in `In 2024-mile races` and
+`In 1500 ft of water`, and so does a unit word that ends the clause:
+`It rose by 1200 feet.` becomes `It rose by 370 metres.` A range's first number is never
+more than ten times the size of the second, which makes it a year or a count. Where the first number cannot open the
 range, the second converts on its own: `In 2024 - 5 feet` becomes
 `In 2024 - 1.5 metres`, and `Price $5 - 10 inches` keeps its price. `from` or `between`
 before the first number makes a range of any two, so `fell from 10 to 0.5 miles` converts
@@ -1232,6 +1248,11 @@ options it had and goes on following the page under them.
   diameter` becomes `a 5.1 centimetres inside diameter`, and `round` describes a noun, so
   `a quarter mile round the bend` becomes `a 400 metre round the bend`. `a 2 pound cake` is
   left as written, because it may be a pound cake.
+- Four figures after a preposition that takes a year are read by where the preposition
+  stands. In the middle of a sentence they are converted before a unit word even where they
+  are a year, so `Traffic grew in 2024 miles of road.` becomes
+  `Traffic grew in 3257 kilometres of road.` Opening a sentence or clause they are left as
+  written even where they are a quantity, as in `In 1500 feet of water, it lies.`
 - A line that ends in a number and a line that opens with a unit word are read as one
   measurement, so `Track 7` above `Feet first` becomes `Track 2.1 metres first`. A
   blank line or a list marker between them keeps them apart.

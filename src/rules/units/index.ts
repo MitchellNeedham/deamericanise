@@ -1,7 +1,7 @@
 import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
-import { endsSentence } from '../sentence.js';
+import { CLOSING, LIST_MARKER, OPENING, endsSentence } from '../sentence.js';
 import {
   COMPOUNDS,
   MEASURES,
@@ -385,6 +385,67 @@ const COUNT_APART = new RegExp(
 
 const BARE_INCH = new RegExp(String.raw`${PREPOSITION_IN}$`, 'i');
 
+const COUNT_IN_WORDS = new RegExp(String.raw`^(?:${SECOND_END_WORDS})$`, 'i');
+
+/** A determiner that takes one of a noun, so the number after it cannot count the noun. */
+const ONE_OF_A_NOUN_BEFORE = /\b(?:a|an|this|that|each|every|per|another)\s+$/i;
+
+/** A size and the join of a list of sizes, as the `long, ` of `two foot-long, three foot-wide`. */
+const SIZE_IN_A_LIST_BEFORE = new RegExp(String.raw`\b${SIZE}(?:,?\s+(?:and|or|by|x|×)|,)\s+$`, 'i');
+
+/** A hyphen tying a length to its size, then the noun they describe, as in `foot-long subs`. */
+const TIED_TO_A_SIZE = new RegExp(String.raw`${AFTER_A_LENGTH}${HYPHEN}${SIZE}\s+${NOUN_START}`, 'iy');
+
+/**
+ * Whether the count in words `raw`, spaced before a unit word that ends at `end` and that a
+ * hyphen ties to its size, counts the noun after them, as `two` does in `two foot-long subs`.
+ * After a determiner that takes one of a noun, or in a list of sizes, it is the number of
+ * units, as in `a two foot-long sub`.
+ */
+function countsSizedNoun(text: string, start: number, raw: string, gap: string, end: number): boolean {
+  if (!COUNT_IN_WORDS.test(raw) || !/^\s+$/.test(gap)) return false;
+  TIED_TO_A_SIZE.lastIndex = end;
+  if (!TIED_TO_A_SIZE.test(text)) return false;
+  const before = text.slice(Math.max(0, start - 24), start);
+  return !ONE_OF_A_NOUN_BEFORE.test(before) && !SIZE_IN_A_LIST_BEFORE.test(before);
+}
+
+/**
+ * A preposition that takes a year, opening a sentence or clause, straight before where a number
+ * starts: at the start of the text or a line, or of a list item there, or after a stop, comma,
+ * semicolon or colon, with only spaces and opening quotes or brackets between.
+ */
+const YEAR_PREPOSITION_BEFORE = new RegExp(
+  String.raw`(?<=(?:(?:^|[\n\r])(?:[^\S\n\r]*${LIST_MARKER})?|[.!?…]${CLOSING}*\s|[,;:])` +
+    String.raw`[^\S\n\r]*${OPENING}*` +
+    String.raw`(in|by|since|until|before|after|during)\s+)`,
+  'diy',
+);
+
+/** Punctuation or the end of the text, after which a unit word starts no noun. */
+const CLOSES_CLAUSE = /\s*(?:[,.;:!?)\]]|$)/y;
+
+/**
+ * Whether the number `raw`, spaced before the unit word that ends at `end`, may be a year, as
+ * `2024` is in `In 2024 yard sales rose` and `In 2024 miles were driven`: four figures from 1000
+ * to 2999 straight after a preposition that takes a year and opens a sentence or clause. In the
+ * middle of a clause they are a quantity, as in `The wreck lies in 1500 feet of water.`, and so
+ * they are before a unit word that closes the clause, which names no thing the year could
+ * date: `It rose by 1200 feet.`
+ */
+function mayBeYear(text: string, start: number, raw: string, gap: string, end: number): boolean {
+  if (!/^[12]\d{3}$/.test(raw) || !/^\s+$/.test(gap)) return false;
+  CLOSES_CLAUSE.lastIndex = end;
+  if (CLOSES_CLAUSE.test(text)) return false;
+  YEAR_PREPOSITION_BEFORE.lastIndex = start;
+  const preposition = YEAR_PREPOSITION_BEFORE.exec(text);
+  if (preposition === null) return false;
+  // After a number on the line above, `in` may be the inch of a wrapped height and `by` a
+  // dimension's join, so the reading would change once a first run converts that number.
+  NUMBER_ENDS_HERE.lastIndex = preposition.indices![1]![0];
+  return !NUMBER_ENDS_HERE.test(text);
+}
+
 /** `6 in` is usually the preposition. `6in` never is. */
 function isBareInch(alias: string, whole: string): boolean {
   return alias.toLowerCase() === 'in' && BARE_INCH.test(whole);
@@ -437,11 +498,17 @@ const QUOTE_OR_BLANK_LINE = new RegExp(
   'g',
 );
 
-/** A number ending where a mark stands. A number in words starts a word: `often` holds none. */
-const NUMBER_BEFORE_MARK = new RegExp(
-  String.raw`(?:(?<![A-Za-z])|(?![A-Za-z]))(?:${NUMBER_PATTERN})${GAP}$`,
-  'i',
-);
+/** A number and the gap after it. A number in words starts a word: `often` holds none. */
+const NUMBER_AND_GAP = String.raw`(?:(?<![A-Za-z])|(?![A-Za-z]))(?:${NUMBER_PATTERN})${GAP}`;
+
+/** A number ending where a mark stands. */
+const NUMBER_BEFORE_MARK = new RegExp(`${NUMBER_AND_GAP}$`, 'i');
+
+/**
+ * A number ending at `lastIndex`. It reads the whole text, so a gap that wraps onto the line
+ * of `lastIndex` is seen as the soft break it is.
+ */
+const NUMBER_ENDS_HERE = new RegExp(`(?<=${NUMBER_AND_GAP})`, 'iy');
 
 function followsNumber(text: string, at: number): boolean {
   const before = text.slice(Math.max(0, at - NUMBER_REACH), at);
@@ -1627,10 +1694,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     matched: string,
     raw: string,
     alias: string,
+    value = parseNumber(raw),
   ): void => {
     const entry = resolve(alias);
-    const value = parseNumber(raw);
     if (!entry || value === null) return;
+    const gap = matched.slice(raw.length, matched.length - alias.length);
     // The hyphen ties the fraction to the unit, so the count before them counts the noun,
     // as in `two quarter-pound burgers`.
     const count = entry.isSingular && matched[raw.length] === '-' ? COUNT_APART.exec(raw) : null;
@@ -1643,9 +1711,15 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       pushSingle(ctx, changes, start + cut, matched.slice(cut), raw.slice(cut), alias);
       return;
     }
+    if (entry.isSingular && countsSizedNoun(ctx.text, start, raw, gap, start + matched.length)) {
+      // The unit is one of itself, as the foot of a foot-long sub is.
+      pushSingle(ctx, changes, start + matched.length - alias.length, alias, '', alias, 1);
+      return;
+    }
     if (
       isOtherSense(ctx, entry, start, start + matched.length) ||
-      (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length))
+      (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length)) ||
+      (entry.isWord && mayBeYear(ctx.text, start, raw, gap, start + matched.length))
     ) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
@@ -1664,7 +1738,6 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     const { precision, maxDecimals } = ctx.options.units;
     const number = formatNumber(target.value, precision, significantFigures(raw), maxDecimals);
     const numberStart = start + (/^an?\s+/i.exec(raw)?.[0].length ?? 0);
-    const gap = matched.slice(raw.length, matched.length - alias.length);
     const attributive =
       entry.isWord &&
       entry.isSingular &&

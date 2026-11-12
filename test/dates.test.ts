@@ -160,6 +160,8 @@ describe('month-first long dates, which only move under localise', () => {
     ${'On March 5, 2024 L.A. was hit.'}                 | ${'On 5 March 2024 L.A. was hit.'}
     ${'On March 5, 2024 t-shirts sold out.'}            | ${'On 5 March 2024 t-shirts sold out.'}
     ${'On May 5, 2024 yard sales were held.'}           | ${'On 5 May 2024 yard sales were held.'}
+    ${'On May 5, 2024 square mile parks opened.'}       | ${'On 5 May 2024 square mile parks opened.'}
+    ${'On May 5, 2024 foot-pound ratings rose.'}        | ${'On 5 May 2024 foot-pound ratings rose.'}
     ${'On March 1st, 1900 square kilometres burned.'}   | ${'On 1 March, 1900 square kilometres burned.'}
   `('still reads the year in $input', ({ input, expected }) => {
     expect(long(input)).toBe(expected);

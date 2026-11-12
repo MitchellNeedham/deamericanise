@@ -1191,7 +1191,21 @@ describe('a unit of more than one word in the singular', () => {
   });
 
   /** The singular of a plural form, as `pound per square inch` is of `pounds per square inch`. */
-  const singular = (form: string) => form.replace(/\b(?:feet|(\w+)s)\b/, (_, stem?: string) => stem ?? 'foot');
+  const singular = (form: string) =>
+    form.replace(/\b(?:feet|(\w+?ch)es|(\w+)s)\b/, (_, ches?: string, stem?: string) => ches ?? stem ?? 'foot');
+
+  /** Forms that are their own plural, so a number above one says nothing of how they are used. */
+  const OWN_PLURAL = ['stone', 'horsepower'];
+
+  it.each(MEASURES.map((measure) => [measure.id, measure] as const))(
+    '%s lists as singular every word that is not a plural',
+    (_, measure) => {
+      const plurals = measure.words.filter((word) => singular(word) !== word);
+      const singulars = measure.words.filter((word) => !plurals.includes(word) && !OWN_PLURAL.includes(word));
+      expect([...measure.singular].sort()).toEqual(singulars.sort());
+      for (const word of plurals) expect(measure.singular, word).toContain(singular(word));
+    },
+  );
   const masked = (text: string) => text.replace(/\d(?:[\d.,]*\d)?/g, '#');
   const compounds = MEASURES.flatMap((measure) =>
     [...new Set(measure.words.filter((word) => /[\s-]/.test(word)).flatMap((word) => [word, singular(word)]))].map(
@@ -1376,6 +1390,95 @@ describe('the year of a written-out date is not a measurement', () => {
     ${'On March 13 25 feet of snow fell.'}         | ${'On March 13 7.6 metres of snow fell.'}         | ${'a number too short to be a year, after a day with no comma'}
   `('still converts $why', ({ input, expected }) => {
     expect(convert(input, localise)).toBe(expected);
+  });
+});
+
+describe('a year after a preposition is not a measurement', () => {
+  it.each`
+    unchanged                                     | why
+    ${'In 2024 yard sales rose.'}                 | ${'a singular unit before a noun'}
+    ${'In 2024 mile markers were added.'}         | ${'the same, for miles'}
+    ${'By 2030 acre prices doubled.'}             | ${'after "by"'}
+    ${'Since 2019 mile markers have been added.'} | ${'after "since"'}
+    ${'In 2024 miles were driven.'}               | ${'a plural unit'}
+    ${'Until 1999 square miles were mapped by hand.'} | ${'a unit of two words, after "until"'}
+    ${'During 2020 miles driven fell.'}           | ${'after "during"'}
+    ${'Before\n1990 acres were farmed here.'}     | ${'across a line that wraps'}
+    ${'By 2025 miles of track will open.'}        | ${'"of" after the unit'}
+    ${'In 5 yard sales we sold it.'}              | ${'a compound noun, whatever the number'}
+    ${'In 1500 feet of water, it lies.'}          | ${'a quantity that opens the sentence reads as a year'}
+    ${'Last year, in 2024 miles were driven.'}    | ${'after a comma'}
+    ${'Note: in 2024 miles were driven.'}         | ${'after a colon'}
+    ${'It rained; in 2024 miles were driven.'}    | ${'after a semicolon'}
+    ${'It rained.\nIn 2024 miles were driven.'}   | ${'at the start of a line'}
+    ${'He said, "In 2024 miles were driven."'}    | ${'after an opening quote'}
+    ${'It rained. (In 2024 miles were driven.)'}  | ${'after a stop and an opening bracket'}
+    ${'- In 2024 miles were driven.'}             | ${'opening a list item'}
+    ${'* In 2024 miles were driven.'}             | ${'the same, after "*"'}
+    ${'+ Since 2019 mile markers have been added.'} | ${'the same, after "+"'}
+    ${'1. In 2024 miles were driven.'}            | ${'the same, after a number and a stop'}
+    ${'2) By 2025 miles of track will open.'}     | ${'the same, after a number and a bracket'}
+    ${'Notes:\n- In 2024 miles were driven.'}     | ${'a list item on a later line'}
+    ${'Notes\n  2) By 2025 miles of track will open.'} | ${'an indented list item'}
+    ${'a 2024 yard dash'}                         | ${'no preposition before the number'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                  | expected                                    | why
+    ${'It is 2024 miles away.'}            | ${'It is 3257 kilometres away.'}            | ${'no preposition before the number'}
+    ${'We drove 2024 miles in 2024.'}      | ${'We drove 3257 kilometres in 2024.'}      | ${'the year after the unit'}
+    ${'In 2024 the race was 26 miles.'}    | ${'In 2024 the race was 42 kilometres.'}    | ${'no unit after the year'}
+    ${'In 2,024 miles were driven.'}       | ${'In 3257 kilometres were driven.'}        | ${'a comma'}
+    ${'In 3024 miles were driven.'}        | ${'In 4867 kilometres were driven.'}        | ${'four figures too large for a year'}
+    ${'In 2024-mile races they tired.'}    | ${'In 3257 kilometre races they tired.'}    | ${'a hyphen ties the number to the unit'}
+    ${'In 1500 ft of water it sank.'}      | ${'In 460 m of water it sank.'}             | ${'an abbreviation'}
+    ${'In 1500 ft of water.'}              | ${'In 460 m of water.'}                     | ${'the same, ending the sentence'}
+    ${'It rose by 1200 feet.'}             | ${'It rose by 370 metres.'}                 | ${'a unit that ends the sentence'}
+    ${'In 1000 feet, turn right.'}         | ${'In 300 metres, turn right.'}             | ${'a unit before a comma'}
+    ${'within 2024 miles of here'}         | ${'within 3257 kilometres of here'}         | ${'"in" inside a word'}
+    ${'The wreck lies in 1500 feet of water.'} | ${'The wreck lies in 460 metres of water.'} | ${'a preposition inside the clause'}
+    ${'Traffic grew in 2024 miles of road.'} | ${'Traffic grew in 3257 kilometres of road.'} | ${'the same, though it may be a year'}
+    ${'Faults fell to 1 in 2000 miles driven.'} | ${'Faults fell to 1 in 3200 kilometres driven.'} | ${'the same, after a number'}
+    ${'It ended (in 2024 miles were driven).'} | ${'It ended (in 3257 kilometres were driven).'} | ${'an opening bracket inside a sentence'}
+    ${'a well-known in 2024 miles fact'}    | ${'a well-known in 3257 kilometres fact'}  | ${'a hyphen inside the line is no list marker'}
+    ${'Notes - In 2024 miles were driven.'} | ${'Notes - In 3257 kilometres were driven.'} | ${'nor is a spaced dash'}
+  `('still converts $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('keeps reading the year of a date before a singular unit of two words under localise', () => {
+    expect(convert('On May 5, 2024 square mile parks opened.', { preset: 'localise' })).toBe(
+      'On 5 May 2024 square mile parks opened.',
+    );
+  });
+
+  it.each([
+    'It was 4 ft 1 in 1000 ounces later.',
+    'six foot one in 1000 ounces later',
+    'It was 4 ft 1\nin 1000 ounces later.',
+    'six foot one\nin 1000 ounces later',
+  ])(
+    'gives the same output on a second run over %j, where "in" may be the inch',
+    (input) => {
+      const once = convert(input);
+      expect(convert(once)).toBe(once);
+    },
+  );
+
+  /** The spans the unit rules hold as written in `text`. */
+  const held = (text: string): string[] => {
+    const resolved = resolveOptions({});
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold)
+      .map((c) => c.before);
+  };
+
+  it('holds the year and its unit word whole', () => {
+    expect(held('In 2024 miles were driven.')).toContain('2024 miles');
   });
 });
 
@@ -3513,6 +3616,21 @@ describe('a singular unit after a number above one describes the noun after it',
   });
 
   it.each`
+    input                                     | expected                              | why
+    ${'a 2 square mile park'}                 | ${'a 5.2 square kilometre park'}      | ${'an area'}
+    ${'a 2 sq mile park'}                     | ${'a 5.2 square kilometre park'}      | ${'the same, shortened'}
+    ${'a 100 foot-pound wrench'}              | ${'a 140 newton metre wrench'}        | ${'a hyphenated torque'}
+    ${'a 100 pound-foot wrench'}              | ${'a 140 newton metre wrench'}        | ${'the other way round'}
+    ${'a 100 foot pound wrench'}              | ${'a 140 newton metre wrench'}        | ${'spaced'}
+    ${'a 10,000 british thermal unit heater'} | ${'an 11,000 kilojoule heater'}       | ${'energy'}
+    ${'a 2 square foot tile'}                 | ${'a 0.19 square metre tile'}         | ${'an area in feet'}
+    ${'2 square miles of forest'}             | ${'5.2 square kilometres of forest'}  | ${'a plural unit stays plural'}
+    ${'1 foot-pound'}                         | ${'1.4 newton metres'}                | ${'no noun after'}
+  `('a unit of more than one word: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
     input                           | expected                            | why
     ${'1/2 pound ground beef'}      | ${'230 grams ground beef'}          | ${'a fraction takes the singular anyway'}
     ${'1/2-1 inch gravel'}          | ${'1.3-2.5 centimetres gravel'}     | ${'so does a range that ends in one'}
@@ -3678,6 +3796,7 @@ describe('a unit that is part of a noun', () => {
     ${'two 1 pound cakes'}           | ${'after a count'}
     ${'Bake 2-3 pound cakes'}        | ${'after a range'}
     ${'Bake a 2 pound cake'}         | ${'with no hyphen it may be a pound cake'}
+    ${'In 5 yard sales we sold it.'} | ${'a yard sale is a sale'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });
@@ -3706,6 +3825,7 @@ describe('a unit that is part of a noun', () => {
     ${'Bake 1 pound cake'}      | ${'1 pound'}
     ${'Send in 6 foot soldiers'} | ${'6 foot'}
     ${'Bake 2-3 pound cakes'}   | ${'2-3 pound'}
+    ${'In 5 yard sales we sold it.'} | ${'5 yard'}
   `('holds $span whole, even with respectConventions off', ({ input, span }) => {
     expect(held(input)).toContain(span);
     expect(held(input, { units: { respectConventions: false } })).toContain(span);
@@ -3773,6 +3893,37 @@ describe('a count before an attributive measurement stays out of it', () => {
     ${'three 2-inch screws'}           | ${'three 2-inch screws'}         | ${'a fastener size'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                     | expected                                     | why
+    ${'Buy two foot-long subs.'}              | ${'Buy two 30 centimetre long subs.'}        | ${'two subs a foot long each'}
+    ${'three foot-long hot dogs'}             | ${'three 30 centimetre long hot dogs'}       | ${'an adjective before the noun'}
+    ${'Cut two inch-thick steaks.'}           | ${'Cut two 2.5 centimetre thick steaks.'}    | ${'another unit and size'}
+    ${'Buy one foot-long sub.'}               | ${'Buy one 30 centimetre long sub.'}         | ${'a count of one'}
+    ${'the two foot-long subs'}               | ${'the two 30 centimetre long subs'}         | ${'after a determiner that takes a count'}
+    ${'twenty-two mile-long queues'}          | ${'twenty-two 1.6 kilometre long queues'}    | ${'a count of two words'}
+    ${'a hundred foot-long subs'}             | ${'a hundred 30 centimetre long subs'}       | ${'a multiplied count'}
+    ${'two foot‑long subs'}                   | ${'two 30 centimetre long subs'}             | ${'a non-breaking hyphen'}
+  `('reads a count spaced before a unit tied to its size as counting the noun: $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                     | expected                                        | why
+    ${'a two foot-long sub'}                  | ${'a 61 centimetre long sub'}                   | ${'a determiner that takes one of the noun'}
+    ${'two foot-long, three foot-wide boards'} | ${'61 centimetre long, 91 centimetre wide boards'} | ${'a list of sizes'}
+    ${'two foot-long and three foot-wide boards'} | ${'61 centimetre long and 91 centimetre wide boards'} | ${'the same, joined by "and"'}
+    ${'The sub is two foot-long.'}            | ${'The sub is 61 centimetres long.'}            | ${'no noun after the size'}
+    ${'two and a half foot-long subs'}        | ${'76 centimetre long subs'}                    | ${'a fraction is no count'}
+    ${'a two-foot-long sub'}                  | ${'a 61 centimetre long sub'}                   | ${'a count hyphenated to the unit is part of it'}
+    ${'a 6-foot-tall fence'}                  | ${'a 1.8 metre tall fence'}                     | ${'the same, in digits'}
+  `('reads the number before a unit tied to its size as the number of units: $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('leaves "a foot-long sub" alone, with no number to read', () => {
+    expect(convert('a foot-long sub')).toBe('a foot-long sub');
   });
 });
 

@@ -3514,7 +3514,7 @@ describe('a fraction word that is also an ordinal', () => {
     ${'a third mile'}                  | ${'540 metres'}            | ${'the same, without "of"'}
     ${'one-third mile'}                | ${'540 metres'}            | ${'"one" counts it'}
     ${'one third mile'}                | ${'540 metres'}            | ${'the same, with a space'}
-    ${'the one-third mile marker'}     | ${'the 540 metre marker'}  | ${'a count after "the" is still a fraction'}
+    ${'the one-third mile track'}      | ${'the 540 metre track'}   | ${'a count after "the" is still a fraction'}
     ${'a third-mile loop'}             | ${'a 540 metre loop'}      | ${'attributive'}
     ${'the last third of a mile'}      | ${'the last 540 metres'}   | ${'"of a" makes even a bare one a fraction'}
     ${'one-fourth pound of butter'}    | ${'110 grams of butter'}   | ${'"fourth" is a fraction word'}
@@ -3867,6 +3867,145 @@ describe('a conventional size names its noun in either number, on either side', 
   });
 });
 
+describe('a distance from a thing sized in inches', () => {
+  it.each`
+    input                                                  | expected                                                    | why
+    ${'Place the monitor about 20 inches from your eyes.'} | ${'Place the monitor about 51 centimetres from your eyes.'} | ${'a distance from the thing'}
+    ${'Space the bolts 6 inches apart.'}                   | ${'Space the bolts 15 centimetres apart.'}                  | ${'a distance between them'}
+    ${'Keep the phone 12 inches away from your face.'}     | ${'Keep the phone 30 centimetres away from your face.'}     | ${'away'}
+    ${'Mount the screen 30 inches above the desk.'}        | ${'Mount the screen 76 centimetres above the desk.'}        | ${'a position'}
+    ${'Place the speaker about 6 inches from the wall.'}   | ${'Place the speaker about 15 centimetres from the wall.'}  | ${'a noun read either side of a size'}
+    ${'The jack is 4 inches from the edge.'}               | ${'The jack is 10 centimetres from the edge.'}              | ${'after a verb'}
+    ${'Keep it 6 inches from the monitor.'}                | ${'Keep it 15 centimetres from the monitor.'}               | ${'the thing after the distance word'}
+    ${'Space the bolts 4 to 6 inches apart.'}              | ${'Space the bolts 10 to 15 centimetres apart.'}            | ${'a range'}
+    ${'Hang the screen 20 x 30 inches above the desk.'}    | ${'Hang the screen 51 x 76 centimetres above the desk.'}    | ${'a dimension'}
+    ${'hail 2 inches in diameter'}                         | ${'hail 5.1 centimetres in diameter'}                       | ${'no conventional noun'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                          | why
+    ${'a 27 inch monitor'}                             | ${'the noun straight after the size'}
+    ${'a 6 inch speaker'}                              | ${'the same'}
+    ${'The screen is 27 inches.'}                      | ${'nothing after the size'}
+    ${'The screen is 27 inches from corner to corner.'} | ${'from one part of the thing to another'}
+    ${'monitors of 27 inches'}                         | ${'the noun before the size'}
+    ${'a 6 inch off-white speaker'}                    | ${'a distance word inside another word'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('drive bays, audio jacks and telescope parts are sized in inches', () => {
+  it.each`
+    unchanged                                                    | converted
+    ${'Fit a 2.5-inch SATA SSD next to the 3.5-inch HDD.'}       | ${'Fit a 6.4 centimetre SATA SSD next to the 8.9 centimetre HDD.'}
+    ${'Plug the guitar into the 1/4-inch TRS jack.'}             | ${'Plug the guitar into the 6.4 millimetre TRS jack.'}
+    ${'Use a 2-inch eyepiece on the 8-inch Dobsonian telescope.'} | ${'Use a 5.1 centimetre eyepiece on the 20 centimetre Dobsonian telescope.'}
+  `('leaves "$unchanged" alone, and converts it with respectConventions off', ({ unchanged, converted }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+    expect(convert(unchanged, { units: { respectConventions: false } })).toBe(converted);
+  });
+
+  it.each`
+    input                                    | expected                                       | why
+    ${'The jack is 4 inches from the edge.'} | ${'The jack is 10 centimetres from the edge.'} | ${'a distance from the jack'}
+    ${'Plug the 2 inch hole with filler.'}   | ${'Plug the 5.1 centimetre hole with filler.'} | ${'a verb before the size names no plug'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged               | why
+    ${'A 3.5mm jack.'}      | ${'already metric'}
+    ${'A 27 inch monitor.'} | ${'a screen'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a shipping container is named by its length in feet', () => {
+  it.each`
+    unchanged                                                            | why
+    ${'We shipped it in a 20-foot container and two 40-foot containers.'} | ${'the standard lengths'}
+    ${'The 40-foot shipping container holds a lot.'}                     | ${'a word between'}
+    ${'a 40-foot high-cube container'}                                   | ${'a hyphenated word between'}
+    ${'a 20-foot reefer box'}                                            | ${'a box of a kind'}
+    ${'the twenty-foot equivalent unit'}                                 | ${'what a TEU stands for'}
+    ${'20- and 40-foot containers'}                                      | ${'two standard lengths'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                       | expected                                       | why
+    ${'A 20-foot boat.'}                        | ${'A 6.1 metre boat.'}                         | ${'no container'}
+    ${'A 6-foot fence.'}                        | ${'A 1.8 metre fence.'}                        | ${'the same'}
+    ${'the container is 20 feet from the wall'} | ${'the container is 6.1 metres from the wall'} | ${'a distance from a container'}
+    ${'Move it 20 feet towards the container.'} | ${'Move it 6.1 metres towards the container.'} | ${'a preposition and a determiner between'}
+    ${'a 30-foot container'}                    | ${'a 9.1 metre container'}                     | ${'no standard length'}
+    ${'a 20 to 30 foot container'}              | ${'a 6.1 to 9.1 metre container'}              | ${'a range with one end no standard length'}
+    ${'a 20-foot box'}                          | ${'a 6.1 metre box'}                           | ${'any box'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('converts a container with respectConventions off', () => {
+    expect(convert('a 20-foot container', { units: { respectConventions: false } })).toBe(
+      'a 6.1 metre container',
+    );
+  });
+});
+
+describe('an aviation altitude is given in feet', () => {
+  it.each`
+    unchanged                                                           | why
+    ${'We cruised at 35,000 feet MSL and descended to 1,500 feet AGL.'} | ${'a reference level after the altitude'}
+    ${'The plane climbed to flight level 350, about 35,000 feet.'}      | ${'a flight level earlier in the sentence'}
+    ${'We reached our cruising altitude of 35,000 feet.'}               | ${'a cruising altitude'}
+    ${'The service ceiling is 41,000 feet.'}                            | ${'an aircraft ceiling'}
+    ${'35,000 feet is a usual cruising altitude'}                       | ${'later in the sentence'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                  | expected                                                 | why
+    ${'The plane is 200 feet long.'}                       | ${'The plane is 61 metres long.'}                        | ${'a plane alone is not enough'}
+    ${'The hill rises 1,500 feet.'}                        | ${'The hill rises 460 metres.'}                          | ${'a height that is no altitude'}
+    ${'a 10-foot ceiling'}                                 | ${'a 3 metre ceiling'}                                   | ${'a room has a ceiling'}
+    ${'We climbed 35,000 feet. The flight level was 350.'} | ${'We climbed 11 kilometres. The flight level was 350.'} | ${'in another sentence'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('converts an altitude with respectConventions off', () => {
+    expect(convert('We cruised at 35,000 feet MSL.', { units: { respectConventions: false } })).toBe(
+      'We cruised at 11 kilometres MSL.',
+    );
+  });
+});
+
+describe('inches of mercury', () => {
+  it.each`
+    input                                       | expected
+    ${'Set the altimeter to 29.92 inHg.'}       | ${'Set the altimeter to 1013 hPa.'}
+    ${'29.92 inches of mercury'}                | ${'1013 hectopascals'}
+    ${'29.92 in Hg'}                            | ${'1013 hPa'}
+    ${'The pressure fell 2 inches of mercury.'} | ${'The pressure fell 68 hectopascals.'}
+    ${'29.92 inHg (1013 hPa)'}                  | ${'1013 hPa'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('honours unitsKeep', () => {
+    expect(convert('Set the altimeter to 29.92 inHg.', { unitsKeep: ['inHg'] })).toBe(
+      'Set the altimeter to 29.92 inHg.',
+    );
+  });
+});
+
 describe('American designations that only look like measurements', () => {
   it.each`
     unchanged                    | why
@@ -4139,6 +4278,56 @@ describe('a unit that is part of a noun', () => {
   `('holds $span whole, even with respectConventions off', ({ input, span }) => {
     expect(held(input)).toContain(span);
     expect(held(input, { units: { respectConventions: false } })).toContain(span);
+  });
+});
+
+describe('a count before a compound noun that starts with a unit', () => {
+  it.each`
+    unchanged                       | why
+    ${'We passed 3 mile markers.'}  | ${'a mile marker is a post'}
+    ${'the 26 mile marker'}         | ${'the post at mile 26'}
+    ${'the 26-mile marker'}         | ${'the same, hyphenated'}
+    ${'We put up 3 yard signs.'}    | ${'a yard sign is a sign'}
+    ${'Press the two pound signs.'} | ${'a pound sign is a mark'}
+    ${'Bake 1 pound cake'}          | ${'a pound cake is a cake'}
+    ${'the 40 yard line'}           | ${'a yard line is a name'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                | expected
+    ${'a 3 mile hike'}   | ${'a 4.8 kilometre hike'}
+    ${'3 miles of road'} | ${'4.8 kilometres of road'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  /** The spans the unit rules hold as written in `text`. */
+  const held = (text: string, options: Options = {}): string[] => {
+    const resolved = resolveOptions(options);
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold)
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                           | span
+    ${'We passed 3 mile markers.'}  | ${'3 mile'}
+    ${'the 26 mile marker'}         | ${'26 mile'}
+    ${'We put up 3 yard signs.'}    | ${'3 yard'}
+    ${'Press the two pound signs.'} | ${'two pound'}
+  `('holds $span whole, even with respectConventions off', ({ input, span }) => {
+    expect(held(input)).toEqual([span]);
+    expect(held(input, { units: { respectConventions: false } })).toEqual([span]);
+  });
+
+  it('converts a hyphenated mile marker with respectConventions off', () => {
+    expect(convert('the 26-mile marker', { units: { respectConventions: false } })).toBe(
+      'the 42 kilometre marker',
+    );
   });
 });
 

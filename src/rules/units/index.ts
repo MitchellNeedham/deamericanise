@@ -297,13 +297,27 @@ function contextText(text: string): string {
   return lastPlain;
 }
 
-function isConventional(ctx: RuleContext, measure: Measure, start: number, end: number): boolean {
-  const rules = measure.conventional;
-  if (!rules || !ctx.options.units.respectConventions) return false;
+/**
+ * Whether the measurement `text.slice(start, end)` in `measure`, whose figures are `values`,
+ * is in one of the measure's conventional contexts.
+ */
+function isConventional(
+  ctx: RuleContext,
+  measure: Measure,
+  start: number,
+  end: number,
+  values: readonly number[],
+): boolean {
+  if (!measure.conventional || !ctx.options.units.respectConventions) return false;
   const text = contextText(ctx.text);
   const before = text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
   const after = text.slice(end, end + CONTEXT_WINDOW);
-  return Boolean((rules.before?.test(before)) || (rules.after?.test(after)));
+  return [measure.conventional].flat().some(
+    (rules) =>
+      (rules.values === undefined || values.every((value) => rules.values!.includes(value))) &&
+      !rules.distance?.test(after) &&
+      Boolean(rules.before?.test(before) || rules.after?.test(after)),
+  );
 }
 
 function isOtherSense(ctx: RuleContext, alias: Alias, start: number, end: number): boolean {
@@ -764,7 +778,10 @@ const METRIC_UNITS = {
     [String.raw`grams?|g`, BASE],
     [String.raw`mg`, times(0.001)],
   ],
-  pressure: [[String.raw`kilopascals?|kPa`, BASE]],
+  pressure: [
+    [String.raw`kilopascals?|kPa`, BASE],
+    [String.raw`hectopascals?|hPa`, times(0.1)],
+  ],
   power: [[String.raw`kilowatts?|kW`, BASE]],
   energy: [[String.raw`kilojoules?|kJ`, BASE]],
 } satisfies Record<string, MetricUnit[]>;
@@ -1922,7 +1939,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       return;
     }
     if (isAmbiguousHere(entry.measure, ctx.text)) return;
-    if (isConventional(ctx, entry.measure, start, start + matched.length)) {
+    if (isConventional(ctx, entry.measure, start, start + matched.length, [value])) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
@@ -1976,7 +1993,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     if (isBareInch(alias, matched)) return;
     if (
       isInParticle(ctx.text, start, start + matched.length, alias) ||
-      isConventional(ctx, entry.measure, start, start + matched.length)
+      isConventional(ctx, entry.measure, start, start + matched.length, [value])
     ) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
@@ -2055,7 +2072,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         }
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(alias, matched)) continue;
-        const conventional = isConventional(ctx, entry.measure, start, end);
+        const values = [...earlier.map((figure) => figure.value), low, high];
+        const conventional = isConventional(ctx, entry.measure, start, end, values);
         const particle = isInParticle(ctx.text, start, end, alias);
         if (reading === 'hold' || conventional || secondOfPair || particle) {
           changes.push(hold(start, matched, entry.measure.id, 35));
@@ -2227,7 +2245,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const unclear = sides.some(
           (s, i) => !s.entry && i > 0 && units[i - 1]!.measure !== units[i]!.measure,
         );
-        if (unclear || measures.some((m) => isConventional(ctx, m, start, end))) {
+        const values = sides.map((s) => s.value!);
+        if (unclear || measures.some((m) => isConventional(ctx, m, start, end, values))) {
           changes.push(hold(start, match[0], entry.measure.id, 38));
           continue;
         }

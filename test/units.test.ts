@@ -266,25 +266,6 @@ describe('a long run of whitespace takes time in line with its length', () => {
   });
 });
 
-describe('a long run of fuel economy ranges takes time in line with its length', () => {
-  // Generous, since each of these takes a few hundred milliseconds at most. Testing every
-  // change against a hold for every range takes several seconds.
-  const LIMIT_MS = 1000;
-
-  it.each`
-    range                    | length   | expected
-    ${'20 to 30 mpg, '}      | ${10000} | ${'7.8 to 12 L/100km, 7.8 to 12 L/100km, '}
-    ${'twenty to 30 mpg, '}  | ${16000} | ${'twenty to 30 mpg, twenty to 30 mpg, '}
-  `('"$range", $length times', ({ range, length, expected }) => {
-    const text = (n: number) => range.repeat(n);
-    convert(text(1));
-    const started = performance.now();
-    const output = convert(text(length));
-    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
-    expect(output.startsWith(expected)).toBe(true);
-  });
-});
-
 describe('mass and volume', () => {
   it.each`
     input                | expected

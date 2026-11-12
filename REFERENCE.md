@@ -286,9 +286,13 @@ by `- 2 pounds beef` is a serving count and a bullet, not a range.
 A measurement never starts straight after `-`, `/`, `,` or `:` following a digit, where the
 number is the tail of a date, a fraction, a grouped number or a clock time. So
 `3/14/2024 1/2 gallon` converts the `1/2 gallon` alone, and `a 7:30 mile pace` is left as
-written, while `Distance:5 miles` still converts. A range's first number is never a price
-either, and never more than ten times the size of the second, which makes it a year or a
-count. The second number then converts on its own: `In 2024 - 5 feet` becomes
+written, while `Distance:5 miles` still converts. Nor does one start on a price, so
+`a $5 gallon of milk` and `a $5 x 10 foot tarp` are left as written. Four figures straight
+after a written-out month and day are the year of a date, so `Oct 22, 2024 1/2 inch` and
+`22 October 2024 1/2 inch` convert the `1/2 inch` alone. A bare month says too little, so
+`In May 5-10 feet` is still a range. A range's first number is never more than ten times the
+size of the second, which makes it a year or a count. Where the first number cannot open the
+range, the second converts on its own: `In 2024 - 5 feet` becomes
 `In 2024 - 1.5 metres`, and `Price $5 - 10 inches` keeps its price. `from` or `between`
 before the first number makes a range of any two, so `fell from 10 to 0.5 miles` converts
 whole.

@@ -137,12 +137,63 @@ function collectFencedCode(text: string, into: Range[]): void {
 /** Fenced code in a prose file that is not Markdown: three backticks, to the next three anywhere. */
 const BACKTICK_PAIRS = /`{3}[\s\S]*?`{3}/g;
 
+/**
+ * An initialism, where every part is one or two letters followed by a stop: `U.S.`, `Ph.D.`,
+ * `p.m.`, `e.g.`, and a plural such as `P.M.s`. A dotted token of this shape is never a dotted
+ * name or a file name.
+ */
+const INITIALISM = String.raw`(?:(?:[A-Za-z]{1,2}\.){2,}s|(?:[A-Za-z]{1,2}\.)+)(?!\w)`;
+
+/**
+ * A unit straight after a number, as in `300 lb.ft` and `32 ft/s/s`, or joined to one, as in
+ * `5ft.tall`, `1/2lb.ft` and `3p.m.`. The measurement and time rules read these, so a token
+ * here is never a file name or an unrooted path. After a hyphen, a word of up to three letters
+ * is a unit, as in `25-lb.ft`, and a longer one is a name, as in `01-colors.md`. The number
+ * holds no comma, or a list such as `1,2,3` would be walked to its end from every item.
+ */
+const UNIT_AFTER_NUMBER = String.raw`(?<=(?<![A-Za-z_])\d[^\S\r\n]*)|[\d./-]*\d(?:[A-Za-z]|-[A-Za-z]{1,3}\.)`;
+
+/** An extension in one case, so `color.It` is the next sentence run on rather than a file. */
+const EXTENSION = String.raw`\.(?:[a-z][a-z\d]*|[A-Z][A-Z\d]*)(?![\w-])`;
+
+/**
+ * A file name: a name holding a letter, then a dot and an extension, with no space either side
+ * of the dot, as in `behavior.ts`, `Center.vue`, `color-picker.tsx` and `GRAY.PNG`. A name with
+ * no letter is a number, as in `3.5mi`.
+ */
+const FILE_NAME =
+  String.raw`(?!${INITIALISM})(?![\d_.-]*${EXTENSION}(?!\.\w))` +
+  String.raw`\.?\w[\w-]*(?:\.[\w-]+)*${EXTENSION}`;
+
+const SEPARATOR = String.raw`[\\/]`;
+
+/** A segment of a path, or `.` and `..` before a separator. */
+const SEGMENT = String.raw`(?:\.{1,2}(?=[\\/])|\.?[\w@][\w@-]*(?:\.[\w@-]+)*)`;
+
+/** `/`, `./`, `../`, `~/` or a drive letter, with either separator after all but the first. */
+const ROOT = String.raw`(?:(?:\.{1,2}|~|[A-Za-z]:)[\\/]|\/)`;
+
+/**
+ * A path, held whole: one that starts at a root, runs to three or more segments, or ends in a
+ * file name. Two words joined by a slash, as in `color/flavor` or `src/colors`, stay prose.
+ */
+const PATH = new RegExp(
+  String.raw`(?<![\w.~@\\/-])(?=[\w.~@:\\/-]*?[A-Za-z])` +
+    String.raw`(?:${ROOT}${SEGMENT}(?:${SEPARATOR}${SEGMENT})*` +
+    String.raw`|(?!${UNIT_AFTER_NUMBER})${SEGMENT}(?:${SEPARATOR}${SEGMENT}){2,}` +
+    String.raw`|(?!${UNIT_AFTER_NUMBER})${SEGMENT}${SEPARATOR}${FILE_NAME})`,
+  'g',
+);
+
 const STRUCTURAL: RegExp[] = [
   /\bhttps?:\/\/\S+/g,
   /\bwww\.\S+/g,
   /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
   CODE_SPAN,
   /<[a-zA-Z/][^>\n]*>/g,
+  PATH,
+  // Never after a separator: `PATH` holds those, and starting there walks a path once per segment.
+  new RegExp(String.raw`(?<![\w$@.\\/-])(?!${UNIT_AFTER_NUMBER})${FILE_NAME}`, 'g'),
 ];
 
 /**
@@ -152,7 +203,8 @@ const STRUCTURAL: RegExp[] = [
 const IDENTIFIERS: RegExp[] = [
   /\b[A-Za-z][A-Za-z0-9]*[a-z][A-Z][A-Za-z0-9]*\b/g,
   /\b\w*_\w+\b/g,
-  /\b[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+\b/g,
+  // Starting only where the token starts, so `M.s` inside `P.M.s` is never a name of its own.
+  new RegExp(String.raw`\b(?<![\w$]\.)(?!${INITIALISM})[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+\b`, 'g'),
   /\b[A-Za-z_$][\w$]*\s*\(\s*\)/g,
   /\b[a-z0-9]+(?:-[a-z0-9]+){2,}\b/g,
   /--?[A-Za-z][\w-]*/g,

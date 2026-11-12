@@ -7,14 +7,18 @@ const HTML_NS = 'http://www.w3.org/1999/xhtml';
 const INLINE = new Set([
   'a', 'abbr', 'acronym', 'b', 'bdi', 'bdo', 'big', 'button', 'cite', 'data', 'dfn', 'em',
   'font', 'i', 'label', 'mark', 'nobr', 'output', 'q', 's', 'small', 'span', 'strike',
-  'strong', 'sub', 'sup', 'time', 'tt', 'u', 'var', 'wbr',
+  'strong', 'sub', 'sup', 'time', 'u', 'var', 'wbr',
 ]);
 
 /** Elements whose text is never rewritten. Attributes on them still can be. */
 const SKIPPED = new Set([
-  'audio', 'canvas', 'code', 'datalist', 'iframe', 'input', 'kbd', 'noscript', 'object',
-  'pre', 'samp', 'script', 'select', 'style', 'template', 'textarea', 'video',
+  'audio', 'canvas', 'code', 'datalist', 'iframe', 'input', 'kbd', 'listing', 'noscript',
+  'object', 'plaintext', 'pre', 'samp', 'script', 'select', 'style', 'template', 'textarea',
+  'tt', 'video', 'xmp',
 ]);
+
+/** Generic font families that draw every character at the same width. */
+const MONOSPACE = new Set(['monospace', 'ui-monospace']);
 
 /** A change that crosses the edge of one of these would move words into or out of it. */
 const ANCHORS = new Set(['a', 'button', 'label']);
@@ -44,7 +48,7 @@ const ATTRIBUTES: Array<[name: string, on: Set<string> | null]> = [
 ];
 
 /** Attributes whose change can move a boundary or open and close a scope. */
-export const SCOPE_ATTRIBUTES = ['lang', 'xml:lang', 'translate', 'contenteditable', 'class'];
+export const SCOPE_ATTRIBUTES = ['lang', 'xml:lang', 'translate', 'contenteditable', 'class', 'role'];
 export const TEXT_ATTRIBUTES = ATTRIBUTES.map(([name]) => name);
 
 /** What applies at a point in the tree. */
@@ -56,7 +60,7 @@ export interface Scope {
   notranslate: boolean;
   editable: boolean;
   foreign: boolean;
-  /** Inside an element from `SKIPPED`. */
+  /** Inside an element from `SKIPPED`, or one the page marks or draws as code. */
   skippedTag: boolean;
 }
 
@@ -118,7 +122,8 @@ export function rootScope(document: Document | null): Scope {
   };
 }
 
-export function enter(parent: Scope, element: Element): Scope {
+/** Pass `joins` when `joinsRun(element)` is already known, so the style is read only once. */
+export function enter(parent: Scope, element: Element, joins?: boolean): Scope {
   const lang = element.getAttribute('lang') ?? element.getAttribute('xml:lang');
   const wholePage = element.namespaceURI === HTML_NS && PAGE_ELEMENTS.has(element.localName);
 
@@ -134,14 +139,41 @@ export function enter(parent: Scope, element: Element): Scope {
   }
   if (editableValue === 'false') editable = false;
 
+  const foreign = parent.foreign || element.namespaceURI !== HTML_NS;
   return {
     lang: lang === null ? parent.lang : lang.trim().toLowerCase(),
     translate,
     notranslate: parent.notranslate || (!wholePage && element.classList.contains('notranslate')),
     editable,
-    foreign: parent.foreign || element.namespaceURI !== HTML_NS,
-    skippedTag: parent.skippedTag || SKIPPED.has(element.localName),
+    foreign,
+    skippedTag:
+      parent.skippedTag ||
+      SKIPPED.has(element.localName) ||
+      namesCodeRole(element.getAttribute('role')) ||
+      (!foreign && !(joins ?? joinsRun(element)) && drawnAsCode(element)),
   };
+}
+
+/** Whether a `role` value includes the ARIA `code` role. */
+export function namesCodeRole(role: string | null): boolean {
+  return role !== null && role.toLowerCase().split(/\s+/).includes('code');
+}
+
+/**
+ * Whether the page draws an element the way it draws code: in a font that falls back to a
+ * generic monospace family, with its white space kept or its lines left unwrapped. That finds
+ * code views that lay out each line in a `div`, `td` or `span`, whatever their markup. A
+ * document with no window has no styles, so nothing in it is drawn as code.
+ */
+function drawnAsCode(element: Element): boolean {
+  const view = element.ownerDocument.defaultView;
+  if (!view) return false;
+  const style = view.getComputedStyle(element);
+  const whiteSpace = style.whiteSpace;
+  if (whiteSpace === '' || whiteSpace === 'normal') return false;
+  // A quoted name is a font called "monospace", not the generic family.
+  const unquoted = style.fontFamily.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""');
+  return unquoted.split(',').some((family) => MONOSPACE.has(family.trim().toLowerCase()));
 }
 
 /**
@@ -168,6 +200,7 @@ export function joinsRun(element: Element): boolean {
     !element.hasAttribute('translate') &&
     !element.hasAttribute('contenteditable') &&
     !element.classList.contains('notranslate') &&
+    !namesCodeRole(element.getAttribute('role')) &&
     laidOutInline(element)
   );
 }
@@ -207,15 +240,18 @@ export function containersAndElementsIn(
   containers: Array<[Node, Scope]>,
   elements: Array<[Element, Scope]>,
   shadowRootOf: ShadowLookup,
+  joins = node.nodeType === 1 && joinsRun(node as Element),
 ): void {
   const isElement = node.nodeType === 1;
   if (!isElement && node.nodeType !== 9 && node.nodeType !== 11) return;
   if (isElement) elements.push([node as Element, scope]);
   // The text of an inline element belongs to the runs of the container around it.
-  if (!isElement || !joinsRun(node as Element)) containers.push([node, scope]);
+  if (!joins) containers.push([node, scope]);
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.nodeType !== 1) continue;
-    containersAndElementsIn(child, enter(scope, child as Element), containers, elements, shadowRootOf);
+    const element = child as Element;
+    const inline = joinsRun(element);
+    containersAndElementsIn(element, enter(scope, element, inline), containers, elements, shadowRootOf, inline);
   }
   const root = isElement ? shadowRootOf(node as Element) : null;
   if (root) containersAndElementsIn(root, scope, containers, elements, shadowRootOf);

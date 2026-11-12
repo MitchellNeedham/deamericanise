@@ -1,3 +1,4 @@
+import { checkOptions } from '../config.js';
 import { detectAmerican } from '../engine/detect.js';
 import { deamericanise } from '../transform.js';
 import type { Change, Options } from '../types.js';
@@ -35,6 +36,7 @@ export interface RemarkOptions extends Options {
  */
 export default function remarkDeamericanise(options: RemarkOptions = {}) {
   const { onChange, ...transformOptions } = options;
+  checkOptions(transformOptions);
 
   return function transformer(tree: Node): Node {
     const nodes: Node[] = [];

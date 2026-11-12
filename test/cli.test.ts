@@ -7,6 +7,8 @@ import { build } from 'tsup';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { main } from '../src/cli-main.js';
 import { DIALECTS } from '../src/dialects/index.js';
+import { ruleIds } from '../src/rules/catalogue.js';
+import type { Dialect } from '../src/types.js';
 
 // The CLI must report the version the package was built with, never a literal of its own.
 const version = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version;
@@ -156,6 +158,61 @@ describe('bad input', () => {
     await expect(main(args as string[])).rejects.toThrow('exited');
     expect(stderr()).toContain(message);
     exit.mockRestore();
+  });
+});
+
+describe('--dialect', () => {
+  const UNKNOWN = ['__proto__', 'toString', 'constructor', 'hasOwnProperty', 'en-XX'];
+
+  function exits(): void {
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`exited ${code}`);
+    }) as never);
+  }
+
+  it.each(UNKNOWN)('rejects --dialect %s with exit 2 before reading anything', async (dialect) => {
+    exits();
+    const path = withFile('a.md', 'The color.');
+    await expect(main(['--write', '--dialect', dialect, path])).rejects.toThrow('exited 2');
+    expect(stderr()).toBe(`deamericanise: unknown dialect "${dialect}". Try --list-dialects.\n`);
+    expect(readFileSync(path, 'utf8')).toBe('The color.');
+    expect(stdout()).toBe('');
+  });
+
+  it('rejects a bad --dialect before reading stdin', async () => {
+    exits();
+    const stdin = vi.fn();
+    vi.spyOn(process, 'stdin', 'get').mockImplementation(stdin);
+    await expect(main(['--language', 'md', '--dialect', '__proto__'])).rejects.toThrow('exited 2');
+    expect(stdin).not.toHaveBeenCalled();
+  });
+
+  it.each(UNKNOWN)('rejects --list-rules --dialect %s in the same words', async (dialect) => {
+    exits();
+    await expect(main(['--list-rules', '--dialect', dialect])).rejects.toThrow('exited 2');
+    expect(stderr()).toBe(`deamericanise: unknown dialect "${dialect}". Try --list-dialects.\n`);
+    expect(stdout()).toBe('');
+  });
+
+  it.each(Object.keys(DIALECTS))('runs under --dialect %s', async (dialect) => {
+    const path = withFile('a.md', 'the color');
+    expect(await main(['--dialect', dialect, path])).toBe(0);
+    expect(stdout()).toBe('the colour');
+  });
+
+  it.each(Object.keys(DIALECTS))('lists the rules of --dialect %s', async (dialect) => {
+    expect(await main(['--list-rules', '--dialect', dialect])).toBe(0);
+    expect(stdout()).toBe(ruleIds(dialect as Dialect).map((id) => `${id}\n`).join(''));
+  });
+
+  it('lists the en-AU rules with no --dialect', async () => {
+    expect(await main(['--list-rules'])).toBe(0);
+    expect(stdout()).toBe(ruleIds('en-AU').map((id) => `${id}\n`).join(''));
+  });
+
+  it('still prints the dialects alongside an unknown --dialect', async () => {
+    expect(await main(['--list-dialects', '--dialect', 'toString'])).toBe(0);
+    expect(stdout()).toContain('en-AU\tAustralian English\n');
   });
 });
 

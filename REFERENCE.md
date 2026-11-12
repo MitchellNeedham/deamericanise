@@ -80,6 +80,10 @@ the run before anything is read, with `unknown language "..."` on stderr and exi
 and a commented file such as `tsconfig.json` has just its comments rewritten. A `.json`
 file is still skipped unless it is forced this way.
 
+`--dialect` takes any id `--list-dialects` prints. Any other value stops the run before
+anything is read, `--list-rules` included, with `unknown dialect "..."` on stderr and exit
+status 2.
+
 `--rule` and `--units-keep` are checked up front, as `--language` is. A `--rule` pattern
 has to match a rule id of at least one dialect, so a command line shared across dialects
 still runs under `en-CA`, which has no `dialect.*` rules. `--units-keep` takes a unit's
@@ -251,11 +255,15 @@ becomes `raise each one by 5.1 centimetres`.
 
 A weight in two units is one weight, as a height in feet and inches is one height:
 `7 pounds 8 ounces` becomes `3.4 kilograms`, `11st 4lb` becomes `71.7 kg`, and
-`11 stone 4 pounds 8 ounces` becomes `71.9 kilograms`. Together the parts claim three
+`11 stone 4 pounds 8 ounces` becomes `71.9 kilograms`. The first part can be a fraction, a
+mixed number or a decimal, so `1 1/2 pounds 3 ounces` becomes `765 grams` and
+`2.5 feet 3 inches` becomes `83.8 centimetres`. Together the parts claim three
 significant figures. Where a unit of the weight is kept, by the dialect or by `unitsKeep`,
 the whole weight is left as written, so an `en-GB` `11 stone 4 pounds` never becomes
 `11 stone 1.8 kilograms`. Turning on `units.mass.stone` or `units.mass.stone-pounds`
-converts it. A weight at the end of a range, as in `7-8 lb 4 oz`, is left as written too.
+converts it. A weight at the end of a range, as in `7-8 lb 4 oz`, is left as written too,
+and so is a height or weight that starts where no measurement can (see below), as in
+`At 7:30 feet 2 inches`.
 `st` is read only in such a weight, because `1st` on its own is an ordinal.
 
 Numbers written out in words are read too, fractions and all: `two and a half feet` becomes
@@ -307,9 +315,13 @@ by `- 2 pounds beef` is a serving count and a bullet, not a range.
 A measurement never starts straight after `-`, `/`, `,` or `:` following a digit, where the
 number is the tail of a date, a fraction, a grouped number or a clock time. So
 `3/14/2024 1/2 gallon` converts the `1/2 gallon` alone, and `a 7:30 mile pace` is left as
-written, while `Distance:5 miles` still converts. A range's first number is never a price
-either, and never more than ten times the size of the second, which makes it a year or a
-count. The second number then converts on its own: `In 2024 - 5 feet` becomes
+written, while `Distance:5 miles` still converts. Nor does one start on a price, so
+`a $5 gallon of milk` and `a $5 x 10 foot tarp` are left as written. Four figures straight
+after a written-out month and day are the year of a date, so `Oct 22, 2024 1/2 inch` and
+`22 October 2024 1/2 inch` convert the `1/2 inch` alone. A bare month says too little, so
+`In May 5-10 feet` is still a range. A range's first number is never more than ten times the
+size of the second, which makes it a year or a count. Where the first number cannot open the
+range, the second converts on its own: `In 2024 - 5 feet` becomes
 `In 2024 - 1.5 metres`, and `Price $5 - 10 inches` keeps its price. `from` or `between`
 before the first number makes a range of any two, so `fell from 10 to 0.5 miles` converts
 whole.
@@ -383,17 +395,29 @@ rule rewrites any part of it.
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
 surrounding text is American enough to trust; see below. Output is ISO by default, with `dmy` and `long` available.
 
+A `dmy` date whose day is 12 or under, such as `04/03/2024`, reads as an ambiguous
+month-first date again. So a second run forced American with `assumeAmerican: true`
+(`--assume-american`) over `dmy` output swaps that date back. Detect mode leaves it alone
+where the first run removed the American evidence, but not where that evidence survives,
+as the named date in `Filed March 5, 2024. Due 03/04/2024.` does under the default preset.
+`long` and `iso` write a date no second run can read the other way round, so use one of
+them with `--write` and the plugins.
+
 The same separator has to appear twice, so `3.22-1000` is a range, not a date. A dotted
 date needs a four-figure year, because `1.13.24` is far more often a version number, and
-nothing straight after a version word such as `version`, `v`, `release`, `Node` or
+no dotted date straight after a version word such as `version`, `v`, `release`, `Node` or
 `Python` is a date. So `On 3.14.2024 we left.` becomes `On 2024-03-14 we left.`, while
-`Upgrade to version 1.13.24` and `Node 1.13.24` stay as written.
+`Upgrade to version 1.13.24` and `Node 3.14.2024` stay as written. A version number is
+written with dots, so a slash or hyphen date after one of those words is still a date:
+`Press release 3/14/2024` becomes `Press release 2024-03-14`.
 
 `March 5, 2024` names its month, so nobody can misread it. Reordering it to `5 March 2024`
 is local convention rather than translation, and waits for `localise` (or
 `dates: { reorderLongDates: true }`). It is still read as evidence: a named month written
 first is about the strongest signal there is that a document is American, and it settles
-the ambiguous numeric dates around it.
+the ambiguous numeric dates around it. Four figures followed by a unit or by the rest of a
+numeric date are not its year, so `On March 1, 1900 square kilometres burned.` and
+`May 24, 2024-03-28` stay as written and count for nothing.
 
 **Times and currency.** `3:00 P.M.` becomes `3:00pm`; a 12-hour clock is
 normal outside America too, so only the styling goes. The last stop stays when it also
@@ -402,6 +426,8 @@ ends the sentence, so `It starts at 3 P.M. Bring snacks.` becomes
 `8 P.M. ET`, loses it. `times: { to24Hour: true }` gives `15:00` if you want it.
 Amounts are never converted, because exchange rates move; a bare
 `$500` becomes `US$500` when the text is American. 
+A scale stays with the amount only as a whole word: `$5 million` and `$50k` become
+`US$5 million` and `US$50k`, and the word after `$50 modernizing` is still respelt.
 
 **Punctuation** (`localise` only). House style rather than comprehension, so it waits to
 be asked for. `U.S.` becomes `US`, and punctuation that is not part of a quotation moves
@@ -485,7 +511,8 @@ Pounds count as `imperial units` only where the unit rules read them as a weight
 
 A numeric date counts as month-first or day-first in exactly the forms the date rule
 reads, so `3/14/2024` counts as month-first and `14/3/2024` as day-first, while the range
-`3.22-1000` and the version in `Node 14.2.10` count for neither.
+`3.22-1000` and the version in `Node 14.2.10` count for neither. A named date counts as
+month-first in exactly the forms the long date rule reorders, `Sep. 1, 1939` among them.
 
 Ambiguous dates ask a narrower question first, because a document writes its dates one way
 round: a sibling date that states its own order, whether by a day above 12 or by a named
@@ -503,6 +530,9 @@ deamericaniseText(text, { assumeAmerican: true });
 deamericaniseText(text, { minAmericanConfidence: 0.4 });
 ```
 
+A forced verdict reads the tool's own `dmy` output as American too, so a second forced run
+swaps back a `dmy` date whose day is 12 or under; see Dates above.
+
 ## What it will not touch
 
 - **Proper nouns.** Pearl Harbor, the World Trade Center, the Department of Defense, the
@@ -518,9 +548,22 @@ deamericaniseText(text, { minAmericanConfidence: 0.4 });
   the end of the text. A prose file that is not Markdown, such as `.rst` or `.txt`, has no
   such fences, since a line of tildes there underlines a heading: three backticks protect
   everything up to the next three.
+- **File names and paths,** read from their shape rather than a list of extensions. A file
+  name is a name holding a letter, then a dot and an extension in one case with no space
+  either side, so `behavior.ts`, `Center.vue` and `GRAY.PNG` are held, and so is a domain or
+  a dotted name such as `theme.colors.gray`. A path is held whole when it starts at a root
+  (`/`, `./`, `../`, `~/` or a drive letter such as `C:\`), runs to three or more segments,
+  or ends in a file name, so `src/colors/center.ts` and `~/favorites` are held. Each rule
+  leaves a common prose shape alone: two words joined by a slash, such as `color/flavor` or
+  `src/colors`, are prose (write `./src/colors` or a code span to hold one); `The color.It`
+  is a missing space, since `It` is mixed case; `3.5mi` is a number, since `3` has no
+  letter; an initialism such as `U.S.` or `Ph.D.` is an initialism; and a unit straight
+  after a number, such as `300 lb.ft` or `32 ft/s/s`, is a measurement.
 - **Identifiers,** when `protectIdentifiers` is on (the default for source files):
   `normalizeInput`, `MAX_COLOR_VALUE`, `background-color`, `theme.colors.gray`,
-  `--color-scheme`, `getColor()`.
+  `--color-scheme`, `getColor()`. An initialism, where every part is one or two letters
+  followed by a stop, is not a dotted name, so `U.S.`, `Ph.D.` and `p.m.` in a comment are
+  rewritten as they are in prose.
 - **Anything you name:**
 
   ```ts
@@ -631,6 +674,10 @@ rewritten. Keep a backtick span on one line there.
 
 ## Integrations
 
+The remark, ESLint and Prettier plugins check their options before they read a file, so
+an option the library rejects, such as an unknown `dialect` or `preset`, fails the run on
+its first file with the library's own message, whatever that file holds.
+
 ### remark
 
 Working on the syntax tree means code fences, inline code, link targets, HTML blocks and
@@ -735,9 +782,19 @@ keeps putting back is left to it after three attempts.
 
 **Left alone:**
 
-- `code`, `pre`, `kbd`, `samp`, `script`, `style`, `noscript`, `template`, `textarea`,
-  `input`, `select`, `iframe`, `object`, `canvas`, `audio`, `video`, SVG and MathML.
-  Attributes on these elements are still rewritten.
+- `code`, `pre`, `kbd`, `samp`, `tt`, `xmp`, `listing`, `plaintext`, `script`, `style`,
+  `noscript`, `template`, `textarea`, `input`, `select`, `iframe`, `object`, `canvas`,
+  `audio`, `video`, SVG and MathML, and any element with `role="code"`, which also ends the
+  run. Attributes on these elements are still rewritten.
+- Code drawn as code, whatever its markup: an element that starts a run of its own, whose
+  computed `font-family` falls back to the generic `monospace` or `ui-monospace`, and whose
+  `white-space` is anything but `normal`. That finds code views that lay out each line in a
+  `div`, `td` or `span`, such as GitHub's file view and Monaco, which keeps its lines
+  unwrapped with `nowrap`. Prose that keeps its white space in a proportional font, as chat
+  apps show it, still converts, and so does a heading in a monospace font that wraps as
+  usual. On a page set wholly in a monospace font, a label kept on one line with `nowrap` is
+  left alone too. The styles are read again once the page's stylesheets have loaded, and
+  attributes are still rewritten.
 - Anything editable: `contenteditable`, and a document in design mode. Text that becomes
   editable after it was rewritten gets its original back.
 - Anything marked `translate="no"` or `class="notranslate"`, the markers sites already use
@@ -817,7 +874,7 @@ there each root needs the rules in its own styles.
 | `rules` | `{}` | Per-rule overrides; a trailing `*` matches a prefix |
 | `protect` | `[]` | Strings or patterns never to rewrite |
 | `protectProperNouns` | `true` | The built-in name list |
-| `protectIdentifiers` | `false` (`true` for code) | camelCase, snake_case, kebab API names, dotted paths |
+| `protectIdentifiers` | `false` (`true` for code) | camelCase, snake_case, kebab API names, dotted names |
 | `unitsKeep` | `[]` | Units to leave alone, by key |
 | `units.precision` | `'natural'` | `natural`, `exact`, or a number of decimal places |
 | `units.keepOriginal` | `false` | Write `1.8 metres (6 ft)` |
@@ -833,7 +890,9 @@ there each root needs the rules in its own styles.
 `units`, `dates`, `times` and `currency` each accept `false` to switch the category off.
 
 A `dialect` or `preset` outside its list throws an `Error` that names the value and the
-ones it accepts, such as `Unknown preset: Localise. Expected one of read, localise.`
+ones it accepts, such as `Unknown preset: Localise. Expected one of read, localise.` Only
+the ids in `DIALECTS` are dialects, so a name every object has, such as `toString`, is
+rejected the same way.
 
 ## Known limits
 
@@ -843,6 +902,10 @@ ones it accepts, such as `Unknown preset: Localise. Expected one of read, locali
 - Identifier protection is deliberately over-eager in code: a hyphenated token containing
   `color`, `center` or `license` is treated as an API name, so `color-coded` in a comment
   survives. Turn it off with `protectIdentifiers: false`.
+- File names and paths are read from their shape, so a few prose shapes read as one: three
+  words joined by slashes (`color/flavor/size`) and a run-on sentence with a lower-case
+  word after the stop (`the color.it was`) are held. A file name straight after a number,
+  as in `Copy 2 color.ts`, reads as a measurement and is rewritten.
 - Outside the remark plugin, the paragraph an inline code span may wrap within is found
   from its lines: a blank line, or a line that opens a heading, quote, list item, fence,
   rule or table row, ends it. A span that wraps onto the next `>` line of a block quote is
@@ -860,6 +923,9 @@ ones it accepts, such as `Unknown preset: Localise. Expected one of read, locali
   the start of the next, or `two and a` then `half feet`, is not read as one. The fraction
   converts on its own and the written-out number is left as written. A web page is read the
   way it is usually laid out, with a line break in its source counting as a space.
+- On a web page, only an element that starts a run of its own is checked for being drawn as
+  code. A `span` inside a sentence that is set in a monospace font, with no `code` element
+  or `role="code"` to mark it, is read as part of the sentence.
 - `a third mile` is read as a fraction, though it can also mean one more mile after two.
   The same goes for `a fourth`, `an eighth` and `a sixteenth`.
 - A line that ends in a number and a line that opens with a unit word are read as one

@@ -96,6 +96,15 @@ export function resolveOptions(options: Options = {}, defaults: Partial<Options>
   };
 }
 
+/**
+ * Throws the error `deamericanise` gives for an option it rejects, such as an unknown
+ * `dialect` or `preset`, without reading any text. The plugins call it before their first
+ * file, so a bad option fails a run whatever its files hold.
+ */
+export function checkOptions(options: Options = {}): void {
+  dialectPack(resolveOptions(options).dialect);
+}
+
 /** A `rules` key matches its own id, and a key ending in `*` matches by prefix. */
 export function matchesRuleId(pattern: string, ruleId: string): boolean {
   if (pattern === ruleId) return true;

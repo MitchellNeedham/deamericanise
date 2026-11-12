@@ -1,5 +1,5 @@
 import type { AmericanSignals } from '../types.js';
-import { numericDates } from '../rules/dates.js';
+import { longDates, numericDates } from '../rules/dates.js';
 import { fahrenheitTemperatures } from '../rules/units/fahrenheit.js';
 import { isUnitInOtherSense } from '../rules/units/index.js';
 
@@ -171,9 +171,6 @@ const WEIGHTS = new Map(MARKERS.map(([label, , weight = ORDINARY]) => [label, we
  */
 const OUTRANKS = new Map([['Fahrenheit oven setting', 'Fahrenheit']]);
 
-/** `March 5, 2024`: month spelled out and written first, which is an American habit. */
-const MONTH_NAME_FIRST =
-  /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?,\s*(?:19|20)\d\d\b/g;
 const DAY_NAME_FIRST =
   /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+(?:19|20)\d\d\b/g;
 
@@ -192,7 +189,7 @@ export function detectAmerican(text: string): AmericanSignals {
     markers: MARKERS.filter(([, pattern]) => pattern.test(text)).map(([label]) => label),
     unambiguousMonthFirstDates: monthFirst,
     unambiguousDayFirstDates: dayFirst,
-    namedMonthFirstDates: count(text, MONTH_NAME_FIRST),
+    namedMonthFirstDates: [...longDates(text)].length,
     namedDayFirstDates: count(text, DAY_NAME_FIRST),
   });
 }

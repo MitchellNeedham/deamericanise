@@ -89,6 +89,7 @@ const LABELS: Record<string, [label: string, example: string]> = {
   'units.mass.ton': ['Tons', '1.8 tonnes for 2 tons'],
   'units.measurement': ['Single measurements', '1.8 metres for 6 feet'],
   'units.power.horsepower': ['Horsepower', '220 kilowatts for 300 horsepower'],
+  'units.pressure.inhg': ['Inches of mercury', '1013 hPa for 29.92 inHg'],
   'units.pressure.psi': ['Pounds per square inch', '220 kPa for 32 psi'],
   'units.range': ['Ranges', '1.5-3 metres for 5-10 feet'],
   'units.speed.mph': ['Miles per hour', '97 km/h for 60 mph'],

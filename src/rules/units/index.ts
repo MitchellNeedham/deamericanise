@@ -128,10 +128,14 @@ interface Alias {
   isSingular: boolean;
 }
 
+/** `an hour` before `ago` or `later` is a time, so `1 mile an hour ago` is a distance. */
+const AN_HOUR = / an hour$/i;
+const NOT_A_TIME = String.raw`(?!\s+(?:ago|later|earlier|before|after)\b)`;
+
 function alternate(aliases: string[]): string {
   return aliases
     .sort((a, b) => b.length - a.length || a.localeCompare(b))
-    .map(escape)
+    .map((alias) => escape(alias) + (AN_HOUR.test(alias) ? NOT_A_TIME : ''))
     .join('|');
 }
 

@@ -157,7 +157,8 @@ const poundCake = startsNoun('pound', /^[\s-]+cakes?\b/i);
 export const SINGULAR_WORDS = new Set([
   'inch', 'foot', 'yard', 'mile', 'fathom', 'acre', 'square foot', 'sq foot',
   'ounce', 'pound', 'ton', 'fluid ounce', 'gallon', 'quart', 'pint', 'cup',
-  'tablespoon', 'teaspoon', 'cubic foot',
+  'tablespoon', 'teaspoon', 'cubic foot', 'mile per hour', 'mile an hour',
+  'pound per square inch', 'foot pound', 'pound foot',
 ]);
 
 export const MEASURES: Measure[] = [
@@ -339,14 +340,14 @@ export const MEASURES: Measure[] = [
   {
     id: 'units.speed.mph',
     keep: 'mph',
-    words: ['miles per hour', 'miles an hour'],
+    words: ['miles per hour', 'miles an hour', 'mile per hour', 'mile an hour'],
     abbrevs: ['mph', 'MPH'],
     convert: (v) => m(v * 1.609344, 'km/h', 'kilometre per hour', 'kilometres per hour'),
   },
   {
     id: 'units.pressure.psi',
     keep: 'psi',
-    words: ['pounds per square inch'],
+    words: ['pounds per square inch', 'pound per square inch'],
     abbrevs: ['psi', 'PSI'],
     convert: (v) => m(v * 6.89475729, 'kPa', 'kilopascal', 'kilopascals'),
   },
@@ -367,7 +368,10 @@ export const MEASURES: Measure[] = [
   {
     id: 'units.torque.foot-pound',
     keep: 'foot-pound',
-    words: ['foot-pounds', 'foot pounds', 'foot-pound', 'pound-feet', 'pound feet', 'pound-foot'],
+    words: [
+      'foot-pounds', 'foot pounds', 'foot-pound', 'foot pound', 'pound-feet', 'pound feet',
+      'pound-foot', 'pound foot',
+    ],
     // `lb ft` has to be listed, or the mass rule claims the number first and the
     // torque silently becomes a weight.
     abbrevs: ['ft-lb', 'ft-lbs', 'ft lb', 'ft lbs', 'lb-ft', 'lb ft', 'lbft', 'lb.ft'],

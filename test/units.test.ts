@@ -636,6 +636,52 @@ describe('speed, power and economy', () => {
   });
 });
 
+describe('a unit of more than one word in the singular', () => {
+  it.each`
+    input                                          | expected
+    ${'Inflate to half a pound per square inch.'}  | ${'Inflate to 3.4 kilopascals.'}
+    ${'It drops 1 pound per square inch a month.'} | ${'It drops 6.9 kilopascals a month.'}
+    ${'It moves at half a mile per hour.'}         | ${'It moves at 0.8 kilometres per hour.'}
+    ${'It moves at 1 mile an hour.'}               | ${'It moves at 1.6 kilometres per hour.'}
+    ${'Tighten it to 1 foot pound.'}               | ${'Tighten it to 1.4 newton metres.'}
+    ${'Expect a 5 pound per square inch drop.'}    | ${'Expect a 34 kilopascal drop.'}
+    ${'Enter a 25 mile per hour zone.'}            | ${'Enter a 40 kilometre per hour zone.'}
+    ${'Add half a pound of butter.'}               | ${'Add 230 grams of butter.'}
+    ${'Inflate to 30 pounds per square inch.'}     | ${'Inflate to 210 kilopascals.'}
+    ${'1 mile'}                                    | ${'1.6 kilometres'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                 | expected
+    ${'I walked 1 mile an hour ago.'}     | ${'I walked 1.6 kilometres an hour ago.'}
+    ${'I walked half a mile an hour ago.'} | ${'I walked 800 metres an hour ago.'}
+    ${'I walked 2 miles an hour ago.'}    | ${'I walked 3.2 kilometres an hour ago.'}
+    ${'She had run 3 miles an hour later.'} | ${'She had run 4.8 kilometres an hour later.'}
+  `('reads the distance before a time in $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  /** The singular of a plural form, as `pound per square inch` is of `pounds per square inch`. */
+  const singular = (form: string) => form.replace(/\b(?:feet|(\w+)s)\b/, (_, stem?: string) => stem ?? 'foot');
+  const masked = (text: string) => text.replace(/\d(?:[\d.,]*\d)?/g, '#');
+  const compounds = MEASURES.flatMap((measure) =>
+    [...new Set(measure.words.filter((word) => /[\s-]/.test(word)).flatMap((word) => [word, singular(word)]))].map(
+      (form) => [form, measure] as const,
+    ),
+  );
+
+  it.each(compounds)('reads "%s" after one and after half as its plural after two', (form, measure) => {
+    const options = { rules: { [measure.id]: true } };
+    const plural = convert(`Set it to 2 ${measure.words[0]}.`, options);
+    expect(plural).not.toContain(measure.words[0]);
+    for (const count of ['1', 'half a']) {
+      expect(masked(convert(`Set it to ${count} ${form}.`, options)), count).toBe(masked(plural));
+    }
+  });
+});
+
 describe('fractions and ranges', () => {
   it.each`
     input                  | expected

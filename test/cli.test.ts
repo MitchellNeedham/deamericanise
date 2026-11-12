@@ -325,6 +325,43 @@ describe('--language', () => {
   });
 });
 
+describe('--syntax', () => {
+  const indented = 'Set the theme:\n\n    theme.color = "gray";\n';
+  const kept = indented;
+  const rewritten = 'Set the theme:\n\n    theme.colour = "grey";\n';
+  const rst = 'Colors\n~~~~~~\n\nThe color of things.\n';
+
+  it.each`
+    args                                           | input       | expected
+    ${[]}                                          | ${indented} | ${rewritten}
+    ${['--syntax', 'markdown']}                    | ${indented} | ${kept}
+    ${['--language', 'md']}                        | ${indented} | ${kept}
+    ${['--language', 'md', '--syntax', 'text']}    | ${indented} | ${rewritten}
+    ${[]}                                          | ${rst}      | ${'Colours\n~~~~~~\n\nThe colour of things.\n'}
+    ${['--syntax', 'markdown']}                    | ${rst}      | ${'Colours\n~~~~~~\n\nThe color of things.\n'}
+  `('reads stdin with $args', async ({ args, input, expected }) => {
+    withStdin(input as string);
+    expect(await main(args as string[])).toBe(0);
+    expect(stdout()).toBe(expected);
+  });
+
+  it('applies to a named prose file too', async () => {
+    const path = withFile('notes.txt', indented);
+    expect(await main(['--write', '--syntax', 'markdown', path])).toBe(0);
+    expect(readFileSync(path, 'utf8')).toBe(kept);
+  });
+
+  it('rejects an unknown value with exit 2', async () => {
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`exited ${code}`);
+    }) as never);
+    withStdin('The color.');
+    await expect(main(['--syntax', 'md'])).rejects.toThrow('exited 2');
+    expect(stderr()).toBe('deamericanise: unknown syntax "md". Known: markdown, text\n');
+    expect(stdout()).toBe('');
+  });
+});
+
 describe('--rule and --units-keep', () => {
   function exits(): void {
     vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {

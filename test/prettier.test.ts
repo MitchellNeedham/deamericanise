@@ -28,6 +28,15 @@ describe('the Prettier plugin against real Prettier', () => {
   });
 
   it.each`
+    parser        | source                                                  | expected
+    ${'markdown'} | ${'Set the theme:\n\n    theme.color = "gray";\n'}       | ${'Set the theme:\n\n    theme.color = "gray";\n'}
+    ${'mdx'}      | ${'Set the theme:\n\n    theme.color = "gray";\n'}       | ${'Set the theme:\n\n    theme.color = "gray";\n'}
+    ${'markdown'} | ${'1. Step one.\n\n   More about the color.\n'}         | ${'1. Step one.\n\n   More about the colour.\n'}
+  `('reads $parser as Markdown, so indented code is left alone: $source', async ({ parser, source, expected }) => {
+    expect(await format(source as string, { parser: parser as string })).toBe(expected);
+  });
+
+  it.each`
     option                       | value                          | source                | expected
     ${'deamericanisePreset'}     | ${'localise'}                             | ${'The sidewalk.\n'}  | ${'The footpath.\n'}
     ${'deamericanisePreset'}     | ${'read'}                                 | ${'The sidewalk.\n'}  | ${'The sidewalk.\n'}

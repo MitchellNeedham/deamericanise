@@ -170,6 +170,64 @@ describe("a prose file's type decides how its code fences are read", () => {
   });
 });
 
+describe("a prose file's type decides whether indented code is protected", () => {
+  const indented = 'Set the theme:\n\n    theme.color = "gray";\n';
+  const kept = 'Set the theme:\n\n    theme.color = "gray";\n';
+  const rewritten = 'Set the theme:\n\n    theme.colour = "grey";\n';
+
+  it.each`
+    filename           | options                   | expected     | why
+    ${'README.md'}     | ${{}}                     | ${kept}      | ${'a Markdown file'}
+    ${'page.mdx'}      | ${{}}                     | ${kept}      | ${'an MDX file'}
+    ${'notes.MARKDOWN'} | ${{}}                    | ${kept}      | ${'the long extension, in any case'}
+    ${'stdin'}         | ${{ language: 'md' }}     | ${kept}      | ${'the Markdown language'}
+    ${'stdin.txt'}     | ${{ syntax: 'markdown' }} | ${kept}      | ${'a syntax option, which wins over the type'}
+    ${'notes.txt'}     | ${{}}                     | ${rewritten} | ${'a plain text file'}
+    ${'guide.rst'}     | ${{}}                     | ${rewritten} | ${'reStructuredText'}
+    ${'README.md'}     | ${{ syntax: 'text' }}     | ${rewritten} | ${'a Markdown file read as plain text'}
+    ${'notes.data'}    | ${{}}                     | ${rewritten} | ${'an unknown type, read as deamericaniseText reads it'}
+    ${'CHANGELOG'}     | ${{}}                     | ${rewritten} | ${'no extension'}
+  `('$why', ({ filename, options, expected }) => {
+    expect(deamericaniseFile(filename, indented, options).text).toBe(expected);
+  });
+
+  it("keeps a .txt file's indented prose and a Markdown list item's paragraphs as prose", () => {
+    expect(deamericaniseFile('a.txt', 'Dear Sam,\n\n    The color is gray.').text).toBe('Dear Sam,\n\n    The colour is grey.');
+    expect(deamericaniseFile('README.md', '- The color\n    is red.').text).toBe('- The colour\n    is red.');
+    expect(deamericaniseFile('README.md', '1.  Step one.\n\n    More about the color.').text).toBe(
+      '1.  Step one.\n\n    More about the colour.',
+    );
+  });
+});
+
+describe("a comment is read in its language's doc markup", () => {
+  const rstDocstring =
+    'def f():\n    """\n    Colors\n    ~~~~~~\n\n    The color of things.\n\n    Behavior\n    ~~~~~~~~\n\n    More color.\n    """\n';
+
+  it('reads a tilde heading underline in a Python docstring as reStructuredText', () => {
+    expect(deamericaniseCode(rstDocstring, { language: 'python', docstrings: true }).text).toBe(
+      'def f():\n    """\n    Colours\n    ~~~~~~\n\n    The colour of things.\n\n    Behaviour\n    ~~~~~~~~\n\n    More colour.\n    """\n',
+    );
+  });
+
+  it.each`
+    language    | source                                                                                         | expected                                                                                         | why
+    ${'python'} | ${'def f():\n    """\n    Run:\n\n    ```\n    color = 1\n    ```\n\n    The color.\n    """\n'} | ${'def f():\n    """\n    Run:\n\n    ```\n    color = 1\n    ```\n\n    The colour.\n    """\n'} | ${'a backtick example in a Python docstring'}
+    ${'ts'}     | ${'/**\n * ~~~\n * the color\n * ~~~\n * The color is red.\n */'}                                | ${'/**\n * ~~~\n * the color\n * ~~~\n * The colour is red.\n */'}                                | ${'a tilde fence in JSDoc'}
+    ${'rs'}     | ${'/**\n * ```\n * the color\n * ```\n * The color is red.\n */'}                                | ${'/**\n * ```\n * the color\n * ```\n * The colour is red.\n */'}                                | ${'a backtick fence in rustdoc'}
+  `('keeps $why protected', ({ language, source, expected }) => {
+    expect(deamericaniseCode(source, { language, docstrings: true }).text).toBe(expected);
+  });
+
+  it('ignores a syntax option, which names the markup of prose', () => {
+    const source = '/*\n * ~~~\n * the color\n * ~~~\n */';
+    expect(deamericaniseCode(source, { language: 'ts', syntax: 'text' }).text).toBe(source);
+    expect(deamericaniseFile('a.py', rstDocstring, { docstrings: true, syntax: 'markdown' }).text).toContain(
+      'The colour of things.',
+    );
+  });
+});
+
 describe('a language option overrides the filename', () => {
   it.each`
     filename           | language        | source                              | expected

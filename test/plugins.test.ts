@@ -118,10 +118,19 @@ describe('the ESLint plugin', () => {
 
   function lint(code: string, ruleOptions: unknown[] = []): Report[] {
     const reports: Report[] = [];
-    const comments = [{ type: 'Line', value: code.slice(code.indexOf('//') + 2), range: [code.indexOf('//'), code.length] }];
+    // The code under test holds no strings or regexes for a comment marker to hide in.
+    const comments = [...code.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g)].map((match) => {
+      const line = match[0].startsWith('//');
+      return {
+        type: line ? 'Line' : 'Block',
+        value: match[0].slice(2, line ? undefined : -2),
+        range: [match.index, match.index + match[0].length],
+      };
+    });
     const context = {
       options: ruleOptions,
       sourceCode: {
+        text: code,
         getAllComments: () => comments,
         getLocFromIndex: (index: number) => ({ line: 1, column: index }),
       },
@@ -191,6 +200,28 @@ describe('the ESLint plugin', () => {
 
     it('share one fix', () => {
       expect(quickFix(code, reports[0]!)).toBe('const a = 1; // Build a 2.4 metre fence.\n');
+    });
+  });
+
+  describe('a comment read across its lines', () => {
+    it.each`
+      code                                                           | why
+      ${'const a = 1;\n// Use `the\n// color` here.\n'}              | ${'a span that wraps across line comments'}
+      ${'/**\n * Use `the\n * color` here.\n */\n'}                  | ${'a span that wraps across the lines of a block comment'}
+      ${"/**\n * Don't use a ` here.\n *\n * Use `color`.\n */\n"}   | ${'a span after a bare star line'}
+    `('reports nothing in $why', ({ code }) => {
+      expect(lint(code)).toEqual([]);
+    });
+
+    it.each`
+      code                                         | fixed
+      ${'/**\n * Use an\n * eraser here.\n */\n'}  | ${'/**\n * Use a\n * rubber here.\n */\n'}
+      ${'// Use an\n// eraser here.\n'}            | ${'// Use a\n// rubber here.\n'}
+    `('reports an article that ends a line with the word that starts the next: $code', ({ code, fixed }) => {
+      const reports = lint(code, [{ preset: 'localise' }]);
+      expect(reports).toHaveLength(1);
+      expect(reports[0]?.data).toEqual({ before: 'an eraser', after: 'a rubber' });
+      expect(quickFix(code, reports[0]!)).toBe(fixed);
     });
   });
 

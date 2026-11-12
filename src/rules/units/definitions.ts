@@ -28,9 +28,10 @@ export interface Measure {
   convert(value: number): MetricValue;
   /**
    * Contexts where the imperial unit is the worldwide convention: screens are sold in
-   * inches everywhere, so are wheels, pipes and vinyl.
+   * inches everywhere, so are wheels, pipes and vinyl. A measurement in any one of them
+   * is left as written.
    */
-  conventional?: { before?: RegExp; after?: RegExp };
+  conventional?: Convention | Convention[];
   /**
    * Skip this measure entirely when the document matches. For units whose name means
    * different things in different places, the document usually says which it means.
@@ -47,6 +48,11 @@ export interface Measure {
    * all, merely imperial-descended and used everywhere.
    */
   keptByDefault?: boolean;
+  /**
+   * Decimal places the metric value is written to under `natural` precision, whatever figures
+   * the source gives, as an altimeter setting is read in whole hectopascals.
+   */
+  decimals?: number;
   /** Other things the unit may measure, told by the words beside the quantity, in the order tried. */
   senses?: Sense[];
 }
@@ -95,6 +101,25 @@ export interface Sense {
   sentence?: string[];
 }
 
+/** A context where a unit is the worldwide convention, read around one measurement. */
+export interface Convention {
+  /** Matches the text that ends where the measurement starts. */
+  before?: RegExp;
+  /** Matches the text that starts where the measurement ends. */
+  after?: RegExp;
+  /**
+   * Matches the text after the measurement when that text makes it a distance or a position,
+   * as `apart` does in `the bolts 6 inches apart`. The convention then does not hold, whatever
+   * `before` and `after` find, since the thing named is what the distance runs from.
+   */
+  distance?: RegExp;
+  /**
+   * The only values the convention holds, as a shipping container's standard lengths are.
+   * Every figure of a range or dimension must be one of them.
+   */
+  values?: readonly number[];
+}
+
 const m = (value: number, symbol: string, singular: string, plural: string): MetricValue => ({
   value,
   symbol,
@@ -139,7 +164,9 @@ export function metricArea(squareMetres: number): MetricValue {
 const SIZED_IN_INCHES = [
   'screen', 'display', 'monitor', 'touchscreen', 'laptop', 'tablet', 'phone', 'macbook', 'tv',
   'television', 'panel', 'wheel', 'rim', 'tyre', 'tire', 'pipe', 'bore', 'vinyl', 'record',
-  'drive', 'disk', 'disc', 'floppy', 'barrel', 'sensor', 'lens', 'pizza', 'subwoofer', 'speaker',
+  'drive', 'disk', 'disc', 'floppy', 'ssd', 'hdd', 'sata', 'nvme', 'barrel', 'sensor', 'lens',
+  'pizza', 'subwoofer', 'speaker', 'jack', 'plug', 'trs', 'trrs', 'phono', 'eyepiece',
+  'telescope', 'dobsonian', 'refractor', 'reflector', 'focuser', 'aperture',
   'nail', 'bolt', 'screw', 'nut', 'washer', 'socket', 'wrench', 'spanner', 'thread', 'hex',
   'ratchet', 'rivet', 'stud', 'dowel', 'tap', 'fitting', 'coupling', 'nipple', 'union', 'elbow',
   'npt', 'unc', 'unf', 'drill', 'bit',
@@ -157,6 +184,22 @@ const BODY_SIZED_IN_INCHES = ['waist', 'chest', 'inseam'];
  */
 const MEASURING_VERBS = new Set(['records', 'drives', 'drills', 'bores']);
 
+/**
+ * Nouns that are also verbs taking what is sized as their object, as in `plug the 2 inch
+ * hole`, so they name a thing only after its size.
+ */
+const SIZING_VERBS = new Set(['plug', 'plugs', 'jack', 'jacks']);
+
+/** Words after a measurement that make it a distance or a position, as in `6 inches apart`. */
+const DISTANCE_WORDS = ['away', 'apart', 'off', 'above', 'below', 'behind', 'beneath', 'from'];
+
+/**
+ * One of `DISTANCE_WORDS`, whole, so `off-white` is none. `from` and then `<word> to <word>`
+ * spans the thing itself, so `27 inches from corner to corner` gives a size.
+ */
+const DISTANCE =
+  String.raw`(?!from\s+[\w-]+\s+to\s+[\w-])(?:${DISTANCE_WORDS.join('|')})(?![\w-])`;
+
 const plural = (noun: string): string =>
   /(?:s|x|ch|sh)$/.test(noun)
     ? `${noun}es`
@@ -166,13 +209,13 @@ const plural = (noun: string): string =>
 
 const withPlurals = (nouns: string[]): string[] => nouns.flatMap((noun) => [noun, plural(noun)]);
 
-const INCH_CONVENTIONS = {
+const INCH_CONVENTIONS: Convention = {
   // A few function words may sit between the thing and its size. A bolt described as up
   // to an inch in diameter is being named; a bolt described as standing away from a wall
   // is being measured. Allowing only function words between the two keeps them apart.
   before: new RegExp(
     String.raw`\b(?:${withPlurals([...SIZED_IN_INCHES, ...BODY_SIZED_IN_INCHES])
-      .filter((noun) => !MEASURING_VERBS.has(noun))
+      .filter((noun) => !MEASURING_VERBS.has(noun) && !SIZING_VERBS.has(noun))
       .join('|')})\b` +
       String.raw`(?:\s+(?:up|to|above|below|over|under|of|and|or|the|a|an|about|approximately|` +
       String.raw`larger|smaller|greater|less|than|from|in|is|are|measuring|between)){0,4}[\s-]*$`,
@@ -184,7 +227,51 @@ const INCH_CONVENTIONS = {
     String.raw`^[\s-]*(?:[\w-]+\s+){0,3}(?:${withPlurals(SIZED_IN_INCHES).join('|')})\b`,
     'i',
   ),
+  distance: new RegExp(String.raw`^[\s-]*${DISTANCE}`, 'i'),
 };
+
+/**
+ * Words that cannot stand between a size and the thing it sizes, as `the` does in
+ * `20 feet towards the container`: a determiner or a preposition starts another phrase.
+ */
+const NOT_A_MODIFIER = [
+  'a', 'an', 'the', 'this', 'that', 'these', 'those', 'its', 'their', 'his', 'her', 'my', 'our',
+  'your', 'of', 'to', 'toward', 'towards', 'into', 'onto', 'at', 'by', 'for', 'in', 'on', 'with',
+  'near', 'past', 'beside', 'between',
+];
+
+/**
+ * Shipping containers are named by their length in feet in every port, metric or not, and
+ * only the standard lengths name one. The TEU, a twenty-foot equivalent unit, counts them.
+ */
+const CONTAINER: Convention = {
+  after: new RegExp(
+    String.raw`^[\s-]*(?:(?!(?:${NOT_A_MODIFIER.join('|')})(?![\w-])|${DISTANCE})[\w-]+\s+){0,2}` +
+      String.raw`(?:containers?|(?:shipping|ISO|high[\s-]cube|reefer|dry|intermodal)\s+box(?:es)?|` +
+      String.raw`TEU|FEU|equivalent\s+units?)\b`,
+    'i',
+  ),
+  values: [10, 20, 40, 45, 48, 53],
+};
+
+/**
+ * Aviation gives altitudes in feet in nearly every country: on charts, in flight levels and
+ * from air traffic control. A room has a ceiling too, so only an aircraft's or a cloud
+ * layer's counts.
+ */
+const AVIATION =
+  String.raw`flight\s+level|cruis(?:e|ing)\s+altitude|(?:service|absolute|cloud)\s+ceiling`;
+
+// A stop ends the sentence unless a digit follows it, as in `Mach 0.85`.
+const IN_SENTENCE = String.raw`(?:[^.!?\n]|\.(?=\d))*`;
+
+const ALTITUDE: Convention[] = [
+  { after: /^\s*(?:MSL|AMSL|AGL|QNH|QFE)\b/i },
+  {
+    before: new RegExp(String.raw`\b(?:${AVIATION})\b${IN_SENTENCE}$`, 'i'),
+    after: new RegExp(String.raw`^${IN_SENTENCE}\b(?:${AVIATION})\b`, 'i'),
+  },
+];
 
 /**
  * Whether the singular unit word `word`, ending the quantity `text.slice(start, end)`, is
@@ -198,7 +285,7 @@ function startsNoun(word: string, nouns: RegExp) {
     unit.test(text.slice(start, end)) && nouns.test(text.slice(end, end + 40));
 }
 
-const poundCake = startsNoun('pound', /^[\s-]+cakes?\b/i);
+const poundNoun = startsNoun('pound', /^[\s-]+(?:cakes?|signs?)\b/i);
 
 /** Drinks and other liquids, which American labels and recipes measure in ounces by volume. */
 const LIQUIDS = [
@@ -292,6 +379,7 @@ export const MEASURES: Measure[] = [
     singular: ['foot'],
     abbrevs: ['ft.', 'ft', '′'],
     convert: (v) => metricLength(v * 0.3048),
+    conventional: [CONTAINER, ...ALTITUDE],
     otherSense: startsNoun('foot', /^[\s-]+(?:soldiers?|traffic)\b/i),
   },
   {
@@ -304,7 +392,7 @@ export const MEASURES: Measure[] = [
     // A gridiron yard line and the 40 yard dash are names for things, not lengths. There
     // is no 37 metre line painted on any field.
     conventional: { after: /^[\s-]*(?:lines?|dash|markers?)\b/i },
-    otherSense: startsNoun('yard', /^[\s-]+sales?\b/i),
+    otherSense: startsNoun('yard', /^[\s-]+(?:sales?|signs?)\b/i),
   },
   {
     id: 'units.length.mile',
@@ -313,6 +401,9 @@ export const MEASURES: Measure[] = [
     singular: ['mile'],
     abbrevs: ['mi'],
     convert: (v) => metricLength(v * 1609.344),
+    // A mile marker is a post, so `the 26-mile marker` stands at mile 26 and is no length.
+    conventional: { after: /^[\s-]*markers?\b/i },
+    otherSense: startsNoun('mile', /^[\s-]+markers?\b/i),
   },
   {
     id: 'units.length.fathom',
@@ -380,7 +471,7 @@ export const MEASURES: Measure[] = [
       after: /^[\s-]*(?:divisions?|classes|class|limits?|bouts?|titles?|champions?|weight)\b/i,
     },
     otherSense: (text, start, end) =>
-      isMoney(text, start, end) || poundCake(text, start, end),
+      isMoney(text, start, end) || poundNoun(text, start, end),
   },
   {
     id: 'units.mass.stone',
@@ -495,6 +586,15 @@ export const MEASURES: Measure[] = [
     singular: ['pound per square inch'],
     abbrevs: ['psi', 'PSI'],
     convert: (v) => m(v * 6.89475729, 'kPa', 'kilopascal', 'kilopascals'),
+  },
+  {
+    id: 'units.pressure.inhg',
+    keep: 'inhg',
+    words: ['inches of mercury', 'inch of mercury'],
+    singular: ['inch of mercury'],
+    abbrevs: ['inHg', 'in. Hg', 'in Hg'],
+    convert: (v) => m(v * 33.8639, 'hPa', 'hectopascal', 'hectopascals'),
+    decimals: 0,
   },
   {
     id: 'units.power.horsepower',

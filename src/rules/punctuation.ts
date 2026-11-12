@@ -1,5 +1,5 @@
 import type { Change, Rule, RuleContext } from '../types.js';
-import { CLOSING, endsSentence } from './sentence.js';
+import { CLOSING, stopStays } from './sentence.js';
 
 /**
  * Outside America the full stop marks a *truncation*, not an abbreviation. A contraction
@@ -94,7 +94,7 @@ function abbreviationRule(): Rule {
             start,
             end,
             before: match[0],
-            after: endsSentence(ctx.text, start, end, OPENER) ? `${written}.` : written,
+            after: stopStays(ctx.text, start, end, OPENER) ? `${written}.` : written,
             ruleId: 'punctuation.abbreviations',
             category: 'punctuation',
             confidence: 'safe',

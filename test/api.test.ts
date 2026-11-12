@@ -393,6 +393,17 @@ describe('analyse', () => {
 describe('the Fahrenheit marker', () => {
   const FAHRENHEIT = 'Fahrenheit';
 
+  /** A Fahrenheit value that only restates the Celsius value before it, which the rules leave alone. */
+  const RESTATED = [
+    'Bake at 175°C (350°F).',
+    'Bake at 175°C (350 degrees Fahrenheit).',
+    'Bake at 175 Celsius (350 Fahrenheit).',
+    'Preheat the oven to 180°C/350°F.',
+    'Heat to 180°C or 350°F.',
+    'It was 11°C (20°F) warmer.',
+    'It rose 11°C or 20°F.',
+  ];
+
   const READ = [
     'Cook until the chicken reaches 165°F.',
     'Cook until the chicken reaches 165 degrees F.',
@@ -407,6 +418,8 @@ describe('the Fahrenheit marker', () => {
     'Bake at 350ºF.',
     'Bake at 350˚F.',
     'It was 95 Fahrenheit.',
+    'Bake at 350°F (175°C).',
+    'Heat to 180°C or 400°F.',
   ];
 
   const NOT_READ = [
@@ -428,6 +441,7 @@ describe('the Fahrenheit marker', () => {
     'I read Fahrenheit 451 at school.',
     'The film Fahrenheit 9/11 opened in 2004.',
     'They filmed the 1966 Fahrenheit 451 in England.',
+    ...RESTATED,
   ];
 
   it.each(READ)('finds Fahrenheit in "%s"', (input) => {
@@ -436,6 +450,14 @@ describe('the Fahrenheit marker', () => {
 
   it.each(NOT_READ)('finds no Fahrenheit in "%s"', (input) => {
     expect(analyse(input).markers).not.toContain(FAHRENHEIT);
+  });
+
+  it.each(RESTATED)('gives no American evidence for the courtesy figure in "%s"', (input) => {
+    expect(analyse(input).markers).toEqual([]);
+  });
+
+  it('still counts a converted temperature beside a courtesy figure', () => {
+    expect(analyse('Bake at 175°C (350°F). Cook the chicken to 165°F.').markers).toEqual([FAHRENHEIT]);
   });
 
   it.each([
@@ -581,6 +603,27 @@ describe('analyse on recipes', () => {
     ${'Bake the risen loaf at 450 for 30 minutes.'}       | ${OVEN}
     ${'Bake for a total of 40 minutes at 350.'}           | ${OVEN}
     ${'Bake off the par-baked rolls at 400.'}             | ${OVEN}
+    ${'Preheat the oven to 350 deg F.'}                   | ${OVEN}
+    ${'Preheat the oven to 350℉.'}                        | ${OVEN}
+    ${'Put the dish in a 350℉ oven.'}                     | ${OVEN}
+    ${'Put the dish in a 350 deg F oven.'}                | ${OVEN}
+    ${'Put the dish in a 350 degrees Fahrenheit oven.'}   | ${OVEN}
+    ${'Put the dish in a 350F oven.'}                     | ${OVEN}
+    ${'Bake at 350 till golden.'}                         | ${OVEN}
+    ${'Bake at 350 til golden.'}                          | ${OVEN}
+    ${'Preheat the oven to 350 before you start.'}        | ${OVEN}
+    ${'Bake at 350 after the dough has risen.'}           | ${OVEN}
+    ${'Bake at 350 about 20 minutes.'}                    | ${OVEN}
+    ${'Bake at 350 approximately 20 minutes.'}            | ${OVEN}
+    ${'Bake at 350 so the top browns.'}                   | ${OVEN}
+    ${'Bake at 350 uncovered.'}                           | ${OVEN}
+    ${'Bake at 350 covered.'}                             | ${OVEN}
+    ${'Bake at 350 undisturbed.'}                         | ${OVEN}
+    ${'Preheat oven to 350 - grease a pan.'}              | ${OVEN}
+    ${'Preheat oven to 350 \u2013 grease a pan.'}         | ${OVEN}
+    ${'Preheat oven to 350\u2014grease a pan.'}           | ${OVEN}
+    ${'Bake at 350 20 to 25 minutes.'}                    | ${OVEN}
+    ${'Roast at 400 1 hour.'}                             | ${OVEN}
     ${'Melt 1 stick of butter.'}                          | ${STICK}
     ${'2 sticks unsalted butter, softened'}               | ${STICK}
     ${'1/2 cup (1 stick) butter, melted'}                 | ${STICK}
@@ -622,6 +665,9 @@ describe('analyse on recipes', () => {
     ${'We baked 200 cakes, which sold at 350.'}                | ${'the at belongs to sold'}
     ${'Baking supplies cost up to 400.'}                       | ${'the to belongs to cost'}
     ${'The bakers baked all day and raised the total to 400.'} | ${'the to belongs to raised'}
+    ${'The bake sale takings came to 320 before noon.'}        | ${'the to belongs to came'}
+    ${'Cook in the oven for up to 300 - 400 minutes.'}         | ${'a dash before a number joins a range'}
+    ${'Heat the oven to 350 deg C.'}                           | ${'marked Celsius, whatever the number'}
   `('finds no oven setting in "$input" ($why)', ({ input }) => {
     expect(analyse(input).markers).not.toContain(OVEN);
   });
@@ -670,7 +716,7 @@ describe('analyse on recipes', () => {
     const recipe =
       'Preheat the oven to 180°C/350°F (160°C fan). Mix 1 1/2 cups (225g) plain flour (all-purpose flour), ' +
       '1 cup (250ml) thickened cream / heavy cream and 2 tbsp cornflour (cornstarch) with 125g butter.';
-    expect(analyse(recipe).markers).toEqual(['Fahrenheit']);
+    expect(analyse(recipe).markers).toEqual([]);
   });
 
   it.each`
@@ -693,6 +739,8 @@ describe('analyse on recipes', () => {
     ${'Melt 1 stick of butter.'}                                | ${0.25}    | ${'a recipe marker outweighs a spelling marker'}
     ${'Preheat the oven to 350 degrees.'}                       | ${0.25}    | ${'and so does an oven in Fahrenheit'}
     ${'Preheat the oven to 350°F.'}                             | ${0.25}    | ${'the oven setting and its °F are one sighting'}
+    ${'Preheat the oven to 350 deg F.'}                         | ${0.25}    | ${'and so are the setting and its deg F'}
+    ${'Preheat the oven to 350 before you start. Melt 1 stick of butter.'} | ${0.5} | ${'two recipe markers clear it'}
     ${'1 cup all-purpose flour'}                                | ${0.15}    | ${'an ingredient name counts like any other vocabulary'}
     ${'Melt 1 stick of butter in a gray pan.'}                  | ${0.4}     | ${'one recipe marker and one other fall short of the bar'}
     ${'Melt 1 stick of butter. Bake at 350.'}                   | ${0.5}     | ${'two recipe markers clear it'}

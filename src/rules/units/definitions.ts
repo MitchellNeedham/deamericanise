@@ -167,7 +167,7 @@ export const MEASURES: Measure[] = [
     id: 'units.length.inch',
     keep: 'inch',
     words: ['inches', 'inch'],
-    abbrevs: ['in.', 'in', '″', '"'],
+    abbrevs: ['in.', 'in', '″', '"', '”'],
     convert: (v) => metricLength(v * 0.0254),
     conventional: INCH_CONVENTIONS,
     otherSense: startsNoun('inch', /^[\s-]+worms?\b/i),
@@ -233,14 +233,14 @@ export const MEASURES: Measure[] = [
     id: 'units.mass.ounce',
     keep: 'ounce',
     words: ['ounces', 'ounce'],
-    abbrevs: ['oz'],
+    abbrevs: ['oz.', 'oz'],
     convert: (v) => metricMass(v * 28.349523125),
   },
   {
     id: 'units.mass.pound',
     keep: 'pound',
     words: ['pounds', 'pound'],
-    abbrevs: ['lbs', 'lb'],
+    abbrevs: ['lbs.', 'lbs', 'lb.', 'lb'],
     convert: (v) => metricMass(v * 453.59237),
     // Fighting weight classes are designations. The 147-pound division is called that
     // whatever the scales say in kilograms.

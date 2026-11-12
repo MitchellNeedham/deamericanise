@@ -1,7 +1,7 @@
 import type { AmericanSignals } from '../types.js';
 import { longDates, numericDates } from '../rules/dates.js';
-import { NOT_A_TITLE, fahrenheitTemperatures } from '../rules/units/fahrenheit.js';
-import { isUnitInOtherSense } from '../rules/units/index.js';
+import { FAHRENHEIT as FAHRENHEIT_UNIT, NOT_A_TITLE, fahrenheitTemperatures } from '../rules/units/fahrenheit.js';
+import { isUnitInOtherSense, restatesCelsiusBefore } from '../rules/units/index.js';
 
 /** What a marker adds to the confidence unless it names its own weight. */
 const ORDINARY = 0.15;
@@ -39,6 +39,23 @@ const SETTING = String.raw`(?:[34]\d\d|500)(?![.,]?\d)`;
 const CELSIUS = String.raw`[\s-]*(?:°|º|˚|degrees?)?\s*(?:C\b|Celsius|centigrade)`;
 
 /**
+ * The unit of a setting: any Fahrenheit unit the temperature rules read, a bare `F`, or a
+ * degree that names no scale.
+ */
+const SETTING_UNIT = String.raw`(?:${FAHRENHEIT_UNIT}|(?:degrees?\b|°|º|˚)(?:[\s-]*F\b)?|F\b)`;
+
+const COOKING_TIME =
+  String.raw`\d+(?:\.\d+)?(?:(?:\s*[-\u2013]\s*|\s+to\s+)\d+(?:\.\d+)?)?\s*(?:minutes?|mins?|hours?|hrs?)\b`;
+
+/**
+ * The rest of an instruction after its setting: a word that joins it, a manner such as
+ * `uncovered`, a dash between clauses, or a cooking time. A dash before a number is a range.
+ */
+const AFTER_SETTING =
+  String.raw`\s+(?:for|until|['’]?till?|before|after|about|approximately|so|and|then|or|on|in|with|to|while|` +
+  String.raw`covered|uncovered|undisturbed)\b|\s+-{1,2}\s(?!\s*\d)|\s*[\u2013\u2014](?!\s*\d)|\s+${COOKING_TIME}`;
+
+/**
  * A baking word that names a thing rather than the act of cooking. `Bake off` without a
  * hyphen is left out, because bakeries use it as a verb for finishing par-baked bread.
  */
@@ -64,10 +81,9 @@ const OVEN_SETTING = new RegExp(
     String.raw`${SETTING}(?!${CELSIUS})` +
     // A setting is followed by its unit or the rest of the instruction, never a quantity:
     // `the baking powder to 300 g of flour`, `in the oven for up to 300 minutes`.
-    String.raw`(?=\s*(?:°|º|˚)|[\s-]*degrees?\b|\s*F\b|\s*Fahrenheit\b|\s*[.,;:!?()/]|\s*$|` +
-    String.raw`\s+(?:for|until|and|then|or|on|in|with|to|while)\b)` +
-    String.raw`|\b(?:a|an)\s+${SETTING}[\s-]*(?:(?:degrees?|°|º|˚)[\s-]*(?:F\b[\s-]*)?)?oven\b` +
-    String.raw`|\b${SETTING}[\s-]*(?:degrees?|°|º|˚)[\s-]*(?:F\b[\s-]*)?oven\b`,
+    String.raw`(?=[\s-]*${SETTING_UNIT}|\s*[.,;:!?()/]|\s*$|${AFTER_SETTING})` +
+    String.raw`|\b(?:a|an)\s+${SETTING}[\s-]*(?:${SETTING_UNIT}[\s-]*)?oven\b` +
+    String.raw`|\b${SETTING}[\s-]*${SETTING_UNIT}[\s-]*oven\b`,
   'i',
 );
 
@@ -110,11 +126,25 @@ const COMMONWEALTH_INGREDIENT =
 const US_INGREDIENTS = unlessNear(MEASURED_US_INGREDIENT, COMMONWEALTH_INGREDIENT, 30, /\n/);
 
 /** The word `Fahrenheit` where it names the scale, and not a title. */
-const SCALE_NAMED = new RegExp(String.raw`\bFahrenheit\b${NOT_A_TITLE}`, 'i');
+const SCALE_NAMED = new RegExp(String.raw`\bFahrenheit\b${NOT_A_TITLE}`, 'gi');
 
-/** Every temperature the Fahrenheit rules convert, and the scale named on its own. */
+/**
+ * Every temperature the Fahrenheit rules convert, and the scale named on its own. A value
+ * that only restates the Celsius value before it is left as written, and so is the word
+ * `Fahrenheit` inside it, as in `175°C (350 degrees Fahrenheit)`.
+ */
 const FAHRENHEIT: Pick<RegExp, 'test'> = {
-  test: (text) => !fahrenheitTemperatures(text).next().done || SCALE_NAMED.test(text),
+  test(text) {
+    const restated: RegExpExecArray[] = [];
+    for (const match of fahrenheitTemperatures(text)) {
+      if (!restatesCelsiusBefore(text, match)) return true;
+      restated.push(match);
+    }
+    for (const { index } of text.matchAll(SCALE_NAMED)) {
+      if (!restated.some((match) => index >= match.index && index < match.index + match[0].length)) return true;
+    }
+    return false;
+  },
 };
 
 // The number may be written out, as older prose and most recipes do.

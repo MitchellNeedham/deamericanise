@@ -294,6 +294,42 @@ describe('punctuation', () => {
     expect(punctuation(input)).toBe(expected);
   });
 
+  const localise = (input: string, options = {}) => deamericaniseText(input, { preset: 'localise', ...options });
+
+  it.each`
+    input                               | expected
+    ${"Acme Inc.'s profits rose."}      | ${"Acme Inc.'s profits rose."}
+    ${'Acme Inc.’s profits rose.'}      | ${'Acme Inc.’s profits rose.'}
+    ${"Acme Co.'s profits rose."}       | ${"Acme Co.'s profits rose."}
+    ${"He paused.'Hello,' she said."}   | ${"He paused.'Hello', she said."}
+    ${'It was "fine."'}                 | ${'It was "fine".'}
+    ${"It was 'fine.'"}                 | ${"It was 'fine'."}
+    ${"She said 'hello,' then left."}   | ${"She said 'hello', then left."}
+    ${"the U.K.'s policy"}              | ${"the UK's policy"}
+  `('takes a quote mark before a letter for no closing quote: $input', ({ input, expected }) => {
+    const once = localise(input);
+    expect(once).toBe(expected);
+    expect(localise(once)).toBe(once);
+  });
+
+  it.each`
+    input                                              | expected                                           | options
+    ${'He said "The color is gray."'}                  | ${'He said "The colour is grey".'}                 | ${{}}
+    ${'He said "The color."'}                          | ${'He said "The colour".'}                         | ${{}}
+    ${'He said "Buy a cookie."'}                       | ${'He said "Buy a biscuit".'}                      | ${{}}
+    ${'The sign said "6 feet."'}                       | ${'The sign said "1.8 metres".'}                   | ${{}}
+    ${'He said "I like the color gray," then left.'}   | ${'He said "I like the colour grey", then left.'}  | ${{}}
+    ${"He wrote 'organize,' 'color,' and 'gray.'"}     | ${"He wrote 'organise', 'colour', and 'grey'."}    | ${{}}
+    ${'"It cost $5M," he said.'}                       | ${'"It cost US$5M", he said.'}                     | ${{ assumeAmerican: true }}
+    ${'"It cost 5 dollars," he said.'}                 | ${'"It cost 5 US dollars", he said.'}              | ${{ assumeAmerican: true }}
+    ${'"It cost $5 million," he said.'}                | ${'"It cost US$5 million", he said.'}              | ${{ assumeAmerican: true }}
+    ${'The sign said "It cost 500 pounds."'}           | ${'The sign said "It cost 500 pounds".'}           | ${{}}
+  `('moves the stop and rewrites the word before it in one run: $input', ({ input, expected, options }) => {
+    const once = localise(input, options);
+    expect(once).toBe(expected);
+    expect(localise(once, options)).toBe(once);
+  });
+
   // The stop marks a truncation, not an abbreviation. A word cut short keeps it.
   it.each`
     unchanged            | why

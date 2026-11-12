@@ -1967,6 +1967,28 @@ describe('a Celsius value written with a bare C', () => {
   });
 });
 
+describe('a temperature with a degree sign before two slashes is no path', () => {
+  it.each`
+    input                                        | expected                              | why
+    ${'Cook it at 225°F/low/slow.'}              | ${'Cook it at 105°C/low/slow.'}       | ${'two words after it'}
+    ${'Set it to 350°F/fan/bake.'}               | ${'Set it to 175°C/fan/bake.'}        | ${'the same'}
+    ${'Preheat the oven to 350°F/180C/gas 4.'}   | ${'Preheat the oven to 180C/gas 4.'}  | ${'the British trio with a bare C'}
+    ${'Cook it at 225°F/low.'}                   | ${'Cook it at 105°C/low.'}            | ${'one word after it'}
+    ${'Cook it at 225°F / low / slow.'}          | ${'Cook it at 105°C / low / slow.'}   | ${'spaced'}
+    ${'Preheat the oven to 350°F/180°C/gas 4.'}  | ${'Preheat the oven to 180°C/gas 4.'} | ${'the trio with both values marked'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                     | why
+    ${'Preheat the oven to 180°C/350°F/gas 4.'}   | ${'the Fahrenheit value restates the Celsius one'}
+    ${'Preheat the oven to 180C/350°F/gas 4.'}    | ${'the same, after a bare C'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
 /** The alternatives at the top level of a pattern's source. */
 function topLevelAlternatives(source: string): string[] {
   const alternatives = [''];

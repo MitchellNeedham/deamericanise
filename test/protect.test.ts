@@ -98,6 +98,8 @@ describe('file names and paths', () => {
     ${'It is -5lb.ft or 1/2lb.ft.'}           | ${'It is -6.8 N·m or 0.68 N·m.'}           | ${'joined to a signed number or a fraction'}
     ${'Use a 25-lb.ft or 10-20lb.ft wrench.'} | ${'Use a 34 N·m or 14-27 N·m wrench.'}     | ${'joined by a hyphen, or to a range'}
     ${'It falls at 32 ft/s/s.'}               | ${'It falls at 9.8 m/s/s.'}                | ${'a unit of three segments after a number'}
+    ${'Cook it at 225°F/low/slow.'}           | ${'Cook it at 105°C/low/slow.'}            | ${'a unit after a number and a degree sign'}
+    ${'Cook it at 225 º F/low/slow.'}         | ${'Cook it at 105°C/low/slow.'}            | ${'spaced, with another degree sign'}
     ${'Runs at 3p.m. daily.'}                 | ${'Runs at 3pm daily.'}                    | ${'a time joined to its number'}
     ${'It was 3/4/2024 then.'}                | ${'It was 2024-03-04 then.'}               | ${'a date has no letter'}
   `('$input -> $expected ($why)', ({ input, expected }) => {

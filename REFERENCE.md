@@ -664,7 +664,8 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   `src/colors`, are prose (write `./src/colors` or a code span to hold one); `The color.It`
   is a missing space, since `It` is mixed case; `3.5mi` is a number, since `3` has no
   letter; an initialism such as `U.S.` or `Ph.D.` is an initialism; and a unit straight
-  after a number, such as `300 lb.ft` or `32 ft/s/s`, is a measurement.
+  after a number, or after a number and a degree sign, such as `300 lb.ft`, `32 ft/s/s` or
+  `225°F/low/slow`, is a measurement.
 - **Identifiers,** when `protectIdentifiers` is on (the default for source files):
   `normalizeInput`, `MAX_COLOR_VALUE`, `background-color`, `theme.colors.gray`,
   `--color-scheme`, `getColor()`. An initialism, where every part is one or two letters

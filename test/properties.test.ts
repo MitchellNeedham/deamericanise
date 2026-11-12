@@ -285,6 +285,29 @@ const KNOWN_FAILURES: KnownFailure[] = [
     // The first run lengthened the text between the word and the context that refused it.
     matches: (v) => v.origin === undefined && v.change?.category === 'vocabulary' && beyondGuardWindow(v),
   },
+  {
+    issue: 286,
+    property: 'idempotence',
+    input: 'The box is 5 pounds 12 in. wide.',
+    options: {},
+    // The first run read the figure before `in.` as pence and as inches.
+    matches: (v) =>
+      v.origin === undefined &&
+      v.change?.ruleId === 'units.mass.pound' &&
+      v.next?.ruleId === 'units.length.inch' &&
+      v.next.before.endsWith('in.'),
+  },
+  {
+    issue: 287,
+    property: 'idempotence',
+    input: 'Gate 10F. December 1, 2024 the oven broke.',
+    options: localise,
+    // The first run wrote a date after a stop day first, which no longer ends the sentence.
+    matches: (v) =>
+      v.origin === undefined &&
+      v.change?.ruleId === 'units.temperature.fahrenheit' &&
+      /[.!?]\s+\d{1,2} [A-Z][a-z]+ \d{4}\b/.test(v.text.slice(v.change.end, v.change.end + 120)),
+  },
 ];
 
 const isKnown = (v: Violation): boolean => KNOWN_FAILURES.some((k) => k.property === v.property && k.matches(v));

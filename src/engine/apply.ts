@@ -11,7 +11,7 @@ function overlaps(a: Range, b: Range): boolean {
 
 /**
  * The part of the source a change rewrites, without the text it writes back unchanged at
- * either end, such as the `s` that `s."` keeps when it becomes `s".`.
+ * either end, such as the `colo` and `r` that `color` keeps when it becomes `colour`.
  */
 function rewritten(change: Change): Range {
   const { before, after } = change;

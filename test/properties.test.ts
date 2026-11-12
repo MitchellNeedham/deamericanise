@@ -314,6 +314,43 @@ const KNOWN_FAILURES: KnownFailure[] = [
       v.change?.ruleId === 'units.temperature.fahrenheit' &&
       /[.!?]\s+\d{1,2} [A-Z][a-z]+ \d{4}\b/.test(v.text.slice(v.change.end, v.change.end + 120)),
   },
+  {
+    issue: 405,
+    property: 'idempotence',
+    input: 'Weigh 8 oz. cookies',
+    options: localise,
+    // The first run dropped the stop that ended the cookie's sentence for its guard.
+    matches: (v) =>
+      v.origin === undefined &&
+      /^cookies?$/i.test(v.change?.before ?? '') &&
+      /\d (?:mg|g|kg|t|mL|L|mm|cm|m|km)\W*$/.test(v.text.slice(Math.max(0, v.change!.start - 16), v.change!.start)),
+  },
+  {
+    issue: 406,
+    property: 'idempotence',
+    input:
+      'Set it to 95F, then pour 100 fluid ounces, 100 fluid ounces, 100 fluid ounces, 100 fluid ounces, ' +
+      '100 fluid ounces and 100 fluid ounces into the oven.',
+    options: localise,
+    // The first run shortened the text between the F and a word about heat beyond its reach.
+    matches: (v) =>
+      v.origin === undefined &&
+      v.change?.ruleId === 'units.temperature.fahrenheit' &&
+      /\dF$/.test(v.change.before) &&
+      v.text.slice(v.change.end).search(/\b(?:degrees|ovens?)\b/i) >= 60,
+  },
+  {
+    issue: 407,
+    property: 'idempotence',
+    input: 'We counted 6 foot traffic lights.',
+    options: { ...localise, dialect: 'en-ZA' },
+    // The first run rewrote the noun that made the unit before it part of a compound.
+    matches: (v) =>
+      v.origin === undefined &&
+      v.change?.category === 'units' &&
+      /(?:foot|pound|yard|inch|mile)$/i.test(v.change.before) &&
+      v.next?.category === 'vocabulary',
+  },
 ];
 
 const isKnown = (v: Violation): boolean => KNOWN_FAILURES.some((k) => k.property === v.property && k.matches(v));

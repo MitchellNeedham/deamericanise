@@ -309,19 +309,19 @@ mixed number or a decimal, so `1 1/2 pounds 3 ounces` becomes `765 grams` and
 left out where nothing that could be a noun follows: before punctuation, the end of the
 text, or a word that cannot open a noun, such as a preposition or a conjunction. So
 `He is six foot two.` becomes `He is 1.88 metres.` and `6 foot 4 with long arms` becomes
-`1.93 metres with long arms`, while `6 feet 2 cars` is two things. `in` is the inch
-abbreviation there, and `to`, `and`, `or` or `by` before a number carry the inches on to a
-range or a side, so `6 feet 2 to 3 inches` becomes `1.8 metres 5.1 to 7.6 centimetres`. The
+`1.93 metres with long arms`, while `6 feet 2 cars` is two things. Of those words, `in` is
+the inch abbreviation, and `to`, `and`, `or` or `by` before a number carry the inches on to
+a range or a side, so `6 feet 2 to 3 inches` becomes `1.8 metres 5.1 to 7.6 centimetres`. The
 inch word can also be left out before a join and another measurement in feet, so
 `6 foot 2 to 6 foot 4` becomes `1.88 metres to 1.93 metres` and `2 feet 6 to 3 feet`
 becomes `76.2 centimetres to 91 centimetres`. A spaced `in` after the inches is the
 preposition when a word or number that opens its object follows, so
 `She stands 5 feet 4 in her socks.` becomes `She stands 1.63 metres in her socks.`, while
 `She is 5 feet 4 in tall.` becomes `She is 1.63 metres tall.` and `a 6 ft 2 in man` keeps
-the `in` as the unit of a height that describes the man. A hyphen may tie each number to
-its unit, and the inches to the foot word or mark: `six-foot-two` and `6′-2″` become
-`1.88 metres`, and `a 6-foot 2-inch pipe` becomes `a 1.88 metre pipe`. A height
-hyphenated to its inches is one word, so a noun after it is what it describes:
+the `in` as the unit of a height that describes the man. A hyphen may tie each number to a
+unit word or abbreviation, and the inches to the foot word or mark: `six-foot-two` and
+`6′-2″` become `1.88 metres`, and `a 6-foot 2-inch pipe` becomes `a 1.88 metre pipe`. A
+height hyphenated to its inches is one word, so a noun after it is what it describes:
 `a six-foot-two man` becomes `a 1.88 metre man`. A number straight after a length is a
 smaller unit of it, never the first end of a range in the same unit, so `5 ft 6 to 6 ft` and
 `3 yards 2 to 4 yards` are left as written. Together the parts claim three significant

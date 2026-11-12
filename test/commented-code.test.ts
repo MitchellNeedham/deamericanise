@@ -187,6 +187,7 @@ describe('every line of a commented-out form is code', () => {
     ${'ts'}      | ${'// if (s == "(") {\n//   paint the center\n// }'}
     ${'ts'}      | ${'// if (x) {\n//   [a, b) is the color range\n// }'}
     ${'ts'}      | ${'// const x = pick(a,\n//   // see (the note\n//   center)'}
+    ${'ts'}      | ${'// const x = pick(a,\n//   b) + mix(c,\n//   center)'}
     ${'ts'}      | ${'/*\n * if (x) {\n *   paint the center\n * }\n */'}
     ${'python'}  | ${'# colors = [\n#     gray,\n#     center,\n# ]'}
     ${'sql'}     | ${'-- INSERT INTO theme (\n--   color\n-- );'}

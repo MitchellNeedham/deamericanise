@@ -513,6 +513,9 @@ describe('a measurement starts only where a number can', () => {
     ${'five-six feet two inches'}                | ${'the same, in words'}
     ${'catch-twenty-two miles'}                  | ${'a hyphenated word the table cannot read'}
     ${'twenty five-pound bags'}                  | ${'twenty bags or one weight'}
+    ${'Route-66 miles'}                          | ${'a name before a unit word'}
+    ${'two hundred-three feet'}                  | ${'a number in words before the hyphen is no unit'}
+    ${'In mid-2024 miles were driven.'}          | ${'a year after mid-'}
   `('leaves "$unchanged" whole ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });
@@ -539,6 +542,15 @@ describe('a measurement starts only where a number can', () => {
     ${'5 sq ft-6 sq ft'}                           | ${'0.46 m²-0.56 m²'}             | ${'the same, with a unit of two words'}
     ${'60 miles per hour-70 miles per hour'}       | ${'97 kilometres per hour-110 kilometres per hour'} | ${'the same, with a unit of three words'}
     ${'two feet-6 feet'}                           | ${'61 centimetres-1.8 metres'}   | ${'the same, after a number in words'}
+    ${'two feet-three feet'}                       | ${'61 centimetres-91 centimetres'} | ${'the same, with both ends in words'}
+    ${'a sub-2 pound tent'}                        | ${'a sub-910 gram tent'}         | ${'digits after a prefix that takes a number'}
+    ${'a sub-two pound tent'}                      | ${'a sub-910 gram tent'}         | ${'the same, in words'}
+    ${'an under-5 pound baby'}                     | ${'an under-2.3 kilogram baby'}  | ${'another prefix'}
+    ${'an under-five pound baby'}                  | ${'an under-2.3 kilogram baby'}  | ${'the same, in words'}
+    ${'a near-100°F day'}                          | ${'a near-37.8°C day'}           | ${'a temperature after a prefix'}
+    ${'over-50 mph winds'}                         | ${'over-80 km/h winds'}          | ${'a speed after a prefix'}
+    ${'a mid-20 mile hike'}                        | ${'a mid-32 kilometre hike'}     | ${'a number after mid- that is no year'}
+    ${'a sub-1 pound bag'}                         | ${'a sub-450 gram bag'}          | ${'a determiner before the prefix keeps the singular'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -1857,6 +1869,11 @@ describe('a Unicode hyphen reads as a hyphen', () => {
     ${'a 6-foot fence'}                      | ${'a 1.8 metre fence'}                  | ${'the same, before a unit'}
     ${'It was −5°F outside'}                 | ${'It was -20.6°C outside'}             | ${'a minus sign'}
     ${'It was -5°F outside'}                 | ${'It was -20.6°C outside'}             | ${'a hyphen-minus before a number, which is a minus sign'}
+    ${'5ft‐6ft'}                        | ${'1.5 m‐1.8 m'}                        | ${'a range with its unit on both ends, joined by U+2010'}
+    ${'5ft‑6ft'}                        | ${'1.5 m‑1.8 m'}                        | ${'the same, joined by U+2011'}
+    ${'two feet‐three feet'}            | ${'61 centimetres‐91 centimetres'}      | ${'the same, in words'}
+    ${'Bake at 350°F‑375°F.'}           | ${'Bake at 175°C‑190°C.'}               | ${'the same, in Fahrenheit'}
+    ${'a sub‐2 pound tent'}             | ${'a sub‐910 gram tent'}                | ${'after a prefix that takes a number'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -1879,6 +1896,7 @@ describe('a Unicode hyphen reads as a hyphen', () => {
     ${'catch‑twenty‑two miles'}   | ${'a hyphenated word the table cannot read'}
     ${'twenty five‑pound bags'}        | ${'twenty bags or one weight'}
     ${'a 5/16‑18 UNC bolt'}            | ${'a thread spec'}
+    ${'catch‐22 feet'}                 | ${'digits after a name'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });
@@ -4155,6 +4173,10 @@ describe('a capitalised unit word that is part of a name', () => {
     ${'It is 10 Miles to Town'}                       | ${'title case, across a small word'}
     ${'A Mile and a Half From Home'}                  | ${'title case around a fraction'}
     ${'The 10 x 12 Feet Room'}                        | ${'title case after a dimension'}
+    ${'Watch The Green Mile and 8 Mile.'}             | ${'a singular after a count above one, ending a title'}
+    ${'I watched 8 Mile last night.'}                 | ${'the same, before words in lower case'}
+    ${'Walk 8 Miles to Town'}                         | ${'title case'}
+    ${'A 10 Mile Run'}                                | ${'title case in a heading'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
     expect(convert(unchanged, { assumeAmerican: true })).toBe(unchanged);
@@ -4165,6 +4187,9 @@ describe('a capitalised unit word that is part of a name', () => {
     ${'10 miles North of town'}          | ${'16 kilometres North of town'}            | ${'a unit word in lower case'}
     ${'Walk 10 Miles'}                   | ${'Walk 16 kilometres'}                     | ${'no capitalised word after it'}
     ${'He walked 10 Miles to the shop.'} | ${'He walked 16 kilometres to the shop.'}   | ${'small words, then one in lower case'}
+    ${'Walk 1 Mile'}                     | ${'Walk 1.6 kilometres'}                    | ${'a singular after one'}
+    ${'an 8 mile hike'}                  | ${'a 13 kilometre hike'}                    | ${'a singular in lower case describing a noun'}
+    ${'It was 8 miles away.'}            | ${'It was 13 kilometres away.'}             | ${'a plural in lower case'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -4185,9 +4210,47 @@ describe('a capitalised unit word that is part of a name', () => {
     ${'From 1955 to 1959 Miles Davis led a quintet.'} | ${'1955 to 1959 Miles'}
     ${'A Mile and a Half From Home'}                  | ${'A Mile and a Half'}
     ${'The 10 x 12 Feet Room'}                        | ${'10 x 12 Feet'}
+    ${'I watched 8 Mile last night.'}                 | ${'8 Mile'}
+    ${'A Boeing 747 mph record.'}                     | ${'Boeing 747 mph'}
+    ${'Route 66 miles from here.'}                    | ${'Route 66 miles'}
+    ${'The Model 3 mpg equivalent.'}                  | ${'Model 3 mpg'}
   `('holds $span whole, even with respectConventions off', ({ input, span }) => {
     expect(held(input)).toContain(span);
     expect(held(input, { units: { respectConventions: false } })).toContain(span);
+  });
+});
+
+describe('a number after a name is part of it', () => {
+  it.each`
+    unchanged                                  | why
+    ${'A Boeing 747 mph record.'}              | ${'a model after a capitalised word, before an abbreviation'}
+    ${'The Model 3 mpg equivalent.'}           | ${'a word that takes a designation'}
+    ${'Python 3.12 ft. new syntax.'}           | ${'a version before a credit'}
+    ${'Route 66 miles from here.'}             | ${'a designation before a unit word'}
+    ${'Ford F-150 mpg'}                        | ${'a hyphenated model'}
+    ${'The new track ft. Drake drops Friday.'} | ${'a credit with no number'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+    expect(convert(unchanged, { assumeAmerican: true })).toBe(unchanged);
+  });
+
+  it.each`
+    input                              | expected                                  | why
+    ${'The pipe is 3 ft. long.'}       | ${'The pipe is 91 cm long.'}              | ${'a word in lower case before the number'}
+    ${'The 2026 F-150 gets 20 mpg.'}   | ${'The 2026 F-150 gets 12 L/100km.'}      | ${'a verb between the name and the number'}
+    ${'It was 8 miles away.'}          | ${'It was 13 kilometres away.'}           | ${'a unit word after a word in lower case'}
+    ${'Version 2 weighs 3 pounds.'}    | ${'Version 2 weighs 1.4 kilograms.'}      | ${'a quantity after the designation'}
+    ${'About 5 mph.'}                  | ${'About 8 km/h.'}                        | ${'a capitalised word that opens the sentence'}
+    ${'It rose. About 5 mph.'}         | ${'It rose. About 8 km/h.'}               | ${'the same, after a stop'}
+    ${'About 3.12 ft. of snow fell.'}  | ${'About 95.1 cm of snow fell.'}          | ${'a decimal before a word that opens no noun'}
+    ${'Season 2 pounds of pork.'}      | ${'Season 910 grams of pork.'}            | ${'a verb that opens a recipe step'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input, { assumeAmerican: true })).toBe(expected);
+  });
+
+  it('holds the name with its number, so no rewrite of the name frees the number', () => {
+    const input = 'The Paycheck 5 lb bonus';
+    expect(deamericaniseText(input, { preset: 'localise' })).toBe(input);
   });
 });
 

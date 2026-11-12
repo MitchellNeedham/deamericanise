@@ -207,16 +207,6 @@ const rewritesReplacement =
   (v: Violation): boolean =>
     v.origin !== undefined && afters.includes(v.origin.after.toLowerCase());
 
-const precedes =
-  (pattern: RegExp) =>
-  (v: Violation): boolean =>
-    v.change !== undefined && pattern.test(v.text.slice(0, v.change.start));
-
-const follows =
-  (pattern: RegExp) =>
-  (v: Violation): boolean =>
-    v.change !== undefined && pattern.test(v.text.slice(v.change.end));
-
 const VOCABULARY = [...baseVocabulary(), ...Object.values(DIALECTS).flatMap((pack) => pack.vocabulary)];
 
 /** Must match `CONTEXT_WINDOW` in src/engine/lexicon.ts. */

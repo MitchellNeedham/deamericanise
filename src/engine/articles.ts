@@ -1,10 +1,14 @@
+import { CLOSING } from '../rules/sentence.js';
 import type { Category, Change } from '../types.js';
 import type { Range } from './apply.js';
 
 /** Written with an h but said with a vowel. */
 const SILENT_H = /^(?:hour|honest|honou?r|heir)/;
-/** Written with a vowel but said with a consonant. */
-const YOD = /^(?:uni|use|user|using|usual|utili|euro|eulog|ubiqu|one|once|ewe)/;
+/**
+ * Written with a vowel but said with a consonant. `ute` must be the whole word, since
+ * `utensil` and `utter` are said with a vowel.
+ */
+const YOD = /^(?:uni|use|user|using|usual|utili|euro|eulog|ubiqu|one|once|ewe|utes?\b)/;
 
 /** A currency sign and the letters that name its country, as in `US$` or `€`. */
 const CURRENCY = /^[A-Z]{0,3}\p{Sc}\s*/u;
@@ -69,7 +73,44 @@ function matchCase(source: string, replacement: string, beside: string): string 
   return replacement;
 }
 
-const ARTICLE = /\b(a|an)(\s+)$/i;
+/**
+ * An article and the space before its word. The space may wrap onto the next line, but a
+ * blank line ends the paragraph, so the word after one is not the one the article qualifies.
+ */
+const ARTICLE = /\b(a|an)((?=\s)[^\S\n]*(?:\n[^\S\n]*)?)$/i;
+
+/** How far either side of a capitalised article its context is read. */
+const CONTEXT = 64;
+
+/** A quote, bracket or emphasis marker that can open a sentence, a title or a block. */
+const OPENER = String.raw`[([{"'‘“«*_~]`;
+
+/**
+ * Where a capital is expected: the start of a line, list item, heading, quote or table cell;
+ * after a sentence end or a colon, past any closing quotes or brackets; or straight after an
+ * opener. The text it is tested against starts with a newline when it starts the whole text.
+ */
+const CAPITAL_EXPECTED = new RegExp(
+  String.raw`(?:\n[^\S\n]*(?:(?:[-*+>]|\d+[.)]|#{1,6})[^\S\n]+)*|[.!?:…|]${CLOSING}*\s+)${OPENER}*$|${OPENER}$`,
+);
+
+const LAST_WORD = /(\p{L}+)\P{L}*$/u;
+const FIRST_WORD = /^\P{L}*(\p{L}+)/u;
+
+/**
+ * Whether a capital `A` at `start` is the article rather than a label, as in
+ * `Grade A` or `Hall A`. It is where a capital is expected, or between two capitalised words,
+ * as in a title or text in capitals. `word` is where the word it qualifies starts.
+ */
+function capitalIsArticle(text: string, start: number, word: number): boolean {
+  const from = Math.max(0, start - CONTEXT);
+  const before = (from === 0 ? '\n' : '') + text.slice(from, start);
+  if (CAPITAL_EXPECTED.test(before)) return true;
+
+  const last = LAST_WORD.exec(before)?.[1];
+  const next = FIRST_WORD.exec(text.slice(word, word + CONTEXT))?.[1];
+  return last !== undefined && next !== undefined && /^\p{Lu}/u.test(last) && /^\p{Lu}/u.test(next);
+}
 
 /** Every article fix carries these. */
 export const ARTICLE_AGREEMENT = {
@@ -99,6 +140,8 @@ export function articleAgreements(text: string, changes: Change[]): Change[] {
     const start = change.start - match[0].length;
     const end = start + match[1]!.length;
     if (taken.some((c) => c.start < end && start < c.end)) continue;
+    // A label is a single letter, so `An` and `AN` are always the article.
+    if (match[1] === 'A' && !capitalIsArticle(text, start, change.start)) continue;
 
     extra.push({
       start,

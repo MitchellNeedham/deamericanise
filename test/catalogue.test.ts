@@ -68,6 +68,14 @@ describe('ruleCatalogue', () => {
     expect(ids(['safe', 'moderate'])).toEqual(['dates.numeric']);
   });
 
+  it.each(['en-AU', 'en-GB', 'en-NZ', 'en-IE', 'en-ZA'] as Dialect[])(
+    'lists risky for the words of %s, whose emergency number is risky',
+    (dialect) => {
+      const words = ruleCatalogue(dialect).find((r) => r.id === `dialect.${dialect}`)!;
+      expect(words.confidence).toEqual(['moderate', 'risky']);
+    },
+  );
+
   it('marks only article agreement as not switchable', () => {
     const fixed = ruleCatalogue().filter((r) => !r.switchable).map((r) => r.id);
     expect(fixed).toEqual(['grammar.article-agreement']);

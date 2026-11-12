@@ -244,11 +244,28 @@ fuel economy. The volume measures are the US ones, which are not the imperial on
 180 lbs         -> 82 kg             10 acres   -> 4 hectares
 ```
 
+A unit that describes the noun after it stays singular: `a 9 inch dish` becomes
+`a 23 centimetre dish`, and so do `9 inch pans`, `the 5-6 inch pans` and `one-inch slices`.
+A determiner, a hyphen tying the number to the unit, or the singular after a number above
+one says so. One and a fraction take the singular anyway, so `one quart small onions` and
+`1/2 pound ground beef` keep a plural unit, read as quantities with the `of` left out. A
+preposition, a size, an adverb of place, slope or time, a pronoun, a conjunction, a number
+or a date after the unit is no noun: `a quarter mile later` becomes `400 metres later`, and
+`a mile and a half back` becomes `2.4 kilometres back`. A count before an attributive
+measurement counts the noun, so `two quarter-pound burgers` becomes `two 110 gram burgers`.
+A unit that starts a noun leaves the number counting it, so `Bake 1 pound cake`,
+`6 foot soldiers`, `foot traffic` and `8 inch worms` are left as written, while
+`a 2-pound cake` becomes `a 910 gram cake`.
+
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 `22 x 28 centimetres`, both ends sharing the unit chosen for the larger. Each side is read
 in its own unit, so `2 feet x 6 inches` becomes `61 x 15 centimetres` and `10 ft x 12 in`
-becomes `3 x 0.3 m`, where the `in` is the unit because the side before it has one. Sides
+becomes `3 x 0.3 m`, where the `in` is the unit because the side before it has one. An `in`
+before `x` and another number is the unit too, so `4 in x 6 in` becomes `10 x 15 cm`, while
+`6 in by 5 in the morning` stays as written. An apostrophe straight after a number is feet
+on a side, when every side has a mark of its own: `2' x 6"` becomes `61 x 15 cm` and
+`2' x 4'` becomes `0.61 x 1.2 m`, while a quoted `'6'` stays a number. Sides
 that measure different things, as in `2 feet x 6 pounds`, convert as two measurements.
 Only a length has sides. Before any other unit a bare number is a count, and the quantity
 after it converts on its own: `2 x 4 oz cans` becomes `2 x 110 g cans`, and
@@ -260,19 +277,25 @@ A side may be a whole number in words: `a ten by twelve foot room` becomes
 words on any side, as in `two and a half by three feet`, leaves the dimension as written. So
 does `one by two feet`, since `one` may be a pronoun with `by` giving an amount. After a word
 such as `each`, `all` or `that one`, only the amount converts: `raise each one by two inches`
-becomes `raise each one by 5.1 centimetres`.
+becomes `raise each one by 5.1 centimetres`, and `raise all 4 by 6 inches` becomes
+`raise all 4 by 15 centimetres`. A pair in digits before a noun describes it, so
+`those 4 by 6 inch photos` becomes `those 10 by 15 centimetre photos`.
 
 A weight in two units is one weight, as a height in feet and inches is one height:
 `7 pounds 8 ounces` becomes `3.4 kilograms`, `11st 4lb` becomes `71.7 kg`, and
 `11 stone 4 pounds 8 ounces` becomes `71.9 kilograms`. The first part can be a fraction, a
 mixed number or a decimal, so `1 1/2 pounds 3 ounces` becomes `765 grams` and
-`2.5 feet 3 inches` becomes `83.8 centimetres`. Together the parts claim three
+`2.5 feet 3 inches` becomes `83.8 centimetres`. Any part can be a whole number in words, so
+`six feet two inches` becomes `1.88 metres`. After `foot` or `feet` the inch word can be
+left out where nothing that could be a noun follows, so `He is six foot two.` becomes
+`He is 1.88 metres.`, while `6 feet 2 cars` is two things. Together the parts claim three
 significant figures. Where a unit of the weight is kept, by the dialect or by `unitsKeep`,
 the whole weight is left as written, so an `en-GB` `11 stone 4 pounds` never becomes
 `11 stone 1.8 kilograms`. Turning on `units.mass.stone` or `units.mass.stone-pounds`
-converts it. A weight at the end of a range, as in `7-8 lb 4 oz`, is left as written too,
-and so is a height or weight that starts where no measurement can (see below), as in
-`At 7:30 feet 2 inches`.
+converts it. A weight or height at the end of a range, as in `7-8 lb 4 oz`,
+`5 to 6 feet 2 inches` or `five to seven pounds eight ounces`, is left as written too, since
+its first end could be in either unit. So is a height or weight that starts where no
+measurement can (see below), as in `At 7:30 feet 2 inches`.
 `st` is read only in such a weight, because `1st` on its own is an ordinal.
 
 Numbers written out in words are read too, fractions and all: `two and a half feet` becomes
@@ -341,11 +364,17 @@ so `Room 13` above a bullet `- 0°F overnight` is a room and a temperature. A ch
 temperature has no 32° offset to take off, so
 `dropped 20°F` becomes `dropped 11°C` and `10°F warmer` becomes `5.6°C warmer`. The words
 beside the number tell the two apart: a verb of change or `by` before it, a comparative
-or a noun such as `drop` after it. `fell to 20°F` names the new temperature and converts
-as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule of their own,
+or a noun such as `drop` after it. They are read past a Celsius value given beside the
+number, so `It was 20°F (11°C) warmer` becomes `It was 11°C warmer`, and
+`It rose 11°C or 20°F` stays as it is. `fell to 20°F` names the new temperature and
+converts as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule of their own,
 `units.temperature.difference`, so they can be switched off apart from temperatures.
 
-Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F` or `degrees Fahrenheit`. A bare `F`,
+Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F`, `degrees Fahrenheit` or
+`95 Fahrenheit`, with `º` or `˚` accepted for the degree sign, as phone keyboards type it.
+The word alone does not count after a whole number of four figures, which reads as a year
+(`In 1724 Fahrenheit proposed his scale`), before `thermometers` or `scale`, where the
+number counts them, or before a number, where it is a title (`Fahrenheit 451`). A bare `F`,
 as in `165F` or `350 F`, is more often a letter, so it counts only as an upper case `F`
 after a number of two or three figures, in a sentence about heat (an oven, cooking, the
 weather, a fever or a temperature) that gives no Celsius value. An American word the
@@ -358,6 +387,11 @@ before a word that cannot continue a name. A number, in figures or in words, nev
 a sentence. `Cook until the chicken
 reaches 165F` becomes `73.9°C`, while `Apartment 3F`, `seat 23F`, `the Boeing 777F`,
 `#33F`, `F-150` and the courtesy figure in `180C/350F/gas 4` stay as they are.
+
+A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `175 Celsius`),
+and as a bare upper case `C` after a number of two or three figures with at most one space.
+So `Bake at 350°F (180C)` becomes `Bake at 180C` and `180C/350°F/gas 4` stays as it is,
+while `Apartment 3C (65°F)` is a flat and its temperature converts.
 
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
@@ -378,7 +412,11 @@ the conversion: the same dimension, and each figure within a quarter of the conv
 `6 feet (5 m)` convert as normal and keep their bracket. The bracket may start on the next
 line, but not after a blank line. `1.8 metres (6 feet)` is left as
 it is, because the bracket only restates the metric value in front of it. That is the
-form `keepOriginal` writes, so running it again changes nothing. The bracket can open
+form `keepOriginal` writes, so running it again changes nothing. The same holds for any
+quantity in words the unit rules convert, as in `1.3 centimetres (half an inch)` and
+`2.4 kilometres (a mile and a half)`, and after emphasis or code that closes on the metric
+value, as in `**1.8 metres** (6 feet)`. Here too the bracket may start on the next line,
+but not after a blank line. The bracket can open
 with a word such as `about`, but it has to hold nothing else, and the dimension has to
 match: `2 metres (6 pounds)` still converts.
 
@@ -468,8 +506,9 @@ contraction that already ends in the word's own last letter drops the stop, so `
 alone.
 
 **Articles.** Replacements drag their article along: `an eraser` becomes `a rubber`, and
-`a popsicle` becomes `an icy pole`. A converted number takes the article it is said with,
-so `an 8 foot fence` becomes `a 2.4 metre fence` and `a 60 foot tree` becomes
+`a popsicle` becomes `an icy pole`. A word is read by its sound, so `a pickup truck`
+becomes `a ute`. A converted number takes the article it is said with, so
+`an 8 foot fence` becomes `a 2.4 metre fence` and `a 60 foot tree` becomes
 `an 18 metre tree`. Eight, eleven and eighteen take `an`, and so does any figure whose
 spoken form starts with one of them, such as `80`, `8.5`, `11,000` or `18 million`. A
 temperature below zero takes `a`, for minus. A currency sign is said after its amount, so
@@ -479,6 +518,17 @@ usual readings disagree, the article is left as it was: `1100` to `1199` and `18
 `1899` (one thousand eight hundred, or eighteen hundred), and a 24-hour time with a
 leading zero other than `08:00` (`05:00` is oh five hundred to some readers and five to
 others).
+
+An article and its word share a paragraph. A single line break between them is a hard
+wrap, so `Use an` at the end of one line still agrees with `eraser` at the start of the
+next, but a blank line ends the paragraph and the article is left as it was. A capital
+`A` counts as the article only where a capital is expected: at the start of the text, a
+line, a list item, a heading or a table cell; after a sentence end or a colon, past any
+closing quotes or brackets; straight after an opening quote, bracket or emphasis marker;
+or between two capitalised words, as in a title or text in capitals. Anywhere else it is
+a label, so `a Grade A eggplant` becomes `a Grade A aubergine` in `en-GB` and
+`Hall A 60 foot ceiling` becomes `Hall A 18 metre ceiling`. A label is a single letter,
+so `An` and `AN` are always the article, as a lower case `a` or `an` is.
 
 ## Deciding whether the text is American
 
@@ -567,7 +617,7 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 
   | `syntax` | |
   | --- | --- |
-  | `'markdown'` | Fences as above, and indented code blocks as CommonMark reads them |
+  | `'markdown'` | Fences as above, and indented code blocks and `pre`, `script`, `style` and `textarea` blocks as CommonMark reads them |
   | `'text'` | No such fences, since a line of tildes underlines a heading in `.rst` or `.txt`: three backticks protect everything up to the next three |
   | none (default) | Fences as above, and an indented line is prose |
 
@@ -575,6 +625,13 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   item or quote it sits in, after a blank line or a block that is not a paragraph. A line
   indented that far inside a paragraph continues it, so a list item's wrapped line or second
   paragraph is still rewritten.
+
+  A `pre`, `script`, `style` or `textarea` block starts on a line that opens with that tag,
+  and runs to the end of the line that holds a closing tag of any of the four, blank lines
+  included, or to the end of the list item or quote it sits in. CommonMark passes it through
+  as raw HTML, so all of it is held, including text after the closing tag on its last line.
+  Other HTML blocks, such as `<div align="center">` on a line of its own, and HTML comments
+  hold text that is still rewritten, as is a tag in the middle of a sentence.
 - **File names and paths,** read from their shape rather than a list of extensions. A file
   name is a name holding a letter, then a dot and an extension in one case with no space
   either side, so `behavior.ts`, `Center.vue` and `GRAY.PNG` are held, and so is a domain or
@@ -618,7 +675,7 @@ deamericaniseText(text, { confidence: ['safe', 'moderate'] });
 deamericaniseText(text, { rules: { 'spelling.contextual.*': false } });
 deamericaniseText(text, { rules: { 'vocabulary.contextual.autumn': false } });
 
-// A single unit
+// A single unit, by key or by name: 'inch', 'inches' and 'in' all keep inches
 deamericaniseText(text, { unitsKeep: ['mile', 'pint'] });
 ```
 
@@ -640,7 +697,8 @@ The three confidence tiers mean:
 
 - **safe**: no plausible false positive. `colour`, `aluminium`, `organise`.
 - **moderate**: a wordlist that could collide with a name. Most vocabulary and all units.
-- **risky**: a guess about what a word means. `tyre`, `cheque`, `autumn`, logical quoting.
+- **risky**: a guess about what a word means. `tyre`, `cheque`, `autumn`, logical quoting,
+  and the emergency number.
 
 ## Source files
 
@@ -691,6 +749,13 @@ value. A weighted score over those signals separates code from prose across C, P
 SQL, CSS and the rest with one rule set, and a line that already starts with the host
 language's comment marker is taken as commented-out on sight.
 
+A run of the marker that a language writes by convention is one marker, not two: `;;`,
+`;;;` and `;;;;` in Lisp, `'''` in Visual Basic, `%%` and `%%%` in Erlang, MATLAB and
+LaTeX, and `!!` in Fortran. So `;; Pick the color.` is rewritten, while `;;; ;; old note`,
+`; ; old note` and `;;;;; old note` are still commented on top of a comment. Other repeats
+are a second marker, so `//// the color` in TypeScript and `## the color` in Python are left
+alone. `LexerSpec.markerRuns` sets these per language.
+
 The costs are lopsided: a missed rewrite inside a commented-out block is invisible, while
 a rewrite there is a broken build. The threshold is set accordingly, so the occasional
 prose line that reads like code is left alone. It works line by line, so a block comment
@@ -704,10 +769,10 @@ Turn it off with `protectCommentedCode: false` or `--no-code-guard`.
 A comment is read the way its author wrote it. A block comment is one text, and so is a run
 of line comments on consecutive lines with the same marker at the same column. A comment
 after code joins only the comments lined up beneath it. Each line's marker (`//`, `#`, `///`,
-`//!`) and the `*` that starts each line of a `/*` comment are taken out first, so the text
+`//!`, `;;`) and the `*` that starts each line of a `/*` comment are taken out first, so the text
 is Markdown: a line left holding only `//` or `*` is a blank line that ends a paragraph, a
 backtick span or a fence may wrap from one line to the next, and an article that ends one
-line agrees with the word that starts the next.
+line agrees with the word that starts the next, but not with one after a blank line.
 
 ```
 /**                          /// ```
@@ -791,8 +856,8 @@ export default {
 Prettier owns the parsers, so the plugin wraps the built-in ones and rewrites the source
 in `preprocess`, before Prettier records the text its printers work from. Markdown, MDX,
 JavaScript, TypeScript, CSS, SCSS, Less, YAML, HTML and Vue are covered: Markdown and MDX
-are handled as prose with `syntax: 'markdown'`, so indented code is left alone, and the
-rest have only their comments touched.
+are handled as prose with `syntax: 'markdown'`, so indented code and `pre`, `script`,
+`style` and `textarea` blocks are left alone, and the rest have only their comments touched.
 
 Prettier validates option types and has no object type, so the two settings people
 actually change are flat and anything else goes through `deamericaniseOptions` as JSON.
@@ -930,8 +995,8 @@ there each root needs the rules in its own styles.
 | `protect` | `[]` | Strings or patterns never to rewrite |
 | `protectProperNouns` | `true` | The built-in name list |
 | `protectIdentifiers` | `false` (`true` for code) | camelCase, snake_case, kebab API names, dotted names |
-| `syntax` | unknown | `markdown` or `text`: how code fences and indented code are read |
-| `unitsKeep` | `[]` | Units to leave alone, by key |
+| `syntax` | unknown | `markdown` or `text`: how code fences, indented code and HTML blocks are read |
+| `unitsKeep` | `[]` | Units to leave alone, by key (`inch`, `square-foot`) or by name (`inches`, `in`), in any case |
 | `units.precision` | `'natural'` | `natural`, `exact`, or a number of decimal places |
 | `units.keepOriginal` | `false` | Write `1.8 metres (6 ft)` |
 | `units.fuelEconomy` | `'l-per-100km'` | Or `km-per-l` |
@@ -945,10 +1010,12 @@ there each root needs the rules in its own styles.
 
 `units`, `dates`, `times` and `currency` each accept `false` to switch the category off.
 
-A `dialect`, `preset` or `syntax` outside its list throws an `Error` that names the value
-and the ones it accepts, such as `Unknown preset: Localise. Expected one of read, localise.`
-Only the ids in `DIALECTS` are dialects, so a name every object has, such as `toString`, is
-rejected the same way.
+A `dialect`, `preset` or `syntax` outside its list, or a `unitsKeep` entry that names no
+unit, throws an `Error` that names the value and the ones it accepts, such as `Unknown
+preset: Localise. Expected one of read, localise.` For a unit, those are the unit keys. It
+throws even when there is no text to read, such as a source file with no comments or a page
+with no prose. Only the ids in `DIALECTS` are dialects, so a name every object has, such as
+`toString`, is rejected the same way.
 
 ## Known limits
 
@@ -971,10 +1038,15 @@ rejected the same way.
   runs on to the next line that would close it, or to the end of the text. A comment in a
   language that documents in Markdown is read that way, so a tilde heading underline in a
   reStructuredText block comment there leaves the text up to the next one as written.
-- Outside the remark plugin, an indented code block is rewritten like the prose around it
-  unless the text is known to be Markdown: a Markdown file, `syntax: 'markdown'`, or
-  Prettier's Markdown parser. So `deamericaniseText` with no `syntax`, stdin without
-  `--language md` or `--syntax markdown`, and comments rewrite it.
+- Outside the remark plugin, an indented code block, and the contents of a `pre`, `script`,
+  `style` or `textarea` block, are rewritten like the prose around them unless the text is
+  known to be Markdown: a Markdown file, `syntax: 'markdown'`, or Prettier's Markdown parser.
+  So `deamericaniseText` with no `syntax`, stdin without `--language md` or
+  `--syntax markdown`, and comments rewrite them.
+- Outside the remark plugin, a `pre`, `script`, `style` or `textarea` element inside another
+  HTML block, such as a `<pre>` between `<div>` and `</div>` with no blank line between them,
+  is read as CommonMark reads it: part of the outer block, so its contents are rewritten. The
+  remark plugin leaves every HTML block alone.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`
   or `keepOriginal` where the numbers matter.
 - A number that a hard wrap splits, such as `1` at the end of one line and `1/2 gallons` at
@@ -986,6 +1058,11 @@ rejected the same way.
   or `role="code"` to mark it, is read as part of the sentence.
 - `a third mile` is read as a fraction, though it can also mean one more mile after two.
   The same goes for `a fourth`, `an eighth` and `a sixteenth`.
+- A word after a unit that is an adverb in one phrase and an adjective in another is always
+  read the same way. `inside`, `outside` and `overhead` are adverbs, so `a 2 inch inside
+  diameter` becomes `a 5.1 centimetres inside diameter`, and `round` describes a noun, so
+  `a quarter mile round the bend` becomes `a 400 metre round the bend`. `a 2 pound cake` is
+  left as written, because it may be a pound cake.
 - A line that ends in a number and a line that opens with a unit word are read as one
   measurement, so `Track 7` above `Miles Davis` becomes `Track 11 kilometres Davis`. A
   blank line or a list marker between them keeps them apart.

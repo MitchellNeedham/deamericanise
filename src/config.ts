@@ -1,6 +1,7 @@
 import { toPatterns } from './engine/protect.js';
 import type { Category, Confidence, LexEntry, Options, Preset, ResolvedOptions, Syntax } from './types.js';
-import { dialectPack } from './dialects/index.js';
+import { dialectPack, isDialect, unknownDialect } from './dialects/index.js';
+import { MEASURES } from './rules/units/definitions.js';
 
 export const CATEGORIES: Category[] = [
   'spelling', 'vocabulary', 'units', 'dates', 'times', 'currency', 'punctuation', 'misc',
@@ -11,6 +12,35 @@ export const CONFIDENCES: Confidence[] = ['safe', 'moderate', 'risky'];
 export const PRESETS: Preset[] = ['read', 'localise'];
 
 export const SYNTAXES: Syntax[] = ['markdown', 'text'];
+
+/** The key of every unit `unitsKeep` can name. */
+export const UNIT_KEYS: string[] = MEASURES.map((measure) => measure.keep);
+
+/**
+ * The `unitsKeep` key of the unit a name stands for, or `undefined` when it names none. Any
+ * case of a unit's key, written-out word or abbreviation counts, so `inch`, `inches`, `in`
+ * and `IN` all give `inch`.
+ */
+export function unitKey(name: string): string | undefined {
+  if (typeof name !== 'string') return undefined;
+  const lower = name.toLowerCase();
+  return MEASURES.find((measure) =>
+    [measure.keep, ...measure.words, ...measure.abbrevs].some((form) => form.toLowerCase() === lower),
+  )?.keep;
+}
+
+function unitKeys(names: string[]): string[] {
+  if (!Array.isArray(names)) throw new Error(`unitsKeep must be a list of units, such as ['mile', 'pint'].`);
+  const keys = names.map((name) => {
+    const key = unitKey(name);
+    if (key === undefined) {
+      const known = UNIT_KEYS.join(', ');
+      throw new Error(`Unknown unit: ${String(name)}. Expected the key, name or abbreviation of one of ${known}.`);
+    }
+    return key;
+  });
+  return [...new Set(keys)];
+}
 
 /**
  * What each preset switches on.
@@ -46,6 +76,9 @@ export function resolveOptions(options: Options = {}, defaults: Partial<Options>
   if (merged.syntax !== undefined && !SYNTAXES.includes(merged.syntax)) {
     throw new Error(`Unknown syntax: ${merged.syntax}. Expected one of ${SYNTAXES.join(', ')}.`);
   }
+  const dialect = merged.dialect ?? 'en-AU';
+  if (!isDialect(dialect)) throw unknownDialect(dialect);
+  const unitsKeep = unitKeys(merged.unitsKeep ?? []);
   const fromPreset = PRESET_CATEGORIES[preset];
   // An explicit category always wins over the preset that suggested it.
   const categories = Object.fromEntries(
@@ -59,7 +92,7 @@ export function resolveOptions(options: Options = {}, defaults: Partial<Options>
     merged.currency === false ? { enabled: false } : { enabled: true, ...(merged.currency ?? {}) };
 
   return {
-    dialect: merged.dialect ?? 'en-AU',
+    dialect,
     preset,
     categories,
     confidence: merged.confidence ?? CONFIDENCES,
@@ -71,7 +104,7 @@ export function resolveOptions(options: Options = {}, defaults: Partial<Options>
     commentMarkers: [],
     syntax: merged.syntax,
     parsed: false,
-    unitsKeep: merged.unitsKeep ?? [],
+    unitsKeep,
     assumeAmerican: merged.assumeAmerican,
     minAmericanConfidence: merged.minAmericanConfidence ?? 0.5,
     units: {
@@ -104,11 +137,11 @@ export function resolveOptions(options: Options = {}, defaults: Partial<Options>
 
 /**
  * Throws the error `deamericanise` gives for an option it rejects, such as an unknown
- * `dialect` or `preset`, without reading any text. The plugins call it before their first
- * file, so a bad option fails a run whatever its files hold.
+ * `dialect`, `preset` or `unitsKeep` entry, without reading any text. The plugins call it
+ * before their first file, so a bad option fails a run whatever its files hold.
  */
 export function checkOptions(options: Options = {}): void {
-  dialectPack(resolveOptions(options).dialect);
+  resolveOptions(options);
 }
 
 /** A `rules` key matches its own id, and a key ending in `*` matches by prefix. */

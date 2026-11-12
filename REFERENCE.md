@@ -272,6 +272,15 @@ after it converts on its own: `2 x 4 oz cans` becomes `2 x 110 g cans`, and
 `2 x 4 lb 8 oz bags` becomes `2 x 2.04 kg bags`. A dimension is left as written when a side with no unit sits between two different units
 (`10 ft x 12 x 6 in`), or when the rule for one of its units is switched off.
 
+Feet and inch marks may be straight, curly or primes: `6'2"`, `6’2”` and `6′2″` all become
+`1.88 metres`, and `the 2’ x 6” shelf` becomes `the 61 x 15 cm shelf`. A `"` or `”` straight
+after a number is the inch mark unless it closes a quotation. A quotation is open after an
+odd number of straight double quotes that are not inch marks, or after a `“` with no `”`
+since, counting back to a blank line. So `a 6" pan` becomes `a 15 cm pan`, while
+`He said "6" twice.` and `“Route 66”` stay as written, and so does a dimension with a side
+quoted that way. An inch mark inside a quotation cannot be told from the quotation's close,
+so `"It is 6" long," she said.` is left as written too. `″` is never a quote.
+
 A side may be a whole number in words: `a ten by twelve foot room` becomes
 `a 3 by 3.7 metre room`, and `two x 4 oz cans` becomes `two x 110 g cans`. A fraction in
 words on any side, as in `two and a half by three feet`, leaves the dimension as written. So

@@ -311,10 +311,11 @@ A whole number hyphenated to a fraction below one is a mixed number, as trade wr
 it: `a 2-3/4 inch board` becomes `a 7 centimetre board`, the same as `a 2 3/4 inch board`.
 `1-3 inches` and `1/2-3/4 inch` are still ranges.
 
-Wherever a hyphen may stand in a measurement, the Unicode hyphen (U+2010) and the
+Wherever a hyphen may stand in or beside a measurement, the Unicode hyphen (U+2010) and the
 non-breaking hyphen (U+2011) that typesetting puts in `5-10` or `6-foot` read the same as
-`-`, so a range written with either still becomes `1.5-3 metres`. Neither is a minus sign,
-so a number straight after one is left as written.
+`-`. So a range written with either still becomes `1.5-3 metres`, and `the 40-yard-line`
+written with either is still a conventional size. Neither is a minus sign, so a number
+straight after one is left as written.
 
 A fraction with a zero denominator, as in `5/0 inches`, is not a quantity, so it is left as
 written, and so is a height or weight it is part of, as in `5 feet 1/0 inches`.

@@ -27,12 +27,14 @@ import {
   NUMERIC_PATTERN,
   SECOND_END_WORDS,
   SOFT_SPACE,
+  SPACE_GROUPED,
   WHOLE_NUMBER,
   canBeRange,
   formatNumber,
   formatTemperature,
   isOvenSetting,
   listReader,
+  mayBeCountAndNumber,
   parseNumber,
   plainHyphens,
   significantFigures,
@@ -148,7 +150,8 @@ const WORD_JOIN = new RegExp(String.raw`^${HYPHEN}?\s*(to|and|or)\s*$`, 'i');
  * `a quarter` opens an idiom, as in `reduce by half to 2 quarts`, so it is not a range. A
  * dash, or a fraction in words, cannot be read whole, so the range is held as written:
  * `five-10 miles`, `two and a half to three miles`. So is `two to three hundred`, which may
- * mean 200 to 300. A hyphen left hanging before the join, as in `two- to three-inch`, is the
+ * mean 200 to 300, and `one hundred to two hundred thousand`, which may mean 100,000 to
+ * 200,000. A hyphen left hanging before the join, as in `two- to three-inch`, is the
  * unit's and changes nothing.
  */
 function writtenRange(
@@ -162,7 +165,7 @@ function writtenRange(
   const word = WORD_JOIN.exec(join)?.[1]!.toLowerCase();
   if (word === 'and') {
     const between = /\bbetween\s+$/i.test(text.slice(Math.max(0, start - 16), start));
-    if (!between || READABLE_NUMBER.test(low + join + high)) return 'skip';
+    if (!between || readsAsOne(text, start, low + join + high)) return 'skip';
   }
   const shared = sharesScale(low, high);
   return word !== undefined && !shared && READABLE_NUMBER.test(low) && READABLE_NUMBER.test(high)
@@ -170,10 +173,30 @@ function writtenRange(
     : 'hold';
 }
 
-/** `two` before `three hundred` may mean 200. */
+const WORDS_TO_END = new RegExp(String.raw`(?:${SECOND_END_WORDS})$`, 'iy');
+
+/**
+ * Whether `words`, at `start` in `text`, read there as one number, as `one hundred and twenty`
+ * does. After `between`, `one hundred and two thousand` does not.
+ */
+function readsAsOne(text: string, start: number, words: string): boolean {
+  // As far back as `writtenRange` looks for `between`, which the number's pattern looks for too.
+  const from = Math.max(0, start - 16);
+  WORDS_TO_END.lastIndex = start - from;
+  return WORDS_TO_END.test(text.slice(from, start + words.length));
+}
+
+/**
+ * `two` before `three hundred` may mean 200, and `one hundred` before `two hundred thousand`
+ * 100,000: the second end's scale after the ones they share may be the first end's too.
+ */
 function sharesScale(low: string, high: string): boolean {
-  const scaled = (end: string) => /\b(?:hundred|thousand)\b/i.test(end);
-  return isWritten(low) && !scaled(low) && scaled(high) && !/^an?\s/i.test(high);
+  if (!isWritten(low) || /^an?\s/i.test(high)) return false;
+  const scales = (end: string) => end.toLowerCase().match(/\b(?:hundred|thousand)\b/g) ?? [];
+  const [lows, highs] = [scales(low), scales(high)];
+  const next = highs[lows.length];
+  if (next === undefined || lows.some((scale, i) => scale !== highs[i])) return false;
+  return lows.length === 0 || (lows[lows.length - 1] === 'hundred' && next === 'thousand');
 }
 
 /**
@@ -523,6 +546,26 @@ function countsSizedNoun(text: string, start: number, raw: string, gap: string, 
 }
 
 /**
+ * Whether the number `raw`, grouped with spaces before the unit `entry` that ends at `end`,
+ * may be a count of the noun the measurement describes and then the measurement's own number,
+ * as in `2 100-pound bags`, which may be two `100-pound` bags. A plural unit word describes no
+ * noun, and a determiner that takes one of a noun leaves no count, as in `a 1 500-foot tower`.
+ */
+function mayCountNoun(
+  text: string,
+  start: number,
+  raw: string,
+  entry: Alias,
+  value: number,
+  gap: string,
+  end: number,
+): boolean {
+  if (!mayBeCountAndNumber(raw) || (entry.isWord && !entry.isSingular)) return false;
+  if (ONE_OF_A_NOUN_BEFORE.test(text.slice(Math.max(0, start - 24), start))) return false;
+  return describesNoun(text, start, value, gap, end);
+}
+
+/**
  * A preposition that takes a year, opening a sentence or clause, straight before where a number
  * starts: at the start of the text or a line, or of a list item there, or after a stop, comma,
  * semicolon or colon, with only spaces and opening quotes or brackets between.
@@ -780,7 +823,8 @@ export function metricUnitForms(dimension: Dimension): string {
   return units.map(afterFigure).join('|');
 }
 
-const METRIC_NUMBER = String.raw`[-−]?\d[\d,]*(?:\.\d+)?`;
+const METRIC_DIGITS = String.raw`(?:${SPACE_GROUPED}|\d[\d,]*)(?:\.\d+)?`;
+const METRIC_NUMBER = `[-−]?${METRIC_DIGITS}`;
 // A comma joins only before a space, or a failing match would try every way to split `1,2,3,4`.
 const METRIC_VALUE =
   String.raw`${METRIC_NUMBER}(?:(?:\s*(?:-|–|—|to|and|or|x|×|by)|,(?=\s)(?:\s+(?:and|or)(?=\s))?)` +
@@ -869,7 +913,7 @@ function hasSides(measure: Measure): boolean {
 }
 
 /** A minus sign straight after a number is the dash of a range: `9-18 m`. */
-const METRIC_FIGURE = /(?:(?<![\d.]\s*)[-−])?\d[\d,]*(?:\.\d+)?/g;
+const METRIC_FIGURE = new RegExp(String.raw`(?:(?<![\d.]\s*)[-−])?${METRIC_DIGITS}`, 'g');
 
 interface MetricReading {
   dimension: Dimension;
@@ -889,7 +933,7 @@ function readMetric(text: string): MetricReading | undefined {
   if (form === undefined) return undefined;
   const figures = text.slice(0, text.lastIndexOf(unit));
   const spans = [...figures.matchAll(METRIC_FIGURE)].map(([figure]): [number, number] => {
-    const value = Number(figure.replace(/,/g, '').replace('−', '-'));
+    const value = Number(figure.replace(/[,\s]/g, '').replace('−', '-'));
     const half = 0.5 * 10 ** -(figure.split('.')[1]?.length ?? 0);
     const ends = [form.toBase(value - half), form.toBase(value + half)];
     return [Math.min(...ends), Math.max(...ends)];
@@ -1666,6 +1710,7 @@ function feetInchesRule(): Rule {
           ctx.options.units.precision,
           3,
           ctx.options.units.maxDecimals,
+          [match[1]!, match[2] ?? bare!],
         );
         let end = match.index + match[0].length;
         let attributive = false;
@@ -1786,7 +1831,8 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
           const target = compound.measures[0]!.convert(total);
           const { precision, maxDecimals } = ctx.options.units;
           // Several components together claim three figures, as feet and inches do.
-          const number = formatNumber(target.value, precision, 3, maxDecimals);
+          const raws = parts.map((p) => p.raw!);
+          const number = formatNumber(target.value, precision, 3, maxDecimals, raws);
 
           const isWord = (p: (typeof parts)[number]) =>
             p.measure.words.some((w) => w === p.unit.toLowerCase());
@@ -1929,7 +1975,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
     const target = entry.measure.convert(value);
     const { precision, maxDecimals } = ctx.options.units;
-    const number = formatNumber(target.value, precision, significantFigures(matched), maxDecimals);
+    const figures = significantFigures(matched);
+    const number = formatNumber(target.value, precision, figures, maxDecimals, [matched]);
     const body = `${number} ${unitWord(target, Number(number.replace(/,/g, '')))}`;
     pushMeasurement(ctx, changes, start, matched, body, entry.measure.id, 30);
   };
@@ -1981,10 +2028,15 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
+    if (mayCountNoun(ctx.text, start, raw, entry, value, gap, start + matched.length)) {
+      changes.push(hold(start, matched, entry.measure.id, 30));
+      return;
+    }
 
     const target = entry.measure.convert(value);
     const { precision, maxDecimals } = ctx.options.units;
-    const number = formatNumber(target.value, precision, significantFigures(raw), maxDecimals);
+    const figures = significantFigures(raw);
+    const number = formatNumber(target.value, precision, figures, maxDecimals, [raw]);
     const numberStart = start + (/^an?\s+/i.exec(raw)?.[0].length ?? 0);
     const attributive =
       entry.isWord &&
@@ -2068,9 +2120,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const figures = Math.max(...raws.map(significantFigures));
         const { precision, maxDecimals } = ctx.options.units;
         const texts = [...earlier.map((figure) => figure.value), low].map((value) =>
-          formatNumber(value * perSourceUnit, precision, figures, maxDecimals),
+          formatNumber(value * perSourceUnit, precision, figures, maxDecimals, raws),
         );
-        texts.push(formatNumber(target.value, precision, figures, maxDecimals));
+        texts.push(formatNumber(target.value, precision, figures, maxDecimals, raws));
         const gap = pair.slice(lowRaw.length + join.length + highRaw.length, -alias.length);
         const attributive = entry.isSingular && describesNoun(ctx.text, start, high, gap, end);
         const unit = entry.isWord
@@ -2234,7 +2286,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
         const target = units[largest]!.measure.convert(sides[largest]!.value!);
         const perBase = target.value / inBase[largest]!;
-        const figures = Math.max(...sides.map((s) => significantFigures(s.raw)));
+        const raws = sides.map((s) => s.raw);
+        const figures = Math.max(...raws.map(significantFigures));
         const { precision, maxDecimals } = ctx.options.units;
         const separator = /\bby\b/i.test(match[0]) ? ' by ' : match[0].includes('×') ? ' × ' : ' x ';
         const unit = entry.isWord
@@ -2242,7 +2295,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           : ` ${target.symbol}`;
         const body =
           inBase
-            .map((v) => formatNumber(v * perBase, precision, figures, maxDecimals))
+            .map((v) => formatNumber(v * perBase, precision, figures, maxDecimals, raws))
             .join(separator) + unit;
 
         pushMeasurement(ctx, changes, start, match[0], body, entry.measure.id, 38);
@@ -2367,9 +2420,9 @@ interface FahrenheitReading {
 function formatEnds(ctx: RuleContext, values: number[], raw: string[]): string[] {
   const { precision, maxDecimals } = ctx.options.units;
   const figures = Math.max(...raw.map(significantFigures));
-  let texts = values.map((v) => formatNumber(v, precision, figures, maxDecimals));
+  let texts = values.map((v) => formatNumber(v, precision, figures, maxDecimals, raw));
   for (let extra = 1; extra <= 2 && texts.length === 2 && texts[0] === texts[1]; extra++) {
-    texts = values.map((v) => formatNumber(v, precision, figures + extra, maxDecimals));
+    texts = values.map((v) => formatNumber(v, precision, figures + extra, maxDecimals, raw));
   }
   return texts;
 }
@@ -2680,8 +2733,8 @@ function fuelEconomyRule(): Rule {
       const perLitre = ctx.options.units.fuelEconomy === 'km-per-l';
       const { precision, maxDecimals } = ctx.options.units;
       const rate = (mpg: number) => (perLitre ? mpg * 0.425143707 : 235.214583 / mpg);
-      const economy = (mpg: number, figures: number) =>
-        formatNumber(rate(mpg), precision, figures, maxDecimals);
+      const economy = (mpg: number, figures: number, raws: string[]) =>
+        formatNumber(rate(mpg), precision, figures, maxDecimals, raws);
       const unit = perLitre ? 'km/L' : 'L/100km';
       // Where each range read here ends, which is where its second end's own match ends.
       const rangeEnds = new Set<number>();
@@ -2691,8 +2744,8 @@ function fuelEconomyRule(): Rule {
         const [pair, lowRaw, join, highRaw] = [match[0], match[1]!, match[2]!, match[3]!];
         const pairStart = match.index;
         const low = parseNumber(lowRaw);
-        const high = Number(highRaw);
-        if (low === null || !canBeRange(ctx.text, pairStart, low, high)) continue;
+        const high = parseNumber(highRaw);
+        if (low === null || high === null || !canBeRange(ctx.text, pairStart, low, high)) continue;
         const earlier = figuresBefore(ctx.text, pairStart, low, high, join);
         if (earlier === null) continue;
         const start = earlier[0]?.start ?? pairStart;
@@ -2711,7 +2764,7 @@ function fuelEconomyRule(): Rule {
         const figures = Math.max(2, ...raws.map(significantFigures));
         const separators = joins.map(separator);
         const write = (order: number[]) =>
-          `${interleave(order.map((mpg) => economy(mpg, figures)), separators)} ${unit}`;
+          `${interleave(order.map((mpg) => economy(mpg, figures, raws)), separators)} ${unit}`;
         const asWritten = write(values);
         const keepOrder =
           rate(values[0]!) <= rate(high) ||
@@ -2728,12 +2781,13 @@ function fuelEconomyRule(): Rule {
       for (const match of ctx.text.matchAll(single)) {
         // Its range settles it.
         if (rangeEnds.has(match.index + match[0].length)) continue;
-        const mpg = Number(match[1]);
+        const mpg = parseNumber(match[1]!);
         if (!mpg || endsRange(ctx.text, match.index, match[1]!)) {
           changes.push(hold(match.index, match[0], id, 35));
           continue;
         }
-        const body = `${economy(mpg, Math.max(2, significantFigures(match[1]!)))} ${unit}`;
+        const raws = [match[1]!];
+        const body = `${economy(mpg, Math.max(2, significantFigures(match[1]!)), raws)} ${unit}`;
         pushMeasurement(ctx, changes, match.index, match[0], body, id, 35);
       }
       return changes;

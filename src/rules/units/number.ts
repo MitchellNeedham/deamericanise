@@ -8,7 +8,6 @@ const VULGAR: Record<string, number> = {
 };
 
 const VULGAR_CLASS = `[${Object.keys(VULGAR).join('')}]`;
-const DIGITS = String.raw`\d{1,3}(?:,\d{3})+|\d+`;
 
 /** How a number in digits ends: a digit or a vulgar fraction, as in `15` and `15½`. */
 export const NUMERIC_LAST = String.raw`(?:\d|${VULGAR_CLASS})`;
@@ -34,6 +33,48 @@ export function plainHyphens(text: string): string {
  */
 export const INLINE_SPACE = String.raw`[^\S\n\r\v\f\u2028\u2029]`;
 const SPACE_OR_HYPHEN = String.raw`(?:${INLINE_SPACE}+|${HYPHEN})`;
+
+/** A space, a no-break space (U+00A0) or a narrow no-break space (U+202F), between groups. */
+const GROUP_SPACES = [' ', String.raw`\u00A0`, String.raw`\u202F`];
+const GROUP_SPACE = `[${GROUP_SPACES.join('')}]`;
+
+/**
+ * What figures that lead no group follow: what no number starts after, as the `98` of
+ * `10/20/98` and the `30` of `7:30` do not, and a written-out month, whose day the `5` of
+ * `June 5` is.
+ */
+const NO_LEAD =
+  String.raw`[\w.]|${NUMERIC_LAST}(?:${HYPHEN}|[\u2013\u2014/,:])|` +
+  String.raw`\b(?:${MONTH_PATTERN})\.?${INLINE_SPACE}+`;
+
+/** One to three digits and a group space, which three digits after continue, as in `1 000`. */
+const GROUP_LEAD = String.raw`(?<!${NO_LEAD})\d{1,3}${GROUP_SPACE}`;
+
+const groupedBy = (separator: string) => String.raw`\d{1,3}(?:${separator}\d{3})+(?!\d)`;
+
+/**
+ * A whole number grouped in thousands by one kind of space throughout: `1 000`, `12 500`. It
+ * never starts on a later group of another, so a long run of groups is read once, nor where
+ * its first figures lead no group.
+ */
+export const SPACE_GROUPED =
+  String.raw`(?=\d{1,3}${GROUP_SPACE}\d)(?<!${GROUP_LEAD}|${NO_LEAD})` +
+  `(?:${GROUP_SPACES.map(groupedBy).join('|')})`;
+
+/** A whole number in digits, grouped in thousands by commas or by spaces, or not at all. */
+const DIGITS = String.raw`${groupedBy(',')}|${SPACE_GROUPED}|\d+`;
+
+const COUNT_THEN_GROUP = new RegExp(
+  String.raw`^\d{1,3}(?:${GROUP_SPACE}\d{3})*${GROUP_SPACE}[1-9]\d\d(?:\.\d+)?$`,
+);
+
+/**
+ * Whether `raw`, grouped with spaces, may instead be a count and then a number, as `2 100` is
+ * in `2 100-pound bags`: its last group is a number of its own, with no leading zero.
+ */
+export function mayBeCountAndNumber(raw: string): boolean {
+  return COUNT_THEN_GROUP.test(raw);
+}
 
 const LINE_BREAK = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
 
@@ -142,13 +183,23 @@ function unlessTail(guard: string, body: string): string {
 const CARDINAL_WORDS = String.raw`(?:${COMPOUND}|${CARD})`;
 const CARDINAL = unlessTail(NOT_IN_COMPOUND, CARDINAL_WORDS);
 
+const COUNT = String.raw`(?:an?${INLINE_SPACE}+|${CARDINAL_WORDS}${SPACE_OR_HYPHEN})`;
+const THOUSAND =
+  String.raw`thousand\b(?:${INLINE_SPACE}+(?:${ONES.join('|')})${SPACE_OR_HYPHEN}hundred\b)?`;
+
 /**
  * A count times `hundred` or `thousand`: `a hundred`, `twenty-two hundred`,
- * `two thousand five hundred`.
+ * `two thousand five hundred`. A count of thousands may itself be a count of hundreds, with a
+ * cardinal after it or not: `a hundred thousand`, `one hundred twenty thousand`,
+ * `two hundred and fifty thousand`. The cardinal is the word straight before `thousand`, so
+ * `one hundred and two hundred thousand` is no count. Straight after `between`, the `and`
+ * joins a range, as in `between one hundred and two thousand`.
  */
 const MULTIPLIED =
-  String.raw`(?:an?${INLINE_SPACE}+|${CARDINAL_WORDS}${SPACE_OR_HYPHEN})` +
-  String.raw`(?:thousand\b(?:${INLINE_SPACE}+(?:${ONES.join('|')})${SPACE_OR_HYPHEN}hundred\b)?|hundred\b)`;
+  String.raw`(?:(?<!\bbetween${SPACING})${COUNT}hundred${INLINE_SPACE}+and${INLINE_SPACE}+` +
+  String.raw`${CARDINAL_WORDS}${SPACE_OR_HYPHEN}${THOUSAND}|` +
+  String.raw`${COUNT}(?:(?:hundred(?:${INLINE_SPACE}+${CARDINAL_WORDS})?${SPACE_OR_HYPHEN})?` +
+  String.raw`${THOUSAND}|hundred\b))`;
 
 /**
  * A whole number in words: a cardinal, a multiplied count, or a multiplied count and then a
@@ -189,10 +240,10 @@ const WORD_NUMBER = [
 export const WHOLE_NUMBER = String.raw`(?:${DIGITS}|${WHOLE_WORDS})`;
 
 /**
- * Digits only: `3`, `1,200`, `1 1/2`, `2-3/4`, `1½`, `3/4`. A dash joins a range only between
- * these, because a written-out fraction contains its own hyphen: `one-half` is one number,
- * not a range running from `one` to `half`. `2-3/4` is a mixed number only where its fraction
- * is below one, which `parseNumber` decides.
+ * Digits only: `3`, `1,200`, `1 200`, `1 1/2`, `2-3/4`, `1½`, `3/4`. A dash joins a range
+ * only between these, because a written-out fraction contains its own hyphen: `one-half` is one
+ * number, not a range running from `one` to `half`. `2-3/4` is a mixed number only where its
+ * fraction is below one, which `parseNumber` decides.
  */
 export const NUMERIC_PATTERN = [
   String.raw`[-−]?\d+${HYPHEN}\d+/\d+`,
@@ -212,7 +263,7 @@ export const NUMBER_PATTERN = `${NUMERIC_PATTERN}|${WORD_NUMBER}`;
 
 function cardinal(word: string): number | undefined {
   if (word === 'a' || word === 'an') return 1;
-  if (/^\d+$/.test(word)) return Number(word);
+  if (/^(?:0|[1-9]\d*)$/.test(word)) return Number(word);
   return CARDINALS[word];
 }
 
@@ -256,17 +307,28 @@ function parseWords(text: string): number | null {
   return total + group;
 }
 
-/** The value `raw` is written as, or null where it is not a finite number, as `5/0` is not. */
+/**
+ * The value `raw` is written as, or null where it is not a finite number, as `5/0` is not, or
+ * its whole part has a leading zero, as `007` and `025` do.
+ */
 export function parseNumber(raw: string): number | null {
   const value = readNumber(raw);
   return value !== null && Number.isFinite(value) ? value : null;
 }
 
+// A space before a fraction's numerator is the gap of a mixed number, as in `1 100/200`.
+const GROUP_SPACE_IN_NUMBER = new RegExp(String.raw`(?<=\d)${GROUP_SPACE}(?=\d{3}(?![\d/]))`, 'g');
+
 function readNumber(raw: string): number | null {
-  const text = plainHyphens(raw.trim()).replace(/−/g, '-').replace(/,/g, '');
+  const text = plainHyphens(raw.trim())
+    .replace(/−/g, '-')
+    .replace(/,/g, '')
+    .replace(GROUP_SPACE_IN_NUMBER, '');
   if (/[a-z]/i.test(text)) return parseWords(text);
   const sign = text.startsWith('-') ? -1 : 1;
   const body = text.replace(/^-/, '');
+  // A whole part with a leading zero is a code or a name, as `007` is, not a quantity.
+  if (/^0\d/.test(body)) return null;
 
   const vulgar = body.match(new RegExp(`^(\\d*)\\s*(${VULGAR_CLASS})$`));
   if (vulgar) {
@@ -334,12 +396,14 @@ const NAME_HYPHEN =
  * minutes of a time such as `7:30`. Straight after a currency sign it is a price, and four
  * figures straight after `Oct 22,`, `22 October`, `October 22` or `May` are the year of a
  * date. The optional space after the sign matches the currency rule, which reads `$ 5` as
- * money.
+ * money. Three figures straight after one to three and a space are a group of a number such
+ * as `1 000`, while one or two are a number of their own, as the `4` of `Rooms 3 4 feet` is.
  */
 export const NUMBER_START =
   String.raw`(?<![\w.${UNICODE_HYPHENS}]|${VULGAR_CLASS}|${NAME_HYPHEN}|` +
   String.raw`${NUMERIC_LAST}(?:${HYPHEN}|[\u2013\u2014/,:])|[$£€]\s?)` +
-  String.raw`(?!(?=\d{4}(?!\d))(?<=${DATE_BEFORE_YEAR}))`;
+  String.raw`(?!(?=\d{4}(?!\d))(?<=${DATE_BEFORE_YEAR}))` +
+  String.raw`(?!(?=\d{3}(?!\d))(?<=${GROUP_LEAD}))`;
 
 /**
  * Where the number of a measurement may start: where `NUMBER_START` lets a number start, and
@@ -433,28 +497,51 @@ function roundToSignificant(value: number, figures: number): number {
   return Math.round(value * factor) / factor;
 }
 
-function group(text: string): string {
+const GROUPED_SOURCE = new RegExp(String.raw`\d(,|${GROUP_SPACE})\d{3}(?![\d/])`);
+
+/** The separator the first of `raws` that groups its thousands groups them with. */
+function thousandsSeparator(raws: readonly string[]): string | undefined {
+  for (const raw of raws) {
+    const separator = GROUPED_SOURCE.exec(raw)?.[1];
+    if (separator !== undefined) return separator;
+  }
+  return undefined;
+}
+
+/**
+ * `text` grouped in thousands: from four digits by `separator`, or from five by commas where
+ * the source grouped none.
+ */
+function group(text: string, separator?: string): string {
   const [whole = '', decimal] = text.split('.');
   const sign = whole.startsWith('-') ? '-' : '';
   const digits = whole.replace('-', '');
-  if (digits.length < 5) return text;
-  return sign + digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (decimal ? `.${decimal}` : '');
+  if (digits.length < (separator === undefined ? 5 : 4)) return text;
+  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, separator ?? ',');
+  return sign + grouped + (decimal ? `.${decimal}` : '');
 }
 
-function trim(value: number, maxDecimals: number): string {
-  return group(String(Number(value.toFixed(maxDecimals))));
+function trim(value: number, maxDecimals: number, separator?: string): string {
+  return group(String(Number(value.toFixed(maxDecimals))), separator);
 }
 
+/**
+ * `value` written to `precision`, its thousands grouped as the source numbers `raws` group
+ * theirs: `2,025 miles` gives `3,259 kilometres`, `1 000 miles` gives `1 600 kilometres`, and
+ * `2025 miles` gives `3259 kilometres`.
+ */
 export function formatNumber(
   value: number,
   precision: Precision,
   sourceFigures: number,
   maxDecimals: number,
+  raws: readonly string[],
 ): string {
-  if (typeof precision === 'number') return group(value.toFixed(precision));
-  if (precision === 'exact') return trim(value, maxDecimals);
+  const separator = thousandsSeparator(raws);
+  if (typeof precision === 'number') return group(value.toFixed(precision), separator);
+  if (precision === 'exact') return trim(value, maxDecimals, separator);
   // `natural`: never claim less than two figures, and never more than the source did.
-  return trim(roundToSignificant(value, Math.max(2, sourceFigures)), 4);
+  return trim(roundToSignificant(value, Math.max(2, sourceFigures)), 4, separator);
 }
 
 /** A Fahrenheit value that reads as an oven dial setting rather than a measurement. */

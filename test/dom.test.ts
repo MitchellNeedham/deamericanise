@@ -7,7 +7,7 @@ import { DomRewriter, deamericaniseDom } from '../src/dom/index.js';
 import type { DomOptions } from '../src/dom/index.js';
 import { distribute } from '../src/dom/distribute.js';
 import { DIALECTS } from '../src/index.js';
-import type { Change, Dialect } from '../src/index.js';
+import type { Change, Dialect, Preset, Syntax } from '../src/index.js';
 
 // A path, not a URL: under jsdom `URL` is jsdom's own, which `node:fs` rejects.
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'html');
@@ -306,6 +306,82 @@ describe('runs of text in a laid-out page', () => {
       expect(host.textContent).toBe('// center the colorthe colour');
       rewriter.stop();
       host.remove();
+    });
+
+    describe('inside a sentence', () => {
+      // jsdom inherits neither property, so each span sets both.
+      const mono = 'font-family: ui-monospace, monospace';
+
+      it.each([
+        [
+          'a span a stylesheet draws as code',
+          '<style>.mono { font-family: ui-monospace, monospace; white-space: pre-wrap; }</style>',
+          '<span class="mono">color</span>',
+        ],
+        ['a span that keeps its white space unwrapped', '', `<span style="${mono}; white-space: pre">color</span>`],
+        ['a span that breaks at its spaces', '', `<span style="${mono}; white-space: break-spaces">color</span>`],
+        ['a span that names its white space by its parts', '', `<span style="${mono}; white-space: preserve nowrap">color</span>`],
+        ['code', '', '<code>color</code>'],
+        ['tt', '', '<tt>color</tt>'],
+        ['kbd', '', '<kbd>color</kbd>'],
+        ['samp', '', '<samp>color</samp>'],
+        ['role="code"', '', '<span role="code">color</span>'],
+      ])('leaves alone %s and converts the sentence around it', (_, sheet, code) => {
+        const host = laidOut(`${sheet}<p>Set the ${code} to gray and center it.</p>`);
+        deamericaniseDom(host);
+        expect(host.innerHTML).toBe(`${sheet}<p>Set the ${code} to grey and centre it.</p>`);
+        host.remove();
+      });
+
+      it('ends the run at inline code, so a word split at its edge is not read whole', () => {
+        const code = `<span style="${mono}; white-space: pre">color</span>`;
+        const host = laidOut(`<p>The ${code}ful theater.</p>`);
+        deamericaniseDom(host);
+        expect(host.innerHTML).toBe(`<p>The ${code}ful theatre.</p>`);
+        host.remove();
+      });
+
+      it('leaves alone text added to inline code later', () => {
+        const host = laidOut(`<p>Set the <span style="${mono}; white-space: pre">color</span> to gray.</p>`);
+        const rewriter = new DomRewriter(host);
+        rewriter.watch();
+        host.querySelector('span')!.append(' center');
+        rewriter.flush();
+        expect(host.textContent).toBe('Set the color center to grey.');
+        rewriter.stop();
+        host.remove();
+      });
+
+      it('puts the original back once the stylesheets that draw a span as code have loaded', () => {
+        const host = laidOut('<p>Set the <span>color</span> to gray.</p>');
+        Object.defineProperty(document, 'readyState', { configurable: true, get: () => 'interactive' });
+        const rewriter = new DomRewriter(host);
+        rewriter.watch();
+        Reflect.deleteProperty(document, 'readyState');
+        expect(host.textContent).toBe('Set the colour to grey.');
+
+        const span = host.querySelector('span')!;
+        span.style.fontFamily = 'ui-monospace, monospace';
+        span.style.whiteSpace = 'pre-wrap';
+        window.dispatchEvent(new Event('load'));
+        expect(host.textContent).toBe('Set the color to grey.');
+        rewriter.stop();
+        host.remove();
+      });
+
+      it.each([
+        ['kept on one line in a proportional font', 'white-space: nowrap'],
+        ['kept on one line in a monospace font', `${mono}; white-space: nowrap`],
+        ['in a monospace font that wraps as usual', `${mono}; white-space: normal`],
+        ['in a monospace font with no white space set', mono],
+        ['in a monospace font that keeps only its line breaks', `${mono}; white-space: pre-line`],
+        ['that keeps its white space in a proportional font', 'font-family: Helvetica, sans-serif; white-space: pre-wrap'],
+      ])('joins a span %s to the sentence', (_, style) => {
+        const host = laidOut(`<p>It is 6 feet <span style="${style}">2 inches</span> wide.</p>`);
+        deamericaniseDom(host);
+        expect(host.innerHTML).toBe(`<p>It is 1.88 metres<span style="${style}"></span> wide.</p>`);
+        host.remove();
+      });
     });
   });
 });
@@ -1158,6 +1234,7 @@ describe('a page with shadow roots', () => {
 
 describe('options it rejects', () => {
   const unknownDialect = 'Unknown dialect: en-XX. Expected one of en-AU, en-GB, en-NZ, en-IE, en-ZA, en-CA.';
+  const unknownPreset = 'Unknown preset: Localise. Expected one of read, localise.';
   const noProse = '<pre>color</pre>';
 
   it('rejects an unknown dialect on a page with no prose', () => {
@@ -1176,5 +1253,34 @@ describe('options it rejects', () => {
 
   it('keeps a unit named the way a person writes it', () => {
     expect(rewrite('<p>It is 6 inches wide.</p>', { unitsKeep: ['inches'] })).toBe('<p>It is 6 inches wide.</p>');
+  });
+
+  it('rejects an unknown preset before reading the page', () => {
+    const doc = page('<p>Fill the gas tank.</p>');
+    expect(() => new DomRewriter(doc, { preset: 'Localise' as Preset })).toThrow(unknownPreset);
+    expect(doc.body.innerHTML).toBe('<p>Fill the gas tank.</p>');
+  });
+
+  it.each([
+    ['an unknown preset', { preset: 'Localise' as Preset }, unknownPreset],
+    ['an unknown dialect', { dialect: 'en-XX' as Dialect }, unknownDialect],
+    ['a unitsKeep entry that names no unit', { unitsKeep: ['furlong'] }, 'Unknown unit: furlong.'],
+    ['an unknown syntax', { syntax: 'prose' as Syntax }, 'Unknown syntax: prose. Expected one of markdown, text.'],
+  ])('keeps following the page under its old options when setOptions rejects %s', (_, rejected, message) => {
+    const doc = page('<p>Fill the gas tank.</p>');
+    const rewriter = new DomRewriter(doc, { preset: 'localise' });
+    rewriter.watch();
+    expect(() => rewriter.setOptions(rejected)).toThrow(message);
+
+    doc.body.insertAdjacentHTML('beforeend', '<p>Fill the gas tank.</p>');
+    rewriter.flush();
+    expect(doc.body.innerHTML).toBe('<p>Fill the petrol tank.</p><p>Fill the petrol tank.</p>');
+    rewriter.run();
+    expect(doc.body.innerHTML).toBe('<p>Fill the petrol tank.</p><p>Fill the petrol tank.</p>');
+    expect(rewriter.changes()).toHaveLength(2);
+
+    rewriter.setOptions({ preset: 'read' });
+    expect(doc.body.innerHTML).toBe('<p>Fill the gas tank.</p><p>Fill the gas tank.</p>');
+    rewriter.stop();
   });
 });

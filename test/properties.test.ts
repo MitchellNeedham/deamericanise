@@ -26,7 +26,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { DIALECTS, MEASURES, commentSpans, deamericanise, deamericaniseCode, lexerFor } from '../src/index.js';
-import type { AmericanSignals, Change, CodeOptions, Result } from '../src/index.js';
+import type { AmericanSignals, Change, CodeOptions, LexEntry, Result } from '../src/index.js';
 import { applyChanges, type Range } from '../src/engine/apply.js';
 import { spellingEntries } from '../src/rules/spelling/index.js';
 import { baseVocabulary } from '../src/rules/vocabulary.js';
@@ -217,6 +217,33 @@ const follows =
   (v: Violation): boolean =>
     v.change !== undefined && pattern.test(v.text.slice(v.change.end));
 
+const VOCABULARY = [...baseVocabulary(), ...Object.values(DIALECTS).flatMap((pack) => pack.vocabulary)];
+
+/** Must match `CONTEXT_WINDOW` in src/engine/lexicon.ts. */
+const GUARD_WINDOW = 80;
+
+/** Whether `entry`'s guards let the span through when they see `window` characters either side. */
+function passesGuards(entry: LexEntry, text: string, start: number, end: number, window: number): boolean {
+  const before = text.slice(Math.max(0, start - window), start);
+  const after = text.slice(end, end + window);
+  if (entry.requireBefore && !entry.requireBefore.test(before)) return false;
+  if (entry.requireAfter && !entry.requireAfter.test(after)) return false;
+  if (entry.forbidBefore && entry.forbidBefore.test(before)) return false;
+  if (entry.forbidAfter && entry.forbidAfter.test(after)) return false;
+  return true;
+}
+
+/** The word's guards refuse it with the whole text in view, but not within their window. */
+const beyondGuardWindow = (v: Violation): boolean => {
+  const change = v.change;
+  if (change === undefined) return false;
+  const entries = VOCABULARY.filter((e) => e.ruleId === change.ruleId && e.from === change.before.toLowerCase());
+  return (
+    entries.some((e) => passesGuards(e, v.text, change.start, change.end, GUARD_WINDOW)) &&
+    !entries.some((e) => passesGuards(e, v.text, change.start, change.end, Infinity))
+  );
+};
+
 const localise = { preset: 'localise' } as const;
 const american = { assumeAmerican: true } as const;
 
@@ -399,6 +426,14 @@ const KNOWN_FAILURES: KnownFailure[] = [
       v.origin === undefined &&
       (v.previous !== undefined || v.next !== undefined) &&
       (v.change?.category === 'vocabulary' || v.change?.category === 'spelling'),
+  },
+  {
+    issue: 186,
+    property: 'idempotence',
+    input: 'https://example.com/10th-grade?q=10th-grade 1/2pounds per square inch 0 by 0 cookies the ',
+    options: { ...localise, units: { keepOriginal: true } },
+    // The first run lengthened the text between the word and the context that refused it.
+    matches: (v) => v.origin === undefined && v.change?.category === 'vocabulary' && beyondGuardWindow(v),
   },
 ];
 

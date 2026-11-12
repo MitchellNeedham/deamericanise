@@ -266,6 +266,25 @@ describe('a long run of whitespace takes time in line with its length', () => {
   });
 });
 
+describe('a long run of fuel economy ranges takes time in line with its length', () => {
+  // Generous, since each of these takes a few hundred milliseconds at most. Testing every
+  // change against a hold for every range takes several seconds.
+  const LIMIT_MS = 1000;
+
+  it.each`
+    range                    | length   | expected
+    ${'20 to 30 mpg, '}      | ${10000} | ${'7.8 to 12 L/100km, 7.8 to 12 L/100km, '}
+    ${'twenty to 30 mpg, '}  | ${16000} | ${'twenty to 30 mpg, twenty to 30 mpg, '}
+  `('"$range", $length times', ({ range, length, expected }) => {
+    const text = (n: number) => range.repeat(n);
+    convert(text(1));
+    const started = performance.now();
+    const output = convert(text(length));
+    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+    expect(output.startsWith(expected)).toBe(true);
+  });
+});
+
 describe('mass and volume', () => {
   it.each`
     input                | expected
@@ -633,6 +652,91 @@ describe('speed, power and economy', () => {
     ${'10 acres'}        | ${'4 hectares'}
     ${'2000 square feet'} | ${'190 square metres'}
   `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('fuel economy', () => {
+  it.each`
+    input                                             | expected                                   | why
+    ${'It does 30 miles/gallon on the highway'}       | ${'It does 7.8 L/100km on the highway'}    | ${'a slash'}
+    ${'It does 30 miles / gallon on the highway'}     | ${'It does 7.8 L/100km on the highway'}    | ${'a spaced slash'}
+    ${'It does 30 mi/gal on the highway'}             | ${'It does 7.8 L/100km on the highway'}    | ${'abbreviated'}
+    ${'It does 30 Miles/Gallon on the highway'}       | ${'It does 7.8 L/100km on the highway'}    | ${'capitalised'}
+    ${'It does 30 miles-per-gallon on the highway'}   | ${'It does 7.8 L/100km on the highway'}    | ${'hyphenated'}
+    ${'It does 30 miles\nper gallon on the highway'}  | ${'It does 7.8 L/100km on the highway'}    | ${'a wrapped line'}
+    ${'a 30-miles-per-gallon car'}                    | ${'a 7.8 L/100km car'}                     | ${'a hyphen after the number'}
+    ${'a 30-mpg car'}                                 | ${'a 7.8 L/100km car'}                     | ${'the same, abbreviated'}
+    ${'In 2024 - 30 miles/gallon on the highway'}     | ${'In 2024 - 7.8 L/100km on the highway'}  | ${'a year before it'}
+    ${'It does 30 miles/gallon (7.8 L/100km) here'}   | ${'It does 7.8 L/100km here'}              | ${'a bracket that restates it'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                | expected                                     | why
+    ${'It does 20 to 30 mpg on the highway'}             | ${'It does 7.8 to 12 L/100km on the highway'} | ${'to, the smaller first'}
+    ${'It does 20 - 30 mpg on the highway'}              | ${'It does 7.8-12 L/100km on the highway'}   | ${'a spaced dash'}
+    ${'It does 20-30 mpg on the highway'}                | ${'It does 7.8-12 L/100km on the highway'}   | ${'a tight dash'}
+    ${'between 25 and 30 miles per gallon'}              | ${'between 7.8 and 9.4 L/100km'}             | ${'and after between'}
+    ${'It does 30 to 20 mpg on the highway'}             | ${'It does 7.8 to 12 L/100km on the highway'} | ${'falling, the smaller first too'}
+    ${'It does 20 to 30 mi/gal on the highway'}          | ${'It does 7.8 to 12 L/100km on the highway'} | ${'not a range of lengths'}
+    ${'Economy improved from 20 to 30 mpg here'}         | ${'Economy improved from 12 to 7.8 L/100km here'} | ${'from shows a direction'}
+    ${'Economy fell from 30 to 20 mpg here'}             | ${'Economy fell from 7.8 to 12 L/100km here'} | ${'the same, falling'}
+    ${'It does 25 to 30 mpg (7.8 to 9.4 L/100km) here'}  | ${'It does 7.8 to 9.4 L/100km here'}         | ${'a bracket that restates it'}
+    ${'It does 25 to 30 mpg (9.4 to 7.8 L/100km) here'}  | ${'It does 9.4 to 7.8 L/100km here'}         | ${'the same, in the source order'}
+    ${'It fell by half to 30 mpg on the hill'}           | ${'It fell by half to 7.8 L/100km on the hill'} | ${'half to is an idiom'}
+  `('reads a range: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                               | why
+    ${'It does twenty to 30 mpg on the highway'}            | ${'a first end in words'}
+    ${'between one and 30 miles per gallon'}                | ${'the same, written out'}
+    ${'It does 0 to 30 mpg on the highway'}                 | ${'a first end of zero'}
+    ${'It does 5 to 20 to 30 miles per gallon on the road'} | ${'the second end of a range'}
+    ${'It does 0 miles per gallon on the hill'}             | ${'zero, which has no litres per 100 km'}
+    ${'It does 7.8 L/100km (30 miles/gallon) here'}         | ${'the original in brackets'}
+    ${'It does 7.8 L/100km (30 mi/gal) here'}               | ${'the same, abbreviated'}
+    ${'It does 7.8 L/100km (30 miles-per-gallon) here'}     | ${'the same, hyphenated'}
+    ${'At 7:30 miles/gallon'}                               | ${'the minutes of a time'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                          | expected
+    ${'It does 30 miles/gallon on the road'}       | ${'It does 13 km/L on the road'}
+    ${'It does 20 to 30 mpg on the road'}          | ${'It does 8.5 to 13 km/L on the road'}
+    ${'It does 30 to 20 mpg on the road'}          | ${'It does 8.5 to 13 km/L on the road'}
+    ${'Economy improved from 20 to 30 mpg here'}   | ${'Economy improved from 8.5 to 13 km/L here'}
+    ${'Economy fell from 30 to 20 mpg here'}       | ${'Economy fell from 13 to 8.5 km/L here'}
+  `('in km per litre: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input, { units: { fuelEconomy: 'km-per-l' } })).toBe(expected);
+  });
+
+  it.each`
+    input                                          | expected
+    ${'It does 30 miles/gallon on the road'}       | ${'It does 7.8 L/100km (30 miles/gallon) on the road'}
+    ${'It does 20 to 30 mpg on the road'}          | ${'It does 7.8 to 12 L/100km (20 to 30 mpg) on the road'}
+    ${'Economy improved from 20 to 30 mpg here'}   | ${'Economy improved from 12 to 7.8 L/100km (20 to 30 mpg) here'}
+  `('keeps the original of $input, and runs twice without converting it again', ({ input, expected }) => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert(input, options);
+    expect(once).toBe(expected);
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each`
+    input                               | expected
+    ${'It flows at 5 gallons/minute.'}  | ${'It flows at 19 litres/minute.'}
+    ${'It moves at 10 feet/second.'}    | ${'It moves at 3 metres/second.'}
+    ${'It does 30 mpg.'}                | ${'It does 7.8 L/100km.'}
+    ${'It does 30 mpg (7.8 L/100km).'}  | ${'It does 7.8 L/100km.'}
+    ${'In 2024 - 30 mpg'}               | ${'In 2024 - 7.8 L/100km'}
+    ${'At 7:30 mpg'}                    | ${'At 7:30 mpg'}
+  `('still gives $input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 });

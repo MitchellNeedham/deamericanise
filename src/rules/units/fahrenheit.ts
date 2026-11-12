@@ -24,8 +24,10 @@ import {
 export const NOT_A_TITLE = String.raw`(?![^\S\n]*(?:\n[^\S\n]*(?!\d+[.)](?:\s|$)))?\d)`;
 
 /**
- * The stop after an `F`, as in `350 degrees F.`, which the unit rules keep only where it also
- * ends the sentence. A stop that opens an ellipsis or runs into a word is left in the text.
+ * The stop after a bare letter `F` that abbreviates the scale, as in `350 degrees F.`, which
+ * the unit rules keep only where it also ends the sentence. `°F` is a symbol, which takes no
+ * stop, so the stop after it is always the sentence's own and is never read here. A stop that
+ * opens an ellipsis or runs into a word is left in the text.
  * So is one before a bracket or a figure, where it may end a sentence that the unit rules'
  * test cannot see end: a bracket may trail the sentence, and a figure never opens one there.
  */
@@ -36,11 +38,11 @@ const STOP = String.raw`(?:\.(?![.\w]|\s*[(\d]))?`;
  * stand in for the degree sign on phone keyboards and Spanish and Portuguese layouts. The
  * word alone counts after a number on the same line, but not after a whole number of four
  * figures, which reads as a year (`In 1724 Fahrenheit proposed his scale`), nor before
- * `thermometers` or `scale`, where the number counts them, nor as a title. An `F` takes the
- * `STOP` after it.
+ * `thermometers` or `scale`, where the number counts them, nor as a title. A bare letter `F`
+ * takes the `STOP` after it.
  */
 export const FAHRENHEIT =
-  String.raw`[°º˚]\s*F\b${STOP}|℉|[°º˚]\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|` +
+  String.raw`[°º˚]\s*F\b|℉|[°º˚]\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|` +
   String.raw`degrees?\s+F\b${STOP}|deg\.?\s*F\b${STOP}|` +
   // The lookahead comes first so the lookbehinds never walk a run of spaces from every place in it.
   String.raw`(?=Fahrenheit\b)(?<=\d${INLINE_SPACE}*)(?<!(?<![\d.])\d{4}${INLINE_SPACE}*)` +
@@ -152,8 +154,9 @@ function bareIsFahrenheit(text: string, match: RegExpExecArray): boolean {
 /**
  * Every Fahrenheit temperature in the text. Groups 1 and 2 are the first number of a
  * range and what joins it to the second, group 3 is the number the unit follows, and
- * group 4 or 5 is the unit, with any stop after its `F`. The temperature rules convert
- * exactly these, and detection counts them, so the two always agree on what is Fahrenheit.
+ * group 4 or 5 is the unit, with any stop after a bare letter `F`. The temperature rules
+ * convert exactly these, and detection counts them, so the two always agree on what is
+ * Fahrenheit.
  */
 export function* fahrenheitTemperatures(text: string): Generator<RegExpExecArray> {
   const pattern = new RegExp(PATTERN);

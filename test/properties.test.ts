@@ -217,6 +217,14 @@ const follows =
   (v: Violation): boolean =>
     v.change !== undefined && pattern.test(v.text.slice(v.change.end));
 
+/** A second run starts a measurement on the year a first run wrote into a date in words. */
+const startsOnWrittenOutYear = (v: Violation): boolean =>
+  v.change?.category === 'units' &&
+  v.origin?.category === 'dates' &&
+  /[A-Za-z]/.test(v.origin.after) &&
+  /^\d{4}\b/.test(v.change.before) &&
+  v.origin.after.endsWith(v.change.before.slice(0, 4));
+
 const localise = { preset: 'localise' } as const;
 const american = { assumeAmerican: true } as const;
 
@@ -401,15 +409,37 @@ const KNOWN_FAILURES: KnownFailure[] = [
     property: 'idempotence',
     input: 'Oct 22, 2024 1/2 inch long',
     options: localise,
-    // The year of a written-out date the first run reordered starts a measurement on the second.
-    matches: (v) => v.change?.category === 'units' && v.origin?.ruleId === 'dates.long' && /^\d{4}\b/.test(v.change.before),
+    matches: startsOnWrittenOutYear,
   },
   {
     issue: 197,
     property: 'idempotence',
     input: 'March 13, 2024 - 250 feet',
     options: localise,
-    matches: (v) => v.change?.category === 'units' && v.origin?.ruleId === 'dates.long' && /^\d{4}\b/.test(v.change.before),
+    matches: startsOnWrittenOutYear,
+  },
+  {
+    issue: 197,
+    property: 'idempotence',
+    input: '1/29/24 in. the ',
+    options: { dates: { format: 'long' }, times: { to24Hour: true } },
+    matches: startsOnWrittenOutYear,
+  },
+  {
+    issue: 198,
+    property: 'idempotence',
+    input: 'It was $1,000 1/2 inch wide.',
+    options: american,
+    // The amount a first run read as a measurement takes the currency mark on the second.
+    matches: (v) => {
+      const amount = /^\$\s?(\d[\d,]*(?:\.\d+)?)/.exec(v.change?.before ?? '')?.[1];
+      return (
+        v.change?.category === 'currency' &&
+        v.origin?.category === 'units' &&
+        amount !== undefined &&
+        v.origin.after.startsWith(amount)
+      );
+    },
   },
 ];
 

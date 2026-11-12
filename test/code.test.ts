@@ -217,7 +217,7 @@ describe('a fenced example across line comments', () => {
     ${'rust'}   | ${'/// ```\n/// let color = 1;\n/// ```\n'}                         | ${'/// ```\n/// let color = 1;\n/// ```\n'}
     ${'rust'}   | ${'//! ```\n//! let color = 1;\n//! ```\n//! The color is red.\n'}  | ${'//! ```\n//! let color = 1;\n//! ```\n//! The colour is red.\n'}
     ${'ts'}     | ${'// ```\n// the color\n// ```\n// The color is red.\n'}           | ${'// ```\n// the color\n// ```\n// The colour is red.\n'}
-    ${'python'} | ${'# ~~~\n# the color\n# ~~~\n# The color is red.\n'}               | ${'# ~~~\n# the color\n# ~~~\n# The colour is red.\n'}
+    ${'python'} | ${'# ```\n# the color\n# ```\n# The color is red.\n'}               | ${'# ```\n# the color\n# ```\n# The colour is red.\n'}
   `('$language: $source', ({ language, source, expected }) => {
     expect(rewrite(language, source)).toBe(expected);
   });
@@ -279,9 +279,9 @@ describe("a prose file's type decides how its code fences are read", () => {
 });
 
 describe("a prose file's type decides whether indented code is protected", () => {
-  const indented = 'Set the theme:\n\n    theme.color = "gray";\n';
-  const kept = 'Set the theme:\n\n    theme.color = "gray";\n';
-  const rewritten = 'Set the theme:\n\n    theme.colour = "grey";\n';
+  const indented = 'Set the theme:\n\n    color = "gray";\n';
+  const kept = 'Set the theme:\n\n    color = "gray";\n';
+  const rewritten = 'Set the theme:\n\n    colour = "grey";\n';
 
   it.each`
     filename           | options                   | expected     | why

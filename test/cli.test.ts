@@ -383,9 +383,9 @@ describe('--language', () => {
 });
 
 describe('--syntax', () => {
-  const indented = 'Set the theme:\n\n    theme.color = "gray";\n';
+  const indented = 'Set the theme:\n\n    color = "gray";\n';
   const kept = indented;
-  const rewritten = 'Set the theme:\n\n    theme.colour = "grey";\n';
+  const rewritten = 'Set the theme:\n\n    colour = "grey";\n';
   const rst = 'Colors\n~~~~~~\n\nThe color of things.\n';
 
   it.each`

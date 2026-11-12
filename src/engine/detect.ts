@@ -150,9 +150,15 @@ const FAHRENHEIT: Pick<RegExp, 'test'> = {
   },
 };
 
-// The number may be written out, as older prose and most recipes do.
-const IMPERIAL_UNIT =
-  /\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|half|quarter|quarters)[\s-]*(miles?|feet|foot|inches?|pounds?|ounces?|gallons?|quarts?|pints?|mph|acres?)\b/gi;
+// The number may be written out, as older prose and most recipes do. Emphasis in `_` may open
+// on it and close on the unit, as in `_5 pounds_`. The lookahead comes first so the lookbehind
+// walks a run of `_` only from its end.
+const IMPERIAL_UNIT = new RegExp(
+  String.raw`(?:\b|(?!_)(?<=(?<!\w)_+))` +
+    String.raw`(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|half|quarter|quarters)[\s-]*` +
+    String.raw`(miles?|feet|foot|inches?|pounds?|ounces?|gallons?|quarts?|pints?|mph|acres?)(?![A-Za-z\d])`,
+  'gi',
+);
 
 /**
  * An imperial unit, unless the unit rules read it in another sense, as they read

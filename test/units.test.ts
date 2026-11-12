@@ -732,9 +732,37 @@ describe('a spelled-out temperature that describes a noun stays singular', () =>
     ${'Preheat to 350 degrees F.'}          | ${'Preheat to 175 degrees Celsius.'}       | ${'the plural with no noun'}
     ${'It was 72 degrees Fahrenheit.'}      | ${'It was 22.2 degrees Celsius.'}          | ${'the same, spelled out'}
     ${'a 350°F oven'}                       | ${'a 175°C oven'}                          | ${'a symbol has no number'}
-    ${'a 350-degree F oven'}                | ${'a 350-degree F oven'}                   | ${'a hyphen is not read'}
+    ${'a 350-degree F oven'}                | ${'a 175 degree Celsius oven'}             | ${'a hyphen ties the number to "degree"'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a hyphenated degree-Fahrenheit modifier', () => {
+  it.each`
+    input                                                       | expected                                  | why
+    ${'It was 110-degree-Fahrenheit heat.'}                     | ${'It was 43.3 degree Celsius heat.'}     | ${'both hyphens'}
+    ${'It was a 110 degree-Fahrenheit day.'}                    | ${'It was a 43.3 degree Celsius day.'}    | ${'the second hyphen alone'}
+    ${'Use a 350‐degree‐F oven today.'}                         | ${'Use a 175 degree Celsius oven today.'} | ${'U+2010 hyphens and an F'}
+    ${'It was a 100-110-degree-Fahrenheit day.'}                | ${'It was a 38-43 degree Celsius day.'}   | ${'a range'}
+    ${'The heat hit 110-degree-Fahrenheit today.'}              | ${'The heat hit 43.3 degrees Celsius today.'} | ${'no noun after it takes the plural'}
+    ${'It was 110-degrees-Fahrenheit today.'}                   | ${'It was 43.3 degrees Celsius today.'}   | ${'the plural stays plural'}
+    ${'It was a 110-degree-Fahrenheit (43-degree-Celsius) day.'} | ${'It was a 43-degree-Celsius day.'}     | ${'a hyphenated Celsius partner'}
+    ${'It was 110 degrees Fahrenheit.'}                         | ${'It was 43.3 degrees Celsius.'}         | ${'spaced'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('converts a hyphenated degree-F modifier', () => {
+    expect(convert('A 110-degree-F day.', { assumeAmerican: true })).toBe('A 43.3 degree Celsius day.');
+  });
+
+  it.each`
+    unchanged                                                    | why
+    ${'A 110-degree day.'}                                       | ${'bare degrees'}
+    ${'It was a 43-degree-Celsius (110-degree-Fahrenheit) day.'} | ${'the Fahrenheit value restates the Celsius one'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
   });
 });
 
@@ -1431,6 +1459,32 @@ describe('a range joined by "or"', () => {
     const once = convert('It is 5 or 6 feet long.', options);
     expect(once).toBe('It is 1.5 or 1.8 metres (5 or 6 feet) long.');
     expect(convert(once, options)).toBe(once);
+  });
+});
+
+describe('a gas mark before a Fahrenheit value', () => {
+  it.each`
+    input                                             | expected                                           | why
+    ${'Preheat to gas mark 4 - 350°F first.'}         | ${'Preheat to gas mark 4 - 175°C first.'}          | ${'a dash'}
+    ${'Preheat to Gas Mark 4 to 350°F first.'}        | ${'Preheat to Gas Mark 4 to 175°C first.'}         | ${'"to"'}
+    ${'Preheat to gas 4 – 350°F first.'}              | ${'Preheat to gas 4 – 175°C first.'}               | ${'an en dash after "gas" alone'}
+    ${'Preheat to gas mark 4 - 350 degrees F first.'} | ${'Preheat to gas mark 4 - 175 degrees Celsius first.'} | ${'spelled out'}
+    ${'Preheat to gas mark 4 - 350F first.'}          | ${'Preheat to gas mark 4 - 175°C first.'}          | ${'a bare F'}
+    ${'Preheat to gas mark 4 - 350 Fahrenheit first.'} | ${'Preheat to gas mark 4 - 175°C first.'}         | ${'the word alone'}
+    ${'Preheat from gas mark 1 to 350°F first.'}      | ${'Preheat from gas mark 1 to 175°C first.'}       | ${'after "from"'}
+    ${'Preheat to gas mark 4 - 350-375°F first.'}     | ${'Preheat to gas mark 4 - 175-190°C first.'}      | ${'a range after it'}
+  `('is no first end of a range: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                               | expected
+    ${'Bake at 350-375°F.'}             | ${'Bake at 175-190°C.'}
+    ${'Preheat to 350°F - gas mark 4.'} | ${'Preheat to 175°C - gas mark 4.'}
+    ${'Preheat to gas mark 4 (350°F).'} | ${'Preheat to gas mark 4 (175°C).'}
+    ${'from -10 to 5°F'}                | ${'from -23 to -15°C'}
+  `('still gives $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
   });
 });
 
@@ -3183,6 +3237,117 @@ describe('a temperature with a degree sign before two slashes is no path', () =>
     unchanged                                     | why
     ${'Preheat the oven to 180°C/350°F/gas 4.'}   | ${'the Fahrenheit value restates the Celsius one'}
     ${'Preheat the oven to 180C/350°F/gas 4.'}    | ${'the same, after a bare C'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a Fahrenheit degree inside a compound unit', () => {
+  it.each`
+    unchanged                                                    | why
+    ${'The wall has a thermal resistance of 0.45 °F·ft²·h/BTU.'} | ${'an R-value'}
+    ${'The R-value is 0.45 °F·ft²·h/BTU per inch.'}              | ${'the same, per inch'}
+    ${'The R-value is 0.45 °F⋅ft²⋅h/BTU.'}                       | ${'the same, with the dot operator'}
+    ${'It warms at 2 °F/min.'}                                   | ${'a rate'}
+    ${'It warms at 2°F/hour.'}                                   | ${'a rate in a word'}
+    ${'It warmed 0.5°F/decade.'}                                 | ${'a rate over years'}
+    ${'The sink is rated 0.5 °F/W.'}                             | ${'a thermal resistance per watt'}
+    ${'It warms at 2 degrees F/min.'}                            | ${'spelled out'}
+    ${'It warms at 2 degrees Fahrenheit/min.'}                   | ${'the same, with the scale named'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                               | expected                          | why
+    ${'It is 75°F/sunny today.'}        | ${'It is 23.9°C/sunny today.'}    | ${'a word after the slash that is no unit'}
+    ${'Grill it at 450°F/high heat.'}   | ${'Grill it at 230°C/high heat.'} | ${'a word that starts like a unit'}
+    ${'It fell 20°F overnight.'}        | ${'It fell 11°C overnight.'}      | ${'a change in temperature'}
+    ${'Bake at 350°F.'}                 | ${'Bake at 175°C.'}               | ${'a temperature'}
+    ${'The rate is 5 BTU per °F.'}      | ${'The rate is 5.3 kJ per °F.'}   | ${'a degree with no number'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a Celsius value in brackets that also gives the gas mark', () => {
+  it.each`
+    input                                                     | expected                                     | why
+    ${'Preheat the oven to 350°F (180°C/gas mark 4).'}        | ${'Preheat the oven to 180°C (gas mark 4).'} | ${'a slash'}
+    ${'Preheat the oven to 350°F (180°C, gas mark 4).'}       | ${'Preheat the oven to 180°C (gas mark 4).'} | ${'a comma'}
+    ${'Preheat the oven to 350°F (180°C or gas mark 4).'}     | ${'Preheat the oven to 180°C (gas mark 4).'} | ${'"or"'}
+    ${'Preheat the oven to 350°F (180°C; Gas Mark 4).'}       | ${'Preheat the oven to 180°C (Gas Mark 4).'} | ${'a semicolon and capitals'}
+    ${'Preheat the oven to 350°F (180°C / gas 4).'}           | ${'Preheat the oven to 180°C (gas 4).'}      | ${'a spaced slash and "gas" alone'}
+    ${'Preheat the oven to 250°F (120°C/gas mark ½).'}        | ${'Preheat the oven to 120°C (gas mark ½).'} | ${'a half gas mark'}
+    ${'Bake at 350-375°F (180-190°C/gas mark 4-5).'}          | ${'Bake at 180-190°C (gas mark 4-5).'}       | ${'a range'}
+    ${'Preheat the oven to 350°F\n(180°C/gas mark 4).'}       | ${'Preheat the oven to 180°C\n(gas mark 4).'} | ${'a wrapped line'}
+    ${'Preheat the oven to **350°F** (180°C/gas mark 4).'}    | ${'Preheat the oven to **180°C** (gas mark 4).'} | ${'bold closes on the metric value'}
+    ${'Preheat the oven to 350°F *(180°C/gas mark 4)*.'}      | ${'Preheat the oven to 180°C *(gas mark 4)*.'} | ${'emphasis on the bracket stays with it'}
+    ${'Preheat the oven to 350°F (*180°C/gas mark 4*).'}      | ${'Preheat the oven to 180°C (*gas mark 4*).'} | ${'emphasis around both stays on the gas mark'}
+    ${'Preheat the oven to 350 degrees F (180 degrees C/gas mark 4).'} | ${'Preheat the oven to 180 degrees C (gas mark 4).'} | ${'spelled out'}
+    ${'Preheat the oven to 350°F (200°C/gas mark 4).'}        | ${'Preheat the oven to 175°C (200°C/gas mark 4).'} | ${'a Celsius value that does not restate it'}
+    ${'It is 6 feet (1.8 m/gas mark 4) tall.'}                | ${'It is 1.8 metres (1.8 m/gas mark 4) tall.'} | ${'a gas mark follows only a temperature'}
+    ${'Preheat the oven to 350°F (180°C).'}                   | ${'Preheat the oven to 180°C.'}              | ${'no gas mark'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('collapses the pair with keepOriginal on, and runs twice without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('Preheat the oven to 350°F (180°C/gas mark 4).', options);
+    expect(once).toBe('Preheat the oven to 180°C (gas mark 4).');
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each`
+    unchanged                                            | why
+    ${'Preheat the oven to 180°C (350°F/gas mark 4).'}   | ${'the Fahrenheit value restates the Celsius one'}
+    ${'Preheat the oven to 180°C (350°F, gas mark 4).'}  | ${'the same, after a comma'}
+    ${'Preheat the oven to 180°C (*350°F*/gas mark 4).'} | ${'the same, with emphasis'}
+    ${'Preheat the oven to 180°C (350°F).'}              | ${'no gas mark'}
+    ${'Bake at gas mark 4 (180°C).'}                     | ${'a gas mark alone'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a measurement in underscore emphasis', () => {
+  it.each`
+    input                                   | expected                                   | why
+    ${'It is _6 feet_ tall.'}               | ${'It is _1.8 metres_ tall.'}              | ${'italic'}
+    ${'It is __6 feet__ tall.'}             | ${'It is __1.8 metres__ tall.'}            | ${'bold'}
+    ${'Bake at __350°F__.'}                 | ${'Bake at __175°C__.'}                    | ${'a temperature'}
+    ${'Bake at 350°F__ today.'}             | ${'Bake at 175°C__ today.'}                | ${'a run of underscores after the unit'}
+    ${'Bake at __350 degrees Fahrenheit__.'} | ${'Bake at __175 degrees Celsius__.'}     | ${'a temperature spelled out'}
+    ${'Bake the cake at _350F_ today.'}     | ${'Bake the cake at _175°C_ today.'}       | ${'a bare F'}
+    ${'It weighs _5 pounds_.'}              | ${'It weighs _2.3 kilograms_.'}            | ${'a weight'}
+    ${'It is _two feet_ long.'}             | ${'It is _61 centimetres_ long.'}          | ${'a number in words'}
+    ${'It is _half an inch_ thick.'}        | ${'It is _1.3 centimetres_ thick.'}        | ${'half an inch'}
+    ${'It is _a mile and a half_ away.'}    | ${'It is _2.4 kilometres_ away.'}          | ${'a mile and a half'}
+    ${'It is _2-3 feet_ long.'}             | ${'It is _61-91 centimetres_ long.'}       | ${'a range'}
+    ${'It is _6 x 4 feet_ wide.'}           | ${'It is _1.8 x 1.2 metres_ wide.'}        | ${'a dimension'}
+    ${'Drive at _60 mph_ there.'}           | ${'Drive at _97 km/h_ there.'}             | ${'a speed'}
+    ${'It does _30 mpg_ there.'}            | ${'It does _7.8 L/100km_ there.'}          | ${'fuel economy'}
+    ${'It is _6 feet 2 inches_ tall.'}      | ${'It is _1.88 metres_ tall.'}             | ${'a height in two units'}
+    ${'He is _six foot two_ now.'}          | ${'He is _1.88 metres_ now.'}              | ${'a height with no inch word'}
+    ${'He is _six-foot-two_ now.'}          | ${'He is _1.88 metres_ now.'}              | ${'the same, hyphenated'}
+    ${'It weighs _7 pounds 8 ounces_.'}     | ${'It weighs _3.4 kilograms_.'}            | ${'a weight in two units'}
+    ${'A _6-foot-tall_ fence.'}             | ${'A _1.8 metre tall_ fence.'}             | ${'a length and its size'}
+    ${'It is _6 feet_ (1.8 metres) tall.'}  | ${'It is _1.8 metres_ tall.'}              | ${'with its metric value'}
+    ${'It is *6 feet* tall.'}               | ${'It is *1.8 metres* tall.'}              | ${'asterisks, as before'}
+    ${'He is *six foot two* now.'}          | ${'He is *1.88 metres* now.'}              | ${'asterisks after a height with no inch word'}
+    ${'Leave __init__ 6 feet away.'}        | ${'Leave __init__ 1.8 metres away.'}       | ${'a run that closes on a word'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+    expect(convert(input, { syntax: 'markdown' })).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                | why
+    ${'Use MAX_6 feet.'}                     | ${'a letter before the underscore'}
+    ${'Use max_6 feet.'}                     | ${'the same, in lower case'}
+    ${'Use v5_6 feet.'}                      | ${'a digit before the underscore'}
+    ${'It is _1.8 metres_ (6 feet) tall.'}   | ${'the metric value it restates'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });

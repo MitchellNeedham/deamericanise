@@ -316,8 +316,19 @@ const DATE_BEFORE_YEAR =
   String.raw`\d{1,2}(?:st|nd|rd|th)?\s+(?:${MONTH_PATTERN})\.?\s+)`;
 
 /**
+ * Letters and then `-`, which join a name such as `catch-22` to its number, unless the letters
+ * end the unit of a quantity before them, as in `5ft-6ft`, `350 °F-375 °F`, `two feet-6 feet`
+ * and `60 miles per hour-70 miles per hour`, where the hyphen joins a range. No unit has more
+ * than three words before its last, as `pounds per square inch` has.
+ */
+const NAME_HYPHEN =
+  String.raw`(?<!(?:${NUMERIC_LAST}|\b(?:${CARD}))${INLINE_SPACE}?(?:[°º˚]${INLINE_SPACE}?)?` +
+  String.raw`(?:[A-Za-z]+${INLINE_SPACE}){0,3})\b[A-Za-z]+-`;
+
+/**
  * Where a number of a measurement may start: not inside a word, a decimal or a number such
- * as `15½`, and not straight after U+2010 or U+2011, which only join words. Straight after a
+ * as `15½`, and not straight after U+2010 or U+2011, which only join words, or after the
+ * letters and hyphen of a name such as `catch-22`. Straight after a
  * digit or vulgar fraction and then a hyphen, dash, `/`, `,` or `:` it is the tail of a date
  * or of a range written tight, of a fraction, of a grouped number such as `1,005`, or the
  * minutes of a time such as `7:30`. Straight after a currency sign it is a price, and four
@@ -326,9 +337,18 @@ const DATE_BEFORE_YEAR =
  * money.
  */
 export const NUMBER_START =
-  String.raw`(?<![\w.${UNICODE_HYPHENS}]|${VULGAR_CLASS}|` +
+  String.raw`(?<![\w.${UNICODE_HYPHENS}]|${VULGAR_CLASS}|${NAME_HYPHEN}|` +
   String.raw`${NUMERIC_LAST}(?:${HYPHEN}|[\u2013\u2014/,:])|[$£€]\s?)` +
   String.raw`(?!(?=\d{4}(?!\d))(?<=${DATE_BEFORE_YEAR}))`;
+
+/**
+ * Where the number of a measurement may start: where `NUMBER_START` lets a number start, and
+ * where a number in words is not the tail of a longer one, which `NOT_IN_COMPOUND` decides. A
+ * rule whose pattern starts at `NUMBER_START` reads the same, since every number in words in
+ * `NUMBER_PATTERN` carries that guard. A rule that finds its measurement from a looser start
+ * asks this of what it finds.
+ */
+export const MEASUREMENT_START = String.raw`${NUMBER_START}(?:(?![A-Za-z])|${NOT_IN_COMPOUND})`;
 
 /** `from` or `between` before a first number, which opens a range whatever its ends. */
 const RANGE_WORD_BEFORE = /\b(?:from|between)\s+$/i;

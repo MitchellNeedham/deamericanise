@@ -612,6 +612,8 @@ describe('analyse on recipes', () => {
     ${'Put the dish in a 350 deg F oven.'}                | ${OVEN}
     ${'Put the dish in a 350 degrees Fahrenheit oven.'}   | ${OVEN}
     ${'Put the dish in a 350F oven.'}                     | ${OVEN}
+    ${'Put the dish in a 350 degree F. oven.'}            | ${OVEN}
+    ${'Put the dish in a 350°F. oven.'}                   | ${OVEN}
     ${'Bake at 350 till golden.'}                         | ${OVEN}
     ${'Bake at 350 til golden.'}                          | ${OVEN}
     ${'Preheat the oven to 350 before you start.'}        | ${OVEN}
@@ -671,8 +673,17 @@ describe('analyse on recipes', () => {
     ${'The bake sale takings came to 320 before noon.'}        | ${'the to belongs to came'}
     ${'Cook in the oven for up to 300 - 400 minutes.'}         | ${'a dash before a number joins a range'}
     ${'Heat the oven to 350 deg C.'}                           | ${'marked Celsius, whatever the number'}
+    ${'Heat the oven to 180℃ or to 400F.'}                     | ${'the setting is in Celsius first, with ℃'}
+    ${'Heat the oven to 200 centigrade or to 400 degrees.'}    | ${'the same, in centigrade'}
+    ${'Preheat the oven to 180 Celsius or to 350 Fahrenheit.'} | ${'the same, in Celsius'}
+    ${'Heat the oven to 180 celsius or to 400 degrees.'}       | ${'the same, in lower case'}
+    ${'Heat the oven to 180 deg C or to 400 degrees.'}         | ${'the same, in deg C'}
   `('finds no oven setting in "$input" ($why)', ({ input }) => {
     expect(analyse(input).markers).not.toContain(OVEN);
+  });
+
+  it('counts a Fahrenheit value after a Celsius setting as Fahrenheit, and no more', () => {
+    expect(analyse('Preheat the oven to 180 Celsius or to 350 Fahrenheit.').markers).toEqual(['Fahrenheit']);
   });
 
   it('keeps a British date British beside a bake sale total', () => {

@@ -310,18 +310,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
       /[a-z]stone$/i.test(v.change.before),
   },
   {
-    issue: 286,
-    property: 'idempotence',
-    input: 'The box is 5 pounds 12 in. wide.',
-    options: {},
-    // The first run read the figure before `in.` as pence and as inches.
-    matches: (v) =>
-      v.origin === undefined &&
-      v.change?.ruleId === 'units.mass.pound' &&
-      v.next?.ruleId === 'units.length.inch' &&
-      v.next.before.endsWith('in.'),
-  },
-  {
     issue: 282,
     property: 'idempotence',
     input: 'Gate 10F. December 1, 2024 the oven broke.',

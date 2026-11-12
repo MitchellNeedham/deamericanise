@@ -43,6 +43,12 @@ describe('lines that read as code, across languages', () => {
     ${'clojure'}    | ${'(defn pick [color] color)'}
     ${'clojure'}    | ${'(ns color.core)'}
     ${'clojure'}    | ${'  [color]))'}
+    ${'js'}         | ${'pick(color)'}
+    ${'js'}         | ${'render(color, size)'}
+    ${'js'}         | ${'x.pick(color)'}
+    ${'js'}         | ${'pick(mix(color), gray)'}
+    ${'js'}         | ${'pick()'}
+    ${'python'}     | ${'print(color)'}
   `('$language: "$line"', ({ line }) => {
     expect(looksLikeCode(line as string)).toBe(true);
   });
@@ -68,6 +74,12 @@ describe('prose comments are not mistaken for code', () => {
     ${'The gray color :))'}
     ${'Pick the color (see [1])'}
     ${'The color ([1]) is gray.'}
+    ${'color(s)'}
+    ${'Color(S)'}
+    ${'match(es)'}
+    ${'Pick the color (see note)'}
+    ${'Pick a color (any one).'}
+    ${'pick(color) then center it'}
   `('"$line"', ({ line }) => {
     expect(looksLikeCode(line as string)).toBe(false);
   });
@@ -127,6 +139,69 @@ describe('commented-out Lisp is left alone', () => {
     ${'ts'}     | ${'// Pick the color (see [1])'}  | ${'// Pick the colour (see [1])'}
     ${'ts'}     | ${'// Pick the color [(see below)]'} | ${'// Pick the colour [(see below)]'}
     ${'ts'}     | ${'// The color ([1]) is gray.'}  | ${'// The colour ([1]) is grey.'}
+  `('$language still rewrites "$source"', ({ language, source, expected }) => {
+    expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(expected);
+  });
+});
+
+describe('a call alone on a line is code', () => {
+  it.each`
+    language     | source
+    ${'ts'}      | ${'// pick(color)\nconst x = 1;\n'}
+    ${'ts'}      | ${'// render(color, size)\nconst x = 1;\n'}
+    ${'ts'}      | ${'// pick(mix(color), gray)'}
+    ${'ts'}      | ${'//   pick(color);'}
+    ${'python'}  | ${'# pick(color)'}
+    ${'sql'}     | ${'-- pick(color)'}
+  `('$language leaves "$source" alone', ({ language, source }) => {
+    const options = { language: language as string, assumeAmerican: true };
+    expect(deamericaniseCode(source as string, options).text).toBe(source);
+  });
+
+  it.each`
+    source                             | expected
+    ${'// (see the color chart)'}      | ${'// (see the colour chart)'}
+    ${'// Pick the color (see note)'}  | ${'// Pick the colour (see note)'}
+    ${'// Pick a color (any one).'}    | ${'// Pick a colour (any one).'}
+    ${'// color(s)'}                   | ${'// colour(s)'}
+    ${'// color(es)'}                  | ${'// colour(es)'}
+    ${'// pick(color) then center it'} | ${'// pick(colour) then centre it'}
+  `('still rewrites "$source"', ({ source, expected }) => {
+    expect(deamericaniseCode(source as string, { language: 'ts', assumeAmerican: true }).text).toBe(expected);
+  });
+});
+
+describe('every line of a commented-out form is code', () => {
+  it.each`
+    language     | source
+    ${'lisp'}    | ${';; (defun pick (x)\n;;   (setq x 1)\n;;   color)'}
+    ${'lisp'}    | ${';; (defun pick (x)\n;;   "Pick the gray one."\n;;   x)'}
+    ${'lisp'}    | ${';; (defun pick (x)\n;;   (if (null x)\n;;       (quote gray)\n;;     x))'}
+    ${'lisp'}    | ${';; (defun pick (x)\n;;   "Pick the dark (or\n;;   light) one."\n;;   gray)'}
+    ${'lisp'}    | ${';; (defun pick (c)\n;;   (eq c ?\\()\n;;   gray)'}
+    ${'lisp'}    | ${';; (defun pick (c)\n;;   (char= c #\\()\n;;   gray)'}
+    ${'clojure'} | ${'; (defn pick [c]\n;   (= c \\()\n;   gray)'}
+    ${'ts'}      | ${'// if (x) {\n//   paint the center\n// }'}
+    ${'ts'}      | ${'// if (x) {\n//\n//   paint the center\n// }'}
+    ${'ts'}      | ${"// if (c == '(') {\n//   paint the center\n// }"}
+    ${'ts'}      | ${'// if (s == "(") {\n//   paint the center\n// }'}
+    ${'ts'}      | ${'// if (x) {\n//   [a, b) is the color range\n// }'}
+    ${'ts'}      | ${'// const x = pick(a,\n//   // see (the note\n//   center)'}
+    ${'ts'}      | ${'// const x = pick(a,\n//   b) + mix(c,\n//   center)'}
+    ${'ts'}      | ${'/*\n * if (x) {\n *   paint the center\n * }\n */'}
+    ${'python'}  | ${'# colors = [\n#     gray,\n#     center,\n# ]'}
+    ${'sql'}     | ${'-- INSERT INTO theme (\n--   color\n-- );'}
+  `('$language leaves "$source" alone', ({ language, source }) => {
+    expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(source);
+  });
+
+  it.each`
+    language    | source                                                       | expected
+    ${'lisp'}   | ${';; (setq x 1)\n;; Pick the color.'}                       | ${';; (setq x 1)\n;; Pick the colour.'}
+    ${'ts'}     | ${'// (see the color chart, which\n// lists every color)'}   | ${'// (see the colour chart, which\n// lists every colour)'}
+    ${'ts'}     | ${'// if (x) {\n//   paint()\n// }\n// Paint the center.'}   | ${'// if (x) {\n//   paint()\n// }\n// Paint the centre.'}
+    ${'ts'}     | ${'// if (x) {\n//   paint the center'}                      | ${'// if (x) {\n//   paint the centre'}
+    ${'ts'}     | ${'// const range = [\n//   the color)\n// Pick the color.'} | ${'// const range = [\n//   the colour)\n// Pick the colour.'}
   `('$language still rewrites "$source"', ({ language, source, expected }) => {
     expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(expected);
   });

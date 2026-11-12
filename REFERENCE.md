@@ -320,7 +320,9 @@ preposition when a word or number that opens its object follows, so
 `She is 5 feet 4 in tall.` becomes `She is 1.63 metres tall.` and `a 6 ft 2 in man` keeps
 the `in` as the unit of a height that describes the man. A hyphen may tie each number to a
 unit word or abbreviation, and the inches to the foot word or mark: `six-foot-two` and
-`6′-2″` become `1.88 metres`, and `a 6-foot 2-inch pipe` becomes `a 1.88 metre pipe`. A
+`6′-2″` become `1.88 metres`, and `a 6-foot 2-inch pipe` becomes `a 1.88 metre pipe`. Only
+inches below a foot, with no unit of their own, are tied that way, so `5 feet-6 feet` stays
+a range and `2 feet-18 inches` two lengths, while `5 feet-6 inches` becomes `1.68 metres`. A
 height hyphenated to its inches is one word, so a noun after it is what it describes:
 `a six-foot-two man` becomes `a 1.88 metre man`. A number straight after a length is a
 smaller unit of it, never the first end of a range in the same unit, so `5 ft 6 to 6 ft` and

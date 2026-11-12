@@ -330,6 +330,12 @@ convert money.
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
 surrounding text is American enough to trust; see below. Output is ISO by default, with `dmy` and `long` available.
 
+The same separator has to appear twice, so `3.22-1000` is a range, not a date. A dotted
+date needs a four-figure year, because `1.13.24` is far more often a version number, and
+nothing straight after a version word such as `version`, `v`, `release`, `Node` or
+`Python` is a date. So `On 3.14.2024 we left.` becomes `On 2024-03-14 we left.`, while
+`Upgrade to version 1.13.24` and `Node 1.13.24` stay as written.
+
 `March 5, 2024` names its month, so nobody can misread it. Reordering it to `5 March 2024`
 is local convention rather than translation, and waits for `localise` (or
 `dates: { reorderLongDates: true }`). It is still read as evidence: a named month written
@@ -416,6 +422,10 @@ does not. The word `Fahrenheit` on its own counts too.
 Pounds count as `imperial units` only where the unit rules read them as a weight, so
 `2 pounds of ground beef` counts, and the money in `It cost 1,500 pounds` or
 `400 pounds a week` does not.
+
+A numeric date counts as month-first or day-first in exactly the forms the date rule
+reads, so `3/14/2024` counts as month-first and `14/3/2024` as day-first, while the range
+`3.22-1000` and the version in `Node 14.2.10` count for neither.
 
 Ambiguous dates ask a narrower question first, because a document writes its dates one way
 round: a sibling date that states its own order, whether by a day above 12 or by a named

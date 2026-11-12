@@ -342,8 +342,15 @@ const METRIC_VALUE =
  */
 const METRIC_INNER = new RegExp(String.raw`^\s*${METRIC_VALUE}\s*$`);
 
-/** A metric measurement ending the text before a parenthetical. */
-const METRIC_BEFORE = new RegExp(String.raw`(?<![\w.])${METRIC_VALUE}\s*$`);
+/**
+ * A metric measurement just before a parenthetical, in text that runs to the opening
+ * bracket. Markdown emphasis or code may close between them, as in `**1.8 metres** (6 feet)`,
+ * and so may a line break that only wraps the paragraph. An opening `_` is emphasis, not
+ * part of a word the measurement starts inside.
+ */
+const METRIC_BEFORE = new RegExp(
+  String.raw`(?<![A-Za-z\d.]_*)${METRIC_VALUE}[*_\`]*${SOFT_SPACE}\($`,
+);
 
 function dimensionOf(match: RegExpMatchArray | null): Dimension | undefined {
   const groups = match?.groups ?? {};
@@ -477,19 +484,48 @@ const UNIT_OF = Object.entries(IMPERIAL_UNITS).map(([dimension, units]) => ({
   pattern: new RegExp(`^(?:${units.join('|')})$`, 'i'),
 }));
 
-const JOINER = String.raw`[-–—]|(?:to|and|x|×|by)(?![A-Za-z])`;
+/**
+ * The words of a quantity before its unit where the unit sits inside it: the `half an` of
+ * `half an inch` and the `one-fourth of a` of `one-fourth of a pound`. The first group holds
+ * `half`, the second any other fraction.
+ */
+const FRACTION_OF =
+  String.raw`(?:((?:an?${INLINE_SPACE}+)?half)|(${FRACTION_WORDS})${INLINE_SPACE}+of)` +
+  String.raw`${INLINE_SPACE}+an?(?=\s)`;
 
 /**
- * One piece of an imperial measurement: a unit, a number, or what joins them. A unit has
- * to be followed by another piece or the end, which is what reads `40 miles per gallon`
- * as fuel economy and not as a length followed by a stray `per`.
+ * The count before the unit in `a mile and a half` and `two inches and a quarter`. A count
+ * straight after `/` or `-` is the tail of `1 1/2` or `twenty-two`, not a number.
+ */
+const COUNT_BEFORE_FRACTION = String.raw`an?(?=\s)|(?<![-−/])${WHOLE_NUMBER}`;
+
+/** The fraction after the unit in `a mile and a half`, in its group. */
+const AND_FRACTION = String.raw`and${INLINE_SPACE}+(${COUNTED_FRACTION})`;
+
+/**
+ * A number as the measurement rules read one: on its own, and in the words around a unit
+ * in `half an inch` and `a mile and a half`. `half an` comes before `half`, and `a quarter`
+ * before `a`, because the first alternative to match is the one taken.
+ */
+const PIECE_NUMBER = [FRACTION_OF, AND_FRACTION, NUMBER_PATTERN, COUNT_BEFORE_FRACTION].join('|');
+
+const JOINER = String.raw`[-–—]|(?:to|and|x|×|by)(?![A-Za-z])`;
+
+const IMPERIAL_UNIT = Object.values(IMPERIAL_UNITS)
+  .flat()
+  // Longest first, so `lb-ft` is torque and not `lb` joined to `ft`.
+  .sort((a, b) => b.length - a.length)
+  .join('|');
+
+/**
+ * One piece of an imperial measurement: a unit, a number, or what joins them. A unit or a
+ * number has to be followed by another piece or the end. That reads `40 miles per gallon`
+ * as fuel economy and not as a length followed by a stray `per`, and reads `a quartersq ft`
+ * as `a quarter` and `sq ft`, where `a quarters` would leave `q ft` over.
  */
 const MEASUREMENT_PIECE = new RegExp(
-  String.raw`\s*(?:(?:${Object.values(IMPERIAL_UNITS)
-    .flat()
-    // Longest first, so `lb-ft` is torque and not `lb` joined to `ft`.
-    .sort((a, b) => b.length - a.length)
-    .join('|')})(?=\s*(?:$|${NUMBER_PATTERN}|${JOINER}))|${NUMBER_PATTERN}|${JOINER})`,
+  String.raw`\s*(?:(?:${IMPERIAL_UNIT})(?=\s*(?:$|${PIECE_NUMBER}|${JOINER}))|` +
+    String.raw`(?:${PIECE_NUMBER})(?=\s*(?:$|${IMPERIAL_UNIT}|${PIECE_NUMBER}|${JOINER}))|${JOINER})`,
   'giy',
 );
 
@@ -532,7 +568,8 @@ function restatesMetric(ctx: RuleContext, start: number, end: number): boolean {
   const dimension = measurementDimension(inside);
   if (dimension === undefined) return false;
   const bracket = start - head.length + open;
-  const before = ctx.text.slice(Math.max(0, bracket - CONTEXT_WINDOW), bracket);
+  // Through the `(`, so a line break before it can see that its next line opens no new block.
+  const before = ctx.text.slice(Math.max(0, bracket - CONTEXT_WINDOW), bracket + 1);
   return dimensionOf(METRIC_BEFORE.exec(before)) === dimension;
 }
 
@@ -927,14 +964,12 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   // `NOT_IN_COMPOUND` walks back over the spaces before it, so it runs only before a letter.
   const fractionOf = new RegExp(
     String.raw`(?<![\w.])(?=[A-Za-z])${NOT_IN_COMPOUND}` +
-      String.raw`(?:((?:an?${S}+)?half)|(${FRACTION_WORDS})${S}+of)` +
-      String.raw`${S}+an?(?=\s)${SOFT_SPACE}(${words})(?![\w-])`,
+      String.raw`${FRACTION_OF}${SOFT_SPACE}(${words})(?![\w-])`,
     'gi',
   );
-  // A count straight after `/` or `-` is the tail of `1 1/2` or `twenty-two`, not a number.
   const andAFraction = new RegExp(
-    String.raw`${START}(an?(?=\s)|(?<![-−/])${WHOLE_NUMBER})${SOFT_SPACE}(${words})` +
-      String.raw`${S}+and${S}+(${COUNTED_FRACTION})(?![\w-])`,
+    String.raw`${START}(${COUNT_BEFORE_FRACTION})${SOFT_SPACE}(${words})` +
+      String.raw`${S}+${AND_FRACTION}(?![\w-])`,
     'gi',
   );
 

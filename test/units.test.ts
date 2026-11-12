@@ -875,6 +875,34 @@ describe('keeping the original', () => {
     expect(convert(once, options)).toBe(once);
   });
 
+  it.each`
+    quantity
+    ${'half a mile'}
+    ${'a half a mile'}
+    ${'half an inch'}
+    ${'half a\nmile'}
+    ${'one-fourth of a pound'}
+    ${'one-quarter of a pound'}
+    ${'a quarter of a mile'}
+    ${'three-quarters of an inch'}
+    ${'three quarters of a mile'}
+    ${'an eighth of an inch'}
+    ${'a mile and a half'}
+    ${'an inch and a half'}
+    ${'a foot and a half'}
+    ${'two inches and a quarter'}
+    ${'twenty-two feet and three-quarters'}
+    ${'two and a half inches'}
+    ${'a quarter pound'}
+    ${'a quartersq ft'}
+  `('running it again on "$quantity" written around its unit changes nothing', ({ quantity }) => {
+    const options = { units: { keepOriginal: true } };
+    const input = `It is ${quantity}.`;
+    const once = convert(input, options);
+    expect(once).not.toBe(input);
+    expect(convert(once, options)).toBe(once);
+  });
+
   it.each(MEASURES.map((measure) => [measure.id, measure.words[0]!]))(
     'running it again on %s changes nothing',
     (id, unit) => {
@@ -1498,8 +1526,42 @@ describe('an imperial original in brackets after its metric value', () => {
     ${'It does 5.9 L/100km (40 miles per gallon).'}            | ${'fuel economy written out, not a length'}
     ${'It turns at 140 N·m (100 lb-ft).'}                      | ${'torque, not a weight joined to a length'}
     ${'It is 1.8 metres\n(6 feet) tall.'}                      | ${'a wrapped line'}
+    ${'It is 1.8 metres\r\n(6 feet) tall.'}                    | ${'a Windows line break'}
+    ${'Roll it 1.3 centimetres (half an inch) thick.'}         | ${'half an inch'}
+    ${'Add 110 grams (one-fourth of a pound) of almonds.'}     | ${'a fraction of a pound'}
+    ${'It is 400 metres (a quarter of a mile) away.'}          | ${'a quarter of a mile'}
+    ${'It is 2.4 kilometres (a mile and a half) away.'}        | ${'a mile and a half'}
+    ${'It is 3.8 centimetres (about an inch and a half).'}      | ${'an inch and a half, rounded'}
+    ${'Add 110 grams (a quarter pound) of almonds.'}           | ${'a quarter pound'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    unchanged                                        | why
+    ${'It is **1.8 metres** (6 feet) tall.'}         | ${'bold'}
+    ${'It is *1.8 metres* (6 feet) tall.'}           | ${'italic'}
+    ${'It is __1.8 metres__ (6 feet) tall.'}         | ${'bold in underscores'}
+    ${'It is _1.8 metres_ (6 feet) tall.'}           | ${'italic in underscores'}
+    ${'It is ***1.8 metres*** (6 feet) tall.'}       | ${'bold italic'}
+    ${'It is **_1.8 metres_** (6 feet) tall.'}       | ${'italic inside bold'}
+    ${'It is `1.8 metres` (6 feet) tall.'}           | ${'code'}
+    ${'It is **1.8 metres**\n(6 feet) tall.'}        | ${'bold and a wrapped line'}
+    ${'Roll it **1.3 centimetres** (half an inch).'} | ${'bold and a written-out original'}
+  `('leaves "$unchanged" alone with markup closing before the bracket ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+    expect(convert(unchanged, { syntax: 'markdown' })).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                      | expected                                                   | why
+    ${'The rope is 2 metres long (the old one was ten feet).'} | ${'The rope is 2 metres long (the old one was 3 metres).'} | ${'a bracket that says more, in words'}
+    ${'Gate A: 1 metre\n\n(3 feet) Gate B'}                    | ${'Gate A: 1 metre\n\n(91 centimetres) Gate B'}            | ${'a blank line ends the metric value'}
+    ${'It is 1.8 metres\n\n(6 feet) tall.'}                    | ${'It is 1.8 metres\n\n(1.8 metres) tall.'}                | ${'the same'}
+    ${'It is **1.8 metres**\n\n(6 feet) tall.'}                | ${'It is **1.8 metres**\n\n(1.8 metres) tall.'}            | ${'the same, after markup'}
+    ${'It is 1.3 centimetres\n\n(half an inch) thick.'}        | ${'It is 1.3 centimetres\n\n(1.3 centimetres) thick.'}     | ${'the same, in words'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
   });
 
   it.each`

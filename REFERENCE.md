@@ -398,8 +398,9 @@ shorter number is no year, so
 `In May 5-10 feet` is still a range. Four figures from 1000 to 2999 straight after `in`, `by`,
 `since`, `until`, `before`, `after` or `during` that opens a sentence or clause may be a
 year, so `In 2024 yard sales rose.` and `Last year, in 2024 miles were driven.` are left as
-written. The preposition opens one at the start of the text or a line, or after a stop,
-comma, semicolon or colon, with only spaces and opening quotes or brackets between. Inside a
+written. The preposition opens one at the start of the text or a line, or of a list item
+there (`- `, `* `, `+ `, `1. ` or `2) `), or after a stop, comma, semicolon or colon, with
+only spaces and opening quotes or brackets between. Inside a
 clause the number is a quantity, so `The wreck lies in 1500 feet of water.` becomes
 `The wreck lies in 460 metres of water.` A comma in the number, a hyphen before the unit or
 an abbreviation for it makes a quantity too, as in `In 2024-mile races` and

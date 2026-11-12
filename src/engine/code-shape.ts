@@ -13,7 +13,7 @@ import type { Range } from './apply.js';
  * invisible; rewriting one breaks the code the moment someone uncomments it. So the
  * threshold is deliberately low and the signals are generous.
  */
-const SIGNALS: Array<[weight: number, pattern: RegExp]> = [
+const SIGNALS: Array<[weight: number, pattern: { test(line: string): boolean }]> = [
   // A declaration keyword opening the line. Prose rarely starts this way.
   [
     3,
@@ -43,6 +43,7 @@ const SIGNALS: Array<[weight: number, pattern: RegExp]> = [
   [2, /=>|->|::|===|!==|!=|>=|<=|\|\||&&|\+\+|--|\*=|\/=|\?\?|\.\.\.|\breturn\s+\w+;/],
   // A call. No space before the bracket, unlike prose such as `the note (below)`.
   [2, /[A-Za-z_$][\w$]*\([^)]*\)/],
+  [3, { test: isLoneCall }],
   // A terminator ending the line.
   [2, /[;{},][ \t]*$/],
   [1, /[{}[\]]/],
@@ -58,6 +59,83 @@ const SIGNALS: Array<[weight: number, pattern: RegExp]> = [
 ];
 
 const THRESHOLD = 3;
+
+const OPENER: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
+
+/**
+ * The brackets of every kind left open so far, outside string and character literals. A
+ * backslash escapes the character after it, as in `?\(` and `#\(` in Lisp and `\(` in
+ * Clojure, and a quote either side of one character, as in `'('`, is a character literal.
+ *
+ * A closing bracket closes the innermost open one of its kind, and with it any opened inside
+ * that never closed. One with none of its kind open is prose and closes nothing, as the `)`
+ * of the interval `[a, b)` is.
+ */
+class Brackets {
+  private readonly open: string[] = [];
+  private readonly counts: Record<string, number> = { '(': 0, '[': 0, '{': 0 };
+  /** Whether the text read so far ends inside a double-quoted string. */
+  inString = false;
+  /** How many closing brackets closed nothing. */
+  stray = 0;
+
+  get depth(): number {
+    return this.open.length;
+  }
+
+  /** Reads one line, and returns the fewest brackets that were open at any point on it. */
+  read(line: string): number {
+    let low = this.open.length;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i]!;
+      if (c === '\\') i++;
+      else if (c === '"') this.inString = !this.inString;
+      else if (this.inString) continue;
+      else if (c === "'") {
+        const close = line[i + 1] === '\\' ? i + 3 : i + 2;
+        if (line[close] === "'") i = close;
+      } else if (c in this.counts) {
+        this.open.push(c);
+        this.counts[c]!++;
+      } else if (c in OPENER) {
+        const opener = OPENER[c]!;
+        if (this.counts[opener] === 0) {
+          this.stray++;
+          continue;
+        }
+        let top: string;
+        do {
+          top = this.open.pop()!;
+          this.counts[top]!--;
+        } while (top !== opener);
+        low = Math.min(low, this.open.length);
+      }
+    }
+    return low;
+  }
+
+  clear(): void {
+    this.open.length = 0;
+    for (const kind in this.counts) this.counts[kind] = 0;
+    this.inString = false;
+  }
+}
+
+const CALLEE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\(/;
+/** What prose puts in brackets after a word to allow for its plural, as in `color(s)`. */
+const PLURAL_ENDING = /^e?s$/i;
+
+/** A line that is one call and nothing else, as in `pick(color)` or `theme.render(color, size)`. */
+function isLoneCall(line: string): boolean {
+  const callee = CALLEE.exec(line);
+  if (!callee || !line.endsWith(')')) return false;
+  const args = line.slice(callee[0].length, -1);
+  // A backslash there escapes the closing bracket.
+  if (PLURAL_ENDING.test(args) || args.endsWith('\\')) return false;
+  const brackets = new Brackets();
+  brackets.read(args);
+  return brackets.depth === 0 && brackets.stray === 0 && !brackets.inString;
+}
 
 /** A line already carrying a comment marker was commented out on top of a comment. */
 function isDoubleCommented(line: string, markers: string[]): boolean {
@@ -79,17 +157,45 @@ export function looksLikeCode(line: string, markers: string[] = []): boolean {
 }
 
 /**
- * Marks every line of a comment that reads as code. Works line by line rather than on
- * the whole comment, so a block comment can hold prose and an `@example` at once.
+ * Marks every line of a comment that reads as code. Each line is judged by itself rather
+ * than the whole comment at once, so a block comment can hold prose and an `@example`.
+ *
+ * The exception is a form. A line that reads as code and leaves a bracket open opens one,
+ * and every line up to the one that closes it is code as well, however it reads alone: the
+ * body of a commented-out block, or the inside of a Lisp form. A form may run to the end of
+ * the comment and no further, and one still open there marks no line of its own.
  */
 export function commentedCodeRanges(text: string, markers: string[] = []): Range[] {
+  const lines = text.split('\n');
+  const code = lines.map((line) => looksLikeCode(line, markers));
+  // Each closed form adds one at its first line and takes it away after its last.
+  const cover = new Array<number>(lines.length + 1).fill(0);
+  // Innermost last, so the depth each closes at rises along the stack.
+  const forms: Array<{ line: number; closesAt: number }> = [];
+  const brackets = new Brackets();
+
+  lines.forEach((line, i) => {
+    // The brackets of a comment commented out are prose, and open and close no form.
+    const low = isDoubleCommented(line, markers) ? brackets.depth : brackets.read(line);
+    let closes = false;
+    while (forms.length > 0 && forms.at(-1)!.closesAt >= low) {
+      cover[forms.pop()!.line]!++;
+      cover[i + 1]!--;
+      closes = true;
+    }
+    if ((code[i] || closes) && brackets.depth > low) forms.push({ line: i, closesAt: low });
+    // Only a form's brackets count, and a string runs on to the next line only inside one,
+    // as a docstring does.
+    if (forms.length === 0) brackets.clear();
+  });
+
   const ranges: Range[] = [];
   let offset = 0;
-
-  for (const line of text.split('\n')) {
-    if (looksLikeCode(line, markers)) ranges.push({ start: offset, end: offset + line.length });
+  let covered = 0;
+  lines.forEach((line, i) => {
+    covered += cover[i]!;
+    if (line.length > 0 && (code[i] || covered > 0)) ranges.push({ start: offset, end: offset + line.length });
     offset += line.length + 1;
-  }
-
+  });
   return ranges;
 }

@@ -24,30 +24,41 @@ import {
 export const NOT_A_TITLE = String.raw`(?![^\S\n]*(?:\n[^\S\n]*(?!\d+[.)](?:\s|$)))?\d)`;
 
 /**
+ * The stop after an `F` or `℉`, as in `350 degrees F.` or `350°F.`, which the unit rules
+ * decide by the form it follows (`fahrenheitKeepsStop` in `index.ts`). A stop that opens an
+ * ellipsis or runs into a word is left in the text. So is one before a bracket or a figure,
+ * where it may end a sentence that the unit rules' test cannot see end: a bracket may trail
+ * the sentence, and a figure never opens one there.
+ */
+const STOP = String.raw`(?:\.(?![.\w]|\s*[(\d]))?`;
+
+/**
  * `°F`, `℉`, `degrees Fahrenheit` and the like: Fahrenheit written as a unit. `º` and `˚`
  * stand in for the degree sign on phone keyboards and Spanish and Portuguese layouts. The
  * word alone counts after a number on the same line, but not after a whole number of four
  * figures, which reads as a year (`In 1724 Fahrenheit proposed his scale`), nor before
- * `thermometers` or `scale`, where the number counts them, nor as a title.
+ * `thermometers` or `scale`, where the number counts them, nor as a title. An `F` or `℉`
+ * takes the `STOP` after it, and the word `Fahrenheit` never does.
  */
 export const FAHRENHEIT =
-  String.raw`[°º˚]\s*F\b|℉|[°º˚]\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|degrees?\s+F\b|deg\.?\s*F\b|` +
+  String.raw`[°º˚]\s*F\b${STOP}|℉${STOP}|[°º˚]\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|` +
+  String.raw`degrees?\s+F\b${STOP}|deg\.?\s*F\b${STOP}|` +
   // The lookahead comes first so the lookbehinds never walk a run of spaces from every place in it.
   String.raw`(?=Fahrenheit\b)(?<=\d${INLINE_SPACE}*)(?<!(?<![\d.])\d{4}${INLINE_SPACE}*)` +
   String.raw`Fahrenheit\b(?!${INLINE_SPACE}+(?:thermometers?|scales?)\b)${NOT_A_TITLE}`;
-const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
+export const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
 
-/** `165F` and `350 F`. `F-150` and `F-type` are names. */
-const BARE = String.raw`${INLINE_SPACE}?F(?![\w'’]|[-–][A-Za-z])`;
+/** `165F` and `350 F`, with any `STOP` after it. `F-150` and `F-type` are names. */
+const BARE = String.raw`${INLINE_SPACE}?F(?![\w'’]|[-–][A-Za-z])${STOP}`;
 
-const JOIN = softGap(String.raw`(?:${HYPHEN}|\u2013|\u2014|to)`);
+const JOIN = softGap(String.raw`(?:${HYPHEN}|\u2013|\u2014|to|or)`);
 const BETWEEN_AND =
   String.raw`(?<=\bbetween(?=\s)${SOFT_SPACE}${DEGREES})` + softGap(String.raw`(?<=\s)and(?=\s)`);
 
 /**
  * One temperature, or a range of them with the unit written once: `350-375°F`,
- * `350 to 375°F`, `between 60 and 70°F`. `and` joins a range only after `between`. A range
- * crosses a line break that only wraps the paragraph, never a new block.
+ * `350 to 375°F`, `350 or 375°F`, `between 60 and 70°F`. `and` joins a range only after
+ * `between`. A range crosses a line break that only wraps the paragraph, never a new block.
  */
 const PATTERN = new RegExp(
   String.raw`${NUMBER_START}(?:(${DEGREES})(${JOIN}|${BETWEEN_AND}))?` +
@@ -131,23 +142,37 @@ function sentenceAround(text: string, start: number, end: number): string {
  * Celsius value.
  */
 function bareIsFahrenheit(text: string, match: RegExpExecArray): boolean {
-  if (!match[5]!.endsWith('F') || !BARE_VALUE.test(match[3]!)) return false;
+  if (!/F\.?$/.test(match[5]!) || !BARE_VALUE.test(match[3]!)) return false;
   if (DESIGNATION.test(text.slice(Math.max(0, match.index - 32), match.index))) return false;
-  const sentence = sentenceAround(text, match.index, match.index + match[0].length);
+  // The sentence's end is looked for after the span, so the span ends before a stop that may be it.
+  const end = match.index + match[0].length - (match[5]!.endsWith('.') ? 1 : 0);
+  const sentence = sentenceAround(text, match.index, end);
   return ABOUT_HEAT.test(sentence) && !CELSIUS.test(sentence);
+}
+
+const GAS_MARK_BEFORE = /\bgas(?:\s+mark)?\s+$/i;
+
+/** `gas mark 4 or 350°F` gives one heat on two scales, so its `or` joins no range. */
+function givesGasMark(text: string, match: RegExpExecArray): boolean {
+  const before = text.slice(Math.max(0, match.index - 16), match.index);
+  return /^\s*or\s*$/i.test(match[2]!) && GAS_MARK_BEFORE.test(before);
 }
 
 /**
  * Every Fahrenheit temperature in the text. Groups 1 and 2 are the first number of a
  * range and what joins it to the second, group 3 is the number the unit follows, and
- * group 4 or 5 is the unit. The temperature rules convert exactly these, and detection
- * counts them, so the two always agree on what is Fahrenheit.
+ * group 4 or 5 is the unit, with any stop after its `F` or `℉`. The temperature rules
+ * convert exactly these, and detection counts them, so the two always agree on what is
+ * Fahrenheit.
  */
 export function* fahrenheitTemperatures(text: string): Generator<RegExpExecArray> {
   const pattern = new RegExp(PATTERN);
   for (let match: RegExpExecArray | null; (match = pattern.exec(text)) !== null; ) {
     const low = match[1] === undefined ? null : parseNumber(match[1]);
-    if (low !== null && !canBeRange(text, match.index, low, parseNumber(match[3]!)!)) {
+    if (
+      low !== null &&
+      (!canBeRange(text, match.index, low, parseNumber(match[3]!)!) || givesGasMark(text, match))
+    ) {
       // The scan goes on as past a start the pattern refused, so the second number can still
       // be a temperature of its own.
       pattern.lastIndex = match.index + 1;

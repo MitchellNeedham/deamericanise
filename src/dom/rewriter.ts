@@ -178,7 +178,10 @@ export class DomRewriter {
     if (this.observer) this.onRecords(this.observer.takeRecords());
   }
 
-  /** Re-reads every run with new options, from the original text. */
+  /**
+   * Re-reads every run with new options, from the original text. Options the library rejects
+   * throw and leave the rewriter following the page under the options it had.
+   */
   setOptions(options: DomOptions): void {
     this.flush();
     this.configure(options);
@@ -274,12 +277,14 @@ export class DomRewriter {
   // ------------------------------- Configuration -------------------------------
 
   private configure(options: DomOptions): void {
-    this.options = options;
     const { verdict, attributes, shadowRoot, ...rest } = options;
-    this.resolved = new Map();
+    // Resolved before anything is assigned, so options that throw leave the old ones in force.
+    const resolved = new Map<boolean | undefined, ResolvedOptions>();
     for (const assume of [undefined, true, false]) {
-      this.resolved.set(assume, resolveOptions({ ...rest, assumeAmerican: assume }));
+      resolved.set(assume, resolveOptions({ ...rest, assumeAmerican: assume }));
     }
+    this.options = options;
+    this.resolved = resolved;
     this.generation++;
     this.verdictBits = new Map([...this.evidence.keys()].map((lang) => [lang, this.bits(lang)]));
   }

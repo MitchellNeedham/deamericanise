@@ -316,8 +316,19 @@ const DATE_BEFORE_YEAR =
   String.raw`\d{1,2}(?:st|nd|rd|th)?\s+(?:${MONTH_PATTERN})\.?\s+)`;
 
 /**
+ * Letters and then `-`, which join a name such as `catch-22` to its number, unless the letters
+ * end the unit of a quantity before them, as in `5ft-6ft`, `350 °F-375 °F`, `two feet-6 feet`
+ * and `60 miles per hour-70 miles per hour`, where the hyphen joins a range. No unit has more
+ * than three words before its last, as `pounds per square inch` has.
+ */
+const NAME_HYPHEN =
+  String.raw`(?<!(?:${NUMERIC_LAST}|\b(?:${CARD}))${INLINE_SPACE}?(?:[°º˚]${INLINE_SPACE}?)?` +
+  String.raw`(?:[A-Za-z]+${INLINE_SPACE}){0,3})\b[A-Za-z]+-`;
+
+/**
  * Where a number of a measurement may start: not inside a word, a decimal or a number such
- * as `15½`, and not straight after U+2010 or U+2011, which only join words. Straight after a
+ * as `15½`, and not straight after U+2010 or U+2011, which only join words, or after the
+ * letters and hyphen of a name such as `catch-22`. Straight after a
  * digit or vulgar fraction and then a hyphen, dash, `/`, `,` or `:` it is the tail of a date
  * or of a range written tight, of a fraction, of a grouped number such as `1,005`, or the
  * minutes of a time such as `7:30`. Straight after a currency sign it is a price, and four
@@ -326,9 +337,18 @@ const DATE_BEFORE_YEAR =
  * money.
  */
 export const NUMBER_START =
-  String.raw`(?<![\w.${UNICODE_HYPHENS}]|${VULGAR_CLASS}|` +
+  String.raw`(?<![\w.${UNICODE_HYPHENS}]|${VULGAR_CLASS}|${NAME_HYPHEN}|` +
   String.raw`${NUMERIC_LAST}(?:${HYPHEN}|[\u2013\u2014/,:])|[$£€]\s?)` +
   String.raw`(?!(?=\d{4}(?!\d))(?<=${DATE_BEFORE_YEAR}))`;
+
+/**
+ * Where the number of a measurement may start: where `NUMBER_START` lets a number start, and
+ * where a number in words is not the tail of a longer one, which `NOT_IN_COMPOUND` decides. A
+ * rule whose pattern starts at `NUMBER_START` reads the same, since every number in words in
+ * `NUMBER_PATTERN` carries that guard. A rule that finds its measurement from a looser start
+ * asks this of what it finds.
+ */
+export const MEASUREMENT_START = String.raw`${NUMBER_START}(?:(?![A-Za-z])|${NOT_IN_COMPOUND})`;
 
 /** `from` or `between` before a first number, which opens a range whatever its ends. */
 const RANGE_WORD_BEFORE = /\b(?:from|between)\s+$/i;
@@ -342,6 +362,68 @@ const RANGE_WORD_BEFORE = /\b(?:from|between)\s+$/i;
 export function canBeRange(text: string, start: number, low: number, high: number): boolean {
   if (high === 0 || low <= 10 * Math.abs(high)) return true;
   return RANGE_WORD_BEFORE.test(text.slice(Math.max(0, start - 16), start));
+}
+
+/** A comma and the space after it, between two figures of a list: the first of `5, 10 and 15 feet`. */
+const LIST_COMMA = String.raw`${softGap(',')}(?<=\s)`;
+
+/**
+ * What joins the last figure of a list to the one before it: a comma, `and` or `or`, or a
+ * comma and either word, as in `5, 10, and 15 feet`.
+ */
+export const LIST_END = String.raw`${softGap(String.raw`(?:,(?:${SOFT_SPACE}(?:and|or))?|and|or)`)}(?<=\s)`;
+
+/** Where a figure is the day of a date, as the `22` of `Oct 22, 5 and 10 feet` is. */
+const DAY_OF_MONTH = new RegExp(String.raw`(?<=\b(?:${MONTH_PATTERN})\.?${INLINE_SPACE}+)`, 'y');
+
+export interface ListFigure {
+  raw: string;
+  start: number;
+  value: number;
+  /** What joins it to the figure after it. */
+  join: string;
+}
+
+/**
+ * Reads back from a figure along the list it is part of, giving the figures before it in
+ * order: from the `15` of `5, 10 and 15 feet`, the `5` and `10`. Each figure is one that
+ * `figure` matches, and starts where a measurement can. `last` says the figure ends the list,
+ * so the join before it may be the list's `and`, `or` or comma. Every join before that is a
+ * comma. `after` is the figure after it, if any. A figure that cannot open a range with the
+ * one after it ends the walk, as the year of `In 2024, 5 and 10 feet` does, and so does the
+ * day of a date, or a figure out of the order the rest of the list runs in, as the count of
+ * `Serves 4, 2 or 3 pounds beef` is.
+ */
+export function listReader(
+  figure: string,
+): (text: string, start: number, value: number, last: boolean, after?: number) => ListFigure[] {
+  const before = (join: string) =>
+    new RegExp(String.raw`(?<=${NUMBER_START}(${figure})(${join}))`, 'diy');
+  const comma = before(LIST_COMMA);
+  const end = before(LIST_END);
+  return (text, start, value, last, after) => {
+    const figures: ListFigure[] = [];
+    let at = start;
+    let next = value;
+    let order = after === undefined ? 0 : Math.sign(after - value);
+    for (let pattern = last ? end : comma; ; pattern = comma) {
+      pattern.lastIndex = at;
+      const match = pattern.exec(text);
+      if (match === null) break;
+      const from = match.indices![1]![0];
+      const parsed = parseNumber(match[1]!);
+      if (parsed === null || !canBeRange(text, from, parsed, next)) break;
+      const step = Math.sign(next - parsed);
+      if (order !== 0 && step !== 0 && step !== order) break;
+      DAY_OF_MONTH.lastIndex = from;
+      if (DAY_OF_MONTH.test(text)) break;
+      figures.push({ raw: match[1]!, start: from, value: parsed, join: match[2]! });
+      order ||= step;
+      at = from;
+      next = parsed;
+    }
+    return figures.reverse();
+  };
 }
 
 function roundToSignificant(value: number, figures: number): number {

@@ -18,6 +18,7 @@ import {
   NUMBER_START,
   NUMERIC_PATTERN,
   RANGE_START,
+  SECOND_END_WORDS,
   SOFT_SPACE,
   WHOLE_NUMBER,
   canBeRange,
@@ -59,6 +60,56 @@ function endsRange(text: string, start: number, value: number): boolean {
   const low = parseNumber(before[1]!);
   return low === null || canBeRange(text, before.indices![1]![0], low, value);
 }
+
+/** A number the range and dimension rules read: any in digits, and a whole number in words. */
+const READABLE_NUMBER = new RegExp(String.raw`^(?:${NUMERIC_PATTERN}|${SECOND_END_WORDS})$`, 'i');
+
+const isWritten = (raw: string) => /[a-z]/i.test(raw);
+
+/** `half` or `a quarter`: one word that `READABLE_NUMBER` refuses is a fraction with no count. */
+const isUncounted = (raw: string) => !READABLE_NUMBER.test(raw) && /^(?:an?\s+)?[a-z]+$/i.test(raw);
+
+/**
+ * What the range rule does with a range that has an end in words. `to` joins whole numbers
+ * as it joins digits, and so does `and` after `between`, unless the `and` is inside one
+ * number, as in `between one hundred and twenty feet and two hundred feet`. `half` or
+ * `a quarter` opens an idiom, as in `reduce by half to 2 quarts`, so it is not a range. A
+ * dash, or a fraction in words, cannot be read whole, so the range is held as written:
+ * `five-10 miles`, `two and a half to three miles`. So is `two to three hundred`, which may
+ * mean 200 to 300.
+ */
+function writtenRange(
+  text: string,
+  start: number,
+  low: string,
+  join: string,
+  high: string,
+): 'read' | 'hold' | 'skip' {
+  if (isUncounted(low) || isUncounted(high)) return 'skip';
+  const word = /^\s*(to|and)\s*$/i.exec(join)?.[1]!.toLowerCase();
+  if (word === 'and') {
+    const between = /\bbetween\s+$/i.test(text.slice(Math.max(0, start - 16), start));
+    if (!between || READABLE_NUMBER.test(low + join + high)) return 'skip';
+  }
+  const scaled = (end: string) => /\b(?:hundred|thousand)\b/i.test(end);
+  const shared = isWritten(low) && !scaled(low) && scaled(high) && !/^an?\s/i.test(high);
+  return word !== undefined && !shared && READABLE_NUMBER.test(low) && READABLE_NUMBER.test(high)
+    ? 'read'
+    : 'hold';
+}
+
+/**
+ * A word that makes the number after it a noun, so a `by` after the number gives an amount
+ * and not a second side: `raise each one by two inches`, `move all three by a foot`.
+ */
+const NUMBER_AS_NOUN = new RegExp(
+  String.raw`\b(?:all|both|each|every|any|these|those|which|other|another|last|first|next|` +
+    String.raw`remaining|either|neither)\s+$`,
+  'i',
+);
+
+/** `this` and `that` make a noun only of one: `this one`, but `this ten by twelve foot room`. */
+const ONE_AS_NOUN = /\b(?:this|that)\s+$/i;
 
 function escape(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -579,7 +630,7 @@ function feetInchesRule(): Rule {
   const pattern = new RegExp(
     String.raw`(?<![\w.])(\d+)${SOFT_SPACE}(?:feet|foot|ft\.?|′|')` +
       softGap(String.raw`(?:and(?=\s))?`) +
-      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+/\d+)` +
+      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+-\d+/\d+|\d+/\d+)` +
       String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|")(?![A-Za-z])`,
     'gi',
   );
@@ -718,8 +769,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     String.raw`${SINGLE_START}(${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
+  const SECOND_END = String.raw`(?<=\b(?:to|and)\s+)(?:${SECOND_END_WORDS})|${NUMBER_PATTERN}`;
   const range = new RegExp(
-    String.raw`${START}${RANGE_START}(${NUMERIC_PATTERN})${RANGE_JOIN}(${NUMERIC_PATTERN})` +
+    String.raw`${START}${RANGE_START}(${NUMBER_PATTERN})(${RANGE_JOIN})(${SECOND_END})` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
@@ -727,8 +779,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   // An optional unit after an inner number, so `8.5" x 11"` and `10 ft x 12 ft` both match.
   const INNER_UNIT = String.raw`(?:${GAP}(${alternation}))?`;
   const dimensions = new RegExp(
-    String.raw`${START}(${NUMERIC_PATTERN})${INNER_UNIT}${DIMENSION_JOIN}(${NUMERIC_PATTERN})` +
-      String.raw`(?:${INNER_UNIT}${DIMENSION_JOIN}(${NUMERIC_PATTERN}))?` +
+    String.raw`${START}(${NUMBER_PATTERN})${INNER_UNIT}${DIMENSION_JOIN}(${NUMBER_PATTERN})` +
+      String.raw`(?:${INNER_UNIT}${DIMENSION_JOIN}(${NUMBER_PATTERN}))?` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'dgi',
   );
@@ -834,35 +886,43 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       const changes: Change[] = [];
       range.lastIndex = 0;
       for (const match of ctx.text.matchAll(range)) {
-        const entry = resolve(match[3]!);
-        const low = parseNumber(match[1]!);
-        const high = parseNumber(match[2]!);
-        if (!entry || low === null || high === null || high === 0) continue;
-        if (!canBeRange(ctx.text, match.index, low, high)) continue;
+        const matched = match[0];
+        const [lowRaw, join, highRaw, alias] = [match[1]!, match[2]!, match[3]!, match[4]!];
         const start = match.index;
-        if (isOtherSense(ctx, entry, start, start + match[0].length)) {
-          changes.push(hold(start, match[0], entry.measure.id, 35));
+        const entry = resolve(alias);
+        const low = parseNumber(lowRaw);
+        const high = parseNumber(highRaw);
+        if (!entry || low === null || high === null || high === 0) continue;
+        const written = isWritten(lowRaw) || isWritten(highRaw);
+        const reading = written ? writtenRange(ctx.text, start, lowRaw, join, highRaw) : 'read';
+        if (reading === 'skip') continue;
+        // `2-3/4` is one number, which the single measurement rule reads.
+        if (!written && join === '-' && parseNumber(`${lowRaw}-${highRaw}`) !== null) continue;
+        if (!canBeRange(ctx.text, start, low, high)) continue;
+        if (isOtherSense(ctx, entry, start, start + matched.length)) {
+          changes.push(hold(start, matched, entry.measure.id, 35));
           continue;
         }
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
-        if (isBareInch(match[3]!, match[0])) continue;
-        if (isConventional(ctx, entry.measure, start, start + match[0].length)) {
-          changes.push(hold(start, match[0], entry.measure.id, 35));
+        if (isBareInch(alias, matched)) continue;
+        const conventional = isConventional(ctx, entry.measure, start, start + matched.length);
+        if (reading === 'hold' || conventional) {
+          changes.push(hold(start, matched, entry.measure.id, 35));
           continue;
         }
 
         // Both ends share the unit chosen for the larger one, so the range stays readable.
         const target = entry.measure.convert(high);
         const perSourceUnit = target.value / high;
-        const figures = Math.max(significantFigures(match[1]!), significantFigures(match[2]!));
+        const figures = Math.max(significantFigures(lowRaw), significantFigures(highRaw));
         const { precision, maxDecimals } = ctx.options.units;
         const lowText = formatNumber(low * perSourceUnit, precision, figures, maxDecimals);
         const highText = formatNumber(target.value, precision, figures, maxDecimals);
-        const separator = /\bto\b/i.test(match[0]) ? ' to ' : /\band\b/i.test(match[0]) ? ' and ' : '-';
+        const separator = /to/i.test(join) ? ' to ' : /and/i.test(join) ? ' and ' : '-';
         const unit = entry.isWord ? ` ${target.plural}` : ` ${target.symbol}`;
         const body = `${lowText}${separator}${highText}${unit}`;
 
-        pushMeasurement(ctx, changes, start, match[0], body, entry.measure.id, 35);
+        pushMeasurement(ctx, changes, start, matched, body, entry.measure.id, 35);
       }
       return changes;
     },
@@ -874,7 +934,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
    * share the unit chosen for the largest of them. Each side is read in its own unit, so
    * `2 feet x 6 inches` comes to `61 x 15 centimetres`. Only a length has sides. With any
    * other unit a bare number is a count and each quantity converts on its own, so
-   * `2 x 4 oz cans` comes to `2 x 110 g cans`.
+   * `2 x 4 oz cans` comes to `2 x 110 g cans`. A whole number in words is a side as digits
+   * are, as in `ten by twelve feet`, and a counted fraction in words, such as
+   * `two and a half`, holds the dimension as written.
    */
   const dimensionRule: Rule = {
     id: 'units.dimensions',
@@ -905,6 +967,14 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           };
         });
         if (sides.some((s) => s.value === null || (s.alias !== undefined && !s.entry))) continue;
+        if (sides.some((s) => isUncounted(s.raw))) continue;
+        const first = sides[0]!;
+        // A number in words with no unit of its own may be a noun, with `by` giving an amount.
+        const mayBeNoun = /\bby\b/i.test(match[0]) && isWritten(first.raw) && !first.alias;
+        const one = /^one$/i.test(first.raw);
+        const before = ctx.text.slice(Math.max(0, start - 24), start);
+        const noun = NUMBER_AS_NOUN.test(before) || (one && ONE_AS_NOUN.test(before));
+        if (mayBeNoun && noun) continue;
         const last = sides[sides.length - 1]!;
         const entry = last.entry!;
 
@@ -932,6 +1002,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         }
         // Beside an earlier side with a unit of its own, as in `10 ft x 12 in`, `in` is the unit.
         if (last.bareInch && !sides.some((s) => s !== last && s.entry && !s.bareInch)) continue;
+        // `one by` may be a pronoun and an amount, as in `lower one by two feet`.
+        if (sides.some((s) => !READABLE_NUMBER.test(s.raw)) || (mayBeNoun && one)) {
+          changes.push(hold(start, match[0], entry.measure.id, 38));
+          continue;
+        }
 
         const scale = commonScale(measures);
         if (!scale) continue;

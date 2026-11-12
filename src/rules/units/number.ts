@@ -130,10 +130,21 @@ const MULTIPLIED =
  * The first alternative ends every number that ends in a cardinal, so read backwards, as the
  * compound rules read the number before theirs, the pattern scans the cardinals once.
  */
-const WHOLE_WORDS =
-  String.raw`(?=an?${INLINE_SPACE}+(?:${SCALE})\b|${CARD})${NOT_IN_COMPOUND}` +
-  String.raw`(?:(?:${MULTIPLIED}${INLINE_SPACE}+(?:and${INLINE_SPACE}+|(?=${CARDINAL_WORDS}(?![\w-]))))?` +
-  String.raw`${CARDINAL_WORDS}(?!${SPACE_OR_HYPHEN}(?:${SCALE})\b)|${MULTIPLIED})`;
+function wholeWords(guard: string): string {
+  return (
+    String.raw`(?=an?${INLINE_SPACE}+(?:${SCALE})\b|${CARD})${guard}` +
+    String.raw`(?:(?:${MULTIPLIED}${INLINE_SPACE}+(?:and${INLINE_SPACE}+|(?=${CARDINAL_WORDS}(?![\w-]))))?` +
+    String.raw`${CARDINAL_WORDS}(?!${SPACE_OR_HYPHEN}(?:${SCALE})\b)|${MULTIPLIED})`
+  );
+}
+
+const WHOLE_WORDS = wholeWords(NOT_IN_COMPOUND);
+
+/**
+ * A whole number in words that may start straight after `hundred to` or `hundred and`, for
+ * the second end of a range, whose `to` or `and` places it: `one hundred to two hundred`.
+ */
+export const SECOND_END_WORDS = wholeWords('');
 
 const WORD_NUMBER = [
   String.raw`(?:${CARDINAL}|\d+)${INLINE_SPACE}+and${INLINE_SPACE}+(?:${CARD}|an?)${SPACE_OR_HYPHEN}(?:${FRAC})`,
@@ -147,11 +158,13 @@ const WORD_NUMBER = [
 export const WHOLE_NUMBER = String.raw`(?:${DIGITS}|${WHOLE_WORDS})`;
 
 /**
- * Digits only. Ranges and dimensions use this rather than the full pattern, because a
- * written-out fraction contains its own hyphen: `one-half` is one number, not a range
- * running from `one` to `half`.
+ * Digits only: `3`, `1,200`, `1 1/2`, `2-3/4`, `1½`, `3/4`. A dash joins a range only between
+ * these, because a written-out fraction contains its own hyphen: `one-half` is one number,
+ * not a range running from `one` to `half`. `2-3/4` is a mixed number only where its fraction
+ * is below one, which `parseNumber` decides.
  */
 export const NUMERIC_PATTERN = [
+  String.raw`[-−]?\d+-\d+/\d+`,
   String.raw`[-−]?(?:${DIGITS})${INLINE_SPACE}+\d+/\d+`,
   String.raw`[-−]?(?:${DIGITS})${INLINE_SPACE}*${VULGAR_CLASS}`,
   String.raw`[-−]?\d+/\d+`,
@@ -232,6 +245,13 @@ function readNumber(raw: string): number | null {
 
   const mixed = body.match(/^(\d+)\s+(\d+)\/(\d+)$/);
   if (mixed) return sign * (Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]));
+
+  // `1-3/2` runs from 1 to 3/2, so only a fraction below one makes a mixed number.
+  const hyphenated = body.match(/^(\d+)-(\d+)\/(\d+)$/);
+  if (hyphenated) {
+    const [numerator, denominator] = [Number(hyphenated[2]), Number(hyphenated[3])];
+    return numerator < denominator ? sign * (Number(hyphenated[1]) + numerator / denominator) : null;
+  }
 
   const fraction = body.match(/^(\d+)\/(\d+)$/);
   if (fraction) return sign * (Number(fraction[1]) / Number(fraction[2]));

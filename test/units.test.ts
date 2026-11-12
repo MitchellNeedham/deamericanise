@@ -1799,6 +1799,10 @@ describe('a year after a preposition is not a measurement', () => {
     ${'In 2020-2024-mile races they tired.'} | ${'In 3251-3257 kilometre races they tired.'}  | ${'a hyphen ties the number to the unit'}
     ${'From 2019 miles driven rose.'}        | ${'From 3249 kilometres driven rose.'}         | ${'"from" before one number'}
     ${'From 1500 feet to 2000 feet the trail climbs.'} | ${'From 460 to 610 metres the trail climbs.'} | ${'a unit after the first number'}
+    ${'From 1000 to 2000 feet the air thins.'} | ${'From 300 to 610 metres the air thins.'} | ${'a range of heights in feet'}
+    ${'Between 2000 and 2500 feet the trail steepens.'} | ${'Between 610 and 760 metres the trail steepens.'} | ${'the same, after "between"'}
+    ${'In 1500-2000 foot climbs we rested.'} | ${'In 460-610 metre climbs we rested.'} | ${'the same, in the singular before a noun'}
+    ${'From 2019 to 2024 feet the air thins.'} | ${'From 615.4 to 616.9 metres the air thins.'} | ${'the same, though its figures may be years'}
   `('still converts $input ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });

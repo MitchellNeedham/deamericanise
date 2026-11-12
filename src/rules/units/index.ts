@@ -548,10 +548,11 @@ const CLOSES_CLAUSE = /\s*(?:[,.;:!?)\]]|$)/y;
  * they are before a unit word that closes the clause, which names no thing the year could
  * date: `It rose by 1200 feet.`
  *
- * `earlier` holds the figures before `raw` of a range or list that starts at `start`. Each may
- * be a year where each is later than the one before, as in `In 2020-2024 miles were driven.`,
- * and a range of years may follow `from` or `between` too, as in
- * `From 2019 to 2024 miles driven rose.`
+ * `earlier` holds the figures before `raw` of a range or list that starts at `start`, before a
+ * unit in `measure`. Each may be a year where each is later than the one before, as in
+ * `In 2020-2024 miles were driven.`, and a range of years may follow `from` or `between` too,
+ * as in `From 2019 to 2024 miles driven rose.` A range or list in feet is a height, never
+ * years, as in `From 1000 to 2000 feet the air thins.`
  */
 function mayBeYear(
   text: string,
@@ -560,7 +561,9 @@ function mayBeYear(
   gap: string,
   end: number,
   earlier: string[] = [],
+  measure?: Measure,
 ): boolean {
+  if (earlier.length > 0 && measure?.id === 'units.length.foot') return false;
   const years = [...earlier, raw];
   if (!years.every((year) => /^[12]\d{3}$/.test(year)) || !/^\s+$/.test(gap)) return false;
   if (years.some((year, i) => i > 0 && Number(year) <= Number(years[i - 1]))) return false;
@@ -2145,7 +2148,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           // A unit after the first number makes it a quantity, as in `From 1500 feet to 2000 feet`.
           (entry.isWord &&
             inner === undefined &&
-            mayBeYear(ctx.text, start, highRaw, gap, end, raws.slice(0, -1)))
+            mayBeYear(ctx.text, start, highRaw, gap, end, raws.slice(0, -1), entry.measure))
         ) {
           changes.push(hold(start, matched, entry.measure.id, 35));
           continue;

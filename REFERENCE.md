@@ -455,7 +455,8 @@ year, so `In 2024 yard sales rose.` and `Last year, in 2024 miles were driven.` 
 written. So may every figure of a range or list of them that rises, after those words or
 `from` or `between`, so `In 2020-2024 miles were driven.`,
 `In 2020, 2022 or 2024 miles were driven.` and `From 2019 to 2024 miles driven rose.` are
-left as written too. The preposition opens one at the start of the text or a line, or of a list item
+left as written too. A range or list in feet is a height, never years, so
+`From 1000 to 2000 feet the air thins.` becomes `From 300 to 610 metres the air thins.` The preposition opens one at the start of the text or a line, or of a list item
 there (`- `, `* `, `+ `, `1. ` or `2) `), or after a stop, comma, semicolon or colon, with
 only spaces and opening quotes or brackets between. Inside a
 clause the number is a quantity, so `The wreck lies in 1500 feet of water.` becomes
@@ -1300,7 +1301,7 @@ options it had and goes on following the page under them.
   are a year, so `Traffic grew in 2024 miles of road.` becomes
   `Traffic grew in 3257 kilometres of road.` Opening a sentence or clause they are left as
   written even where they are a quantity, as in `In 1500 feet of water, it lies.` and
-  `From 1000 to 2000 feet the air thins.`
+  `Between 1500 and 2000 miles the road climbs.`
 - A line that ends in a number and a line that opens with a unit word are read as one
   measurement, so `Track 7` above `Feet first` becomes `Track 2.1 metres first`. A
   blank line or a list marker between them keeps them apart.

@@ -249,14 +249,6 @@ const american = { assumeAmerican: true } as const;
 
 const KNOWN_FAILURES: KnownFailure[] = [
   {
-    issue: 153,
-    property: 'idempotence',
-    input: 'Roll it half an inch thick.',
-    options: { units: { keepOriginal: true } },
-    // The second run converts the original that `keepOriginal` put in brackets.
-    matches: (v) => v.change !== undefined && v.origin?.after.endsWith(`(${v.change.before})`) === true,
-  },
-  {
     issue: 155,
     property: 'paragraphs',
     input: 'Room 13\n\n- 0°F overnight',

@@ -11,6 +11,7 @@ import {
   NUMBER_PATTERN,
   NUMBER_START,
   SOFT_SPACE,
+  UNIT_END,
   canBeRange,
   parseNumber,
   softGap,
@@ -33,6 +34,12 @@ export const NOT_A_TITLE = String.raw`(?![^\S\n]*(?:\n[^\S\n]*(?!\d+[.)](?:\s|$)
 const STOP = String.raw`(?:\.(?![.\w]|\s*[(\d]))?`;
 
 /**
+ * Between `degree` and the scale: a space, or the hyphen of `110-degree-Fahrenheit heat`. The
+ * Celsius forms read the same, so `43-degree-Celsius` can restate it.
+ */
+export const DEGREE_GAP = String.raw`(?:\s+|${HYPHEN})`;
+
+/**
  * `°F`, `℉`, `degrees Fahrenheit` and the like: Fahrenheit written as a unit. `º` and `˚`
  * stand in for the degree sign on phone keyboards and Spanish and Portuguese layouts. The
  * word alone counts after a number on the same line, but not after a whole number of four
@@ -41,28 +48,48 @@ const STOP = String.raw`(?:\.(?![.\w]|\s*[(\d]))?`;
  * takes the `STOP` after it, and the word `Fahrenheit` never does.
  */
 export const FAHRENHEIT =
-  String.raw`[°º˚]\s*F\b${STOP}|℉${STOP}|[°º˚]\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|` +
-  String.raw`degrees?\s+F\b${STOP}|deg\.?\s*F\b${STOP}|` +
+  String.raw`[°º˚]\s*F${UNIT_END}${STOP}|℉${STOP}|[°º˚]\s*Fahrenheit${UNIT_END}|` +
+  String.raw`degrees?${DEGREE_GAP}Fahrenheit${UNIT_END}|degrees?${DEGREE_GAP}F${UNIT_END}${STOP}|` +
+  String.raw`deg\.?\s*F${UNIT_END}${STOP}|` +
   // The lookahead comes first so the lookbehinds never walk a run of spaces from every place in it.
-  String.raw`(?=Fahrenheit\b)(?<=\d${INLINE_SPACE}*)(?<!(?<![\d.])\d{4}${INLINE_SPACE}*)` +
-  String.raw`Fahrenheit\b(?!${INLINE_SPACE}+(?:thermometers?|scales?)\b)${NOT_A_TITLE}`;
+  String.raw`(?=Fahrenheit${UNIT_END})(?<=\d${INLINE_SPACE}*)(?<!(?<![\d.])\d{4}${INLINE_SPACE}*)` +
+  String.raw`Fahrenheit${UNIT_END}(?!${INLINE_SPACE}+(?:thermometers?|scales?)\b)${NOT_A_TITLE}`;
 export const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
 
 /** `165F` and `350 F`, with any `STOP` after it. `F-150` and `F-type` are names. */
-const BARE = String.raw`${INLINE_SPACE}?F(?![\w'’]|[-–][A-Za-z])${STOP}`;
+const BARE = String.raw`${INLINE_SPACE}?F(?![A-Za-z\d'’]|[-–][A-Za-z])${STOP}`;
 
 const JOIN = softGap(String.raw`(?:${HYPHEN}|\u2013|\u2014|to|or)`);
 const BETWEEN_AND =
   String.raw`(?<=\bbetween(?=\s)${SOFT_SPACE}${DEGREES})` + softGap(String.raw`(?<=\s)and(?=\s)`);
 
 /**
+ * The units a Fahrenheit degree can be divided by in a rate or a compound unit: time, length,
+ * energy and power, as in `°F/min`, `°F/ft` and `°F/W`.
+ */
+const PER_UNIT = [
+  's', 'secs?', 'seconds?', 'mins?', 'minutes?', 'h', 'hrs?', 'hours?', 'd', 'days?', 'wks?',
+  'weeks?', 'mos?', 'months?', 'yrs?', 'years?', 'decades?', 'century', 'centuries', 'ft', 'foot',
+  'feet', 'inch(?:es)?', 'mi', 'miles?', 'k?m', 'cm', 'mm', 'BTUs?', 'k?W', 'k?J', 'k?cal',
+].join('|');
+
+/**
+ * A Fahrenheit degree that is one factor of a compound unit, as in `0.45 °F·ft²·h/BTU` and
+ * `2 °F/min`, which measures no temperature. A slash makes one only before a unit, since
+ * `225°F/low/slow` and `350°F/gas 4` give a setting and another word for it.
+ */
+const IN_COMPOUND = String.raw`[·⋅][A-Za-z]|/(?:${PER_UNIT})${UNIT_END}`;
+
+/**
  * One temperature, or a range of them with the unit written once: `350-375°F`,
  * `350 to 375°F`, `350 or 375°F`, `between 60 and 70°F`. `and` joins a range only after
  * `between`. A range crosses a line break that only wraps the paragraph, never a new block.
+ * A hyphen may tie the number to `degree`, as in `110-degree-Fahrenheit heat`.
  */
 const PATTERN = new RegExp(
   String.raw`${NUMBER_START}(?:(${DEGREES})(${JOIN}|${BETWEEN_AND}))?` +
-    String.raw`(${DEGREES})(?:\s*(${FAHRENHEIT})|(${BARE}))`,
+    String.raw`(${DEGREES})(?:(?:\s*|${HYPHEN}(?=degree))(${FAHRENHEIT})|(${BARE}))` +
+    String.raw`(?!${IN_COMPOUND})`,
   'gi',
 );
 
@@ -150,12 +177,19 @@ function bareIsFahrenheit(text: string, match: RegExpExecArray): boolean {
   return ABOUT_HEAT.test(sentence) && !CELSIUS.test(sentence);
 }
 
-const GAS_MARK_BEFORE = /\bgas(?:\s+mark)?\s+$/i;
+/** The words before a gas mark's figure, in any case. */
+const GAS_WORDS = String.raw`\b[Gg][Aa][Ss](?:\s+[Mm][Aa][Rr][Kk])?\s+`;
+const GAS_MARK_BEFORE = new RegExp(`${GAS_WORDS}$`);
 
-/** `gas mark 4 or 350°F` gives one heat on two scales, so its `or` joins no range. */
+/** A gas mark, as in `gas mark 4`, `Gas 4`, `gas mark ½` and `gas 4-5`. */
+export const GAS_MARK = String.raw`${GAS_WORDS}(?:\d+|[¼½¾]|1/[24])(?:\s*[-–]\s*\d+)?`;
+
+/**
+ * `gas mark 4 - 350°F`, `gas mark 4 to 350°F` and `gas mark 4 or 350°F` give one heat on
+ * two scales, so whatever joins them joins no range.
+ */
 function givesGasMark(text: string, match: RegExpExecArray): boolean {
-  const before = text.slice(Math.max(0, match.index - 16), match.index);
-  return /^\s*or\s*$/i.test(match[2]!) && GAS_MARK_BEFORE.test(before);
+  return GAS_MARK_BEFORE.test(text.slice(Math.max(0, match.index - 16), match.index));
 }
 
 /**

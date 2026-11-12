@@ -65,6 +65,9 @@ export function softGap(token: string): string {
   );
 }
 
+// Unlike `\b`, this holds before the closing `_` of emphasis, as in `_175 degrees Celsius_`.
+export const UNIT_END = String.raw`(?![A-Za-z\d])`;
+
 /** Recipes and older prose write their numbers out: `one cup`, `three-quarters cup`. */
 const CARDINALS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -326,6 +329,14 @@ const NAME_HYPHEN =
   String.raw`(?:[A-Za-z]+${INLINE_SPACE}){0,3})\b[A-Za-z]+-`;
 
 /**
+ * Not inside a word or a decimal. A run of `_` before a number opens emphasis, as in
+ * `_6 feet_`, unless a letter, digit or stop stands before the run, as in `MAX_6`.
+ */
+export const OUTSIDE_WORD =
+  // The lookahead comes first so the lookbehind walks a run of `_` only from its end.
+  String.raw`(?!_)(?<![A-Za-z\d.]_*)`;
+
+/**
  * Where a number of a measurement may start: not inside a word, a decimal or a number such
  * as `15½`, and not straight after U+2010 or U+2011, which only join words, or after the
  * letters and hyphen of a name such as `catch-22`. Straight after a
@@ -334,10 +345,10 @@ const NAME_HYPHEN =
  * minutes of a time such as `7:30`. Straight after a currency sign it is a price, and four
  * figures straight after `Oct 22,`, `22 October`, `October 22` or `May` are the year of a
  * date. The optional space after the sign matches the currency rule, which reads `$ 5` as
- * money.
+ * money. Emphasis may open on it, as `OUTSIDE_WORD` reads it.
  */
 export const NUMBER_START =
-  String.raw`(?<![\w.${UNICODE_HYPHENS}]|${VULGAR_CLASS}|${NAME_HYPHEN}|` +
+  String.raw`${OUTSIDE_WORD}(?<![${UNICODE_HYPHENS}]|${VULGAR_CLASS}|${NAME_HYPHEN}|` +
   String.raw`${NUMERIC_LAST}(?:${HYPHEN}|[\u2013\u2014/,:])|[$£€]\s?)` +
   String.raw`(?!(?=\d{4}(?!\d))(?<=${DATE_BEFORE_YEAR}))`;
 

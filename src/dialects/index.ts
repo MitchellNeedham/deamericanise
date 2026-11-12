@@ -314,6 +314,12 @@ const GATES: Record<string, Guard[]> = {
   'field trips': FIELD_TRIP,
 };
 
+/**
+ * Rows on a tier of their own. The emergency number is right for a text the reader will act
+ * on and wrong for a report about America, so it is `risky` and `safe,moderate` leaves it.
+ */
+const TIERS = new Map<string, Confidence>([['911', 'risky']]);
+
 function rows(id: Dialect, list: Row[], confidence: Confidence = 'moderate'): LexEntry[] {
   return list.flatMap(([from, to]) =>
     (GATES[from] ?? [{}]).map((guard) => ({
@@ -321,7 +327,7 @@ function rows(id: Dialect, list: Row[], confidence: Confidence = 'moderate'): Le
       to,
       ruleId: `dialect.${id}`,
       category: 'vocabulary' as const,
-      confidence,
+      confidence: TIERS.get(from) ?? confidence,
       priority: 30,
       ...guard,
     })),
@@ -572,7 +578,12 @@ export function isDialect(id: unknown): id is Dialect {
   return typeof id === 'string' && Object.hasOwn(DIALECTS, id);
 }
 
+/** The error for a dialect that `isDialect` refuses, naming it and the dialects there are. */
+export function unknownDialect(id: unknown): Error {
+  return new Error(`Unknown dialect: ${String(id)}. Expected one of ${Object.keys(DIALECTS).join(', ')}.`);
+}
+
 export function dialectPack(id: Dialect): DialectPack {
-  if (!isDialect(id)) throw new Error(`Unknown dialect: ${id}. Expected one of ${Object.keys(DIALECTS).join(', ')}.`);
+  if (!isDialect(id)) throw unknownDialect(id);
   return DIALECTS[id];
 }

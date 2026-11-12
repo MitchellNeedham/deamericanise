@@ -126,6 +126,8 @@ describe('rule selection from the command line', () => {
     ${['-l']}                                     | ${'a bell pepper'}           | ${'a capsicum'}
     ${['--preset', 'localise']}                   | ${'call 911'}                | ${'call 000'}
     ${['--preset', 'read']}                       | ${'call 911'}                | ${'call 911'}
+    ${['-l', '--confidence', 'safe,moderate']}    | ${'call 911'}                | ${'call 911'}
+    ${['-l', '--confidence', 'safe,moderate']}    | ${'the sidewalk'}            | ${'the footpath'}
     ${['--off', 'units']}                         | ${'6 feet'}                  | ${'6 feet'}
     ${['--only', 'spelling', '--localise']}       | ${'the color sidewalk'}      | ${'the colour sidewalk'}
     ${['--confidence', 'safe']}                   | ${'a flat tire'}             | ${'a flat tire'}

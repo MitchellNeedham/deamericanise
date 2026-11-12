@@ -155,7 +155,11 @@ export interface Options {
    * `protectIdentifiers`, so it is on for source files and off for prose.
    */
   protectCommentedCode?: boolean;
-  /** Units to leave alone, by their `keep` key: `mile`, `pint`, `inch`, and so on. */
+  /**
+   * Units to leave alone, by their `keep` key (`mile`, `square-foot`) or by any word or
+   * abbreviation for the unit (`inches`, `in`, `fl oz`), in any case. An entry that names no
+   * unit throws.
+   */
   unitsKeep?: string[];
   units?: UnitOptions | false;
   dates?: DateOptions | false;

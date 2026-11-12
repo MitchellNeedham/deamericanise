@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { analyse, deamericanise, deamericaniseText, resolveOptions } from '../src/index.js';
+import { analyse, deamericanise, deamericaniseCode, deamericaniseText, resolveOptions } from '../src/index.js';
 import type { Change, Options, RuleContext } from '../src/index.js';
+import { checkOptions } from '../src/config.js';
 import { resolveChanges } from '../src/engine/apply.js';
 import { patternRules } from '../src/rules/index.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
@@ -848,6 +849,74 @@ describe('units can be switched off', () => {
 
   it('honours unitsKeep for a single measure', () => {
     expect(convert('10 miles at 60 mph', { unitsKeep: ['mile'] })).toBe('10 miles at 97 km/h');
+  });
+});
+
+describe('unitsKeep names a unit by key, word or abbreviation', () => {
+  it.each`
+    unitsKeep               | input                           | expected
+    ${['inches', 'miles']}  | ${'6 inches and 2 miles'}       | ${'6 inches and 2 miles'}
+    ${['inch', 'mile']}     | ${'6 inches and 2 miles'}       | ${'6 inches and 2 miles'}
+    ${['Inches']}           | ${'6 inches and 2 feet'}        | ${'6 inches and 61 centimetres'}
+    ${['in']}               | ${'6 inches'}                   | ${'6 inches'}
+    ${['FL OZ', 'sq ft']}   | ${'8 fl oz on 100 square feet'} | ${'8 fl oz on 100 square feet'}
+    ${['MPH']}              | ${'60 mph'}                     | ${'60 mph'}
+    ${['LB']}               | ${'5 pounds of flour'}          | ${'5 pounds of flour'}
+    ${['lbs']}              | ${'7 pounds 8 ounces'}          | ${'7 pounds 8 ounces'}
+    ${['mile', 'pint']}     | ${'10 miles and 2 pints'}       | ${'10 miles and 2 pints'}
+    ${['mile', 'pint']}     | ${'10 miles and 6 feet'}        | ${'10 miles and 1.8 metres'}
+  `('$unitsKeep turns "$input" into "$expected"', ({ unitsKeep, input, expected }) => {
+    expect(convert(input, { unitsKeep })).toBe(expected);
+  });
+
+  it('reads every key, word and abbreviation, in any case, as its own unit', () => {
+    for (const measure of MEASURES) {
+      for (const form of [measure.keep, ...measure.words, ...measure.abbrevs]) {
+        for (const written of [form, form.toUpperCase(), form.toLowerCase()]) {
+          expect(resolveOptions({ unitsKeep: [written] }).unitsKeep, written).toEqual([measure.keep]);
+        }
+      }
+    }
+  });
+
+  it('lists each unit once, in the order first named', () => {
+    expect(resolveOptions({ unitsKeep: ['Pints', 'inches', 'in', 'inch', 'pint'] }).unitsKeep).toEqual([
+      'pint',
+      'inch',
+    ]);
+  });
+
+  it('adds to what the dialect keeps, and gives way to a rule turned on by id', () => {
+    const gb = { dialect: 'en-GB' } as const;
+    expect(convert('10 miles at 60 mph, 2 pints and 11 stone', gb)).toBe('10 miles at 60 mph, 2 pints and 11 stone');
+    expect(convert('10 miles and 6 inches', gb)).toBe('10 miles and 15 centimetres');
+    expect(convert('10 miles and 6 inches', { ...gb, unitsKeep: ['inches'] })).toBe('10 miles and 6 inches');
+    expect(convert('10 miles', { ...gb, rules: { 'units.length.mile': true } })).toBe('16 kilometres');
+    expect(convert('10 miles', { unitsKeep: ['miles'], rules: { 'units.length.mile': true } })).toBe('16 kilometres');
+  });
+
+  const known = 'Expected the key, name or abbreviation of one of inch, foot, yard, mile,';
+
+  it.each(['furlong', 'inchs', 'fahrenheit', 'units.length.inch', 'square foot2', '', ' inch', 'toString'])(
+    'rejects "%s" by name, listing the known keys, even with nothing to read',
+    (entry) => {
+      const message = `Unknown unit: ${entry}. ${known}`;
+      expect(() => resolveOptions({ unitsKeep: [entry] })).toThrow(message);
+      expect(() => checkOptions({ unitsKeep: [entry] })).toThrow(message);
+      expect(() => convert('6 inches', { unitsKeep: [entry] })).toThrow(message);
+      expect(() => deamericaniseCode('const a = 1;\n', { language: 'ts', unitsKeep: [entry] })).toThrow(message);
+    },
+  );
+
+  it('names the entry that names no unit among ones that do, and ends the list of keys', () => {
+    expect(() => resolveOptions({ unitsKeep: ['mile', 'furlong', 'pint'] })).toThrow(
+      /^Unknown unit: furlong\. Expected .*\bpint\b.*, foot-pound\.$/,
+    );
+  });
+
+  it('rejects a unitsKeep that is not a list', () => {
+    const unitsKeep = 'mile' as unknown as string[];
+    expect(() => resolveOptions({ unitsKeep })).toThrow("unitsKeep must be a list of units, such as ['mile', 'pint'].");
   });
 });
 

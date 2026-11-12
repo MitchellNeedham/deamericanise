@@ -596,6 +596,8 @@ describe('the stop of a unit abbreviation', () => {
     ${'It weighs 5 lbs. The bag is full.'}         | ${'It weighs 2.3 kg. The bag is full.'}        | ${'pounds, plural'}
     ${'Add 8 oz.'}                                 | ${'Add 230 g.'}                                | ${'ounces'}
     ${'The baby weighed 7 lb. 8 oz.'}              | ${'The baby weighed 3.4 kg.'}                  | ${'a weight in two units'}
+    ${'It weighs 5 lb. 1 December 2024 was cold.'} | ${'It weighs 2.3 kg. 1 December 2024 was cold.'} | ${'before a sentence that opens with a day-first date'}
+    ${'It weighs 5 lb. 25/12/2024 was cold.'}      | ${'It weighs 2.3 kg. 25/12/2024 was cold.'}    | ${'before a sentence that opens with a date in figures'}
   `('keeps the stop that also ends the sentence: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -626,6 +628,29 @@ describe('the stop of a unit abbreviation', () => {
     ${'The bag weighs 2.2 lb. (1 kg).'}       | ${'The bag weighs 1 kg.'}
     ${'The bag weighs 1 kg (2.2 lb.) today.'} | ${'The bag weighs 1 kg (2.2 lb.) today.'}
   `('reads a dotted weight whole beside its metric value: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                          | expected                              | why
+    ${'The bag weighs 2.2 lb. (1 kg) Then stir.'}  | ${'The bag weighs 1 kg. Then stir.'}  | ${'before a new sentence'}
+    ${'The fence is 6 ft. (1.8 m) It is new.'}     | ${'The fence is 1.8 m. It is new.'}   | ${'the same, feet'}
+    ${'The bag weighs 2.2 lb. (1 kg)'}             | ${'The bag weighs 1 kg.'}             | ${'the end of the text'}
+    ${'The bag weighs 2.2 lb./1 kg Then stir.'}    | ${'The bag weighs 1 kg. Then stir.'}  | ${'a pair joined by a slash'}
+    ${'The bag weighs 2.2 lb. (1 kg) of flour.'}   | ${'The bag weighs 1 kg of flour.'}    | ${'before a word in lower case'}
+    ${'The bag weighs 2.2 lb. (1 kg), then stir.'} | ${'The bag weighs 1 kg, then stir.'}  | ${'before a comma'}
+    ${'The bag weighs 2.2 lb. (1 kg).'}            | ${'The bag weighs 1 kg.'}             | ${'before the sentence stop after the bracket'}
+  `('decides the stop past the metric value a pair collapses into: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                              | expected                          | why
+    ${'The board is 12 in...'}         | ${'The board is 30 cm...'}        | ${'inches'}
+    ${'It weighs 5 lb...'}             | ${'It weighs 2.3 kg...'}          | ${'pounds'}
+    ${'The fence is 6 ft... or so.'}   | ${'The fence is 1.8 m... or so.'} | ${'inside the sentence'}
+    ${'It is 12 in.... long'}          | ${'It is 30 cm... long'}          | ${'a whole ellipsis after the stop'}
+  `('keeps the stop that opens an ellipsis: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 });
@@ -745,7 +770,7 @@ describe('the stop of a Fahrenheit F', () => {
     input                                                 | expected                                                  | why
     ${'Bake at 350 degrees F...'}                         | ${'Bake at 175 degrees Celsius...'}                       | ${'an ellipsis'}
     ${'Bake at 350 degrees F. 2 trays fit.'}              | ${'Bake at 175 degrees Celsius. 2 trays fit.'}            | ${'before a figure'}
-    ${'Bake at 350 degrees F. (180 degrees C) Then stir.'} | ${'Bake at 175 degrees Celsius. (180 degrees C) Then stir.'} | ${'before a bracket the sentence may trail'}
+    ${'Bake at 350 degrees F. (see below) Then stir.'}    | ${'Bake at 175 degrees Celsius. (see below) Then stir.'}    | ${'before a bracket the sentence may trail'}
     ${'Set it to 350 F. for an hour.'}                    | ${'Set it to 350 F. for an hour.'}                        | ${'a bare F with no word about heat'}
     ${'Bake it at 350 f. for an hour.'}                   | ${'Bake it at 350 f. for an hour.'}                       | ${'a lower case bare f'}
   `('leaves the stop in the text: $input -> $expected ($why)', ({ input, expected }) => {
@@ -776,10 +801,25 @@ describe('the stop of a Fahrenheit F', () => {
     ${'It was 90°F. Then it rained.'}        | ${'It was 32.2°C. Then it rained.'}       | ${'the same'}
     ${'Highs in the 80s°F. Then rain.'}      | ${'Highs between 27 and 32°C. Then rain.'} | ${'a decade before a new sentence'}
     ${'Bake at 350°F. 2 trays fit.'}         | ${'Bake at 175°C. 2 trays fit.'}          | ${'before a figure'}
-    ${'Bake at 350°F. (180°C) Then stir.'}   | ${'Bake at 175°C. (180°C) Then stir.'}    | ${'before a bracket'}
+    ${'Bake at 350°F. (see below) Then stir.'} | ${'Bake at 175°C. (see below) Then stir.'} | ${'before a bracket'}
     ${'Bake at 350°F (175°C).'}              | ${'Bake at 175°C.'}                       | ${'after its Celsius value'}
     ${'- 350 degrees Fahrenheit.'}           | ${'- 175 degrees Celsius.'}               | ${'the word takes no stop'}
   `('leaves the stop after a symbol or the word everywhere else: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                            | expected                       | why
+    ${'Bake at 350°F. (175°C) Then stir.'}           | ${'Bake at 175°C. Then stir.'} | ${'a symbol before a new sentence'}
+    ${'Bake at 350°F. (175°C)'}                      | ${'Bake at 175°C.'}            | ${'the end of the text'}
+    ${'Bake at 350°F. (175°C) for an hour.'}         | ${'Bake at 175°C for an hour.'} | ${'a symbol before a word in lower case'}
+    ${'Bake at 350°F. (175°C).'}                     | ${'Bake at 175°C.'}            | ${'before the sentence stop after the bracket'}
+    ${'Bake at 350°F. (175°C), then stir.'}          | ${'Bake at 175°C, then stir.'} | ${'before a comma'}
+    ${'Bake at 350 degrees F. (175°C) for an hour.'} | ${'Bake at 175°C for an hour.'} | ${'a bare letter F'}
+    ${'Bake at 350 degrees F. (175°C) Then stir.'}   | ${'Bake at 175°C. Then stir.'} | ${'a bare letter F before a new sentence'}
+    ${'Bake at 350°F (175°C). Then stir.'}           | ${'Bake at 175°C. Then stir.'} | ${'no stop before the bracket'}
+    ${'Bake at 350°F. Then stir.'}                   | ${'Bake at 175°C. Then stir.'} | ${'no bracket'}
+  `('decides the stop past the Celsius value a pair collapses into: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 
@@ -1042,10 +1082,22 @@ describe('Fahrenheit written as a bare F', () => {
     ${'At 20C by 6 p.m. Temperatures hit 50F.'}           | ${'At 20C by 6pm. Temperatures hit 10°C.'}
     ${'Put the cookie sheet in at 350F.'}                 | ${'Put the baking tray in at 175°C.'}
     ${'Put the baking tray in at 350F.'}                  | ${'Put the baking tray in at 175°C.'}
+    ${'It hit 10F. December 1, 2024 was a few degrees colder.'} | ${'It hit 10F. 1 December 2024 was a few degrees colder.'}
+    ${'It hit 10F. Dec 1st was a few degrees colder.'}    | ${'It hit 10F. 1 December was a few degrees colder.'}
+    ${'It hit 10F. 1 December 2024 was a few degrees colder.'} | ${'It hit 10F. 1 December 2024 was a few degrees colder.'}
+    ${'It hit 10F. In December it was a few degrees colder.'} | ${'It hit 10F. In December it was a few degrees colder.'}
+    ${'The heat was bad. Two feet of snow fell at 35F.'}  | ${'The heat was bad. 61 centimetres of snow fell at 1.7°C.'}
   `('decides $input on the first run as the second would', ({ input, expected }) => {
     const once = deamericaniseText(input, { preset: 'localise' });
     expect(once).toBe(expected);
     expect(deamericaniseText(once, { preset: 'localise' })).toBe(once);
+  });
+
+  it('decides a bare F before a month-first date on the first run as the second would, with dates in figures', () => {
+    const dayFirst = { preset: 'localise', dates: { format: 'dmy' } } as const;
+    const once = deamericaniseText('It hit 10F. December 1, 2024 was a few degrees colder.', dayFirst);
+    expect(once).toBe('It hit 10F. 01/12/2024 was a few degrees colder.');
+    expect(deamericaniseText(once, dayFirst)).toBe(once);
   });
 
   it('keeps a sentence that opens with a number in words, which a unit rule writes in figures', () => {

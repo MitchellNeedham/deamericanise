@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DomRewriter, deamericaniseDom } from '../src/dom/index.js';
 import type { DomOptions } from '../src/dom/index.js';
 import { distribute } from '../src/dom/distribute.js';
@@ -339,6 +339,19 @@ describe('runs of text in a laid-out page', () => {
         deamericaniseDom(host);
         expect(host.innerHTML).toBe(`<p>The ${code}ful theatre.</p>`);
         host.remove();
+      });
+
+      it('reads the style of inline code no more often than that of any other span', () => {
+        const reads = (span: string) => {
+          const host = laidOut(`<p>Set the ${span} to gray.</p>`.repeat(20));
+          const spy = vi.spyOn(window, 'getComputedStyle');
+          deamericaniseDom(host);
+          const count = spy.mock.calls.length;
+          spy.mockRestore();
+          host.remove();
+          return count;
+        };
+        expect(reads(`<span style="${mono}; white-space: pre">color</span>`)).toBe(reads('<span>color</span>'));
       });
 
       it('leaves alone text added to inline code later', () => {

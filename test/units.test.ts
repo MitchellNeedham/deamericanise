@@ -128,10 +128,8 @@ describe('feet and inches together', () => {
     expect(convert(input)).toBe(expected);
   });
 
-  it('gives a height before an adjective and a noun no worse a unit than before', () => {
-    expect(['a 1.88 metres tall man', 'a 1.88 metre tall man']).toContain(
-      convert('a 6 foot 2 inch tall man'),
-    );
+  it('gives a height before an adjective and a noun the singular', () => {
+    expect(convert('a 6 foot 2 inch tall man')).toBe('a 1.88 metre tall man');
   });
 
   it.each`

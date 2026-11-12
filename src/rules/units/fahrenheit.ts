@@ -1,4 +1,4 @@
-import { INLINE_SPACE, NUMBER_START, canBeRange, parseNumber } from './number.js';
+import { HYPHEN, INLINE_SPACE, NUMBER_START, canBeRange, parseNumber } from './number.js';
 
 /** `°F`, `℉`, `degrees Fahrenheit` and the like: Fahrenheit written as a unit. */
 export const FAHRENHEIT = String.raw`°\s*F\b|℉|°\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|degrees?\s+F\b|deg\.?\s*F\b`;
@@ -12,7 +12,7 @@ const BARE = String.raw`${INLINE_SPACE}?F(?![\w'’]|[-–][A-Za-z])`;
  * `350 to 375°F`, `between 60 and 70°F`. `and` joins a range only after `between`.
  */
 const PATTERN = new RegExp(
-  String.raw`${NUMBER_START}(?:(${DEGREES})(\s*(?:-|\u2013|\u2014|to)\s*|(?<=\bbetween\s+${DEGREES})\s+and\s+))?` +
+  String.raw`${NUMBER_START}(?:(${DEGREES})(\s*(?:${HYPHEN}|\u2013|\u2014|to)\s*|(?<=\bbetween\s+${DEGREES})\s+and\s+))?` +
     String.raw`(${DEGREES})(?:\s*(${FAHRENHEIT})|(${BARE}))`,
   'gi',
 );

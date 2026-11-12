@@ -60,3 +60,23 @@ describe.skipIf(onCi)('spans held or protected beside many changes take time in 
     60_000,
   );
 });
+
+describe.skipIf(onCi)('a long chain of weights takes time in line with its length', () => {
+  // Each weight's next unit is decided by walking back along the chain, once for the text.
+  // Walking back from every weight takes time in the square of the chain's length, which is
+  // sixteen times as long for four times the chain.
+  const MAX_RATIO = 10;
+
+  it.each`
+    link                  | length  | expected
+    ${'11 stone 4 to '}   | ${1000} | ${'71.7 kilograms to 71.7 kilograms to '}
+    ${'7 lb 8 to 9 lb, '} | ${1000} | ${'3.4 kg to 4.1 kg, 3.4 kg to 4.1 kg, '}
+  `(
+    '"$link", $length times and four times that',
+    ({ link, length, expected }) => {
+      expect(convert(link.repeat(length)).startsWith(expected)).toBe(true);
+      expect(growth(link.repeat(length), link.repeat(length * 4))).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});

@@ -331,10 +331,13 @@ unit word or abbreviation, and the inches to the foot word or mark: `six-foot-tw
 inches below a foot, with no unit of their own, are tied that way, so `5 feet-6 feet` stays
 a range and `2 feet-18 inches` two lengths, while `5 feet-6 inches` becomes `1.68 metres`. A
 height hyphenated to its inches is one word, so a noun after it is what it describes:
-`a six-foot-two man` becomes `a 1.88 metre man`. A number straight after a length is a
-smaller unit of it, never the first end of a range in the same unit, so `5 ft 6 to 6 ft` and
-`3 yards 2 to 4 yards` are left as written. Together the parts claim three significant
-figures. A height that describes the noun after it keeps the singular where its inch unit is
+`a six-foot-two man` becomes `a 1.88 metre man`. A number straight after a length, or
+after stone or pounds, is a smaller unit of it, never the first end of a range in the same
+unit, so `5 ft 6 to 6 ft` and `3 yards 2 to 4 yards` are left as written. A weight's next
+unit word can be left out before a join and another weight in its larger unit too, so
+`11 stone 4 to 12 stone` becomes `71.7 kilograms to 76 kilograms` and `7 lb 8 to 9 lb`
+becomes `3.4 kg to 4.1 kg`, while `11 stone 14 to 12 stone` is left as written. Together the
+parts claim three significant figures. A height that describes the noun after it keeps the singular where its inch unit is
 the singular word or a determiner opens it: `a 6 foot 2 inch man` and `a 6 ft 2 in man` both
 become `a 1.88 metre man`. Where a unit of the weight is kept, by the dialect or by `unitsKeep`,
 the whole weight is left as written, so an `en-GB` `11 stone 4 pounds` never becomes
@@ -393,6 +396,11 @@ a range with a fraction in words at either end, as in `two and a half to three m
 `two to three hundred feet`, which may mean 200 to 300. `half to` is an idiom, so
 `reduce by half to 2 quarts` converts only the quarts.
 
+A hyphen left hanging on a range's first number, as recipes write it, joins the range with
+`to`, `and` or `or` after it: `Cut into 2- to 3-inch pieces.` becomes
+`Cut into 5.1 to 7.6 centimetre pieces.`, and `Use 8- or 9-inch pans.` becomes
+`Use 20 or 23 centimetre pans.`
+
 A whole number hyphenated to a fraction below one is a mixed number, as trade writing has
 it: `a 2-3/4 inch board` becomes `a 7 centimetre board`, the same as `a 2 3/4 inch board`.
 `1-3 inches` and `1/2-3/4 inch` are still ranges.
@@ -445,8 +453,8 @@ range, the second converts on its own: `In 2024 - 5 feet` becomes
 `In 2024 - 1.5 metres`, and `Price $5 - 10 inches` keeps its price. `from` or `between`
 before the first number makes a range of any two, so `fell from 10 to 0.5 miles` converts
 whole. With `units.range` or `units.dimensions` switched off, a range or dimension is left as
-written, never half converted, so `½-¾ inch`, `½ to ¾ inch` and `1½ x 2 inch` stay as they
-are.
+written, never half converted, so `½-¾ inch`, `½ to ¾ inch`, `1½ x 2 inch`,
+`five to 10 miles` and `ten by 12 feet` stay as they are.
 
 Fuel economy is read as `mpg`, `miles per gallon`, `miles-per-gallon`, `miles/gallon` or
 `mi/gal`, so `30 miles/gallon` becomes `7.8 L/100km`, never kilometres per gallon, and

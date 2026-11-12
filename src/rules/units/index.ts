@@ -43,7 +43,13 @@ import {
 const CONTEXT_WINDOW = 48;
 /** Between a number and its unit: a space, a hyphen (`6-foot`), or nothing (`6ft`). */
 const GAP = softGap(`${HYPHEN}?`);
-const RANGE_JOIN = softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and|or)`);
+/**
+ * A hyphen left hanging on a range's first number, since the unit's hyphen is written once for
+ * both ends, and then a word that joins them: the `- to ` of `2- to 3-inch`.
+ */
+const HANGING_JOIN = String.raw`${HYPHEN}(?=\s)${softGap('(?:to|and|or)')}`;
+const RANGE_JOIN =
+  String.raw`(?:${softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and|or)`)}|${HANGING_JOIN})`;
 const DIMENSION_JOIN = softGap('(?:x|×|by)');
 const TIGHT_HYPHEN = new RegExp(`^${HYPHEN}$`);
 
@@ -52,13 +58,8 @@ const TIGHT_HYPHEN = new RegExp(`^${HYPHEN}$`);
  * pair does not match as a whole: `14 1/2 gallon` in `2024-03-14 1/2 gallon`.
  */
 const NOT_SECOND_OF_PAIR =
-  String.raw`(?<!${NUMERIC_LAST}${softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and|or|x|×|by)`)})`;
-
-/** A range's first number and its join, ending where the range's second number starts. */
-const RANGE_BEFORE = new RegExp(
-  String.raw`(?<=${NUMBER_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=${NUMERIC_FIRST})`,
-  'diy',
-);
+  String.raw`(?<!${NUMERIC_LAST}(?:` +
+  String.raw`${softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and|or|x|×|by)`)}|${HANGING_JOIN}))`;
 
 const readListBefore = listReader(NUMBER_PATTERN);
 
@@ -99,9 +100,12 @@ function listedBefore(
   return figures.length >= 2 ? figures : [];
 }
 
+/** A hanging hyphen before a join is the unit's, as in `2- to 3-inch`, so the join drops it. */
+const SEPARATOR = new RegExp(String.raw`^\s*(?:${HYPHEN}(?=\s))?\s*(,?)\s*(to|and|or)?\s*$`, 'i');
+
 /** A join as a converted range or list writes it: ` to `, ` and `, ` or `, `, `, `, or `, or `-`. */
 function separator(join: string): string {
-  const [, comma = '', word] = /^\s*(,?)\s*(to|and|or)?\s*$/i.exec(join) ?? [];
+  const [, comma = '', word] = SEPARATOR.exec(join) ?? [];
   if (word !== undefined) return `${comma} ${word.toLowerCase()} `;
   return comma ? ', ' : '-';
 }
@@ -112,20 +116,19 @@ function interleave(figures: string[], joins: string[]): string {
 }
 
 /**
- * The number at `start` is the second end of a range, as the `10` of `5 - 10 feet` is, or
- * the last figure of a list, as the `8` of `4, 6, 8 inches` is, and not a measurement of its
- * own, even where the range does not match as a whole. A first number that cannot open the
- * range leaves it free: `Price $5 - 10 inches`, `In 2024 - 5 feet`, and the inches of
- * `2 feet 6 to 3 feet`.
+ * The number at `start`, written `first`, is the second end of a range that the range rule
+ * reads or holds, as the `10` of `5 - 10 feet` and of `five to 10 miles` is, or the last
+ * figure of a list, as the `8` of `4, 6, 8 inches` is, and not a measurement of its own, even
+ * where the range does not match as a whole or its rule is off. A first number that cannot
+ * open the range leaves it free: `Price $5 - 10 inches`, `In 2024 - 5 feet`,
+ * `reduce by half to 2 quarts`, and the inches of `2 feet 6 to 3 feet`.
+ * A height or weight in two units that ends a range or list is held, since its first end could
+ * be in either unit, as in `7-8 lb 4 oz` and `5, 6, 7 feet 2 inches`. The range rule's change
+ * splits the hold and is dropped, and the whole range stays as written.
  */
-function endsRange(text: string, start: number, value: number): boolean {
-  RANGE_BEFORE.lastIndex = start;
-  const before = RANGE_BEFORE.exec(text);
-  if (before === null) return listedBefore(text, start, value).length > 0;
-  const lowStart = before.indices![1]![0];
-  if (isHeightInches(text, lowStart)) return false;
-  const low = parseNumber(before[1]!);
-  return low === null || canBeRange(text, lowStart, low, value);
+function endsRange(text: string, start: number, first: string): boolean {
+  const lowStart = rangeOpening(text, start, first);
+  return lowStart !== null && !isSmallerPart(text, lowStart);
 }
 
 /** A number the range and dimension rules read: any in digits, and a whole number in words. */
@@ -136,6 +139,8 @@ const isWritten = (raw: string) => /[a-z]/i.test(raw);
 /** `half` or `a quarter`: one word that `READABLE_NUMBER` refuses is a fraction with no count. */
 const isUncounted = (raw: string) => !READABLE_NUMBER.test(raw) && /^(?:an?\s+)?[a-z]+$/i.test(raw);
 
+const WORD_JOIN = new RegExp(String.raw`^${HYPHEN}?\s*(to|and|or)\s*$`, 'i');
+
 /**
  * What the range rule does with a range that has an end in words. `to` and `or` join whole
  * numbers as they join digits, and so does `and` after `between`, unless the `and` is inside
@@ -143,7 +148,8 @@ const isUncounted = (raw: string) => !READABLE_NUMBER.test(raw) && /^(?:an?\s+)?
  * `a quarter` opens an idiom, as in `reduce by half to 2 quarts`, so it is not a range. A
  * dash, or a fraction in words, cannot be read whole, so the range is held as written:
  * `five-10 miles`, `two and a half to three miles`. So is `two to three hundred`, which may
- * mean 200 to 300.
+ * mean 200 to 300. A hyphen left hanging before the join, as in `two- to three-inch`, is the
+ * unit's and changes nothing.
  */
 function writtenRange(
   text: string,
@@ -153,7 +159,7 @@ function writtenRange(
   high: string,
 ): 'read' | 'hold' | 'skip' {
   if (isUncounted(low) || isUncounted(high)) return 'skip';
-  const word = /^\s*(to|and|or)\s*$/i.exec(join)?.[1]!.toLowerCase();
+  const word = WORD_JOIN.exec(join)?.[1]!.toLowerCase();
   if (word === 'and') {
     const between = /\bbetween\s+$/i.test(text.slice(Math.max(0, start - 16), start));
     if (!between || READABLE_NUMBER.test(low + join + high)) return 'skip';
@@ -193,6 +199,35 @@ const NUMBER_AS_NOUN = new RegExp(
 
 /** `this` and `that` make a noun only of one: `this one`, but `this ten by twelve foot room`. */
 const ONE_AS_NOUN = /\b(?:this|that)\s+$/i;
+
+/** The words `before` the number `raw` make it a noun, so a `by` after it gives an amount. */
+const namesNoun = (before: string, raw: string) =>
+  NUMBER_AS_NOUN.test(before) || (/^one$/i.test(raw) && ONE_AS_NOUN.test(before));
+
+/** A number and a dimension's join, ending where the dimension's next number starts. */
+const SIDE_OPENING = new RegExp(
+  String.raw`(?<=${NUMBER_START}(${NUMBER_PATTERN})(${DIMENSION_JOIN}))`,
+  'diy',
+);
+
+/**
+ * The length at `start` is a side of a dimension whose side before it is a number in words,
+ * as the `12 feet` of `ten by 12 feet` is, and not a measurement of its own, even where the
+ * dimension rule is off. A number in digits before the join is refused by the single rule's
+ * pattern. `half` opens no side, and after a word that makes the number before `by` a noun,
+ * the length is an amount, as in `raise each one by two inches`.
+ */
+function endsSide(text: string, start: number, measure: Measure): boolean {
+  if (!hasSides(measure)) return false;
+  SIDE_OPENING.lastIndex = start;
+  const opening = SIDE_OPENING.exec(text);
+  if (opening === null) return false;
+  const side = opening[1]!;
+  if (!isWritten(side) || isUncounted(side)) return false;
+  const sideStart = opening.indices![1]![0];
+  const before = text.slice(Math.max(0, sideStart - 24), sideStart);
+  return !/by/i.test(opening[2]!) || !namesNoun(before, side);
+}
 
 function escape(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1316,22 +1351,9 @@ const RANGE_OPENING = new RegExp(
 );
 
 /**
- * The measurement in two units at `start`, whose first number is `first`, ends a range or
- * list that the range rule reads or holds, as in `7-8 lb 4 oz`, `five to six feet two inches`
- * and `5, 6, 7 feet 2 inches`.
- * Whether the range's first end is `7` or `7 lb` cannot be told, so the measurement is held,
- * the range rule's change splits the hold and is dropped, and the whole range stays as written.
- * The inches of a height open no range, so `6 foot 2 to 6 foot 4 inches` is two heights.
- */
-function endsRangeWhole(text: string, start: number, first: string): boolean {
-  const lowStart = rangeOpening(text, start, first);
-  return lowStart !== null && !isHeightInches(text, lowStart);
-}
-
-/**
- * Where the first end starts of the range that `endsRangeWhole` asks about, before it asks
- * whether that end is the inches of a height, or `null` where no such range opens. A list
- * with no range join before its last figure opens at its first.
+ * Where the first end starts of the range that `endsRange` asks about, before it asks
+ * whether that end is the smaller part of a height or weight, or `null` where no such range
+ * opens. A list with no range join before its last figure opens at its first.
  */
 function rangeOpening(text: string, start: number, first: string): number | null {
   RANGE_OPENING.lastIndex = start;
@@ -1396,54 +1418,153 @@ const INCHES_OF_HEIGHT = new RegExp(
   'diy',
 );
 
+/** The larger part of a height or weight in two units: its number and where it starts. */
+interface LargerPart {
+  raw: string;
+  start: number;
+}
+
 /**
  * The height whose inches start at `start`, with no inch word before another height, where it
  * starts where a measurement can: its feet and where they start.
  */
-function heightAt(text: string, start: number): { feet: string; feetStart: number } | null {
+function heightAt(text: string, start: number): LargerPart | null {
   INCHES_OF_HEIGHT.lastIndex = start;
   const match = INCHES_OF_HEIGHT.exec(text);
   if (match === null || parseNumber(match[1]!) === null) return null;
   if (!isInchCount(parseNumber(match[2]!))) return null;
   const feetStart = match.indices![1]![0];
   STARTS_HERE.lastIndex = feetStart;
-  return STARTS_HERE.test(text) ? { feet: match[1]!, feetStart } : null;
+  return STARTS_HERE.test(text) ? { raw: match[1]!, start: feetStart } : null;
 }
 
-let inchesText = '';
-const inchesAt = new Map<number, boolean>();
+/** Every form a weight in two units may write a unit in, including `st`, read only there. */
+const compoundAliases = (measure: Measure) => [
+  ...measure.words,
+  ...measure.abbrevs,
+  ...(measure.compoundAbbrevs ?? []),
+];
 
 /**
- * The number at `start` is the inches of a height that `feetInchesRule` converts before
- * another height, as the `2` of `6 foot 2 to 6 foot 4` is, and not the first end of a range.
- * Where that height itself ends a range, the answer is the one for the range's first end, so
- * the walk follows a chain such as `5 to 6 foot 1 to 6 foot 2 to 6 foot 3` back to its start.
- * Every answer is kept for the text, so a long chain takes time in line with its length, and
- * the walk is a loop, so no chain is too long for the stack.
+ * A join and a weight in `measure` that the single rule reads, as the ` to 12 stone` of
+ * `11 stone 4 to 12 stone`.
  */
-function isHeightInches(text: string, start: number): boolean {
-  if (text !== inchesText) {
-    inchesText = text;
-    inchesAt.clear();
+const anotherWeight = (measure: Measure) =>
+  String.raw`${RANGE_JOIN}${NUMBER_START}(?:${UNSIGNED_NUMBER})${GAP}` +
+  String.raw`(?:${alternate([...measure.words, ...measure.abbrevs])})(?![A-Za-z])`;
+
+/**
+ * After a weight's larger unit and the space after it, its next unit's number with no unit
+ * word, before another weight in the larger unit, which the last group spans: the `4` and
+ * ` to 12 stone` of `11 stone 4 to 12 stone`.
+ */
+const unnamedPart = (measure: Measure) =>
+  String.raw`(?<=\s)(${WHOLE_NUMBER})(?=(${anotherWeight(measure)}))`;
+
+/** A number of a weight's next unit written without its word: a whole number below `per`. */
+const isPartCount = (value: number | null, per: number) =>
+  value !== null && Number.isInteger(value) && value >= 1 && value < per;
+
+/** The units a weight in two units writes first: stone, and pounds before ounces. */
+const FIRST_OF_WEIGHT = new Set(COMPOUNDS.map((compound) => compound.measures[0]!));
+
+/**
+ * For each unit a weight in two units writes first, a unit larger still that ends straight
+ * before a number, as `stone` does before the `4 pounds` of `11 stone 4 pounds 8 to 12 pounds`.
+ */
+const AFTER_LARGER_UNIT = new Map(
+  [...FIRST_OF_WEIGHT].flatMap((measure) => {
+    const larger = COMPOUNDS.flatMap(({ measures }) =>
+      measures.slice(0, Math.max(0, measures.indexOf(measure))),
+    );
+    if (larger.length === 0) return [];
+    const units = alternate(larger.flatMap(compoundAliases));
+    const pattern = new RegExp(
+      String.raw`(?<![A-Za-z])(?:${units})(?![A-Za-z])${SOFT_SPACE}$`,
+      'i',
+    );
+    return [[measure, pattern] as const];
+  }),
+);
+
+/**
+ * The weight in `measure` at `start` is the tail of one in a larger unit still, which reads
+ * it: the `4 pounds` of `11 stone 4 pounds`.
+ */
+const continuesWeight = (text: string, start: number, measure: Measure) =>
+  AFTER_LARGER_UNIT.get(measure)?.test(text.slice(Math.max(0, start - CONTEXT_WINDOW), start)) ===
+  true;
+
+/**
+ * For each weight in two units, its larger part and then, starting where the pattern is
+ * tried, the shape `unnamedPart` reads. The same shape as the compound rules' last
+ * alternative.
+ */
+const UNNAMED_PARTS = COMPOUNDS.map((compound) => {
+  const larger = compound.measures[0]!;
+  const pattern = new RegExp(
+    String.raw`(?<=(?<![\w.])(${UNSIGNED_NUMBER})${GAP}(?:${alternate(compoundAliases(larger))})` +
+      String.raw`(?![A-Za-z])${SOFT_SPACE})${unnamedPart(larger)}`,
+    'diy',
+  );
+  return { pattern, larger, per: compound.per[0]! };
+});
+
+/**
+ * The weight whose next unit's number starts at `start`, with no unit word before another
+ * weight in the larger unit, where it starts where a measurement can and is no tail of a
+ * weight in a larger unit still: its larger part and where that starts.
+ */
+function weightAt(text: string, start: number): LargerPart | null {
+  for (const { pattern, larger, per } of UNNAMED_PARTS) {
+    pattern.lastIndex = start;
+    const match = pattern.exec(text);
+    if (match === null || parseNumber(match[1]!) === null) continue;
+    if (!isPartCount(parseNumber(match[2]!), per)) continue;
+    const largerStart = match.indices![1]![0];
+    STARTS_HERE.lastIndex = largerStart;
+    if (!STARTS_HERE.test(text) || continuesWeight(text, largerStart, larger)) continue;
+    return { raw: match[1]!, start: largerStart };
+  }
+  return null;
+}
+
+let smallerText = '';
+const smallerAt = new Map<number, boolean>();
+
+/**
+ * The number at `start` is the smaller part of a height or weight in two units, written
+ * without its unit word before another measurement in the larger unit, as the `2` of
+ * `6 foot 2 to 6 foot 4` and the `4` of `11 stone 4 to 12 stone` are. `feetInchesRule` or a
+ * compound rule converts that measurement, and the number is not the first end of a range.
+ * Where the measurement itself ends a range, the answer is the one for the range's first end,
+ * so the walk follows a chain such as `5 to 6 foot 1 to 6 foot 2 to 6 foot 3` back to its
+ * start. Every answer is kept for the text, so a long chain takes time in line with its
+ * length, and the walk is a loop, so no chain is too long for the stack.
+ */
+function isSmallerPart(text: string, start: number): boolean {
+  if (text !== smallerText) {
+    smallerText = text;
+    smallerAt.clear();
   }
   const walked: number[] = [];
   let at: number | null = start;
   let answer = true;
   while (at !== null) {
-    const known = inchesAt.get(at);
+    const known = smallerAt.get(at);
     if (known !== undefined) {
       answer = known;
       break;
     }
     walked.push(at);
-    const height = heightAt(text, at);
-    if (height === null) {
+    const larger = heightAt(text, at) ?? weightAt(text, at);
+    if (larger === null) {
       answer = false;
       break;
     }
-    at = rangeOpening(text, height.feetStart, height.feet);
+    at = rangeOpening(text, larger.start, larger.raw);
   }
-  for (const position of walked) inchesAt.set(position, answer);
+  for (const position of walked) smallerAt.set(position, answer);
   return answer;
 }
 
@@ -1534,7 +1655,7 @@ function feetInchesRule(): Rule {
         const tied =
           match[2] !== undefined && TIGHT_HYPHEN.test(ctx.text.charAt(match.indices![2]![0] - 1));
         if (tied && !(inches !== null && inches < 12)) continue;
-        if (feet === null || inches === null || endsRangeWhole(ctx.text, match.index, match[1]!)) {
+        if (feet === null || inches === null || endsRange(ctx.text, match.index, match[1]!)) {
           changes.push(hold(match.index, match[0], 'units.length.feet-inches', 40));
           continue;
         }
@@ -1583,21 +1704,26 @@ const ORDINAL = /^(?:\d*[02-9])?1st(?![a-z])/i;
  * `7 pounds 8 ounces`, `11st 4lb` and `11 stone 4 pounds 8 ounces` are each one weight, as
  * `6 feet 2 inches` is one height. A weight that cannot be converted whole is held whole:
  * one in a unit that is kept, and one that ends a range, as in `7-8 lb 4 oz`. A weight has
- * no sides, so the number in `2 x 4 lb 8 oz bags` counts the bags.
+ * no sides, so the number in `2 x 4 lb 8 oz bags` counts the bags. The next unit's word may
+ * be left out before a join and another weight in the larger unit, as in
+ * `11 stone 4 to 12 stone`, and a weight read so that cannot be converted is held up to the
+ * end of the other weight, which would otherwise convert alone.
  */
 function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule[] {
   const AND = softGap(String.raw`(?:and(?=\s))?`);
-  const unitOf = (m: Measure) =>
-    String.raw`(${alternate([...m.words, ...m.abbrevs, ...(m.compoundAbbrevs ?? [])])})(?![A-Za-z])`;
+  const unitOf = (m: Measure) => String.raw`(${alternate(compoundAliases(m))})(?![A-Za-z])`;
 
   return COMPOUNDS.map((compound): Rule => {
     const [largest, next, ...rest] = compound.measures.map(unitOf);
     const part = (unit: string) => String.raw`${AND}(${UNSIGNED_NUMBER})${GAP}${unit}`;
     const optional = rest.reduceRight((inner, unit) => `(?:${part(unit)}${inner})?`, '');
+    const withWords = `${part(next!)}${optional}`;
+    const withoutWord = String.raw`${SOFT_SPACE}${unnamedPart(compound.measures[0]!)}`;
     const pattern = new RegExp(
-      String.raw`(${FIRST_NUMBER})${GAP}${largest}${part(next!)}${optional}`,
+      String.raw`(${FIRST_NUMBER})${GAP}${largest}(?:${withWords}|${withoutWord})`,
       'dgi',
     );
+    const unnamedGroup = 2 * compound.measures.length + 1;
     const sided = hasSides(compound.measures[0]!);
 
     return {
@@ -1613,20 +1739,42 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
           const parts = compound.measures
             .map((measure, i) => ({ measure, raw: match[2 * i + 1], unit: match[2 * i + 2] ?? '' }))
             .filter((p) => p.raw !== undefined);
+          const unnamed = match[unnamedGroup];
+          if (unnamed !== undefined) {
+            parts.push({ measure: compound.measures[1]!, raw: unnamed, unit: '' });
+          }
           const values = parts.map((p) => parseNumber(p.raw!));
+          const start = match.index;
+          const held =
+            unnamed === undefined
+              ? match[0]
+              : ctx.text.slice(start, match.indices![unnamedGroup + 1]![1]);
           if (values.some((v) => v === null)) {
-            changes.push(hold(match.index, match[0], compound.id, 40));
+            changes.push(hold(start, held, compound.id, 40));
+            continue;
+          }
+          if (
+            unnamed !== undefined &&
+            (!isPartCount(values[1]!, compound.per[0]!) ||
+              continuesWeight(ctx.text, start, compound.measures[0]!))
+          ) {
             continue;
           }
 
-          const start = match.index;
           NOT_SECOND.lastIndex = start;
           const kept =
             forced[compound.id] !== true && parts.some((p) => isKept(p.measure, skip, forced));
           const second =
-            endsRangeWhole(ctx.text, start, match[1]!) || (sided && !NOT_SECOND.test(ctx.text));
-          if (kept || second) {
-            changes.push(hold(start, match[0], compound.id, 40));
+            endsRange(ctx.text, start, match[1]!) || (sided && !NOT_SECOND.test(ctx.text));
+          // With no unit word after its number, nothing makes the larger unit a weight, so
+          // `pounds` may be money, as in `It cost 5 pounds 10 to 6 pounds`.
+          const larger = compound.measures[0]!;
+          const otherSense =
+            unnamed !== undefined &&
+            larger.words.includes(match[2]!.toLowerCase()) &&
+            larger.otherSense?.(contextText(ctx.text), start, match.indices![2]![1]) === true;
+          if (kept || second || otherSense) {
+            changes.push(hold(start, held, compound.id, 40));
             continue;
           }
 
@@ -1649,9 +1797,9 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
           // A singular after a number above one says so in any part, as the pound does in
           // `7 pound 1 ounce babies`.
           const value = Math.max(...parts.flatMap((p, i) => (singular(p) ? [values[i]!] : [])));
-          const lastNumber = match.indices![2 * parts.length - 1]!;
-          const lastUnit = match.indices![2 * parts.length]!;
-          const gap = ctx.text.slice(lastNumber[1], lastUnit[0]);
+          const lastNumber = match.indices![2 * parts.length - 1];
+          const lastUnit = match.indices![2 * parts.length];
+          const gap = lastNumber && lastUnit ? ctx.text.slice(lastNumber[1], lastUnit[0]) : '';
           const attributive = singular(last) && describesNoun(ctx.text, start, value, gap, end);
           const unit = !parts.some(isWord)
             ? target.symbol
@@ -1674,8 +1822,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   // The pair guard can only apply before a number in digits, and is too costly to run at every
   // word.
   const START = String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})${NOT_SECOND_OF_PAIR}|(?!${NUMERIC_FIRST}))`;
-  // Only a dimension's second number is refused here. `endsRange` judges a range's, which
-  // needs both numbers.
+  // Only a dimension's number after digits is refused here. `endsRange` judges a range's, and
+  // `endsSide` one after words, which need both numbers.
   const SINGLE_START =
     String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})(?<!${NUMERIC_LAST}${DIMENSION_JOIN})|(?!${NUMERIC_FIRST}))`;
   const single = new RegExp(
@@ -1725,17 +1873,31 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   );
 
   /**
-   * Where a length measurement in `measure` starts that ends straight before `start`, with
-   * only space between, as `5 ft` does before the `6` of `5 ft 6 to 6 ft`. A number there is
-   * a smaller unit of that measurement, never more of the same unit.
+   * Where a measurement in `measure` starts that ends straight before `start`, with only space
+   * between, as `5 ft` does before the `6` of `5 ft 6 to 6 ft`, and `11 stone` before the `4`
+   * of `11 stone 4 to 12 stone`. After a length, or a weight in a unit that a smaller one may
+   * follow, a number there is a smaller unit of that measurement, never more of the same unit.
+   * A weight there may be the tail of one in a larger unit still, which then starts first, as
+   * `11 stone 4 pounds` does before the `8` of `11 stone 4 pounds 8 to 12 pounds`.
    */
-  const sameLengthBefore = (text: string, start: number, measure: Measure): number | null => {
-    if (!hasSides(measure)) return null;
+  const sameUnitBefore = (text: string, start: number, measure: Measure): number | null => {
+    if (!hasSides(measure) && !FIRST_OF_WEIGHT.has(measure)) return null;
     const from = Math.max(0, start - NUMBER_REACH);
     const before = measurementBefore.exec(text.slice(from, start));
     if (before === null || resolve(before[1]!)?.measure !== measure) return null;
     const quantity = before[0].slice(0, before.indices![1]![1] - before.index);
-    return isBareInch(before[1]!, quantity) ? null : from + before.index;
+    if (isBareInch(before[1]!, quantity)) return null;
+    let measurementStart = from + before.index;
+    let unit = measure;
+    while (continuesWeight(text, measurementStart, unit)) {
+      const reach = Math.max(0, measurementStart - NUMBER_REACH);
+      const outer = measurementBefore.exec(text.slice(reach, measurementStart));
+      const outerUnit = outer && resolve(outer[1]!)?.measure;
+      if (!outerUnit) break;
+      measurementStart = reach + outer.index;
+      unit = outerUnit;
+    }
+    return measurementStart;
   };
 
   /** A written-out quantity with its unit inside it, as in `half a mile`. */
@@ -1873,11 +2035,12 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         // A list that starts as the second number of a pair, as in `1 to 2, 4 or 6 feet`.
         NOT_SECOND.lastIndex = start;
         const secondOfPair = earlier.length > 0 && !NOT_SECOND.test(ctx.text);
-        const measurementStart = sameLengthBefore(ctx.text, start, entry.measure);
+        const measurementStart = sameUnitBefore(ctx.text, start, entry.measure);
         if (measurementStart !== null) {
-          // The inches of a height are for `feetInchesRule`. Any other smaller unit cannot be
-          // read, so the measurement and range stay as written.
-          if (!isHeightInches(ctx.text, start)) {
+          // The inches of a height are for `feetInchesRule`, and the next unit of a weight for
+          // its compound rule. Any other smaller unit cannot be read, so the measurement and
+          // range stay as written.
+          if (!isSmallerPart(ctx.text, start)) {
             const held = ctx.text.slice(measurementStart, end);
             changes.push(hold(measurementStart, held, entry.measure.id, 35));
           }
@@ -2000,7 +2163,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const mayBeNoun =
           /\bby\b/i.test(match[0]) && !first.alias && (isWritten(first.raw) || !describes);
         const one = /^one$/i.test(first.raw);
-        const noun = NUMBER_AS_NOUN.test(before) || (one && ONE_AS_NOUN.test(before));
+        const noun = namesNoun(before, first.raw);
         if (mayBeNoun && noun) {
           // The single rule never reads a number in digits straight after `4 by`.
           if (sides.length === 2) {
@@ -2098,8 +2261,14 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       single.lastIndex = 0;
       for (let match: RegExpExecArray | null; (match = single.exec(ctx.text)) !== null; ) {
         if (isQuotationMark(ctx.text, match.index + match[0].length - 1)) continue;
+        const entry = resolve(match[2]!);
         const value = parseNumber(match[1]!);
-        if (resolve(match[2]!) && value !== null && endsRange(ctx.text, match.index, value)) {
+        if (
+          entry &&
+          value !== null &&
+          (endsRange(ctx.text, match.index, match[1]!) ||
+            endsSide(ctx.text, match.index, entry.measure))
+        ) {
           // Resumes at the next character, as past a start the pattern refused, so a measurement
           // that starts inside this match is still found.
           single.lastIndex = match.index + 1;
@@ -2560,7 +2729,7 @@ function fuelEconomyRule(): Rule {
         // Its range settles it.
         if (rangeEnds.has(match.index + match[0].length)) continue;
         const mpg = Number(match[1]);
-        if (!mpg || endsRange(ctx.text, match.index, mpg)) {
+        if (!mpg || endsRange(ctx.text, match.index, match[1]!)) {
           changes.push(hold(match.index, match[0], id, 35));
           continue;
         }

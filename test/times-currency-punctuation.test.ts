@@ -167,6 +167,34 @@ describe('currency', () => {
     expect(deamericaniseText(input, options)).toBe(expected);
   });
 
+  it.each`
+    unchanged                                                        | why
+    ${'In the replacement string, $1 is the first capture group.'}   | ${'a capture group'}
+    ${'Use $0 for the script name.'}                                 | ${'a script name'}
+    ${'Swap $1 and $2 in sed.'}                                      | ${'sed'}
+    ${'The regex puts the year in $1.'}                              | ${'a regex'}
+    ${'Set $HOME and $1 first.'}                                     | ${'a variable with a name'}
+    ${'Then $@ holds all of them and $1 the first.'}                 | ${'a variable that is a sign'}
+  `('leaves the variable in "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(money(unchanged, american)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                    | expected
+    ${'It costs $1.'}                        | ${'It costs US$1.'}
+    ${'Use $1 off coupons.'}                 | ${'Use US$1 off coupons.'}
+    ${'It cost $5, then $6.'}                | ${'It cost US$5, then US$6.'}
+    ${'Group tickets cost $5.'}              | ${'Group tickets cost US$5.'}
+    ${'Entry to the match is $5.'}           | ${'Entry to the match is US$5.'}
+    ${'Kids pay $1 and adults pay $2.'}      | ${'Kids pay US$1 and adults pay US$2.'}
+    ${'It costs $1. The regex is free.'}     | ${'It costs US$1. The regex is free.'}
+    ${'A regex course costs $1.50 a month.'} | ${'A regex course costs US$1.50 a month.'}
+    ${'A regex course raised $1 million.'}   | ${'A regex course raised US$1 million.'}
+    ${'A regex course costs $ 1 a month.'}   | ${'A regex course costs US$ 1 a month.'}
+  `('reads $input as an amount', ({ input, expected }) => {
+    expect(money(input, american)).toBe(expected);
+  });
+
   it('says nothing when the text does not look American', () => {
     expect(money('It cost $500.')).toBe('It cost $500.');
   });

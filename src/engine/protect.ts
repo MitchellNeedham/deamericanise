@@ -1,5 +1,6 @@
 import type { Range } from './apply.js';
 import { commentedCodeRanges } from './code-shape.js';
+import { collectFrontMatter } from './front-matter.js';
 import { collectVerbatimBlocks } from './indented-code.js';
 import type { Syntax } from '../types.js';
 
@@ -74,6 +75,28 @@ const CODE_SPAN = new RegExp(
     String.raw`(?:[^\`\n]|(?<!${ONE_LINE_BLOCK})\n(?!${PARAGRAPH_BREAK})|(?!\1(?!\`))\`+(?!\`))*\1(?!\`)`,
   'g',
 );
+
+/** A line break that a span may wrap over, as it may within a paragraph. */
+const WRAP = String.raw`(?<!${ONE_LINE_BLOCK})\n(?!${PARAGRAPH_BREAK})`;
+
+/** `$$` display maths as Pandoc reads it: closed by the next `$$` in the paragraph. */
+const DISPLAY_MATH =
+  String.raw`(?=\$\$)(?<!${ESCAPE}|\$)\$\$(?!\$)(?:[^$\n]|\$(?!\$)|${WRAP})+?\$\$(?!\$)`;
+
+/**
+ * `$` inline maths as Pandoc and GitHub read it: no space after the opening `$`, closed by the
+ * next unescaped `$` in the paragraph if that has no space before it and no digit after it.
+ * Otherwise the `$` opens nothing, so `$5 and $10` is two amounts.
+ */
+const INLINE_MATH =
+  String.raw`(?=\$)(?<!${ESCAPE}|\$)\$(?![\s$])` +
+  String.raw`(?:[^$\\\n]|\\(?:[^\n]|(?=\n))|${WRAP})*(?<!\s)\$(?![\d$])`;
+
+/**
+ * Code spans and TeX maths in Markdown, in one pass so that whichever opens first holds the
+ * other's delimiters as written, as CommonMark reads them.
+ */
+const CODE_OR_MATH = new RegExp(`${CODE_SPAN.source}|${DISPLAY_MATH}|${INLINE_MATH}`, 'g');
 
 /**
  * A line that starts with a run of three or more backticks or tildes, split into its quote
@@ -190,12 +213,25 @@ const PATH = new RegExp(
   'g',
 );
 
-/** Code spans and code blocks, read by the rules of the text's syntax. */
+/**
+ * Code spans and code blocks, read by the rules of the text's syntax, and in Markdown, front
+ * matter and maths.
+ */
 function collectCode(text: string, syntax: Syntax | undefined, into: Range[]): void {
-  collect(text, [CODE_SPAN], into);
-  if (syntax === 'text') collect(text, [BACKTICK_PAIRS], into);
-  else collectFencedCode(text, into);
-  if (syntax === 'markdown') collectVerbatimBlocks(text, into);
+  if (syntax !== 'markdown') {
+    collect(text, [CODE_SPAN], into);
+    if (syntax === 'text') collect(text, [BACKTICK_PAIRS], into);
+    else collectFencedCode(text, into);
+    return;
+  }
+  const body = collectFrontMatter(text, into);
+  collect(text, [CODE_OR_MATH], into);
+  // A fence or HTML tag in front matter opens no block, so blocks are read from after it.
+  const rest = text.slice(body);
+  const blocks: Range[] = [];
+  collectFencedCode(rest, blocks);
+  collectVerbatimBlocks(rest, blocks);
+  for (const block of blocks) into.push({ start: block.start + body, end: block.end + body });
 }
 
 /**
@@ -205,10 +241,31 @@ function collectCode(text: string, syntax: Syntax | undefined, into: Range[]): v
  */
 const LONG_FLAG = /(?<![\w!-])--[A-Za-z][\w-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|\S*))?/g;
 
+/** A TeX argument in braces, after any optional ones in brackets. */
+const TEX_ARGUMENT = String.raw`(?:[ \t]*\[[^[\]\n]*\])*[ \t]*\{[^{}\n]*\}`;
+
+/** TeX commands whose first argument names a colour, colour model or environment. */
+const TEX_NAMING = 'color|textcolor|colorbox|pagecolor|rowcolor|cellcolor|columncolor|begin|end';
+
+/**
+ * A TeX command, with the arguments that name a colour, colour model or environment, as in
+ * `\color{gray}`, `\definecolor{shade}{gray}{0.9}` and `\begin{center}`. TeX knows each by one
+ * spelling, so a respelt one stops the document compiling. The text that `\textcolor{gray}{word}`
+ * and `\colorbox` colour is prose.
+ */
+const TEX_COMMAND = new RegExp(
+  String.raw`\\(?:definecolor(?![A-Za-z])(?:${TEX_ARGUMENT}){0,3}` +
+    String.raw`|(?:fcolorbox|colorlet)(?![A-Za-z])(?:${TEX_ARGUMENT}){0,2}` +
+    String.raw`|(?:${TEX_NAMING})(?![A-Za-z])(?:${TEX_ARGUMENT})?` +
+    String.raw`|[A-Za-z]+)`,
+  'g',
+);
+
 const STRUCTURAL: RegExp[] = [
   /\bhttps?:\/\/\S+/g,
   /\bwww\.\S+/g,
   LONG_FLAG,
+  TEX_COMMAND,
   // Starting only where the token starts, so a long dotted token is walked once, not once per word.
   /(?<![\w.+-])[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
   /<[a-zA-Z/][^>\n]*>/g,

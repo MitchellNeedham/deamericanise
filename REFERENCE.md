@@ -652,6 +652,13 @@ Amounts are never converted, because exchange rates move; a bare
 `$500` becomes `US$500` when the text is American. 
 A scale stays with the amount only as a whole word: `$5 million` and `$50k` become
 `US$5 million` and `US$50k`, and the word after `$50 modernizing` is still respelt.
+A `$` and one figure, with no decimal, comma or scale, is a variable rather than an amount
+in a sentence about code: one that says `capture group`, `regex`, `regular expression`,
+`replacement string`, `back-reference`, `script name`, `sed`, `awk`, `bash` or `perl`, or
+names a variable such as `$HOME`, `${name}` or `$@`. Words that prices share, such as
+`group` or `match`, are no sign, and nor is another figure, so `Swap $1 and $2 in sed.`
+stays as written while `Group tickets cost $5.` becomes `Group tickets cost US$5.` and
+`Kids pay $1 and adults pay $2.` becomes `Kids pay US$1 and adults pay US$2.`
 
 **Punctuation** (`localise` only). House style rather than comprehension, so it waits to
 be asked for. `U.S.` becomes `US`, and punctuation that is not part of a quotation moves
@@ -807,7 +814,7 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 
   | `syntax` | |
   | --- | --- |
-  | `'markdown'` | Fences as above, and indented code blocks and `pre`, `script`, `style` and `textarea` blocks and elements as CommonMark reads them |
+  | `'markdown'` | Fences as above, and indented code blocks and `pre`, `script`, `style` and `textarea` blocks and elements as CommonMark reads them, front matter, and `$` and `$$` maths |
   | `'text'` | No such fences, since a line of tildes underlines a heading in `.rst` or `.txt`: three backticks protect everything up to the next three |
   | none (default) | Fences as above, and an indented line is prose |
 
@@ -826,6 +833,28 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   `textarea` element is held from its opening tag to the next closing tag of the same name,
   or to the end of the block. The rest of that block, and HTML comments, hold text that is
   still rewritten, as is a tag in the middle of a sentence.
+
+  Front matter is read as remark-frontmatter reads it: a `---` (YAML) or `+++` (TOML) line
+  that opens the text, closed by the next line that repeats it. Its keys name layouts, URLs
+  and tags, so it is held, except the value of a `title`, `description`, `summary`,
+  `excerpt`, `subtitle`, `caption` or `alt` key that sits on the key's own line, which is
+  rewritten inside any quotes. So `layout: color-page` stays as written and
+  `title: "The color guide"` becomes `title: "The colour guide"`. A value that is a list, a
+  block or a string over several lines is held. A text that opens with a `---` thematic break
+  and has another `---` line further down is read as front matter, as remark-frontmatter
+  reads it.
+
+  Maths is read as Pandoc and GitHub read it. `$$` opens display maths, closed by the next `$$`.
+  A single `$` with no space after it opens inline maths, closed by the next unescaped `$` with
+  no space before it and no digit after it, so `$2^n$` and `$5x + 3 = 8$` are held while
+  `$5 and $10` is two amounts. Neither may cross a blank line, and a code span or maths that
+  opens first holds the other's delimiters.
+- **TeX commands.** A backslash and the letters after it, such as `\centering` or `\color`,
+  with the arguments of colour commands that name a colour, colour model or colour
+  definition (`\color`, `\textcolor`, `\colorbox`, `\fcolorbox`, `\definecolor`, `\colorlet`,
+  `\pagecolor`, `\rowcolor`, `\cellcolor` and `\columncolor`) and the environment that
+  `\begin` and `\end` name. TeX knows each by one spelling. The text a command colours is
+  prose, so `\textcolor{gray}{gray word}` becomes `\textcolor{gray}{grey word}`.
 - **File names and paths,** read from their shape rather than a list of extensions. A file
   name is a name holding a letter, then a dot and an extension in one case with no space
   either side, so `behavior.ts`, `Center.vue` and `GRAY.PNG` are held, and so is a domain or
@@ -1268,9 +1297,10 @@ options it had and goes on following the page under them.
   runs on to the next line that would close it, or to the end of the text. A comment in a
   language that documents in Markdown is read that way, so a tilde heading underline in a
   reStructuredText block comment there leaves the text up to the next one as written.
-- Outside the remark plugin, an indented code block, and the contents of a `pre`, `script`,
-  `style` or `textarea` block, are rewritten like the prose around them unless the text is
-  known to be Markdown: a Markdown file, `syntax: 'markdown'`, or Prettier's Markdown parser.
+- Outside the remark plugin, an indented code block, the contents of a `pre`, `script`,
+  `style` or `textarea` block, front matter and maths are rewritten like the prose around
+  them unless the text is known to be Markdown: a Markdown file, `syntax: 'markdown'`, or
+  Prettier's Markdown parser.
   So `deamericaniseText` with no `syntax`, stdin without `--language md` or
   `--syntax markdown`, and comments rewrite them.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`

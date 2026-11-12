@@ -1,4 +1,4 @@
-import { buildGate, type Gate } from '../../config.js';
+import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
 import {
@@ -1471,9 +1471,12 @@ function formatEnds(ctx: RuleContext, values: number[], raw: string[]): string[]
   return texts;
 }
 
-function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
+function fahrenheitReadings(
+  ctx: RuleContext,
+  matches: Iterable<RegExpExecArray> = fahrenheitTemperatures(ctx.text),
+): FahrenheitReading[] {
   const readings: FahrenheitReading[] = [];
-  for (const match of fahrenheitTemperatures(ctx.text)) {
+  for (const match of matches) {
     const raw = match[1] === undefined ? [match[3]!] : [match[1], match[3]!];
     const parsed = raw.map(parseNumber);
     if (parsed.some((v) => v === null)) continue;
@@ -1511,6 +1514,37 @@ function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
     });
   }
   return readings;
+}
+
+/** A rule run with the default options and no verdict, for a caller outside one. */
+const DEFAULT_RUN: Omit<RuleContext, 'text'> = {
+  options: resolveOptions(),
+  signals: {
+    confidence: 0,
+    markers: [],
+    unambiguousMonthFirstDates: 0,
+    unambiguousDayFirstDates: 0,
+    namedMonthFirstDates: 0,
+    namedDayFirstDates: 0,
+  },
+  american: false,
+};
+
+/**
+ * Whether the Fahrenheit temperature `match`, as `fahrenheitTemperatures` gives it, only
+ * restates the Celsius value before it, as in `175°C (350°F)` and `180°C/350°F`. The
+ * temperature rules leave such a value as written. A value before its Celsius partner, as
+ * in `350°F (175°C)`, is not a restatement: the rules convert it by dropping the partner.
+ */
+export function restatesCelsiusBefore(text: string, match: RegExpExecArray): boolean {
+  const ctx = { ...DEFAULT_RUN, text };
+  const [reading] = fahrenheitReadings(ctx, [match]);
+  if (reading === undefined) return false;
+  const end = reading.start + reading.matched.length;
+  return (
+    restatesMetric(ctx, reading.start, end) ||
+    followsItsMetric(ctx, reading.start, end, reading.body, reading.ruleId)
+  );
 }
 
 /**

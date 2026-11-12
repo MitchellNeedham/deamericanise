@@ -74,6 +74,66 @@ describe('feet and inches together', () => {
   });
 
   it.each`
+    input                                     | expected                                  | why
+    ${'He is 6 foot 2 to 6 foot 4.'}          | ${'He is 1.88 metres to 1.93 metres.'}    | ${'joined by "to"'}
+    ${'He is six foot two to six foot four.'} | ${'He is 1.88 metres to 1.93 metres.'}    | ${'in words'}
+    ${'between 5 foot 10 and 6 foot 2'}       | ${'between 1.78 metres and 1.88 metres'}  | ${'joined by "and"'}
+    ${'He is 6 foot 2 - 6 foot 4 tall.'}      | ${'He is 1.88 metres - 1.93 metres tall.'} | ${'joined by a spaced dash'}
+    ${'He is 6 foot 2 to 6 feet 4 inches.'}   | ${'He is 1.88 metres to 1.93 metres.'}    | ${'before a height with its inch word'}
+    ${'2 feet 6 to 3 feet'}                   | ${'76.2 centimetres to 91 centimetres'}   | ${'before feet alone'}
+    ${'from 5 foot 2 to 6 ft'}                | ${'from 1.57 metres to 1.8 m'}            | ${'before an abbreviation'}
+    ${'5 foot 1 to 5 foot 2 to 5 foot 3'}     | ${'1.55 metres to 1.57 metres to 1.6 metres'} | ${'three heights in a row'}
+  `('reads inches with no inch word before another height: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                       | why
+    ${'5 ft 6 to 6 ft'}             | ${'only "foot" or "feet" lets the inch word go'}
+    ${'3 yards 2 to 4 yards'}       | ${'a smaller unit after yards'}
+    ${'10 feet 12 to 15 feet'}      | ${'twelve is not a number of inches'}
+    ${'6 foot 2-6 foot 4'}          | ${'a dash written tight, where no second height can start'}
+    ${'5 to 6 foot 2 to 6 foot 4'}  | ${'the first height ends a range'}
+  `('leaves "$unchanged" as written, since its number after a length is no range ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                  | expected                                         | why
+    ${'6 feet 2 to 3 inches'}              | ${'1.8 metres 5.1 to 7.6 centimetres'}           | ${'a range in a smaller unit'}
+    ${'Pack 5 in 2 to 3 inches of foam.'}  | ${'Pack 5 in 5.1 to 7.6 centimetres of foam.'}   | ${'"in" before a number is a preposition'}
+    ${'5 to 10 feet'}                      | ${'1.5 to 3 metres'}                             | ${'a range on its own'}
+  `('still reads a range after a number: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                          | expected                       | why
+    ${'a 6 foot 2 inch man'}       | ${'a 1.88 metre man'}          | ${'a determiner and a singular unit'}
+    ${'the 2 foot 6 inch pipes'}   | ${'the 76.2 centimetre pipes'} | ${'a plural noun'}
+    ${'a 6 ft 2 in man'}           | ${'a 1.88 metre man'}          | ${'abbreviations after a determiner'}
+    ${'6 feet 2 inch pipes'}       | ${'1.88 metre pipes'}          | ${'the singular after a number above one'}
+    ${'a 6 foot 1 inch man'}       | ${'a 1.85 metre man'}          | ${'one inch after a determiner'}
+  `('keeps the unit singular before a noun: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                              | expected                       | why
+    ${'He is 6 feet 2 inches tall.'}   | ${'He is 1.88 metres tall.'}   | ${'"tall" is no noun'}
+    ${'He is 6 foot 2 inches tall.'}   | ${'He is 1.88 metres tall.'}   | ${'nor after "foot"'}
+    ${'6 ft 2 in'}                     | ${'1.88 metres'}               | ${'nothing after it'}
+  `('keeps the plural where no noun follows: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('gives a height before an adjective and a noun no worse a unit than before', () => {
+    expect(['a 1.88 metres tall man', 'a 1.88 metre tall man']).toContain(
+      convert('a 6 foot 2 inch tall man'),
+    );
+  });
+
+  it.each`
     input                       | expected                     | why
     ${'6 feet 2 cars'}          | ${'1.8 metres 2 cars'}       | ${'a noun follows the number'}
     ${'six foot two\nboxes'}    | ${'1.8 metres two\nboxes'}   | ${'a word follows on the next line'}
@@ -100,6 +160,7 @@ describe('a measurement in two units that ends a range is left whole', () => {
     ${'five - six feet two inches'}                      | ${'a height in words after a spaced dash'}
     ${'five to 6 feet 2 inches'}                         | ${'a first end in words'}
     ${'He is five to six foot two.'}                     | ${'a height with no inch word'}
+    ${'5 to 6 feet 2 inches'}                            | ${'with nothing around it'}
     ${'Babies weigh five to seven pounds eight ounces.'} | ${'a weight in words'}
     ${'between five and seven pounds eight ounces'}      | ${'a weight in words after "and" in a range'}
     ${'five to 7 pounds 8 ounces'}                       | ${'a first end in words'}
@@ -895,6 +956,10 @@ describe('a Unicode hyphen reads as a hyphen', () => {
     ${'twenty‐two miles'}               | ${'35 kilometres'}                      | ${'inside a number of two words'}
     ${'a forty‑five‑mile drive'}   | ${'a 72 kilometre drive'}               | ${'the same, hyphenated to its unit'}
     ${'a 2‑3/4 inch board'}             | ${'a 7 centimetre board'}               | ${'inside a mixed number'}
+    ${'6 feet 2‑1/2 inches'}            | ${'1.89 metres'}                        | ${'inside the inches of a height'}
+    ${'6 feet 2‐1/2 inches'}            | ${'1.89 metres'}                        | ${'the same, with U+2010'}
+    ${'5 ft 2‑3/4 in'}                  | ${'1.59 metres'}                        | ${'the same, abbreviated'}
+    ${'6 feet 2-1/2 inches'}                 | ${'1.89 metres'}                        | ${'a height with a hyphen-minus'}
     ${'Highs in the 70s‑80s today.'}    | ${'Highs between 21 and 32°C today.'}   | ${'between two Fahrenheit decades'}
     ${'5-10 feet'}                           | ${'1.5-3 metres'}                       | ${'a hyphen-minus'}
     ${'a 6-foot fence'}                      | ${'a 1.8 metre fence'}                  | ${'the same, before a unit'}

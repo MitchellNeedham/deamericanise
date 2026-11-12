@@ -8,7 +8,7 @@ import {
   type Measure,
   type MetricValue,
 } from './definitions.js';
-import { FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
+import { BARE_CELSIUS_FIGURE, FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
 import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
@@ -263,18 +263,25 @@ function withOriginal(ctx: RuleContext, body: string, original: string): string 
 }
 
 
-/** A metric unit's forms, and what a value in it comes to in its dimension's base unit. */
-type MetricUnit = [forms: string, toBase: (value: number) => number];
+/**
+ * A metric unit's forms, what a value in it comes to in its dimension's base unit, and,
+ * for forms that are a unit only after the right figure, what has to stand before them.
+ */
+type MetricUnit = [forms: string, toBase: (value: number) => number, figure?: string];
 
 const times = (factor: number) => (value: number) => value * factor;
 const BASE = times(1);
 
 /**
- * Metric units by dimension, in every form the unit rules write them and in the American
- * spellings. Each key names a capture group, which is how a match reports its dimension.
+ * Metric units by dimension, in every form the unit rules write them, in the American
+ * spellings, and in the shorthand of a hand-written temperature such as `180C` or `180ºC`.
+ * Each key names a capture group, which is how a match reports its dimension.
  */
 const METRIC_UNITS = {
-  temperature: [[String.raw`degrees?\s+(?:Celsius|C)\b|°\s*C`, BASE]],
+  temperature: [
+    [String.raw`degrees?\s+(?:Celsius|C)\b|[°º˚]\s*C(?:elsius\b)?|Celsius\b`, BASE],
+    [String.raw`C\b`, BASE, BARE_CELSIUS_FIGURE],
+  ],
   speed: [[String.raw`(?:kilometres?|kilometers?)\s+per\s+hour|km/h`, BASE]],
   torque: [[String.raw`newton[\s-]+(?:metres?|meters?)|N·m|Nm`, BASE]],
   area: [
@@ -309,11 +316,14 @@ const METRIC_UNITS = {
 
 type Dimension = keyof typeof METRIC_UNITS;
 
+// `METRIC_FORMS` reads a unit apart from its figure, so the figure a form needs is checked here.
+const afterFigure = ([forms, , figure]: MetricUnit) => (figure ? `(?<=${figure})(?:${forms})` : forms);
+
 const METRIC_NUMBER = String.raw`[-−]?\d[\d,]*(?:\.\d+)?`;
 const METRIC_VALUE =
   String.raw`${METRIC_NUMBER}(?:\s*(?:-|–|—|to|and|x|×|by)\s*${METRIC_NUMBER})*\s*-?\s*` +
   `(?:${Object.entries(METRIC_UNITS)
-    .map(([dimension, units]) => `(?<${dimension}>${units.map(([forms]) => forms).join('|')})`)
+    .map(([dimension, units]) => `(?<${dimension}>${units.map(afterFigure).join('|')})`)
     .join('|')})`;
 
 /**
@@ -435,10 +445,11 @@ function restatesConversion(
  */
 const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
   temperature: [
-    String.raw`°\s*F(?:ahrenheit)?`,
+    String.raw`[°º˚]\s*F(?:ahrenheit)?`,
     '℉',
     String.raw`degrees?\s+F(?:ahrenheit)?`,
     String.raw`deg\.?\s*F`,
+    'Fahrenheit',
   ],
   economy: ['mpg', String.raw`miles\s+per\s+gallon`],
   length: ["'"],
@@ -550,6 +561,27 @@ function restatesBody(metric: string, body: string, ruleId: string): boolean {
   return restatesConversion(given, converted, ruleId === ABSOLUTE_ID);
 }
 
+interface PairedMetric {
+  /** Where the metric value starts in the text. */
+  start: number;
+  metric: string;
+  dimension: Dimension | undefined;
+}
+
+/** The metric value joined by `/` or `or` before the measurement from `start` to `end`. */
+function metricPairedBefore(text: string, start: number, end: number): PairedMetric | undefined {
+  const from = Math.max(0, start - CONTEXT_WINDOW);
+  if (!ENDS_IN_JOIN.test(text.slice(from, start))) return undefined;
+  // The window runs on to `end` so a line break in the join can see that the next line
+  // holds the measurement and opens no new block.
+  for (const match of text.slice(from, end).matchAll(METRIC_PAIRED_BEFORE)) {
+    if (from + match.index + match[0].length === start) {
+      return { start: from + match.index, metric: match[1]!, dimension: dimensionOf(match) };
+    }
+  }
+  return undefined;
+}
+
 /** `180°C/350°F` and `180°C or 350°F` give the imperial value after the metric one it restates. */
 function followsItsMetric(
   ctx: RuleContext,
@@ -558,14 +590,8 @@ function followsItsMetric(
   body: string,
   ruleId: string,
 ): boolean {
-  const from = Math.max(0, start - CONTEXT_WINDOW);
-  if (!ENDS_IN_JOIN.test(ctx.text.slice(from, start))) return false;
-  // The window runs on to `end` so a line break in the join can see that the next line
-  // holds the measurement and opens no new block.
-  for (const match of ctx.text.slice(from, end).matchAll(METRIC_PAIRED_BEFORE)) {
-    if (from + match.index + match[0].length === start) return restatesBody(match[1]!, body, ruleId);
-  }
-  return false;
+  const paired = metricPairedBefore(ctx.text, start, end);
+  return paired !== undefined && restatesBody(paired.metric, body, ruleId);
 }
 
 /**
@@ -1168,6 +1194,27 @@ const CHANGE_AFTER = new RegExp(
 /** `10°F below zero` is a negative temperature, not a distance from zero. */
 const FROM_ZERO = /^\s+(above|below)\s+zero\b/i;
 
+/** The Celsius value in brackets or joined by `/` or `or` at the start of `rest`. */
+function celsiusPartnerAfter(rest: string): RegExpExecArray | null {
+  const match = BRACKET_AFTER.exec(rest) ?? METRIC_PAIRED_AFTER.exec(rest);
+  return match && dimensionOf(METRIC_INNER.exec(match[1]!)) === 'temperature' ? match : null;
+}
+
+/**
+ * The text either side of a Fahrenheit value from `start` to `end`, past any Celsius value
+ * given beside it, where the words that mark a change in temperature stand, as they do in
+ * `20°F (11°C) warmer` and `rose 11°C or 20°F`.
+ */
+function wordsBeside(text: string, start: number, end: number): { before: string; after: string } {
+  const paired = metricPairedBefore(text, start, end);
+  const from = paired?.dimension === 'temperature' ? paired.start : start;
+  const to = end + (celsiusPartnerAfter(text.slice(end))?.[0].length ?? 0);
+  return {
+    before: text.slice(Math.max(0, from - CONTEXT_WINDOW), from),
+    after: text.slice(to, to + CONTEXT_WINDOW),
+  };
+}
+
 const ABSOLUTE_ID = 'units.temperature.fahrenheit';
 const DIFFERENCE_ID = 'units.temperature.difference';
 
@@ -1203,14 +1250,14 @@ function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
 
     const start = match.index;
     let end = start + match[0].length;
-    const before = ctx.text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
+    const beside = wordsBeside(ctx.text, start, end);
     const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
     const zero = FROM_ZERO.exec(after);
     if (zero) {
       end += zero[0].length;
       if (zero[1]!.toLowerCase() === 'below') values = values.map((v) => -Math.abs(v));
     }
-    const difference = !zero && (CHANGE_BEFORE.test(before) || CHANGE_AFTER.test(after));
+    const difference = !zero && (CHANGE_BEFORE.test(beside.before) || CHANGE_AFTER.test(beside.after));
 
     let numbers: string[];
     if (difference) {

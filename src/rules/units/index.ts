@@ -841,7 +841,7 @@ function pushMeasurement(
     const before = ctx.text.slice(start, redundant.end);
     // A tag is protected, so no change can rewrite across one to collapse the pair.
     if (HAS_TAG.test(before)) {
-      changes.push(hold(start, before, ruleId, priority));
+      changes.push(hold(start, matched, ruleId, priority));
       return;
     }
     changes.push({

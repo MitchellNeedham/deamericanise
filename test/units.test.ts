@@ -1912,6 +1912,7 @@ describe('markup on a measurement given in both systems', () => {
     ${'Bake at **180°C**/**350°F**.'}                            | ${'both values bold'}
     ${'Bake at <b>180°C</b>/350°F.'}                             | ${'a slash after an HTML tag'}
     ${'It is <b>6 feet</b> (1.8 m) tall.'}                       | ${'no change can rewrite across a tag, so the pair is held'}
+    ${'It is <b>6 feet 2 inches</b> (1.88 m) tall.'}             | ${'the same, and no piece of it converts'}
     ${'Bake at <b>350°F</b>/180°C.'}                             | ${'the same, joined by a slash'}
     ${'It is **1.8 metres** (6 feet) tall.'}                     | ${'bold closes on the metric value'}
     ${'Bake at 180°C/350°F.'}                                    | ${'no markup'}
@@ -1929,6 +1930,12 @@ describe('markup on a measurement given in both systems', () => {
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
     expect(convert(input, { syntax: 'markdown' })).toBe(expected);
+  });
+
+  it('holds only the imperial value of a pair it cannot collapse across a tag', () => {
+    expect(deamericaniseText('It is <b>6 feet</b> (1.8 meters) tall.')).toBe(
+      'It is <b>6 feet</b> (1.8 metres) tall.',
+    );
   });
 });
 

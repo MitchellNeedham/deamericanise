@@ -465,8 +465,9 @@ contraction that already ends in the word's own last letter drops the stop, so `
 alone.
 
 **Articles.** Replacements drag their article along: `an eraser` becomes `a rubber`, and
-`a popsicle` becomes `an icy pole`. A converted number takes the article it is said with,
-so `an 8 foot fence` becomes `a 2.4 metre fence` and `a 60 foot tree` becomes
+`a popsicle` becomes `an icy pole`. A word is read by its sound, so `a pickup truck`
+becomes `a ute`. A converted number takes the article it is said with, so
+`an 8 foot fence` becomes `a 2.4 metre fence` and `a 60 foot tree` becomes
 `an 18 metre tree`. Eight, eleven and eighteen take `an`, and so does any figure whose
 spoken form starts with one of them, such as `80`, `8.5`, `11,000` or `18 million`. A
 temperature below zero takes `a`, for minus. A currency sign is said after its amount, so
@@ -476,6 +477,17 @@ usual readings disagree, the article is left as it was: `1100` to `1199` and `18
 `1899` (one thousand eight hundred, or eighteen hundred), and a 24-hour time with a
 leading zero other than `08:00` (`05:00` is oh five hundred to some readers and five to
 others).
+
+An article and its word share a paragraph. A single line break between them is a hard
+wrap, so `Use an` at the end of one line still agrees with `eraser` at the start of the
+next, but a blank line ends the paragraph and the article is left as it was. A capital
+`A` counts as the article only where a capital is expected: at the start of the text, a
+line, a list item, a heading or a table cell; after a sentence end or a colon, past any
+closing quotes or brackets; straight after an opening quote, bracket or emphasis marker;
+or between two capitalised words, as in a title or text in capitals. Anywhere else it is
+a label, so `a Grade A eggplant` becomes `a Grade A aubergine` in `en-GB` and
+`Hall A 60 foot ceiling` becomes `Hall A 18 metre ceiling`. A label is a single letter,
+so `An` and `AN` are always the article, as a lower case `a` or `an` is.
 
 ## Deciding whether the text is American
 
@@ -704,7 +716,7 @@ after code joins only the comments lined up beneath it. Each line's marker (`//`
 `//!`) and the `*` that starts each line of a `/*` comment are taken out first, so the text
 is Markdown: a line left holding only `//` or `*` is a blank line that ends a paragraph, a
 backtick span or a fence may wrap from one line to the next, and an article that ends one
-line agrees with the word that starts the next.
+line agrees with the word that starts the next, but not with one after a blank line.
 
 ```
 /**                          /// ```

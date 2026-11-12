@@ -117,6 +117,65 @@ describe('a weight in two units is one weight', () => {
   });
 });
 
+describe('a measurement in two units reads its first number whole', () => {
+  it.each`
+    input                                      | expected                          | why
+    ${'1 1/2 pounds 3 ounces'}                 | ${'765 grams'}                    | ${'a mixed number'}
+    ${'1/2 pounds 3 ounces'}                   | ${'312 grams'}                    | ${'a fraction'}
+    ${'2.7 pounds 3 ounces'}                   | ${'1.31 kilograms'}               | ${'a decimal'}
+    ${'1½ pounds 3 ounces'}                    | ${'765 grams'}                    | ${'a vulgar fraction after a whole number'}
+    ${'½ pound 3 ounces'}                      | ${'312 grams'}                    | ${'a vulgar fraction'}
+    ${'1/2 stone 3 pounds'}                    | ${'4.54 kilograms'}               | ${'a fraction of a stone'}
+    ${'1/2 feet 3 inches'}                     | ${'22.9 centimetres'}             | ${'a fraction of a foot'}
+    ${'1 1/2 feet 3 inches'}                   | ${'53.3 centimetres'}             | ${'a mixed number of feet'}
+    ${'2.5 feet 3 inches'}                     | ${'83.8 centimetres'}             | ${'a decimal number of feet'}
+    ${'-2 pounds 3 ounces'}                    | ${'-992 grams'}                   | ${'a minus before the whole weight'}
+    ${'Bought 2024-03-14 1/2 pounds 3 ounces'} | ${'Bought 2024-03-14 312 grams'}  | ${'a fraction after a date'}
+    ${'7 pounds 8 ounces'}                     | ${'3.4 kilograms'}                | ${'a whole number of pounds'}
+    ${'6 feet 2 inches'}                       | ${'1.88 metres'}                  | ${'a whole number of feet'}
+    ${'1 1/2 pounds'}                          | ${'680 grams'}                    | ${'a mixed number on its own'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                    | why
+    ${'1/0 pounds 3 ounces'}     | ${'a first part that is not finite'}
+    ${'1 1/0 pounds 3 ounces'}   | ${'a mixed first part that is not finite'}
+    ${'1/0 feet 3 inches'}       | ${'feet that are not finite'}
+    ${'5 feet 1/0 inches'}       | ${'inches that are not finite'}
+    ${'7 pounds 1/0 ounces'}     | ${'ounces that are not finite'}
+    ${'1,5 pounds 3 ounces'}     | ${'the tail of a grouped number'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a long run of whitespace takes time in line with its length', () => {
+  // Generous, since each of these takes a few milliseconds. A pattern that walks the run from
+  // every place in it, or tries every split of it, takes several seconds.
+  const LIMIT_MS = 1000;
+
+  it.each`
+    before                         | name          | run     | length   | after                      | expected
+    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'The color.'}            | ${'A 3.4 kilogram baby.'}
+    ${'A 7 pound 8 ounce baby.'}   | ${'tabs'}     | ${'\t'} | ${3000}  | ${'The color.'}            | ${'A 3.4 kilogram baby.'}
+    ${'A 7 pound 8 ounce baby.'}   | ${'newlines'} | ${'\n'} | ${12000} | ${'The color.'}            | ${'A 3.4 kilogram baby.'}
+    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'5 feet'}                | ${'A 3.4 kilogram baby.'}
+    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'half a mile'}           | ${'A 3.4 kilogram baby.'}
+    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'seven pounds 8 ounces'} | ${'A 3.4 kilogram baby.'}
+    ${'It weighs 7 pounds'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'The color.'}            | ${'It weighs 3.2 kilograms'}
+    ${'It is 5'}                   | ${'spaces'}   | ${' '}  | ${30000} | ${'The color.'}            | ${'It is 5'}
+  `('"$before", $length $name, then "$after"', ({ before, run, length, after, expected }) => {
+    const text = (n: number) => `${before}${run.repeat(n)}${after}`;
+    convert(text(1));
+    const started = performance.now();
+    const output = convert(text(length));
+    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+    expect(output.startsWith(expected)).toBe(true);
+  });
+});
+
 describe('mass and volume', () => {
   it.each`
     input                | expected
@@ -446,12 +505,21 @@ describe('the minutes of a clock time are not a measurement', () => {
     ${'Hold 8:15 miles for the tempo run.'}  | ${'a pace before a plural unit'}
     ${'At 18:00 pound the cutlets thin.'}    | ${'a 24-hour time before a verb'}
     ${'At 7:30 F the oven was hot.'}         | ${'a bare F after a time'}
+    ${'At 7:30 feet 2 inches'}               | ${'a height in two units'}
+    ${'At 18:00 pounds 8 ounces'}            | ${'a weight in two units'}
+    ${'At 7:30 stone 4 pounds 8 ounces'}     | ${'a weight in three units'}
+    ${'At 7:30 mpg'}                         | ${'fuel economy'}
+    ${'At 7:30 miles per gallon'}            | ${'fuel economy written out'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });
 
   it.each`
     input                                        | expected                                         | why
+    ${'At 7:30 6 feet 2 inches'}                 | ${'At 7:30 1.88 metres'}                         | ${'a height after a time'}
+    ${'At 7:30 1/2 pounds 3 ounces'}             | ${'At 7:30 312 grams'}                           | ${'a weight after a time'}
+    ${'7 pounds 8 ounces'}                       | ${'3.4 kilograms'}                               | ${'a weight in two units'}
+    ${'30 mpg'}                                  | ${'7.8 L/100km'}                                 | ${'fuel economy'}
     ${'30 miles'}                                | ${'48 kilometres'}                               | ${'a measurement'}
     ${'a 30 mile drive'}                         | ${'a 48 kilometre drive'}                        | ${'an attributive measurement'}
     ${'Gates open at 7:30. 5 miles of parking.'} | ${'Gates open at 7:30. 8 kilometres of parking.'} | ${'a measurement after a time'}

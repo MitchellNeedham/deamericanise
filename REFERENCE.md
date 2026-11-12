@@ -853,6 +853,26 @@ with a Lisp declaration or special form in lower case, such as `(defun`, `(setq`
 `; (setq color 1)` and `;; (let ((color 1)) color)` are left alone, while
 `; (See the color chart.)` is rewritten.
 
+A call alone on a line, a name (dotted or not) straight against its bracket with nothing
+after the bracket closes, reads as code: `// pick(color)` and `// render(color, size)` are
+left alone. A bracket holding only a plural ending is prose, so `// color(s)` is rewritten.
+
+A line that reads as code and leaves a bracket open opens a form, and every line up to the
+one that closes it is left alone, however it reads by itself. That keeps the body of a
+commented-out block whole, and the inside of a commented-out Lisp form:
+
+```
+// if (x) {                      <- left alone
+//   paint the center            <- left alone, inside the block
+// }                             <- left alone
+```
+
+Brackets of every kind count, but not those in a string or a character literal, such as
+`"("`, `'('`, `?\(` and `#\(`, nor those in a line commented on top of a comment. A
+closing bracket closes the innermost open bracket of its own kind, so the `)` of the
+interval `[a, b)` closes nothing. A form may run to the end of the comment and no further.
+One still open there holds no line beyond those that read as code by themselves.
+
 A run of the marker that a language writes by convention is one marker, not two: `;;`,
 `;;;` and `;;;;` in Lisp, `'''` in Visual Basic, `%%` and `%%%` in Erlang, MATLAB and
 LaTeX, and `!!` in Fortran. So `;; Pick the color.` is rewritten, while `;;; ;; old note`,
@@ -863,9 +883,10 @@ alone. `LexerSpec.markerRuns` sets these per language.
 The costs are lopsided: a missed rewrite inside a commented-out block is invisible, while
 a rewrite there is a broken build. The threshold is set accordingly, so the occasional
 prose line that reads like code is left alone, such as `// (when ready, center it)` in any
-language. It works line by line, so a block comment can hold prose and an `@example` at
-once, and doc tags keep their operands: the name in `@param {string} color` is protected
-while the description beside it is not.
+language, and so are the lines up to the end of a parenthetical that such a line leaves
+open. Outside a form it works line by line, so a block comment can hold prose and an
+`@example` at once, and doc tags keep their operands: the name in `@param {string} color`
+is protected while the description beside it is not.
 
 Turn it off with `protectCommentedCode: false` or `--no-code-guard`.
 

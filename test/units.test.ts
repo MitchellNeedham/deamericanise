@@ -2491,6 +2491,32 @@ describe('a fastener size a few words from its noun', () => {
   });
 });
 
+describe('a conventional size names its noun in either number, on either side', () => {
+  it.each`
+    unchanged                            | why
+    ${'a monitor of 27 inches'}          | ${'a singular noun before the size'}
+    ${'monitors of 27 inches'}           | ${'its plural'}
+    ${'laptops of 13 inches'}            | ${'the same'}
+    ${'screens up to 15.6 inches'}       | ${'the same, with function words between'}
+    ${'wheels of 15 to 17 inches'}       | ${'a range after "of"'}
+    ${'wheels between 15 and 17 inches'} | ${'a range after "between"'}
+    ${'a pizza of 12 inches'}            | ${'a noun read after a size reads before one'}
+    ${'a 6 inch phone'}                  | ${'and the other way round'}
+    ${'a waist of 32 inches'}            | ${'a body size before its number'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                    | expected                                         | why
+    ${'between 15 and 17 inches'}            | ${'between 38 and 43 centimetres'}               | ${'no conventional noun'}
+    ${'The gauge records 2 inches of rain.'} | ${'The gauge records 5.1 centimetres of rain.'}  | ${'a plural that is also a verb of measuring'}
+    ${'Lose 2 inches off your waist.'}       | ${'Lose 5.1 centimetres off your waist.'}        | ${'a body measured, not sized'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
 describe('American designations that only look like measurements', () => {
   it.each`
     unchanged                    | why

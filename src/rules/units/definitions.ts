@@ -85,23 +85,54 @@ export function metricArea(squareMetres: number): MetricValue {
  * 3/8 inch bolt is a designation rather than a measurement: there is no metric bolt of
  * 9.5 mm, and a workshop happily mixes a 10 mm bolt and a 3/8 inch bolt in one sentence.
  */
+const SIZED_IN_INCHES = [
+  'screen', 'display', 'monitor', 'touchscreen', 'laptop', 'tablet', 'phone', 'macbook', 'tv',
+  'television', 'panel', 'wheel', 'rim', 'tyre', 'tire', 'pipe', 'bore', 'vinyl', 'record',
+  'drive', 'disk', 'disc', 'floppy', 'barrel', 'sensor', 'lens', 'pizza', 'subwoofer', 'speaker',
+  'nail', 'bolt', 'screw', 'nut', 'washer', 'socket', 'wrench', 'spanner', 'thread', 'hex',
+  'ratchet', 'rivet', 'stud', 'dowel', 'tap', 'fitting', 'coupling', 'nipple', 'union', 'elbow',
+  'npt', 'unc', 'unf', 'drill', 'bit',
+];
+
+/**
+ * A body is measured as well as sized, as in `2 inches off your waist`, so a part of it names
+ * a size only before the size.
+ */
+const BODY_SIZED_IN_INCHES = ['waist', 'chest', 'inseam'];
+
+/**
+ * Plurals that are also verbs of measuring, as in `the gauge records 2 inches of rain`, so
+ * they name a thing only after its size.
+ */
+const MEASURING_VERBS = new Set(['records', 'drives', 'drills', 'bores']);
+
+const plural = (noun: string): string =>
+  /(?:s|x|ch|sh)$/.test(noun)
+    ? `${noun}es`
+    : /[^aeiou]y$/.test(noun)
+      ? `${noun.slice(0, -1)}ies`
+      : `${noun}s`;
+
+const withPlurals = (nouns: string[]): string[] => nouns.flatMap((noun) => [noun, plural(noun)]);
+
 const INCH_CONVENTIONS = {
   // A few function words may sit between the thing and its size. A bolt described as up
   // to an inch in diameter is being named; a bolt described as standing away from a wall
   // is being measured. Allowing only function words between the two keeps them apart.
   before: new RegExp(
-    String.raw`\b(?:screen|display|monitor|touchscreen|laptop|tablet|phone|tv|television|panel|` +
-      String.raw`wheels?|rims?|tyres?|tires?|pipes?|bore|vinyl|record|drive|disk|disc|barrel|waist|` +
-      String.raw`chest|inseam|sensor|lens|nails?|bolts?|screws?|nuts?|washers?|sockets?|wrench(?:es)?|` +
-      String.raw`spanners?|threads?|rivets?|studs?|drill|bit)\b` +
+    String.raw`\b(?:${withPlurals([...SIZED_IN_INCHES, ...BODY_SIZED_IN_INCHES])
+      .filter((noun) => !MEASURING_VERBS.has(noun))
+      .join('|')})\b` +
       String.raw`(?:\s+(?:up|to|above|below|over|under|of|and|or|the|a|an|about|approximately|` +
-      String.raw`larger|smaller|greater|less|than|from|in|is|are|measuring)){0,4}[\s-]*$`,
+      String.raw`larger|smaller|greater|less|than|from|in|is|are|measuring|between)){0,4}[\s-]*$`,
     'i',
   ),
   // Up to three words may sit between the measurement and the thing measured, as in
   // `a 12-inch capacitive LCD touchscreen`.
-  after:
-    /^[\s-]*(?:[\w-]+\s+){0,3}(?:screens?|displays?|monitors?|touchscreens?|laptops?|tablets?|macbook|tvs?|televisions?|panels?|wheels?|rims?|tyres?|tires?|pipes?|vinyl|records?|drives?|disks?|discs?|floppy|barrels?|sensors?|lens|lenses|nails?|pizzas?|subwoofers?|speakers?|bolts?|screws?|nuts?|washers?|sockets?|wrench(?:es)?|spanners?|threads?|hex|ratchets?|rivets?|studs?|dowels?|taps?|fittings?|couplings?|nipples?|unions?|elbows?|npt|unc|unf|bits?)\b/i,
+  after: new RegExp(
+    String.raw`^[\s-]*(?:[\w-]+\s+){0,3}(?:${withPlurals(SIZED_IN_INCHES).join('|')})\b`,
+    'i',
+  ),
 };
 
 /**

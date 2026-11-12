@@ -798,8 +798,6 @@ describe('fuel economy', () => {
       .flatMap((rule) => rule.find(ctx));
   };
 
-  // `resolveChanges` tests every change against every hold, so a second change or hold for
-  // each range makes a long run of ranges quadratic.
   it.each`
     range                   | read
     ${'20 to 30 mpg, '}     | ${'converted'}
@@ -1559,6 +1557,77 @@ describe('a held span in change resolution', () => {
     ${'She said "I need bolts of ½-¾ inch."'}              | ${'She said "I need bolts of ½-¾ inch".'}
   `('moves the stop out of a quotation that ends in a held span: $input', ({ input, expected }) => {
     expect(deamericaniseText(input, { preset: 'localise' })).toBe(expected);
+  });
+});
+
+describe('resolving many changes beside many spans', () => {
+  const at = (start: number, end: number, extra: Partial<Change> = {}): Change => ({
+    start,
+    end,
+    before: 'x'.repeat(end - start),
+    after: 'y',
+    ruleId: 'test',
+    category: 'units',
+    confidence: 'moderate',
+    ...extra,
+  });
+  /** `span`, counting each read of one of its properties in `reads`. */
+  const counted = <T extends object>(span: T, reads: { count: number }): T =>
+    new Proxy(span, {
+      get(target, key, receiver) {
+        reads.count++;
+        return Reflect.get(target, key, receiver);
+      },
+    });
+  const spans = 200;
+  /** A span every 20 characters, as `make` builds it from its start and end. */
+  const everyTwenty = <T>(make: (start: number, end: number) => T) =>
+    Array.from({ length: spans }, (_, i) => make(i * 20, i * 20 + 10));
+  /** `count` changes, one every 20 characters, clear of the spans `everyTwenty` builds. */
+  const beside = (count: number) => Array.from({ length: count }, (_, i) => at(i * 20 + 12, i * 20 + 15));
+
+  const readsOfHeld = (changes: number) => {
+    const reads = { count: 0 };
+    const held = everyTwenty((start, end) => counted(at(start, end, { hold: true }), reads));
+    expect(resolveChanges([...held, ...beside(changes)], [])).toHaveLength(changes);
+    return reads.count;
+  };
+
+  const readsOfProtected = (changes: number) => {
+    const reads = { count: 0 };
+    const ranges = everyTwenty((start, end) => counted({ start, end }, reads));
+    expect(resolveChanges(beside(changes), ranges)).toHaveLength(changes);
+    return reads.count;
+  };
+
+  const readsOfChanges = (changes: number) => {
+    const reads = { count: 0 };
+    expect(resolveChanges(beside(changes).map((c) => counted(c, reads)), [])).toHaveLength(changes);
+    return reads.count;
+  };
+
+  it('reads each held span a fixed number of times, however many changes there are', () => {
+    expect(readsOfHeld(spans)).toBe(readsOfHeld(1));
+  });
+
+  it('reads each protected range a fixed number of times, however many changes there are', () => {
+    expect(readsOfProtected(spans)).toBe(readsOfProtected(1));
+  });
+
+  it('reads the changes a number of times in line with how many there are', () => {
+    // Given in order of rank, so sorting them reads each one a fixed number of times.
+    expect(readsOfChanges(2000)).toBeLessThan(5 * readsOfChanges(500));
+  });
+
+  it.each`
+    input                             | expected
+    ${'It cost 500 pounds.'}          | ${'It cost 500 pounds.'}
+    ${'Use bolts of ½-¾ inch.'}       | ${'Use bolts of ½-¾ inch.'}
+    ${'He is 6 feet 2 inches tall.'}  | ${'He is 1.88 metres tall.'}
+    ${'It is 6 feet (1.8 m) tall.'}   | ${'It is 1.8 m tall.'}
+    ${'the 40 yard line, the color.'} | ${'the 40 yard line, the colour.'}
+  `('resolves "$input" as "$expected"', ({ input, expected }) => {
+    expect(deamericaniseText(input)).toBe(expected);
   });
 });
 

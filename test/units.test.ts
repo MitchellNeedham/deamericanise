@@ -3741,6 +3741,22 @@ describe('Fahrenheit decades', () => {
     expect(convert(input)).toBe(expected);
   });
 
+  it.each`
+    input                                  | expected                               | why
+    ${'Highs in the 70s or 80s.'}          | ${'Highs between 21 and 32°C.'}        | ${'or'}
+    ${'Highs in the 70s and 80s.'}         | ${'Highs between 21 and 32°C.'}        | ${'and'}
+    ${'Highs in the 70s to 80s.'}          | ${'Highs between 21 and 32°C.'}        | ${'to'}
+    ${'highs in the 70s—80s'}              | ${'highs between 21 and 32°C'}         | ${'an em dash'}
+    ${'highs in the low 70s or upper 80s'} | ${'highs between 21 and 32°C'}         | ${'two banded decades'}
+    ${'highs in the 70s or 80s °F'}        | ${'highs between 21 and 32°C'}         | ${'a Fahrenheit unit after the pair'}
+    ${'highs in the 70s or 80s degrees'}   | ${'highs between 21 and 32°C'}         | ${'a bare degrees after the pair'}
+    ${'highs in the 70s or\n80s'}          | ${'highs between 21 and 32°C'}         | ${'the pair wrapped across lines'}
+    ${'highs in the 100s or 110s'}         | ${'highs between 38 and 48°C'}         | ${'decades of three figures'}
+    ${'Highs in the 70s or so.'}           | ${'Highs between 21 and 26°C or so.'}  | ${'no second decade after or'}
+  `('reads two decades joined as a range does: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
   it('takes a bare degrees after a decade as its unit whatever the verdict', () => {
     expect(convert('temperatures in the 80s degrees', { assumeAmerican: true })).toBe(
       'temperatures between 27 and 32°C',

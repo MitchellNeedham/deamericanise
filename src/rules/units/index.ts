@@ -2505,7 +2505,7 @@ function temperatureDecadeRule(): Rule {
   const DECADE = String.raw`(?:(low|mid|middle|high|upper|lower)(?:\s|${HYPHEN})*)?(1[01]0|\d0)['\u2019]?s`;
   const pattern = new RegExp(
     String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
-      String.raw`(?:\s*(?:and|to|${HYPHEN}|\u2013)\s*${DECADE})?(?!\w)` +
+      String.raw`(?:${RANGE_JOIN}${DECADE})?(?!\w)` +
       // A bare `degrees` after a decade can only be its unit, unless a Celsius unit begins there.
       String.raw`(\s*(?:${FAHRENHEIT}|Fahrenheit\b|(?!${metricUnitForms('temperature')})degrees\b))?`,
     'gi',

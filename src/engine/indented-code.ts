@@ -1,15 +1,16 @@
 import type { Range } from './apply.js';
 
 /**
- * The blocks CommonMark opens as it reads a document line by line. Only indented code is
- * collected. The rest decide where indented code may start: never inside a paragraph, and
- * four columns past the content of the list item or quote it sits in.
+ * The blocks CommonMark opens as it reads a document line by line. Only indented code and HTML
+ * blocks of the first kind are collected. The rest decide where those may start: never
+ * indented code inside a paragraph, and four columns past the content of the list item or
+ * quote it sits in.
  */
 type Block =
   | { kind: 'document' | 'quote' | 'paragraph' | 'heading' | 'break' }
   | { kind: 'item'; width: number; empty: boolean }
   | { kind: 'fence'; char: string; length: number; indent: number }
-  | { kind: 'html'; type: number }
+  | { kind: 'html'; type: number; start: number; end: number }
   | { kind: 'code'; start: number; end: number };
 
 const CONTAINERS = new Set<Block['kind']>(['document', 'quote', 'item']);
@@ -54,9 +55,9 @@ const isSpaceOrTab = (c: string | undefined): boolean => c === ' ' || c === '\t'
 
 /**
  * Reads block structure the way the CommonMark reference parser (commonmark.js) does, keeping
- * only what decides indented code: containers, paragraphs and the leaf blocks that end them.
- * Columns count tabs to the next multiple of four. Link reference definitions are read as the
- * paragraphs they sit in.
+ * only what decides indented code and HTML blocks: containers, paragraphs and the leaf blocks
+ * that end them. Columns count tabs to the next multiple of four. Link reference definitions
+ * are read as the paragraphs they sit in.
  */
 class Scanner {
   private readonly open: Block[] = [{ kind: 'document' }];
@@ -133,7 +134,9 @@ class Scanner {
 
   private close(): void {
     const block = this.open.pop()!;
-    if (block.kind === 'code') this.into.push({ start: block.start, end: block.end });
+    if (block.kind === 'code' || (block.kind === 'html' && block.type === 1)) {
+      this.into.push({ start: block.start, end: block.end });
+    }
   }
 
   private closeUnmatched(): void {
@@ -263,8 +266,9 @@ class Scanner {
         for (let type = 1; type <= 7; type++) {
           // The seventh kind cannot interrupt a paragraph.
           if (HTML_OPEN[type]!.test(rest) && (type < 7 || (container.kind !== 'paragraph' && !lazy))) {
+            const start = this.lineStart + this.nextNonspace;
             this.closeUnmatched();
-            this.addChild({ kind: 'html', type });
+            this.addChild({ kind: 'html', type, start, end: this.lineStart + this.line.length });
             return 2;
           }
         }
@@ -341,6 +345,7 @@ class Scanner {
     if (container.kind === 'code') {
       if (!this.blank) container.end = this.lineStart + this.line.length;
     } else if (container.kind === 'html') {
+      if (!this.blank) container.end = this.lineStart + this.line.length;
       if (container.type <= 5 && HTML_CLOSE[container.type]!.test(this.line.slice(this.offset))) this.close();
     } else if (container.kind !== 'paragraph' && container.kind !== 'fence') {
       if (this.offset < this.line.length && !this.blank) this.addChild({ kind: 'paragraph' });
@@ -353,13 +358,23 @@ class Scanner {
 }
 
 /**
- * Indented code blocks as CommonMark reads them: lines four or more columns past the content
- * of the list item or quote they sit in, opened after a blank line or any block that is not a
- * paragraph. A line indented that far inside a paragraph continues it, so a list item's
- * wrapped line or second paragraph stays prose. Each range runs from the first character of
- * the block's code to the end of its last line that is not blank.
+ * The blocks other than fences whose contents CommonMark passes through verbatim, as it reads
+ * them.
+ *
+ * Indented code: lines four or more columns past the content of the list item or quote they
+ * sit in, opened after a blank line or any block that is not a paragraph. A line indented that
+ * far inside a paragraph continues it, so a list item's wrapped line or second paragraph stays
+ * prose.
+ *
+ * HTML blocks of the first kind: a line that starts with `<pre`, `<script`, `<style` or
+ * `<textarea`, through the line that holds a closing tag of any of the four, blank lines
+ * included, or to the end of the list item or quote it sits in. Other HTML blocks, comments
+ * among them, are not collected, so the text in them reads as prose.
+ *
+ * Each range runs from the block's first character to the end of its last line that is not
+ * blank.
  */
-export function collectIndentedCode(text: string, into: Range[]): void {
+export function collectVerbatimBlocks(text: string, into: Range[]): void {
   const scanner = new Scanner(into);
   let start = 0;
   for (const line of text.split('\n')) {

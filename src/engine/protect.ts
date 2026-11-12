@@ -1,6 +1,6 @@
 import type { Range } from './apply.js';
 import { commentedCodeRanges } from './code-shape.js';
-import { collectIndentedCode } from './indented-code.js';
+import { collectVerbatimBlocks } from './indented-code.js';
 import type { Syntax } from '../types.js';
 
 /**
@@ -192,7 +192,7 @@ function collectCode(text: string, syntax: Syntax | undefined, into: Range[]): v
   collect(text, [CODE_SPAN], into);
   if (syntax === 'text') collect(text, [BACKTICK_PAIRS], into);
   else collectFencedCode(text, into);
-  if (syntax === 'markdown') collectIndentedCode(text, into);
+  if (syntax === 'markdown') collectVerbatimBlocks(text, into);
 }
 
 const STRUCTURAL: RegExp[] = [

@@ -236,6 +236,47 @@ describe('indented code in Markdown, read the way CommonMark reads it', () => {
   });
 });
 
+describe('raw HTML blocks in Markdown, read the way CommonMark reads them', () => {
+  const md = (input: string) => au(input, { syntax: 'markdown' });
+
+  it.each`
+    input                                                              | expected                                                            | why
+    ${'The color.\n\n<pre>\nconst color = "gray";\n</pre>\n'}          | ${'The colour.\n\n<pre>\nconst color = "gray";\n</pre>\n'}          | ${'a pre block'}
+    ${'<script>\nconst color = "gray";\n</script>\n\nThe color.'}      | ${'<script>\nconst color = "gray";\n</script>\n\nThe colour.'}      | ${'a script block'}
+    ${'<style>\n.gray { color: gray; }\n</style>\n\nThe color.'}       | ${'<style>\n.gray { color: gray; }\n</style>\n\nThe colour.'}       | ${'a style block'}
+    ${'<textarea>\nThe color\n</textarea>\n\nThe color.'}              | ${'<textarea>\nThe color\n</textarea>\n\nThe colour.'}              | ${'a textarea block'}
+    ${'<PRE class="x">\nThe color\n</PRE>\nThe color.'}                | ${'<PRE class="x">\nThe color\n</PRE>\nThe colour.'}                | ${'a tag in capitals, with an attribute'}
+    ${'<pre>\nThe color\n\nThe color\n</pre>\nThe color.'}             | ${'<pre>\nThe color\n\nThe color\n</pre>\nThe colour.'}             | ${'a blank line inside a block'}
+    ${'The color.\n<pre>\nThe color\n</pre>\nThe color.'}              | ${'The colour.\n<pre>\nThe color\n</pre>\nThe colour.'}             | ${'a block straight after a paragraph line'}
+    ${'<pre>The color</pre> The color.\nThe color.'}                   | ${'<pre>The color</pre> The color.\nThe colour.'}                   | ${'a block on one line, which runs to the end of that line'}
+    ${'<pre>\nThe color\n</script>\nThe color.'}                       | ${'<pre>\nThe color\n</script>\nThe colour.'}                       | ${'any of the four closing tags ends a block'}
+    ${'> <pre>\n> The color\n> </pre>\n\nThe color.'}                  | ${'> <pre>\n> The color\n> </pre>\n\nThe colour.'}                  | ${'a block in a quote'}
+    ${'> <pre>\n> The color\nThe color.'}                              | ${'> <pre>\n> The color\nThe colour.'}                              | ${'a block that its quote ends'}
+    ${'- <pre>\n  The color\n\nThe color.'}                            | ${'- <pre>\n  The color\n\nThe colour.'}                            | ${'a block that its list item ends'}
+    ${'The color.\n\n<pre>\nThe color\n\nThe color'}                   | ${'The colour.\n\n<pre>\nThe color\n\nThe color'}                   | ${'a block that never closes runs to the end'}
+    ${'<pre>\r\nThe color\r\n</pre>\r\nThe color.'}                    | ${'<pre>\r\nThe color\r\n</pre>\r\nThe colour.'}                    | ${'Windows line endings'}
+  `('$why', ({ input, expected }) => {
+    expect(md(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                    | expected                                                  | why
+    ${'<div align="center">\nThe color\n</div>'}             | ${'<div align="center">\nThe colour\n</div>'}             | ${'another kind of HTML block'}
+    ${'<!--\nThe color\n-->\nThe color.'}                    | ${'<!--\nThe colour\n-->\nThe colour.'}                   | ${'an HTML comment'}
+    ${'<prefix>\nThe color\n</prefix>'}                      | ${'<prefix>\nThe colour\n</prefix>'}                      | ${'a tag whose name only starts with pre'}
+    ${'Use the <pre> tag for the color.'}                    | ${'Use the <pre> tag for the colour.'}                    | ${'a tag inside a sentence'}
+    ${'The color <pre>\nThe color\n</pre>'}                  | ${'The colour <pre>\nThe colour\n</pre>'}                 | ${'a tag after text on its line'}
+  `('reads $why as prose, as before', ({ input, expected }) => {
+    expect(md(input)).toBe(expected);
+  });
+
+  it('rewrites the block when the syntax is unknown or plain text, as before', () => {
+    const input = 'The color.\n\n<pre>\nThe color\n</pre>\n';
+    expect(au(input)).toBe('The colour.\n\n<pre>\nThe colour\n</pre>\n');
+    expect(au(input, { syntax: 'text' })).toBe('The colour.\n\n<pre>\nThe colour\n</pre>\n');
+  });
+});
+
 describe('identifier protection, for comments in source files', () => {
   it.each`
     unchanged                    | why

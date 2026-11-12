@@ -445,7 +445,9 @@ deamericaniseText(text, { minAmericanConfidence: 0.4 });
   escaped as `` \` ``, protects nothing. A fenced code block opens on a line that starts with
   three or more backticks or tildes and closes on a line of the same character at least as
   long, so a fence of four backticks can hold one of three. A fence that never closes runs to
-  the end of the text.
+  the end of the text. A prose file that is not Markdown, such as `.rst` or `.txt`, has no
+  such fences, since a line of tildes there underlines a heading: three backticks protect
+  everything up to the next three.
 - **Identifiers,** when `protectIdentifiers` is on (the default for source files):
   `normalizeInput`, `MAX_COLOR_VALUE`, `background-color`, `theme.colors.gray`,
   `--color-scheme`, `getColor()`.
@@ -774,10 +776,9 @@ there each root needs the rules in its own styles.
   therefore not protected. The remark plugin reads the real structure.
 - Outside the remark plugin, a fence is read from its own lines, without the list items and
   quotes around it. A fence that a list item or quote ends without a closing line therefore
-  runs on to the next line that would close it, or to the end of the text. A line of three or
-  more tildes opens a fence in any prose file, so a reStructuredText heading underlined with
-  tildes, or a plain-text divider made of them, leaves the text up to the next such line as
-  written.
+  runs on to the next line that would close it, or to the end of the text. Comments and
+  docstrings are read as Markdown, so a tilde heading underline in a reStructuredText
+  docstring leaves the text up to the next one as written.
 - Outside the remark plugin, an indented code block is rewritten like the prose around it:
   telling it from indented prose needs to know the text is Markdown.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`

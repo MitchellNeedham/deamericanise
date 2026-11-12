@@ -564,8 +564,15 @@ export const DIALECTS: Record<Dialect, DialectPack> = {
   },
 };
 
+/**
+ * Whether `id` names a dialect in `DIALECTS`. Only its own keys count, so a name every
+ * object inherits, such as `toString` or `__proto__`, is not a dialect.
+ */
+export function isDialect(id: unknown): id is Dialect {
+  return typeof id === 'string' && Object.hasOwn(DIALECTS, id);
+}
+
 export function dialectPack(id: Dialect): DialectPack {
-  const pack = DIALECTS[id];
-  if (!pack) throw new Error(`Unknown dialect: ${id}. Expected one of ${Object.keys(DIALECTS).join(', ')}.`);
-  return pack;
+  if (!isDialect(id)) throw new Error(`Unknown dialect: ${id}. Expected one of ${Object.keys(DIALECTS).join(', ')}.`);
+  return DIALECTS[id];
 }

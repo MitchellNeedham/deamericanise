@@ -2,7 +2,7 @@ import { readFileSync, statSync, writeFileSync, readdirSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { parseArgs } from 'node:util';
 import { CATEGORIES, CONFIDENCES, PRESETS, matchesRuleId } from './config.js';
-import { DIALECTS } from './dialects/index.js';
+import { DIALECTS, isDialect } from './dialects/index.js';
 import { PROSE_EXTENSIONS, languageNames, lexerFor } from './lexers/index.js';
 import { ruleIds } from './rules/catalogue.js';
 import { MEASURES } from './rules/units/definitions.js';
@@ -228,13 +228,14 @@ export async function main(argv: string[]): Promise<number> {
     for (const name of [...languageNames(), ...PROSE_EXTENSIONS].sort()) print(`${name}\n`);
     return 0;
   }
+
+  const dialect = values.dialect ?? 'en-AU';
+  if (!isDialect(dialect)) fail(`unknown dialect "${dialect}". Try --list-dialects.`);
+
   if (values['list-rules']) {
-    for (const id of ruleIds((values.dialect as Dialect) ?? 'en-AU')) print(`${id}\n`);
+    for (const id of ruleIds(dialect)) print(`${id}\n`);
     return 0;
   }
-
-  const dialect = (values.dialect ?? 'en-AU') as Dialect;
-  if (!(dialect in DIALECTS)) fail(`unknown dialect "${dialect}". Try --list-dialects.`);
 
   const wantsLocalise = Boolean(values.localise || values.localize);
   const preset = (values.preset ?? (wantsLocalise ? 'localise' : 'read')) as Preset;

@@ -17,7 +17,6 @@ import {
   NUMBER_PATTERN,
   NUMBER_START,
   NUMERIC_PATTERN,
-  RANGE_START,
   SOFT_SPACE,
   WHOLE_NUMBER,
   canBeRange,
@@ -43,8 +42,8 @@ const NOT_SECOND_OF_PAIR = String.raw`(?<!\d${softGap(String.raw`(?:[-\u2013\u20
 
 /** A range's first number and its join, ending where the range's second number starts. */
 const RANGE_BEFORE = new RegExp(
-  String.raw`(?<=${NUMBER_START}${RANGE_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=[\d\-−])`,
-  'dy',
+  String.raw`(?<=${NUMBER_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=[\d\-−])`,
+  'diy',
 );
 
 /**
@@ -574,10 +573,52 @@ function pushMeasurement(
   changes.push(change(start, matched, withOriginal(ctx, body, matched), ruleId, priority));
 }
 
+/**
+ * A number of a measurement in two units, in any shape the single rule reads but unsigned. A
+ * minus before the first number stays outside the match, where it negates the whole.
+ */
+const UNSIGNED_NUMBER = String.raw`(?![-−])(?:${NUMERIC_PATTERN})`;
+
+const STARTS_HERE = new RegExp(NUMBER_START, 'y');
+
+/**
+ * The matches of `pattern`, which starts more loosely than `NUMBER_START`, split by whether
+ * `NUMBER_START` lets each one's number start where it stands. Past a refused match the
+ * search resumes one character on, so a measurement inside it is still found, as the
+ * `1/2 pounds 3 ounces` of `7:30 1/2 pounds 3 ounces` is. A refused match with none inside
+ * it is for the rule to hold, so that no other rule converts a piece of it, as the single
+ * rule would the `2 inches` of `At 7:30 feet 2 inches`.
+ */
+function splitByStart(
+  pattern: RegExp,
+  text: string,
+): { found: RegExpExecArray[]; refused: RegExpExecArray[] } {
+  const found: RegExpExecArray[] = [];
+  const refused: RegExpExecArray[] = [];
+  let pending: RegExpExecArray | undefined;
+  pattern.lastIndex = 0;
+  for (let match: RegExpExecArray | null; (match = pattern.exec(text)) !== null; ) {
+    if (pending && match.index >= pending.index + pending[0].length) {
+      refused.push(pending);
+      pending = undefined;
+    }
+    STARTS_HERE.lastIndex = match.index;
+    if (STARTS_HERE.test(text)) {
+      found.push(match);
+      pending = undefined;
+    } else {
+      pending ??= match;
+      pattern.lastIndex = match.index + 1;
+    }
+  }
+  if (pending) refused.push(pending);
+  return { found, refused };
+}
+
 /** `6 feet 2 inches`, `6'2"` and `5 ft 11 in` collapse into a single metric height. */
 function feetInchesRule(): Rule {
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(\d+)${SOFT_SPACE}(?:feet|foot|ft\.?|′|')` +
+    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:feet|foot|ft\.?|′|')` +
       softGap(String.raw`(?:and(?=\s))?`) +
       String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+/\d+)` +
       String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|")(?![A-Za-z])`,
@@ -590,15 +631,18 @@ function feetInchesRule(): Rule {
     confidence: 'moderate',
     priority: 40,
     find(ctx) {
-      const changes: Change[] = [];
-      pattern.lastIndex = 0;
-      for (const match of ctx.text.matchAll(pattern)) {
+      const { found, refused } = splitByStart(pattern, ctx.text);
+      const changes = refused.map((match) =>
+        hold(match.index, match[0], 'units.length.feet-inches', 40),
+      );
+      for (const match of found) {
+        const feet = parseNumber(match[1]!);
         const inches = parseNumber(match[2]!);
-        if (inches === null) {
+        if (feet === null || inches === null) {
           changes.push(hold(match.index, match[0], 'units.length.feet-inches', 40));
           continue;
         }
-        const target = metricLength(Number(match[1]) * 0.3048 + inches * 0.0254);
+        const target = metricLength(feet * 0.3048 + inches * 0.0254);
         // Two components together claim three figures of precision, not one.
         const number = formatNumber(
           target.value,
@@ -628,18 +672,22 @@ const ORDINAL = /^(?:\d*[02-9])?1st(?![a-z])/i;
  */
 function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule[] {
   // A written-out number never starts inside another, such as the `two` of `twenty-two`.
-  const START = String.raw`(?<![\w.])(?<![A-Za-z]-)(?:(?=\d)|(?<!\b(?:${WHOLE_NUMBER})[-\s]+))`;
-  const SMALLER = String.raw`(?![-−])(?:${NUMERIC_PATTERN}|${WHOLE_NUMBER})`;
+  // The lookbehind runs only before a letter, and takes a run of spaces whole, because each
+  // place it tries inside the run costs a walk over the rest of it.
+  const START =
+    String.raw`(?<![\w.])(?<![A-Za-z]-)` +
+    String.raw`(?:(?![A-Za-z])|(?=[A-Za-z])(?<!\b(?:${WHOLE_NUMBER})(?<![-\s])[-\s]+))`;
+  const NUMBER = String.raw`(?:${UNSIGNED_NUMBER}|${WHOLE_NUMBER})`;
   const AND = softGap(String.raw`(?:and(?=\s))?`);
   const unitOf = (m: Measure) =>
     String.raw`(${alternate([...m.words, ...m.abbrevs, ...(m.compoundAbbrevs ?? [])])})(?![A-Za-z])`;
 
   return COMPOUNDS.map((compound): Rule => {
     const [largest, next, ...rest] = compound.measures.map(unitOf);
-    const part = (unit: string) => String.raw`${AND}(${SMALLER})${GAP}${unit}`;
+    const part = (unit: string) => String.raw`${AND}(${NUMBER})${GAP}${unit}`;
     const optional = rest.reduceRight((inner, unit) => `(?:${part(unit)}${inner})?`, '');
     const pattern = new RegExp(
-      String.raw`${START}(${WHOLE_NUMBER})${GAP}${largest}${part(next!)}${optional}`,
+      String.raw`${START}(${NUMBER})${GAP}${largest}${part(next!)}${optional}`,
       'gi',
     );
     const notSecond = hasSides(compound.measures[0]!) ? NOT_SECOND : NOT_END_OF_RANGE;
@@ -650,8 +698,9 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
       confidence: 'moderate',
       priority: 40,
       find(ctx) {
-        const changes: Change[] = [];
-        for (const match of ctx.text.matchAll(pattern)) {
+        const { found, refused } = splitByStart(pattern, ctx.text);
+        const changes = refused.map((match) => hold(match.index, match[0], compound.id, 40));
+        for (const match of found) {
           if (ORDINAL.test(match[0])) continue;
           const parts = compound.measures
             .map((measure, i) => ({ measure, raw: match[2 * i + 1], unit: match[2 * i + 2] ?? '' }))
@@ -719,7 +768,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     'gi',
   );
   const range = new RegExp(
-    String.raw`${START}${RANGE_START}(${NUMERIC_PATTERN})${RANGE_JOIN}(${NUMERIC_PATTERN})` +
+    String.raw`${START}(${NUMERIC_PATTERN})${RANGE_JOIN}(${NUMERIC_PATTERN})` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
@@ -734,8 +783,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   );
 
   // Written-out units only, because an abbreviation can be a word: `a gal and a half`.
+  // `NOT_IN_COMPOUND` walks back over the spaces before it, so it runs only before a letter.
   const fractionOf = new RegExp(
-    String.raw`(?<![\w.])${NOT_IN_COMPOUND}(?:((?:an?${S}+)?half)|(${FRACTION_WORDS})${S}+of)` +
+    String.raw`(?<![\w.])(?=[A-Za-z])${NOT_IN_COMPOUND}` +
+      String.raw`(?:((?:an?${S}+)?half)|(${FRACTION_WORDS})${S}+of)` +
       String.raw`${S}+an?(?=\s)${SOFT_SPACE}(${words})(?![\w-])`,
     'gi',
   );
@@ -1291,7 +1342,10 @@ function coinSizeRule(): Rule {
 }
 
 function fuelEconomyRule(): Rule {
-  const pattern = /(?<![\w.])(\d+(?:\.\d+)?)\s*(mpg|miles per gallon)(?![A-Za-z])/gi;
+  const pattern = new RegExp(
+    String.raw`${NUMBER_START}(\d+(?:\.\d+)?)\s*(mpg|miles per gallon)(?![A-Za-z])`,
+    'gi',
+  );
 
   return {
     id: 'units.economy.mpg',

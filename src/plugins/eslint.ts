@@ -1,4 +1,4 @@
-import { resolveOptions } from '../config.js';
+import { checkOptions, resolveOptions } from '../config.js';
 import { agreesWith } from '../engine/articles.js';
 import { changesInSource, joinComments } from '../lexers/join.js';
 import type { SourceComment } from '../lexers/scan.js';
@@ -72,6 +72,7 @@ const rule = {
 
   create(context: Context) {
     const options = (context.options[0] ?? {}) as Options;
+    checkOptions(options);
     const sourceCode = context.sourceCode ?? context.getSourceCode?.();
     if (!sourceCode) return {};
 

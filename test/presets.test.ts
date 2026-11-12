@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deamericaniseCode, deamericaniseText, resolveOptions } from '../src/index.js';
 import type { Preset } from '../src/index.js';
+import { checkOptions } from '../src/config.js';
 
 const read = (input: string) => deamericaniseText(input);
 const localise = (input: string) => deamericaniseText(input, { preset: 'localise' });
@@ -97,6 +98,7 @@ describe('a preset it does not know', () => {
         message(preset),
       );
       expect(() => resolveOptions({ preset: preset as Preset })).toThrow(message(preset));
+      expect(() => checkOptions({ preset: preset as Preset })).toThrow(message(preset));
     },
   );
 

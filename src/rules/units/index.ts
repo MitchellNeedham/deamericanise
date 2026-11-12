@@ -28,6 +28,7 @@ import {
   formatTemperature,
   isOvenSetting,
   parseNumber,
+  plainHyphens,
   significantFigures,
   softGap,
 } from './number.js';
@@ -163,16 +164,33 @@ function isAmbiguousHere(measure: Measure, text: string): boolean {
   return measure.ambiguousWhen !== undefined && measure.ambiguousWhen.test(text);
 }
 
+let lastText = '';
+let lastPlain = '';
+
+/**
+ * `text` as the checks on the words around a measurement read it, since their patterns name
+ * only the hyphen-minus. The rules ask about one text many times in a row, so the last one is
+ * kept.
+ */
+function contextText(text: string): string {
+  if (text !== lastText) {
+    lastText = text;
+    lastPlain = plainHyphens(text);
+  }
+  return lastPlain;
+}
+
 function isConventional(ctx: RuleContext, measure: Measure, start: number, end: number): boolean {
   const rules = measure.conventional;
   if (!rules || !ctx.options.units.respectConventions) return false;
-  const before = ctx.text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
-  const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
+  const text = contextText(ctx.text);
+  const before = text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
+  const after = text.slice(end, end + CONTEXT_WINDOW);
   return Boolean((rules.before?.test(before)) || (rules.after?.test(after)));
 }
 
 function isOtherSense(ctx: RuleContext, alias: Alias, start: number, end: number): boolean {
-  return alias.isWord && alias.measure.otherSense?.(ctx.text, start, end) === true;
+  return alias.isWord && alias.measure.otherSense?.(contextText(ctx.text), start, end) === true;
 }
 
 const OTHER_SENSES = new Map(
@@ -203,7 +221,7 @@ export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: num
   if (!otherSense) return false;
   const from = Math.max(0, unitStart - NUMBER_REACH);
   const number = NUMBER_BEFORE_UNIT.exec(text.slice(from, unitStart));
-  return number !== null && otherSense(text, from + number.index, unitEnd);
+  return number !== null && otherSense(contextText(text), from + number.index, unitEnd);
 }
 
 /**
@@ -216,7 +234,7 @@ export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: num
 const DETERMINER_BEFORE = /(?:\b(?:a|an|the|this|that|each|every|per|another)\s+|\d\s*[x×]\s*)$/i;
 
 const MODIFIES_A_NOUN = new RegExp(
-  String.raw`^[\s-]+(?!(?:of|in|on|at|by|for|and|or|to|from|with|per|thick|wide|long|tall|deep|high|` +
+  String.raw`^(?:\s|${HYPHEN})+(?!(?:of|in|on|at|by|for|and|or|to|from|with|per|thick|wide|long|tall|deep|high|` +
     String.raw`across|away|apart|each|only|down|up|north|south|east|west|ahead|behind|past|along|` +
     String.raw`beyond|into|through|short|further|farther|more|less|longer|shorter|wider|taller|` +
     String.raw`deeper|higher|closer)\b)[a-z]`,
@@ -507,16 +525,17 @@ function measurementDimension(text: string): Dimension | undefined {
  * including a piece of the measurement such as the `2 inches` in `(6 feet 2 inches)`.
  */
 function restatesMetric(ctx: RuleContext, start: number, end: number): boolean {
-  const head = ctx.text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
-  const tail = ctx.text.slice(end, end + CONTEXT_WINDOW);
+  const text = contextText(ctx.text);
+  const head = text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
+  const tail = text.slice(end, end + CONTEXT_WINDOW);
   const open = head.lastIndexOf('(');
   const close = tail.indexOf(')');
   if (open < 0 || close < 0) return false;
-  const inside = head.slice(open + 1) + ctx.text.slice(start, end) + tail.slice(0, close);
+  const inside = head.slice(open + 1) + text.slice(start, end) + tail.slice(0, close);
   const dimension = measurementDimension(inside);
   if (dimension === undefined) return false;
   const bracket = start - head.length + open;
-  const before = ctx.text.slice(Math.max(0, bracket - CONTEXT_WINDOW), bracket);
+  const before = text.slice(Math.max(0, bracket - CONTEXT_WINDOW), bracket);
   return dimensionOf(METRIC_BEFORE.exec(before)) === dimension;
 }
 
@@ -563,11 +582,12 @@ function followsItsMetric(
   body: string,
   ruleId: string,
 ): boolean {
+  const text = contextText(ctx.text);
   const from = Math.max(0, start - CONTEXT_WINDOW);
-  if (!ENDS_IN_JOIN.test(ctx.text.slice(from, start))) return false;
+  if (!ENDS_IN_JOIN.test(text.slice(from, start))) return false;
   // The window runs on to `end` so a line break in the join can see that the next line
   // holds the measurement and opens no new block.
-  for (const match of ctx.text.slice(from, end).matchAll(METRIC_PAIRED_BEFORE)) {
+  for (const match of text.slice(from, end).matchAll(METRIC_PAIRED_BEFORE)) {
     if (from + match.index + match[0].length === start) return restatesBody(match[1]!, body, ruleId);
   }
   return false;
@@ -586,7 +606,7 @@ function redundantMetric(
   body: string,
   ruleId: string,
 ): { end: number; after: string } | null {
-  const rest = ctx.text.slice(end);
+  const rest = contextText(ctx.text).slice(end);
   const match = BRACKET_AFTER.exec(rest) ?? METRIC_PAIRED_AFTER.exec(rest);
   if (!match || !restatesBody(match[1]!, body, ruleId)) return null;
   return { end: end + match[0].length, after: metricSpelling(match[1]!.trim()) };

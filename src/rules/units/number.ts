@@ -21,7 +21,12 @@ const UNICODE_HYPHENS = String.raw`\u2010\u2011`;
 
 /** A hyphen as typesetting writes it: the hyphen-minus, U+2010 or U+2011. */
 export const HYPHEN = `[-${UNICODE_HYPHENS}]`;
-const HYPHENS = new RegExp(HYPHEN, 'g');
+const UNICODE_HYPHEN = new RegExp(`[${UNICODE_HYPHENS}]`, 'g');
+
+/** `text` with U+2010 and U+2011 written as `-`, at the same offsets. */
+export function plainHyphens(text: string): string {
+  return text.replace(UNICODE_HYPHEN, '-');
+}
 
 /**
  * Whitespace that stays on one line. A number is never written across a line break, so
@@ -258,7 +263,7 @@ export function parseNumber(raw: string): number | null {
 }
 
 function readNumber(raw: string): number | null {
-  const text = raw.trim().replace(/−/g, '-').replace(HYPHENS, '-').replace(/,/g, '');
+  const text = plainHyphens(raw.trim()).replace(/−/g, '-').replace(/,/g, '');
   if (/[a-z]/i.test(text)) return parseWords(text);
   const sign = text.startsWith('-') ? -1 : 1;
   const body = text.replace(/^-/, '');

@@ -25,7 +25,8 @@ const SETEXT_UNDERLINE = /^(?:=+|-+)[ \t]*$/;
 const BULLET = /^[*+-]/;
 const ORDERED = /^(\d{1,9})([.)])/;
 
-const ATTRIBUTE = String.raw`(?:\s+[a-zA-Z_:][a-zA-Z0-9:._-]*(?:\s*=\s*(?:[^"'=<>\x60\x00-\x20]+|'[^']*'|"[^"]*"))?)`;
+const ATTRIBUTE_VALUE = String.raw`(?:[^"'=<>\x60\x00-\x20]+|'[^']*'|"[^"]*")`;
+const ATTRIBUTE = String.raw`(?:\s+[a-zA-Z_:][a-zA-Z0-9:._-]*(?:\s*=\s*${ATTRIBUTE_VALUE})?)`;
 const OPEN_TAG = String.raw`<[A-Za-z][A-Za-z0-9-]*${ATTRIBUTE}*\s*\/?>`;
 const CLOSE_TAG = String.raw`<\/[A-Za-z][A-Za-z0-9-]*\s*>`;
 
@@ -65,6 +66,8 @@ class Scanner {
   private column = 0;
   private nextNonspace = 0;
   private nextNonspaceColumn = 0;
+  /** Where the scan that found `nextNonspace` started. */
+  private scanStart = Infinity;
   private indent = 0;
   private indented = false;
   private blank = false;
@@ -78,17 +81,24 @@ class Scanner {
   }
 
   private findNextNonspace(): void {
-    let i = this.offset;
-    let column = this.column;
-    let c = this.line[i];
-    while (c === ' ' || c === '\t') {
-      column += c === ' ' ? 1 : 4 - (column % 4);
-      c = this.line[++i];
+    // Each container in turn looks for the same character, so a list nested deep scans its
+    // indentation once rather than once per level. A tab ends on a fixed column, so the column
+    // found does not depend on where the scan started.
+    if (this.offset < this.scanStart || this.offset > this.nextNonspace) {
+      let i = this.offset;
+      let column = this.column;
+      let c = this.line[i];
+      while (c === ' ' || c === '\t') {
+        column += c === ' ' ? 1 : 4 - (column % 4);
+        c = this.line[++i];
+      }
+      this.scanStart = this.offset;
+      this.nextNonspace = i;
+      this.nextNonspaceColumn = column;
     }
+    const c = this.line[this.nextNonspace];
     this.blank = c === undefined || c === '\r';
-    this.nextNonspace = i;
-    this.nextNonspaceColumn = column;
-    this.indent = column - this.column;
+    this.indent = this.nextNonspaceColumn - this.column;
     this.indented = this.indent >= CODE_INDENT;
   }
 
@@ -168,7 +178,9 @@ class Scanner {
           this.close();
           return 2;
         }
-        for (let i = block.indent; i > 0 && isSpaceOrTab(this.line[this.offset]); i--) this.advanceOffset(1, true);
+        for (let i = block.indent; i > 0 && isSpaceOrTab(this.line[this.offset]); i--) {
+          this.advanceOffset(1, true);
+        }
         return 0;
       }
       case 'code':
@@ -220,7 +232,7 @@ class Scanner {
     return markerOffset + length + spaces;
   }
 
-  /** Tries each kind of block start in CommonMark's order: 0 for none, 1 for a container, 2 for a leaf. */
+  /** Tries each block start in CommonMark's order: 0 for none, 1 for a container, 2 for a leaf. */
   private startBlock(container: Block): 0 | 1 | 2 {
     const rest = this.line.slice(this.nextNonspace);
     if (!this.indented) {
@@ -292,6 +304,7 @@ class Scanner {
     this.offset = 0;
     this.column = 0;
     this.blank = false;
+    this.scanStart = Infinity;
     const oldTip = this.open.length - 1;
 
     let matched = 0;
@@ -329,8 +342,8 @@ class Scanner {
       if (!this.blank) container.end = this.lineStart + this.line.length;
     } else if (container.kind === 'html') {
       if (container.type <= 5 && HTML_CLOSE[container.type]!.test(this.line.slice(this.offset))) this.close();
-    } else if (container.kind !== 'paragraph' && container.kind !== 'fence' && this.offset < this.line.length && !this.blank) {
-      this.addChild({ kind: 'paragraph' });
+    } else if (container.kind !== 'paragraph' && container.kind !== 'fence') {
+      if (this.offset < this.line.length && !this.blank) this.addChild({ kind: 'paragraph' });
     }
   }
 

@@ -131,7 +131,7 @@ const OPENER = new RegExp(
 const REACH = 120;
 
 /** The words either side of a match in its sentence. */
-function sentenceAround(text: string, start: number, end: number): string {
+export function sentenceAround(text: string, start: number, end: number): string {
   const [from, to] = sentenceBounds(text, start, end, OPENER, REACH);
   return `${text.slice(from, start)} ${text.slice(end, to)}`;
 }

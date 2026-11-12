@@ -47,6 +47,48 @@ export interface Measure {
    * all, merely imperial-descended and used everywhere.
    */
   keptByDefault?: boolean;
+  /** Other things the unit may measure, told by the words beside the quantity, in the order tried. */
+  senses?: Sense[];
+}
+
+/**
+ * A sense in which a measure's unit measures something else, told by the words beside the
+ * quantity: an ounce of milk is a fluid ounce, an ounce of gold a troy ounce, and the ton of
+ * an air conditioner a rate of cooling. A metric value the author gives after the quantity
+ * decides by its dimension. Otherwise what the quantity measures, after it, decides, and only
+ * where nothing after it names a thing do the words before it count, and then its sentence.
+ */
+export interface Sense {
+  /**
+   * The id of the measure the quantity converts as. Without one, no conversion fits, and the
+   * quantity is held as written, as the copper weight of a circuit board is.
+   */
+  as?: string;
+  /** Says on each change made in this sense how the unit was read. */
+  note?: string;
+  /**
+   * What the quantity measures or describes in this sense, in the phrase after the unit:
+   * after an optional `of`, with at most two words between that are not function words, as
+   * `milk` in `8 oz of whole milk` and `AC` in `a 3-ton central AC unit`.
+   */
+  things: string[];
+  /**
+   * Nouns one of `things` may describe in turn, as `unit` in `AC unit`. Any other noun after
+   * a thing makes it describe that noun, so `cream cheese` is a cheese. A head that is one of
+   * `things` too is a vessel, and takes no head of its own: `a 16 oz glass jar` is a jar.
+   */
+  heads?: string[];
+  /** Nouns read through to what they hold, as the `can` of `a 12 oz can of soda`. */
+  vessels?: string[];
+  /** Names that hold one of `things` or a word before it and are no such thing: `sour cream`. */
+  except?: string[];
+  /**
+   * Words before the number that say so, with at most one of `heads` and three function words
+   * between, as in `AC units of 2 to 5 tons`.
+   */
+  before?: string[];
+  /** Words that say so anywhere in the quantity's sentence, as `PCB` does. */
+  sentence?: string[];
 }
 
 const m = (value: number, symbol: string, singular: string, plural: string): MetricValue => ({
@@ -154,6 +196,72 @@ function startsNoun(word: string, nouns: RegExp) {
 
 const poundCake = startsNoun('pound', /^[\s-]+cakes?\b/i);
 
+/** Drinks and other liquids, which American labels and recipes measure in ounces by volume. */
+const LIQUIDS = [
+  'water', 'milk', 'buttermilk', 'half-and-half', 'cream', 'juice', 'lemonade', 'soda', 'cola',
+  'seltzer', 'tonic', 'coffee', 'espresso', 'broth', 'stock', 'oil', 'vinegar', 'syrup', 'liquid',
+  'drink', 'beer', 'ale', 'lager', 'cider', 'wine', 'champagne', 'sherry', 'vermouth', 'sake',
+  'liquor', 'liqueur', 'whiskey', 'whisky', 'bourbon', 'vodka', 'gin', 'rum', 'tequila', 'brandy',
+  'cognac',
+];
+
+/** Vessels that only ever hold a drink. */
+const DRINKWARE = ['glass', 'mug', 'tumbler', 'pint', 'shot'];
+
+/** Vessels that hold food as often, which is weighed, as `a 15 oz can of beans` is. */
+const VESSELS = ['can', 'bottle', 'cup', 'carton', 'jug', 'jar', 'keg', 'pitcher', 'flask', 'carafe'];
+
+/** Solids named for a liquid. */
+const NOT_LIQUIDS = [
+  'sour cream', 'ice cream', 'whipped cream', 'clotted cream', 'baking soda', 'caustic soda',
+  'washing soda', 'ground coffee', 'instant coffee', 'bean coffee', 'powdered milk', 'dried milk',
+  'dry milk', 'condensed milk',
+];
+
+const FLUID_OUNCES: Sense = {
+  as: 'units.volume.fluid-ounce',
+  note: 'read as fluid ounces, since it measures a liquid',
+  things: withPlurals([...LIQUIDS, ...DRINKWARE]),
+  heads: withPlurals([...DRINKWARE, ...VESSELS, 'box']),
+  vessels: withPlurals(VESSELS),
+  except: NOT_LIQUIDS,
+};
+
+const TROY_OUNCES: Sense = {
+  as: 'units.mass.troy-ounce',
+  note: 'read as troy ounces, in which precious metals are weighed',
+  things: ['gold', 'silver', 'platinum', 'palladium', 'bullion'],
+  heads: withPlurals(['coin', 'bar', 'round', 'ingot', 'nugget', 'wafer']),
+};
+
+/** A circuit board's copper, which boards are ordered by in ounces per square foot. */
+const COPPER_WEIGHT: Sense = {
+  things: ['copper', 'cu', 'cladding', 'copper clad'],
+  heads: withPlurals(['weight', 'thickness', 'pour', 'layer', 'plane', 'trace', 'foil', 'plating', 'board', 'pcb']),
+  before: ['copper', 'cu'],
+  sentence: withPlurals(['pcb', 'fr-4', 'fr4', 'circuit board', 'printed circuit']),
+};
+
+/**
+ * What a ton of cooling is the rating of. A ship's tonnage is a weight, so `tonnage` says
+ * nothing. `cooling` and the compressor say so only after the quantity, since a block of
+ * steel is cooled and a compressor weighed.
+ */
+const COOLED = [
+  'ac', 'a/c', 'air conditioner', 'air conditioning', 'heat pump', 'condenser', 'chiller', 'hvac',
+  'refrigeration', 'btu', 'seer', 'split system', 'mini split',
+];
+
+const TONS_OF_COOLING: Sense = {
+  as: 'units.power.refrigeration-ton',
+  note: 'read as tons of refrigeration, a rate of cooling',
+  things: withPlurals([...COOLED, 'compressor', 'cooling']),
+  heads: withPlurals([
+    'unit', 'system', 'capacity', 'load', 'size', 'rating', 'tower', 'plant', 'equipment', 'coil',
+  ]),
+  before: withPlurals(COOLED),
+};
+
 export const MEASURES: Measure[] = [
   // ----- length -----
   {
@@ -238,6 +346,15 @@ export const MEASURES: Measure[] = [
     singular: ['ounce'],
     abbrevs: ['oz.', 'oz'],
     convert: (v) => metricMass(v * 28.349523125),
+    senses: [FLUID_OUNCES, TROY_OUNCES, COPPER_WEIGHT],
+  },
+  {
+    id: 'units.mass.troy-ounce',
+    keep: 'troy-ounce',
+    words: ['troy ounces', 'troy ounce'],
+    singular: ['troy ounce'],
+    abbrevs: ['troy oz', 'ozt', 'oz t'],
+    convert: (v) => metricMass(v * 31.1034768),
   },
   {
     id: 'units.mass.pound',
@@ -273,6 +390,7 @@ export const MEASURES: Measure[] = [
     // those already, and reading its tons as short tons would be plainly wrong.
     convert: (v) => metricMass(v * 907_184.74),
     ambiguousWhen: /\b(?:metric\s+tons?|tonnes?|long\s+tons?)\b/i,
+    senses: [TONS_OF_COOLING],
   },
 
   // ----- volume. Every one of these is the US measure, which is not the imperial one. -----
@@ -374,6 +492,15 @@ export const MEASURES: Measure[] = [
     singular: [],
     abbrevs: ['hp'],
     convert: (v) => m(v * 0.745699872, 'kW', 'kilowatt', 'kilowatts'),
+  },
+  {
+    // `12,000 BTU` an hour.
+    id: 'units.power.refrigeration-ton',
+    keep: 'refrigeration-ton',
+    words: ['tons of refrigeration', 'ton of refrigeration'],
+    singular: ['ton of refrigeration'],
+    abbrevs: [],
+    convert: (v) => m(v * 3.516852842, 'kW', 'kilowatt', 'kilowatts'),
   },
   {
     id: 'units.energy.btu',

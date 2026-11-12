@@ -283,10 +283,14 @@ A metric value the author gives after the quantity decides the sense by its dime
 `8 oz (240 mL) of milk` becomes `240 mL of milk` and `8 oz (230 g) of milk` becomes
 `230 g of milk`. Otherwise the phrase after the unit decides: an optional `of`, at most two
 words that are not function words, and then the thing measured. A container is read
-through to what it holds, so `a 15 oz can of beans` stays a weight. The thing has to end
-the phrase, or describe a noun that keeps its sense such as the `unit` of `AC unit`, so
-`8 oz cream cheese`, `8 oz milk chocolate` and `12 oz coffee beans` are weights, as are
-`sour cream`, `ice cream`, `baking soda` and `ground coffee`. A phrase that names any other
+through to what it holds, so `a 15 oz can of beans` stays a weight. The thing counts
+whatever follows it, so `Add 8 oz of milk slowly.` and `A 5-ton air conditioner cools the hall.`
+read in the sense, but not inside the name of something else: `8 oz cream cheese`,
+`8 oz milk chocolate` and `12 oz coffee beans` are weights, as are `sour cream`, `ice cream`,
+`baking soda` and `ground coffee`. A word ending in `s` between the unit and the thing is a
+plural or a verb, so it stands there alone, and `A 3-ton truck needs AC.` is a weight. A
+drinking glass before another vessel is its material, so `a 16 oz glass jar of honey` is a
+weight. A phrase that names any other
 thing keeps the unit's own sense, as `The AC is in a 3-ton truck` and
 `Dissolve 2 oz of sugar in water` do. Only where nothing after the quantity names a thing do
 the words before the number count, across at most a noun such as `unit` and three function

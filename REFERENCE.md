@@ -262,6 +262,11 @@ becomes `cut into 1.3 centimetre thick slices`, and `a 6-foot-tall fence` become
 `a 1.8 metre tall fence`. A size with no noun after it leaves the unit plural, so
 `6 feet long` becomes `1.8 metres long`.
 
+A unit of more than one word is read in the singular as well as the plural, so
+`half a pound per square inch` becomes `3.4 kilopascals` and `1 mile per hour` becomes
+`1.6 kilometres per hour`. `an hour` before `ago`, `later`, `earlier`, `before` or `after`
+is a time, so `2 miles an hour ago` becomes `3.2 kilometres an hour ago`.
+
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 `22 x 28 centimetres`, both ends sharing the unit chosen for the larger. Each side is read
@@ -485,11 +490,17 @@ becomes `Cut 1.8 metres or 3 metres of rope`, and `Cut 3 metres or 6 feet of rop
 `5 gallons/minute` becomes `19 litres/minute`.
 
 Measurements that are imperial worldwide are left alone: screens, wheels, pipes, vinyl.
-`a 15 inch laptop` stays a 15 inch laptop. So does a unit that is part of a name, such as
-`the 40 yard line` or `the 147-pound division`. A range or dimension of them stays whole,
-so `bolts of ½-¾ inch` and `a 15" x 17" panel` are left exactly as written, with no
-piece of them converted on its own. `units: { respectConventions: false }` converts all
-of them.
+`a 15 inch laptop` stays a 15 inch laptop, and so do `monitors of 27 inches` and
+`wheels between 15 and 17 inches`, which name the thing first. So does a unit that is part
+of a name, such as `the 40 yard line` or `the 147-pound division`. A range or dimension of
+them stays whole, so `bolts of ½-¾ inch` and `a 15" x 17" panel` are left exactly as
+written, with no piece of them converted on its own. `units: { respectConventions: false }`
+converts all of them.
+
+A unit word with a capital is part of a name when the next word has one too, or when the
+next word that title case would capitalise does. So `Track 7 Miles Davis`,
+`a 1983 Foot Locker ad` and the title `It is 10 Miles to Town` are left as written, whatever
+`respectConventions` says, while `10 miles North of town` and `Walk 10 Miles` convert.
 
 Pounds of money are left alone, because British prose spells amounts out. A money word
 such as `cost`, `paid`, `earns`, `worth` or `a fine of` claims the amount straight after
@@ -1154,7 +1165,7 @@ with no prose. Only the ids in `DIALECTS` are dialects, so a name every object h
   `a quarter mile round the bend` becomes `a 400 metre round the bend`. `a 2 pound cake` is
   left as written, because it may be a pound cake.
 - A line that ends in a number and a line that opens with a unit word are read as one
-  measurement, so `Track 7` above `Miles Davis` becomes `Track 11 kilometres Davis`. A
+  measurement, so `Track 7` above `Feet first` becomes `Track 2.1 metres first`. A
   blank line or a list marker between them keeps them apart.
 - Pounds with nothing beside them to say money or weight, as in `It's 5 pounds.`, are read
   as a weight.

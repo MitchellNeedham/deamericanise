@@ -128,10 +128,8 @@ describe('feet and inches together', () => {
     expect(convert(input)).toBe(expected);
   });
 
-  it('gives a height before an adjective and a noun no worse a unit than before', () => {
-    expect(['a 1.88 metres tall man', 'a 1.88 metre tall man']).toContain(
-      convert('a 6 foot 2 inch tall man'),
-    );
+  it('gives a height before an adjective and a noun the singular', () => {
+    expect(convert('a 6 foot 2 inch tall man')).toBe('a 1.88 metre tall man');
   });
 
   it.each`
@@ -891,6 +889,52 @@ describe('fuel economy', () => {
     ${'At 7:30 mpg'}                    | ${'At 7:30 mpg'}
   `('still gives $input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a unit of more than one word in the singular', () => {
+  it.each`
+    input                                          | expected
+    ${'Inflate to half a pound per square inch.'}  | ${'Inflate to 3.4 kilopascals.'}
+    ${'It drops 1 pound per square inch a month.'} | ${'It drops 6.9 kilopascals a month.'}
+    ${'It moves at half a mile per hour.'}         | ${'It moves at 0.8 kilometres per hour.'}
+    ${'It moves at 1 mile an hour.'}               | ${'It moves at 1.6 kilometres per hour.'}
+    ${'Tighten it to 1 foot pound.'}               | ${'Tighten it to 1.4 newton metres.'}
+    ${'Expect a 5 pound per square inch drop.'}    | ${'Expect a 34 kilopascal drop.'}
+    ${'Enter a 25 mile per hour zone.'}            | ${'Enter a 40 kilometre per hour zone.'}
+    ${'Add half a pound of butter.'}               | ${'Add 230 grams of butter.'}
+    ${'Inflate to 30 pounds per square inch.'}     | ${'Inflate to 210 kilopascals.'}
+    ${'1 mile'}                                    | ${'1.6 kilometres'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                 | expected
+    ${'I walked 1 mile an hour ago.'}     | ${'I walked 1.6 kilometres an hour ago.'}
+    ${'I walked half a mile an hour ago.'} | ${'I walked 800 metres an hour ago.'}
+    ${'I walked 2 miles an hour ago.'}    | ${'I walked 3.2 kilometres an hour ago.'}
+    ${'She had run 3 miles an hour later.'} | ${'She had run 4.8 kilometres an hour later.'}
+  `('reads the distance before a time in $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  /** The singular of a plural form, as `pound per square inch` is of `pounds per square inch`. */
+  const singular = (form: string) => form.replace(/\b(?:feet|(\w+)s)\b/, (_, stem?: string) => stem ?? 'foot');
+  const masked = (text: string) => text.replace(/\d(?:[\d.,]*\d)?/g, '#');
+  const compounds = MEASURES.flatMap((measure) =>
+    [...new Set(measure.words.filter((word) => /[\s-]/.test(word)).flatMap((word) => [word, singular(word)]))].map(
+      (form) => [form, measure] as const,
+    ),
+  );
+
+  it.each(compounds)('reads "%s" after one and after half as its plural after two', (form, measure) => {
+    const options = { rules: { [measure.id]: true } };
+    const plural = convert(`Set it to 2 ${measure.words[0]}.`, options);
+    expect(plural).not.toContain(measure.words[0]);
+    for (const count of ['1', 'half a']) {
+      expect(masked(convert(`Set it to ${count} ${form}.`, options)), count).toBe(masked(plural));
+    }
   });
 });
 
@@ -2993,6 +3037,32 @@ describe('a fastener size a few words from its noun', () => {
   });
 });
 
+describe('a conventional size names its noun in either number, on either side', () => {
+  it.each`
+    unchanged                            | why
+    ${'a monitor of 27 inches'}          | ${'a singular noun before the size'}
+    ${'monitors of 27 inches'}           | ${'its plural'}
+    ${'laptops of 13 inches'}            | ${'the same'}
+    ${'screens up to 15.6 inches'}       | ${'the same, with function words between'}
+    ${'wheels of 15 to 17 inches'}       | ${'a range after "of"'}
+    ${'wheels between 15 and 17 inches'} | ${'a range after "between"'}
+    ${'a pizza of 12 inches'}            | ${'a noun read after a size reads before one'}
+    ${'a 6 inch phone'}                  | ${'and the other way round'}
+    ${'a waist of 32 inches'}            | ${'a body size before its number'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                    | expected                                         | why
+    ${'between 15 and 17 inches'}            | ${'between 38 and 43 centimetres'}               | ${'no conventional noun'}
+    ${'The gauge records 2 inches of rain.'} | ${'The gauge records 5.1 centimetres of rain.'}  | ${'a plural that is also a verb of measuring'}
+    ${'Lose 2 inches off your waist.'}       | ${'Lose 5.1 centimetres off your waist.'}        | ${'a body measured, not sized'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
 describe('American designations that only look like measurements', () => {
   it.each`
     unchanged                    | why
@@ -3245,6 +3315,55 @@ describe('a unit that is part of a noun', () => {
     ${'Bake 1 pound cake'}      | ${'1 pound'}
     ${'Send in 6 foot soldiers'} | ${'6 foot'}
     ${'Bake 2-3 pound cakes'}   | ${'2-3 pound'}
+  `('holds $span whole, even with respectConventions off', ({ input, span }) => {
+    expect(held(input)).toContain(span);
+    expect(held(input, { units: { respectConventions: false } })).toContain(span);
+  });
+});
+
+describe('a capitalised unit word that is part of a name', () => {
+  it.each`
+    unchanged                                         | why
+    ${'Track 7 Miles Davis'}                          | ${'a first name'}
+    ${'Album: 1959 Miles Davis'}                      | ${'after a year'}
+    ${'From 1955 to 1959 Miles Davis led a quintet.'} | ${'after a range'}
+    ${'Track 7\nMiles Davis'}                         | ${'across a line that wraps'}
+    ${'the 1972 Pound Ridge fire'}                    | ${'a place'}
+    ${'a 1983 Foot Locker ad'}                        | ${'a shop'}
+    ${'Track 3 Gallon Drunk'}                         | ${'a band'}
+    ${'It is 10 Miles to Town'}                       | ${'title case, across a small word'}
+    ${'A Mile and a Half From Home'}                  | ${'title case around a fraction'}
+    ${'The 10 x 12 Feet Room'}                        | ${'title case after a dimension'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+    expect(convert(unchanged, { assumeAmerican: true })).toBe(unchanged);
+  });
+
+  it.each`
+    input                                | expected                                    | why
+    ${'10 miles North of town'}          | ${'16 kilometres North of town'}            | ${'a unit word in lower case'}
+    ${'Walk 10 Miles'}                   | ${'Walk 16 kilometres'}                     | ${'no capitalised word after it'}
+    ${'He walked 10 Miles to the shop.'} | ${'He walked 16 kilometres to the shop.'}   | ${'small words, then one in lower case'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  /** The spans the unit rules hold as written in `text`. */
+  const held = (text: string, options: Options = {}): string[] => {
+    const resolved = resolveOptions(options);
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold)
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                                             | span
+    ${'Track 7 Miles Davis'}                          | ${'7 Miles'}
+    ${'From 1955 to 1959 Miles Davis led a quintet.'} | ${'1955 to 1959 Miles'}
+    ${'A Mile and a Half From Home'}                  | ${'A Mile and a Half'}
+    ${'The 10 x 12 Feet Room'}                        | ${'10 x 12 Feet'}
   `('holds $span whole, even with respectConventions off', ({ input, span }) => {
     expect(held(input)).toContain(span);
     expect(held(input, { units: { respectConventions: false } })).toContain(span);

@@ -132,10 +132,14 @@ interface Alias {
   isSingular: boolean;
 }
 
+/** `an hour` before `ago` or `later` is a time, so `1 mile an hour ago` is a distance. */
+const AN_HOUR = / an hour$/i;
+const NOT_A_TIME = String.raw`(?!\s+(?:ago|later|earlier|before|after)\b)`;
+
 function alternate(aliases: string[]): string {
   return aliases
     .sort((a, b) => b.length - a.length || a.localeCompare(b))
-    .map(escape)
+    .map((alias) => escape(alias) + (AN_HOUR.test(alias) ? NOT_A_TIME : ''))
     .join('|');
 }
 
@@ -198,6 +202,31 @@ function isOtherSense(ctx: RuleContext, alias: Alias, start: number, end: number
   return alias.isWord && alias.measure.otherSense?.(contextText(ctx.text), start, end) === true;
 }
 
+/** The words title case leaves in lower case between capitalised ones. */
+const TITLE_CASE_MINOR = [
+  'a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'so', 'yet', 'as', 'at', 'by', 'in', 'of',
+  'off', 'on', 'per', 'to', 'up', 'via', 'from', 'into', 'onto', 'over', 'with',
+];
+
+// Both case-sensitive, so `10 miles North of town` and `10 MILES TO GO` are measurements.
+const CAPITALISED = /^[A-Z][a-z]/;
+const CAPITALISED_NEXT = new RegExp(
+  String.raw`^(?=\s)${SOFT_SPACE}(?:(?:${TITLE_CASE_MINOR.join('|')})${INLINE_SPACE}+){0,3}[A-ZÀ-ÖØ-Þ]`,
+);
+
+/**
+ * Whether the unit word written as `written`, before the text from `end`, is part of a name,
+ * as `Miles` is in `Track 7 Miles Davis`. A unit word follows its number, so a capital on it
+ * is never the one that opens a sentence. Beside another capitalised word, or beside the
+ * lower-case words of title case and then one, it names something, and title case counts:
+ * `It is 10 Miles to Town` is a title.
+ */
+function isPartOfName(text: string, written: string, end: number): boolean {
+  return CAPITALISED.test(written) && CAPITALISED_NEXT.test(text.slice(end, end + CONTEXT_WINDOW));
+}
+
+const UNIT_WORDS = new Set(MEASURES.flatMap((measure) => measure.words.map((word) => word.toLowerCase())));
+
 const OTHER_SENSES = new Map(
   MEASURES.flatMap(({ words, otherSense }) =>
     otherSense ? words.map((word) => [word.toLowerCase(), otherSense] as const) : [],
@@ -218,11 +247,14 @@ const NUMBER_REACH = 64;
 
 /**
  * Whether the measurement rules read the written-out unit `text.slice(unitStart, unitEnd)`
- * in another sense over the quantity it ends, as they read `It cost 1,500 pounds` as money.
- * Detection asks this, so it never counts as an imperial unit what the rules leave alone.
+ * in another sense over the quantity it ends, as they read `It cost 1,500 pounds` as money
+ * and `Track 7 Miles Davis` as a name. Detection asks this, so it never counts as an imperial
+ * unit what the rules leave alone.
  */
 export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: number): boolean {
-  const otherSense = OTHER_SENSES.get(text.slice(unitStart, unitEnd).toLowerCase());
+  const unit = text.slice(unitStart, unitEnd);
+  if (UNIT_WORDS.has(unit.toLowerCase()) && isPartOfName(text, unit, unitEnd)) return true;
+  const otherSense = OTHER_SENSES.get(unit.toLowerCase());
   if (!otherSense) return false;
   const from = Math.max(0, unitStart - NUMBER_REACH);
   const number = NUMBER_BEFORE_UNIT.exec(text.slice(from, unitStart));
@@ -1431,7 +1463,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     // A noun straight after claims the words before it: `half a pound cake` is half a cake,
     // and `a mile and a half hour later` is half an hour.
     if (MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) return;
-    if (isOtherSense(ctx, entry, start, start + matched.length)) {
+    if (
+      isOtherSense(ctx, entry, start, start + matched.length) ||
+      (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length))
+    ) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
@@ -1472,7 +1507,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       pushSingle(ctx, changes, start + cut, matched.slice(cut), raw.slice(cut), alias);
       return;
     }
-    if (isOtherSense(ctx, entry, start, start + matched.length)) {
+    if (
+      isOtherSense(ctx, entry, start, start + matched.length) ||
+      (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length))
+    ) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
@@ -1536,7 +1574,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           }
           continue;
         }
-        if (isOtherSense(ctx, entry, start, start + matched.length)) {
+        if (
+          isOtherSense(ctx, entry, start, start + matched.length) ||
+          (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length))
+        ) {
           changes.push(hold(start, matched, entry.measure.id, 35));
           continue;
         }
@@ -1619,6 +1660,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const last = sides[sides.length - 1]!;
         const entry = last.entry!;
         const before = ctx.text.slice(Math.max(0, start - 24), start);
+        if (entry.isWord && isPartOfName(ctx.text, last.alias!, end)) {
+          changes.push(hold(start, match[0], entry.measure.id, 38));
+          continue;
+        }
 
         // A side whose mark closes a quotation is a number, and converting the other sides alone
         // would split the dimension.

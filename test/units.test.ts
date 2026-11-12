@@ -117,6 +117,65 @@ describe('a weight in two units is one weight', () => {
   });
 });
 
+describe('a measurement in two units reads its first number whole', () => {
+  it.each`
+    input                                      | expected                          | why
+    ${'1 1/2 pounds 3 ounces'}                 | ${'765 grams'}                    | ${'a mixed number'}
+    ${'1/2 pounds 3 ounces'}                   | ${'312 grams'}                    | ${'a fraction'}
+    ${'2.7 pounds 3 ounces'}                   | ${'1.31 kilograms'}               | ${'a decimal'}
+    ${'1½ pounds 3 ounces'}                    | ${'765 grams'}                    | ${'a vulgar fraction after a whole number'}
+    ${'½ pound 3 ounces'}                      | ${'312 grams'}                    | ${'a vulgar fraction'}
+    ${'1/2 stone 3 pounds'}                    | ${'4.54 kilograms'}               | ${'a fraction of a stone'}
+    ${'1/2 feet 3 inches'}                     | ${'22.9 centimetres'}             | ${'a fraction of a foot'}
+    ${'1 1/2 feet 3 inches'}                   | ${'53.3 centimetres'}             | ${'a mixed number of feet'}
+    ${'2.5 feet 3 inches'}                     | ${'83.8 centimetres'}             | ${'a decimal number of feet'}
+    ${'-2 pounds 3 ounces'}                    | ${'-992 grams'}                   | ${'a minus before the whole weight'}
+    ${'Bought 2024-03-14 1/2 pounds 3 ounces'} | ${'Bought 2024-03-14 312 grams'}  | ${'a fraction after a date'}
+    ${'7 pounds 8 ounces'}                     | ${'3.4 kilograms'}                | ${'a whole number of pounds'}
+    ${'6 feet 2 inches'}                       | ${'1.88 metres'}                  | ${'a whole number of feet'}
+    ${'1 1/2 pounds'}                          | ${'680 grams'}                    | ${'a mixed number on its own'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                    | why
+    ${'1/0 pounds 3 ounces'}     | ${'a first part that is not finite'}
+    ${'1 1/0 pounds 3 ounces'}   | ${'a mixed first part that is not finite'}
+    ${'1/0 feet 3 inches'}       | ${'feet that are not finite'}
+    ${'5 feet 1/0 inches'}       | ${'inches that are not finite'}
+    ${'7 pounds 1/0 ounces'}     | ${'ounces that are not finite'}
+    ${'1,5 pounds 3 ounces'}     | ${'the tail of a grouped number'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a long run of whitespace takes time in line with its length', () => {
+  // Generous, since each of these takes a few milliseconds. A pattern that walks the run from
+  // every place in it, or tries every split of it, takes several seconds.
+  const LIMIT_MS = 1000;
+
+  it.each`
+    before                         | name          | run     | length   | after                      | expected
+    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'The color.'}            | ${'A 3.4 kilogram baby.'}
+    ${'A 7 pound 8 ounce baby.'}   | ${'tabs'}     | ${'\t'} | ${3000}  | ${'The color.'}            | ${'A 3.4 kilogram baby.'}
+    ${'A 7 pound 8 ounce baby.'}   | ${'newlines'} | ${'\n'} | ${12000} | ${'The color.'}            | ${'A 3.4 kilogram baby.'}
+    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'5 feet'}                | ${'A 3.4 kilogram baby.'}
+    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'half a mile'}           | ${'A 3.4 kilogram baby.'}
+    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'seven pounds 8 ounces'} | ${'A 3.4 kilogram baby.'}
+    ${'It weighs 7 pounds'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'The color.'}            | ${'It weighs 3.2 kilograms'}
+    ${'It is 5'}                   | ${'spaces'}   | ${' '}  | ${30000} | ${'The color.'}            | ${'It is 5'}
+  `('"$before", $length $name, then "$after"', ({ before, run, length, after, expected }) => {
+    const text = (n: number) => `${before}${run.repeat(n)}${after}`;
+    convert(text(1));
+    const started = performance.now();
+    const output = convert(text(length));
+    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+    expect(output.startsWith(expected)).toBe(true);
+  });
+});
+
 describe('mass and volume', () => {
   it.each`
     input                | expected
@@ -409,7 +468,7 @@ describe('a range opens only on a number that can be its first end', () => {
     unchanged           | why
     ${'$5-10 feet'}     | ${'a price range written tight'}
     ${'In 2024-5 feet'} | ${'a span of years written tight'}
-    ${'12-3/4 inch'}    | ${'a fraction straight after a dash, once its range is refused'}
+    ${'20-3/2 inch'}    | ${'a fraction straight after a dash, once its range is refused'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });
@@ -439,6 +498,123 @@ describe('a range opens only on a number that can be its first end', () => {
   });
 });
 
+describe('the year of a written-out date is not a measurement', () => {
+  const localise = { preset: 'localise' } as const;
+
+  it.each`
+    input                                  | expected                                    | why
+    ${'Oct 22, 2024 1/2 inch long'}        | ${'22 October 2024 1.3 centimetres long'}   | ${'a fraction after a date it rewrites'}
+    ${'22 October 2024 1/2 inch long'}     | ${'22 October 2024 1.3 centimetres long'}   | ${'a fraction after a date written day first'}
+    ${'22nd October 2024 1/2 inch long'}   | ${'22nd October 2024 1.3 centimetres long'} | ${'a day written as an ordinal'}
+    ${'October 22, 1850 1/2 inch long'}    | ${'October 22, 1850 1.3 centimetres long'}  | ${'a year the date rule leaves'}
+    ${'March 13, 2024 - 250 feet'}         | ${'13 March 2024 - 76 metres'}              | ${'a range after a date it rewrites'}
+    ${'13 March 2024 - 250 feet'}          | ${'13 March 2024 - 76 metres'}              | ${'a range after a date written day first'}
+    ${'Oct. 22nd, 2024 - 250 feet'}        | ${'22 October 2024 - 76 metres'}            | ${'an abbreviated month with a stop'}
+    ${'13 march 2024 - 250 feet'}          | ${'13 march 2024 - 76 metres'}              | ${'a month in lower case'}
+    ${'22 October 2024 - 350°F'}           | ${'22 October 2024 - 175°C'}                | ${'a temperature range'}
+  `('converts the quantity alone after $why', ({ input, expected }) => {
+    expect(convert(input, localise)).toBe(expected);
+  });
+
+  it.each([
+    ['Oct 22, 2024 1/2 inch long', localise],
+    ['March 13, 2024 - 250 feet', localise],
+    ['1/29/24 in. the ', { dates: { format: 'long' } }],
+  ] as const)('runs twice on %j', (input, options) => {
+    const once = convert(input, options);
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each`
+    input                                          | expected                                          | why
+    ${'In May 5-10 feet of snow fell.'}            | ${'In May 1.5-3 metres of snow fell.'}            | ${'a range after a bare month'}
+    ${'On March 13, 2024 - 25 feet of snow fell.'} | ${'On 13 March 2024 - 7.6 metres of snow fell.'}  | ${'a range refused by its size'}
+    ${'March 5, 2024'}                             | ${'5 March 2024'}                                 | ${'the date itself'}
+    ${'On Oct 22, 5 feet of snow fell.'}           | ${'On Oct 22, 1.5 metres of snow fell.'}          | ${'a number too short to be a year'}
+    ${'On 22 October 5 feet of snow fell.'}        | ${'On 22 October 1.5 metres of snow fell.'}       | ${'the same, after a date written day first'}
+  `('still converts $why', ({ input, expected }) => {
+    expect(convert(input, localise)).toBe(expected);
+  });
+});
+
+describe('a price is not a measurement', () => {
+  const american = { assumeAmerican: true } as const;
+
+  it.each`
+    unchanged                     | why
+    ${'Buy a $5 gallon of milk.'} | ${'a price before a unit word'}
+    ${'A $20 pound of coffee.'}   | ${'the same, before pound'}
+    ${'It costs $ 5 gallons.'}    | ${'a space after the sign'}
+    ${'A €5 gallon of milk.'}     | ${'another currency sign'}
+    ${'A $5 x 10 foot tarp.'}     | ${'a price before a dimension'}
+    ${'It cost $350°F.'}          | ${'a price before a temperature'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                             | expected
+    ${'Buy a $5 gallon of milk.'}     | ${'Buy a US$5 gallon of milk.'}
+    ${'A $5 x 10 foot tarp.'}         | ${'A US$5 x 10 foot tarp.'}
+    ${'It was $1,000 1/2 inch wide.'} | ${'It was US$1,000 1.3 centimetres wide.'}
+  `('leaves "$input" to the currency rule', ({ input, expected }) => {
+    const once = convert(input, american);
+    expect(once).toBe(expected);
+    expect(convert(once, american)).toBe(once);
+  });
+
+  it.each`
+    input                                  | expected                                     | options
+    ${'Price $5 - 10 inches long.'}        | ${'Price US$5 - 25 centimetres long.'}       | ${american}
+    ${'It cost $20 for 5 pounds of beef.'} | ${'It cost $20 for 2.3 kilograms of beef.'}  | ${{}}
+    ${'5 gallons'}                         | ${'19 litres'}                               | ${{}}
+  `('still converts "$input"', ({ input, expected, options }) => {
+    expect(convert(input, options)).toBe(expected);
+  });
+});
+
+describe('a whole number hyphenated to a fraction is one mixed number', () => {
+  it.each`
+    input                         | expected                          | why
+    ${'a 2-3/4 inch board'}       | ${'a 7 centimetre board'}         | ${'the same as "2 3/4 inch"'}
+    ${'a 5-1/2 foot fence'}       | ${'a 1.7 metre fence'}            | ${'in feet'}
+    ${'cut it 1-1/4 inches long'} | ${'cut it 3.2 centimetres long'}  | ${'plural'}
+    ${'12-3/4 inch'}              | ${'32 centimetres'}               | ${'a whole part of two figures'}
+    ${'a 2-3/4-inch board'}       | ${'a 7 centimetre board'}         | ${'hyphenated to its unit'}
+    ${'2-3/4 to 5 inches'}        | ${'7 to 13 centimetres'}          | ${'the first end of a range'}
+    ${'1-2-3/4 inches'}           | ${'2.5-7 centimetres'}            | ${'the second end of a range'}
+    ${'2-3/4 x 5 inches'}         | ${'7 x 13 centimetres'}           | ${'a side of a dimension'}
+    ${'5 feet 2-3/4 inches'}      | ${'1.59 metres'}                  | ${'the inches of a height'}
+    ${'7 lb 2-1/2 oz'}            | ${'3.25 kg'}                      | ${'the ounces of a weight'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                      | expected                   | why
+    ${'1-3 inches'}            | ${'2.5-7.6 centimetres'}   | ${'two whole numbers are a range'}
+    ${'1/2-3/4 inch'}          | ${'1.3-1.9 centimetres'}   | ${'so are two fractions'}
+    ${'1-3/2 inches'}          | ${'2.5-3.8 centimetres'}   | ${'and a whole number and a fraction above one'}
+    ${'2024-03-14 1/2 gallon'} | ${'2024-03-14 1.9 litres'} | ${'a fraction after a date is its own number'}
+  `('still converts $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('leaves a thread spec alone', () => {
+    expect(convert('a 5/16-18 UNC bolt')).toBe('a 5/16-18 UNC bolt');
+  });
+
+  it.each`
+    raw         | value
+    ${'2-3/4'}  | ${2.75}
+    ${'−2-3/4'} | ${-2.75}
+    ${'1-3/2'}  | ${null}
+    ${'2-3/0'}  | ${null}
+  `('reads "$raw" as $value', ({ raw, value }) => {
+    expect(parseNumber(raw)).toBe(value);
+  });
+});
+
 describe('the minutes of a clock time are not a measurement', () => {
   it.each`
     unchanged                                | why
@@ -446,12 +622,21 @@ describe('the minutes of a clock time are not a measurement', () => {
     ${'Hold 8:15 miles for the tempo run.'}  | ${'a pace before a plural unit'}
     ${'At 18:00 pound the cutlets thin.'}    | ${'a 24-hour time before a verb'}
     ${'At 7:30 F the oven was hot.'}         | ${'a bare F after a time'}
+    ${'At 7:30 feet 2 inches'}               | ${'a height in two units'}
+    ${'At 18:00 pounds 8 ounces'}            | ${'a weight in two units'}
+    ${'At 7:30 stone 4 pounds 8 ounces'}     | ${'a weight in three units'}
+    ${'At 7:30 mpg'}                         | ${'fuel economy'}
+    ${'At 7:30 miles per gallon'}            | ${'fuel economy written out'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });
 
   it.each`
     input                                        | expected                                         | why
+    ${'At 7:30 6 feet 2 inches'}                 | ${'At 7:30 1.88 metres'}                         | ${'a height after a time'}
+    ${'At 7:30 1/2 pounds 3 ounces'}             | ${'At 7:30 312 grams'}                           | ${'a weight after a time'}
+    ${'7 pounds 8 ounces'}                       | ${'3.4 kilograms'}                               | ${'a weight in two units'}
+    ${'30 mpg'}                                  | ${'7.8 L/100km'}                                 | ${'fuel economy'}
     ${'30 miles'}                                | ${'48 kilometres'}                               | ${'a measurement'}
     ${'a 30 mile drive'}                         | ${'a 48 kilometre drive'}                        | ${'an attributive measurement'}
     ${'Gates open at 7:30. 5 miles of parking.'} | ${'Gates open at 7:30. 8 kilometres of parking.'} | ${'a measurement after a time'}
@@ -764,6 +949,50 @@ describe('a count before a weight or volume', () => {
     ${'2 x 11 stone 4 pounds'}      | ${{ dialect: 'en-GB' }}                     | ${'a unit of the weight is kept'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged, options }) => {
     expect(convert(unchanged, options)).toBe(unchanged);
+  });
+});
+
+describe('a dimension with a side in words', () => {
+  it.each`
+    input                                | expected                            | why
+    ${'A ten by twelve foot room.'}      | ${'A 3 by 3.7 metre room.'}         | ${'every side in words'}
+    ${'The room is ten by twelve feet.'} | ${'The room is 3 by 3.7 metres.'}   | ${'plural'}
+    ${'The room is 10 by twelve feet.'}  | ${'The room is 3 by 3.7 metres.'}   | ${'digits and words'}
+    ${'A two feet x six inches board.'}  | ${'A 61 x 15 centimetres board.'}   | ${'each side in its own unit'}
+    ${'ten by twelve by eight feet'}     | ${'3 by 3.7 by 2.4 metres'}         | ${'three sides'}
+    ${'twenty-two by ten feet'}          | ${'6.7 by 3 metres'}                | ${'a cardinal of two words'}
+    ${'a hundred by fifty feet'}         | ${'30 by 15 metres'}                | ${'a multiplied count'}
+    ${'ten × twelve feet'}               | ${'3 × 3.7 metres'}                 | ${'the multiplication sign'}
+    ${'This ten by twelve foot room'}    | ${'This 3 by 3.7 metre room'}       | ${'"this" before a number above one'}
+    ${'ten by twelve feet (3 by 3.7 m)'} | ${'3 by 3.7 m'}                     | ${'a bracket that restates it'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                                 | why
+    ${'buy two x 4 oz cans'}               | ${'buy two x 110 g cans'}                | ${'a count before a weight'}
+    ${'six x twelve fl oz bottles'}        | ${'six x 350 mL bottles'}                | ${'a count before a volume'}
+    ${'Raise each one by two inches.'}     | ${'Raise each one by 5.1 centimetres.'}  | ${'a noun before "by" and an amount'}
+    ${'move all three by two feet'}        | ${'move all three by 61 centimetres'}    | ${'the same, above one'}
+    ${'that one by two feet'}              | ${'that one by 61 centimetres'}          | ${'"that" before "one"'}
+    ${'A 10 by 12 foot room.'}             | ${'A 3 by 3.7 metre room.'}              | ${'digits'}
+    ${'She won by two feet.'}              | ${'She won by 61 centimetres.'}          | ${'no number before "by"'}
+    ${'One by one, they walked ten feet.'} | ${'One by one, they walked 3 metres.'}   | ${'no unit after the pair'}
+  `('still converts $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                            | why
+    ${'two and a half by three feet'}    | ${'a fraction in words on the first side'}
+    ${'two by three and a half feet'}    | ${'the same, on the last side'}
+    ${'one-half by three-quarters inch'} | ${'two fractions in words'}
+    ${'Lower one by two feet.'}          | ${'"one" may be a pronoun, with "by" giving an amount'}
+    ${'It cost two x 5 pounds.'}         | ${'money, with the count in its amount'}
+    ${'ten x twelve in'}                 | ${'"in" may be the preposition'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
   });
 });
 
@@ -1199,6 +1428,8 @@ describe('a written-out number with hundred or thousand', () => {
     ${'two hundred pounds eight ounces'}          | ${'90.9 kilograms'}          | ${'a weight in two units'}
     ${'twenty-two pounds of beef'}                | ${'10 kilograms of beef'}    | ${'a cardinal of two words on its own still reads'}
     ${'two and a half feet'}                      | ${'76 centimetres'}          | ${'as does "and a half"'}
+    ${'between one hundred and two hundred miles'} | ${'between 160 and 320 kilometres'} | ${'a range, whose second end follows "hundred and"'}
+    ${'one hundred to two hundred miles'}         | ${'160 to 320 kilometres'}   | ${'the same, with "to"'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -1207,8 +1438,6 @@ describe('a written-out number with hundred or thousand', () => {
     unchanged                                     | why
     ${'hundreds of miles'}                        | ${'a plural is not a number'}
     ${'a few hundred feet'}                       | ${'no count before the multiplier'}
-    ${'between one hundred and two hundred miles'} | ${'"and" joins a range here, which is never half converted'}
-    ${'one hundred to two hundred miles'}         | ${'the same, with "to"'}
     ${'twenty-two hundred hours'}                 | ${'a time'}
     ${'one hundred and a half feet'}              | ${'a fraction is never what follows the multiplier'}
     ${'one hundred and twenty and a half feet'}   | ${'nor after the cardinal that follows it'}
@@ -1237,6 +1466,50 @@ describe('a written-out number with hundred or thousand', () => {
     ${'hundred'}                   | ${null}
   `('reads "$words" as $value', ({ words, value }) => {
     expect(parseNumber(words)).toBe(value);
+  });
+});
+
+describe('a range with an end in words', () => {
+  it.each`
+    input                                | expected                           | why
+    ${'five to 10 miles'}                | ${'8 to 16 kilometres'}            | ${'the first end in words'}
+    ${'10 to twelve miles'}              | ${'16 to 19 kilometres'}           | ${'the second end in words'}
+    ${'five to ten miles'}               | ${'8 to 16 kilometres'}            | ${'both ends'}
+    ${'between one and two pounds'}      | ${'between 450 and 910 grams'}     | ${'"and" after "between"'}
+    ${'twenty-two to thirty miles'}      | ${'35 to 48 kilometres'}           | ${'a cardinal of two words'}
+    ${'one hundred to two hundred feet'} | ${'30 to 61 metres'}               | ${'the second end after "hundred to"'}
+    ${'ten to a hundred feet'}           | ${'3 to 30 metres'}                | ${'a hundred counted by "a"'}
+    ${'from five to six feet'}           | ${'from 1.5 to 1.8 metres'}        | ${'opened by "from"'}
+    ${'five to\nten miles'}              | ${'8 to 16 kilometres'}            | ${'broken at its "to"'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                         | expected                             | why
+    ${'one and two pounds'}                                       | ${'one and 910 grams'}               | ${'"and" without "between" joins no range in words'}
+    ${'between one hundred and twenty feet and two hundred feet'} | ${'between 37 metres and 61 metres'} | ${'"and" inside one number'}
+    ${'reduce by half to 2 quarts'}                               | ${'reduce by half to 1.9 litres'}    | ${'"half to" is an idiom'}
+    ${'twenty-two miles'}                                         | ${'35 kilometres'}                   | ${'a hyphen inside a cardinal'}
+    ${'one-half inch'}                                            | ${'1.3 centimetres'}                 | ${'a hyphen inside a fraction'}
+    ${'5-10 feet'}                                                | ${'1.5-3 metres'}                    | ${'a dash between digits'}
+  `('still converts $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                 | why
+    ${'five-10 miles'}                        | ${'a dash after a number in words'}
+    ${'10-twelve miles'}                      | ${'a dash before one'}
+    ${'five - ten miles'}                     | ${'a spaced dash between words'}
+    ${'twenty-5 miles'}                       | ${'a dash after a tens word'}
+    ${'two and a half to three miles'}        | ${'a fraction in words at the first end'}
+    ${'one to one and a half miles'}          | ${'the same at the second end'}
+    ${'two to three hundred feet'}            | ${'which may mean 200 to 300'}
+    ${'between two and three hundred feet'}   | ${'the same, with "and"'}
+    ${'It cost between one and two pounds.'}  | ${'money'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
   });
 });
 

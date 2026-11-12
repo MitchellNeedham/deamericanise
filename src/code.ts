@@ -1,7 +1,8 @@
-import { applyChanges, offsetChanges } from './engine/apply.js';
+import { applyChanges } from './engine/apply.js';
 import { detectAmerican } from './engine/detect.js';
 import { resolveOptions } from './config.js';
-import { commentSpans, lexerFor, PROSE_EXTENSIONS } from './lexers/index.js';
+import { lexerFor, PROSE_EXTENSIONS } from './lexers/index.js';
+import { changesInSource, commentTexts } from './lexers/join.js';
 import { deamericanise, findChanges } from './transform.js';
 import type { Change, Options, Result, Syntax } from './types.js';
 
@@ -37,19 +38,19 @@ export function deamericaniseCode(source: string, options: CodeOptions = {}): Re
   // Comments follow their language's doc markup, never `syntax`. A Markdown comment reads as
   // unknown syntax: the marker that starts each of its lines throws off a reading of indented code.
   resolved.syntax = lexer.docMarkup === 'rst' ? 'text' : undefined;
-  const spans = commentSpans(source, lexer, docstrings ?? false);
+  const comments = commentTexts(source, lexer, docstrings ?? false);
 
   // The verdict on whether this file is American comes from its prose, not its syntax.
-  const prose = spans.map((s) => source.slice(s.start, s.end)).join('\n');
+  const prose = comments.map((c) => c.text).join('\n');
   const signals =
     resolved.assumeAmerican === undefined
       ? detectAmerican(prose)
       : { ...detectAmerican(prose), confidence: resolved.assumeAmerican ? 1 : 0 };
 
   const changes: Change[] = [];
-  for (const span of spans) {
-    const text = source.slice(span.start, span.end);
-    changes.push(...offsetChanges(findChanges({ text, options: resolved, signals }), span.start));
+  for (const comment of comments) {
+    const found = findChanges({ text: comment.text, options: resolved, signals, boundaries: comment.boundaries });
+    changes.push(...changesInSource(comment, found));
   }
 
   changes.sort((a, b) => a.start - b.start);

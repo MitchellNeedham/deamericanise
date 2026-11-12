@@ -93,14 +93,110 @@ describe('identifiers inside comments survive', () => {
   });
 });
 
+describe('an initialism in a comment is not a dotted name', () => {
+  it.each`
+    source                                  | options                   | expected
+    ${'// Only ships to the U.S.\n'}        | ${{ preset: 'localise' }} | ${'// Only ships to the US.\n'}
+    ${'// Ask a Ph.D. student.\n'}          | ${{ preset: 'localise' }} | ${'// Ask a PhD student.\n'}
+    ${'// Two P.M.s and a Ph.D.\n'}         | ${{ preset: 'localise' }} | ${'// Two PMs and a PhD.\n'}
+    ${'// Runs at 3 p.m. every day.\n'}     | ${{}}                     | ${'// Runs at 3pm every day.\n'}
+    ${'// e.g. the color\n'}                | ${{}}                     | ${'// e.g. the colour\n'}
+    ${'// see theme.colors.gray.\n'}        | ${{}}                     | ${'// see theme.colors.gray.\n'}
+    ${'// call os.path.join() first\n'}     | ${{}}                     | ${'// call os.path.join() first\n'}
+    ${'// read io.Color.Gray.\n'}           | ${{}}                     | ${'// read io.Color.Gray.\n'}
+  `('$source -> $expected', ({ source, options, expected }) => {
+    expect(deamericaniseCode(source, { language: 'ts', ...options }).text).toBe(expected);
+  });
+});
+
 describe('inline code inside a comment', () => {
   it.each`
     source                                                              | expected                                                             | why
     ${'/* Use `the\n   color` here. */'}                                | ${'/* Use `the\n   color` here. */'}                                 | ${'a span that wraps in a block comment'}
     ${"/**\n * It's a `stray backtick.\n *\n * The color is `red`.\n */"} | ${"/**\n * It's a `stray backtick.\n *\n * The colour is `red`.\n */"} | ${'a bare star line ends the paragraph'}
-    ${"/**\n * Don't use a ` here.\n * Use `color` and `center`.\n */"}  | ${"/**\n * Don't use a ` here.\n * Use `color` and `center`.\n */"}   | ${'so does a line that starts with a star'}
+    ${"/**\n * Don't use a ` here.\n *\n * Use `color`.\n */"}            | ${"/**\n * Don't use a ` here.\n *\n * Use `color`.\n */"}             | ${'a backtick does not pair across a bare star line'}
+    ${"/**\n * Don't use a ` here.\n * Use `color` and `center`.\n */"}  | ${"/**\n * Don't use a ` here.\n * Use `colour` and `centre`.\n */"}  | ${'a stray backtick pairs within its paragraph, as in Markdown'}
+    ${"/**\n * - Don't use a ` here.\n * - Use `color` and `center`.\n */"} | ${"/**\n * - Don't use a ` here.\n * - Use `color` and `center`.\n */"} | ${'a list item after the star ends the paragraph'}
+    ${"/**\n * Don't use a ` here.\n * * Use `color` and `center`.\n */"} | ${"/**\n * Don't use a ` here.\n * * Use `color` and `center`.\n */"} | ${'so does a star bullet after the star'}
+    ${'/**\n * Use `the\n * color` here.\n */\n'}                        | ${'/**\n * Use `the\n * color` here.\n */\n'}                        | ${'a span that wraps onto a line that starts with a star'}
+    ${'/** Use `the\n *  color` here. */'}                              | ${'/** Use `the\n *  color` here. */'}                              | ${'and starts on the line that opens the comment'}
+    ${'// Use `the\n// color` here.\n'}                                 | ${'// Use `the\n// color` here.\n'}                                 | ${'a span that wraps onto the next line comment'}
+    ${'  // Use `the\n  // color` here.\n'}                             | ${'  // Use `the\n  // color` here.\n'}                             | ${'indented line comments'}
+    ${'x = 1; // Use `the\n       // color` here.\n'}                   | ${'x = 1; // Use `the\n       // color` here.\n'}                   | ${'a trailing comment and the comment lined up beneath it'}
+    ${'// Use `the\n//\n// color` here.\n'}                             | ${'// Use `the\n//\n// colour` here.\n'}                            | ${'a bare marker line ends the paragraph'}
+    ${'// Use `color`.\n'}                                              | ${'// Use `color`.\n'}                                              | ${'a span on one comment line'}
   `('$why', ({ source, expected }) => {
     expect(rewrite('ts', source)).toBe(expected);
+  });
+
+  it.each`
+    language    | source                                         | expected
+    ${'python'} | ${'# Use `the\n# color` here.\n'}              | ${'# Use `the\n# color` here.\n'}
+    ${'rust'}   | ${'/// Use `the\n/// color` here.\n'}          | ${'/// Use `the\n/// color` here.\n'}
+    ${'rust'}   | ${'//! Use `the\n//! color` here.\n'}          | ${'//! Use `the\n//! color` here.\n'}
+    ${'sql'}    | ${'-- Use `the\n-- color` here.\n'}            | ${'-- Use `the\n-- color` here.\n'}
+    ${'rust'}   | ${'/// Use `the\n///\n/// color` here.\n'}     | ${'/// Use `the\n///\n/// colour` here.\n'}
+  `('$language: a span that wraps across line comments', ({ language, source, expected }) => {
+    expect(rewrite(language, source)).toBe(expected);
+  });
+});
+
+describe('which line comments are read as one text', () => {
+  it.each`
+    source                                           | why
+    ${'x = 1; // Use `the\n// color` here.\n'}       | ${'a trailing comment and one that is not lined up with it'}
+    ${'x = 1; // Use `the\ny = 2; // color` here.\n'} | ${'two trailing comments lined up'}
+    ${'// Use `the\n  // color` here.\n'}            | ${'comments at different columns'}
+    ${'// Use `the\nx = 1;\n// color` here.\n'}      | ${'comments with code between them'}
+    ${'// Use `the\n\n// color` here.\n'}            | ${'comments with a blank line between them'}
+    ${'/* Use `the */\n// color` here.\n'}           | ${'a block comment and a line comment'}
+  `('not $why', ({ source }) => {
+    expect(rewrite('ts', source)).toBe(source.replace('color', 'colour'));
+  });
+
+  it('not a doc comment and a plain one', () => {
+    expect(rewrite('rust', '/// Use `the\n// color` here.\n')).toBe('/// Use `the\n// colour` here.\n');
+  });
+
+  it('not two markers of the same language', () => {
+    expect(rewrite('php', '// Use `the\n# color` here.\n')).toBe('// Use `the\n# colour` here.\n');
+  });
+
+  it('sees an ignore block across them', () => {
+    const source = '// deamericanise-ignore-start\n// the color\n// deamericanise-ignore-end\n// the color\n';
+    expect(rewrite('ts', source)).toBe(
+      '// deamericanise-ignore-start\n// the color\n// deamericanise-ignore-end\n// the colour\n',
+    );
+  });
+
+  it('keeps a change from crossing the marker between two of them', () => {
+    expect(rewrite('ts', '// It is 6\n// feet tall.\n')).toBe('// It is 6\n// feet tall.\n');
+    expect(rewrite('ts', '/**\n * It is 6\n * feet tall.\n */')).toBe('/**\n * It is 6\n * feet tall.\n */');
+  });
+
+  it('lets a change cross a line of a block comment with no star on it', () => {
+    expect(rewrite('ts', '/* It is 6\n   feet tall. */')).toBe('/* It is 1.8 metres tall. */');
+  });
+});
+
+describe('an article at the end of a comment line', () => {
+  it.each`
+    language    | source                                          | expected
+    ${'ts'}     | ${'/**\n * Use an\n * eraser here.\n */'}       | ${'/**\n * Use a\n * rubber here.\n */'}
+    ${'ts'}     | ${'// Use an\n// eraser here.\n'}               | ${'// Use a\n// rubber here.\n'}
+    ${'ts'}     | ${'/* Use an\n   eraser here. */'}              | ${'/* Use a\n   rubber here. */'}
+    ${'python'} | ${'# Use an\n# eraser here.\n'}                 | ${'# Use a\n# rubber here.\n'}
+    ${'rust'}   | ${'/// Use an\n/// eraser here.\n'}             | ${'/// Use a\n/// rubber here.\n'}
+  `('agrees with the word on the next line: $source', ({ language, source, expected }) => {
+    expect(deamericaniseCode(source, { language, preset: 'localise' }).text).toBe(expected);
+  });
+
+  it('points the article fix at its replacement on the next line', () => {
+    const source = 'const a = 1;\n/**\n * Use an\n * eraser here.\n */\n';
+    const [article, word] = deamericaniseCode(source, { language: 'ts', preset: 'localise' }).changes;
+    expect(source.slice(article!.start, article!.end)).toBe('an');
+    expect(source.slice(word!.start, word!.end)).toBe('eraser');
+    expect(article?.agreesWith).toEqual({ start: word!.start, end: word!.end });
   });
 });
 
@@ -112,6 +208,18 @@ describe('a fenced example inside a block comment', () => {
     ${'/**\n *\n *     ```text\n *     the color\n *     ```\n *\n * The color is red.\n */'}  | ${'/**\n *\n *     ```text\n *     the color\n *     ```\n *\n * The colour is red.\n */'}  | ${'a fence indented past the star'}
   `('$why', ({ source, expected }) => {
     expect(rewrite('ts', source)).toBe(expected);
+  });
+});
+
+describe('a fenced example across line comments', () => {
+  it.each`
+    language    | source                                                              | expected
+    ${'rust'}   | ${'/// ```\n/// let color = 1;\n/// ```\n'}                         | ${'/// ```\n/// let color = 1;\n/// ```\n'}
+    ${'rust'}   | ${'//! ```\n//! let color = 1;\n//! ```\n//! The color is red.\n'}  | ${'//! ```\n//! let color = 1;\n//! ```\n//! The colour is red.\n'}
+    ${'ts'}     | ${'// ```\n// the color\n// ```\n// The color is red.\n'}           | ${'// ```\n// the color\n// ```\n// The colour is red.\n'}
+    ${'python'} | ${'# ~~~\n# the color\n# ~~~\n# The color is red.\n'}               | ${'# ~~~\n# the color\n# ~~~\n# The colour is red.\n'}
+  `('$language: $source', ({ language, source, expected }) => {
+    expect(rewrite(language, source)).toBe(expected);
   });
 });
 
@@ -300,6 +408,15 @@ describe('change offsets point into the original file', () => {
     const [article, word] = deamericaniseCode(source, { language: 'ts', preset: 'localise' }).changes;
     expect(source.slice(word!.start, word!.end)).toBe('eraser');
     expect(article?.agreesWith).toEqual({ start: word!.start, end: word!.end });
+  });
+
+  it('reports positions that slice back to the original text across joined comment lines', () => {
+    const source = 'const a = 1;\n/**\n * The color\n *   of the center.\n */\n///  the color\n/// and the center\n// the gray\n';
+    const result = deamericaniseCode(source, { language: 'rust' });
+    expect(result.changes.map((c) => c.before)).toEqual(['color', 'center', 'color', 'center', 'gray']);
+    for (const change of result.changes) {
+      expect(source.slice(change.start, change.end)).toBe(change.before);
+    }
   });
 
   it('points an article fix at a converted measurement in the same file', () => {

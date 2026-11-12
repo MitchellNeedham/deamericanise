@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import remarkDeamericanise from '../src/plugins/remark.js';
 import eslintPlugin from '../src/plugins/eslint.js';
 
@@ -21,6 +21,16 @@ function flatten(node: Node): string[] {
   if (node.value !== undefined) return [node.value];
   return (node.children ?? []).flatMap(flatten);
 }
+
+const EXPECTED_DIALECTS = 'Expected one of en-AU, en-GB, en-NZ, en-IE, en-ZA, en-CA.';
+
+const REJECTED = [
+  { options: { dialect: 'en-XX' }, message: `Unknown dialect: en-XX. ${EXPECTED_DIALECTS}` },
+  { options: { dialect: 'toString' }, message: `Unknown dialect: toString. ${EXPECTED_DIALECTS}` },
+  { options: { preset: 'Localise' }, message: 'Unknown preset: Localise. Expected one of read, localise.' },
+];
+
+const VALID = [{ dialect: 'en-GB', preset: 'localise' }, { categories: { spelling: false } }, {}];
 
 describe('the remark plugin', () => {
   it.each`
@@ -107,6 +117,17 @@ describe('the remark plugin', () => {
     const tree = root(paragraph(text('the color')));
     expect(() => run(tree, { preset: 'Localise' })).toThrow('Unknown preset: Localise. Expected one of read, localise.');
   });
+
+  it.each(REJECTED)('rejects $options when attached, before any document', ({ options, message }) => {
+    expect(() => remarkDeamericanise(options as never)).toThrow(message);
+    expect(() => run(root({ type: 'code', value: 'color' }), options)).toThrow(message);
+  });
+
+  it.each(VALID)('leaves a document with no prose alone under $options', (options) => {
+    const tree = root({ type: 'code', value: 'color' }, { type: 'thematicBreak' });
+    expect(run(tree, options)).toBe(tree);
+    expect(flatten(tree)).toEqual(['color']);
+  });
 });
 
 describe('the ESLint plugin', () => {
@@ -134,10 +155,19 @@ describe('the ESLint plugin', () => {
 
   function lint(code: string, ruleOptions: unknown[] = []): Report[] {
     const reports: Report[] = [];
-    const comments = [{ type: 'Line', value: code.slice(code.indexOf('//') + 2), range: [code.indexOf('//'), code.length] }];
+    // The code under test holds no strings or regexes for a comment marker to hide in.
+    const comments = [...code.matchAll(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g)].map((match) => {
+      const line = match[0].startsWith('//');
+      return {
+        type: line ? 'Line' : 'Block',
+        value: match[0].slice(2, line ? undefined : -2),
+        range: [match.index, match.index + match[0].length],
+      };
+    });
     const context = {
       options: ruleOptions,
       sourceCode: {
+        text: code,
         getAllComments: () => comments,
         getLocFromIndex: (index: number) => ({ line: 1, column: index }),
       },
@@ -214,6 +244,28 @@ describe('the ESLint plugin', () => {
     });
   });
 
+  describe('a comment read across its lines', () => {
+    it.each`
+      code                                                           | why
+      ${'const a = 1;\n// Use `the\n// color` here.\n'}              | ${'a span that wraps across line comments'}
+      ${'/**\n * Use `the\n * color` here.\n */\n'}                  | ${'a span that wraps across the lines of a block comment'}
+      ${"/**\n * Don't use a ` here.\n *\n * Use `color`.\n */\n"}   | ${'a span after a bare star line'}
+    `('reports nothing in $why', ({ code }) => {
+      expect(lint(code)).toEqual([]);
+    });
+
+    it.each`
+      code                                         | fixed
+      ${'/**\n * Use an\n * eraser here.\n */\n'}  | ${'/**\n * Use a\n * rubber here.\n */\n'}
+      ${'// Use an\n// eraser here.\n'}            | ${'// Use a\n// rubber here.\n'}
+    `('reports an article that ends a line with the word that starts the next: $code', ({ code, fixed }) => {
+      const reports = lint(code, [{ preset: 'localise' }]);
+      expect(reports).toHaveLength(1);
+      expect(reports[0]?.data).toEqual({ before: 'an eraser', after: 'a rubber' });
+      expect(quickFix(code, reports[0]!)).toBe(fixed);
+    });
+  });
+
   it('takes rule options', () => {
     expect(lint(source, [{ categories: { spelling: false } }])).toHaveLength(0);
   });
@@ -222,6 +274,34 @@ describe('the ESLint plugin', () => {
     expect(() => lint(source, [{ preset: 'Localise' }])).toThrow(
       'Unknown preset: Localise. Expected one of read, localise.',
     );
+  });
+
+  it.each(REJECTED)('rejects $options when the rule is created, before any comment', ({ options, message }) => {
+    const getAllComments = vi.fn(() => []);
+    const context = {
+      options: [options],
+      sourceCode: { getAllComments, getLocFromIndex: () => ({ line: 1, column: 0 }) },
+      report: vi.fn(),
+    };
+    expect(() => eslintPlugin.rules.comments.create(context as never)).toThrow(message);
+    expect(getAllComments).not.toHaveBeenCalled();
+  });
+
+  it.each(VALID)('reports nothing in a file with no comments under $options', (options) => {
+    const report = vi.fn();
+    const context = {
+      options: [options],
+      sourceCode: { getAllComments: () => [], getLocFromIndex: () => ({ line: 1, column: 0 }) },
+      report,
+    };
+    const visitor = eslintPlugin.rules.comments.create(context as never) as { Program?: () => void };
+    visitor.Program?.();
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  it('takes a dialect and preset in its options', () => {
+    const reports = lint('const a = 1; // the sidewalk\n', [{ dialect: 'en-GB', preset: 'localise' }]);
+    expect(reports.map((r) => r.data)).toEqual([{ before: 'sidewalk', after: 'pavement' }]);
   });
 
   it('ships a flat-config preset', () => {

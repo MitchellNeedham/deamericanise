@@ -1,4 +1,5 @@
 import type { Precision } from '../../types.js';
+import { MONTH_PATTERN } from '../dates.js';
 
 const VULGAR: Record<string, number> = {
   '¼': 0.25, '½': 0.5, '¾': 0.75,
@@ -21,7 +22,11 @@ const LINE_BREAK = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
 /** A line that starts a new block: blank, a list item, a heading, a quote or a table row. */
 const NEW_BLOCK = String.raw`${INLINE_SPACE}*(?:${LINE_BREAK}|$|[-*+](?=\s|$)|\d+[.)](?=\s|$)|[#>|])`;
 
-const SOFT_BREAK = String.raw`${INLINE_SPACE}*${LINE_BREAK}(?!${NEW_BLOCK})${INLINE_SPACE}*`;
+// The `(?<=...)` always holds. Read backwards in a lookbehind it is tested before the
+// lookahead, and turns down a run of spaces with no line break at once, where the lookahead
+// would walk the rest of the run from every space in it.
+const SOFT_BREAK =
+  String.raw`${INLINE_SPACE}*${LINE_BREAK}(?!${NEW_BLOCK})(?<=[\n\r\v\f\u2028\u2029])${INLINE_SPACE}*`;
 
 /**
  * Whitespace inside one quantity but outside its number: on one line, or across a single
@@ -29,9 +34,17 @@ const SOFT_BREAK = String.raw`${INLINE_SPACE}*${LINE_BREAK}(?!${NEW_BLOCK})${INL
  */
 export const SOFT_SPACE = String.raw`(?:${SOFT_BREAK}|${INLINE_SPACE}*)`;
 
-/** `SOFT_SPACE` on either side of `token`, with at most one line break between them. */
+/**
+ * `SOFT_SPACE` on either side of `token`, with at most one line break between them. `token`
+ * may match nothing, but never ends in a space.
+ */
 export function softGap(token: string): string {
-  return String.raw`(?:${SOFT_SPACE}${token}${INLINE_SPACE}*|${INLINE_SPACE}*${token}${SOFT_BREAK})`;
+  // Space after the token only follows something other than space. After an empty token two
+  // runs of space would meet, and a match failing after them would try every split of the run.
+  return (
+    String.raw`(?:${SOFT_SPACE}${token}(?:(?<!${INLINE_SPACE})${INLINE_SPACE}+)?|` +
+    String.raw`${INLINE_SPACE}*${token}(?<!${INLINE_SPACE})${SOFT_BREAK})`
+  );
 }
 
 /** Recipes and older prose write their numbers out: `one cup`, `three-quarters cup`. */
@@ -130,10 +143,21 @@ const MULTIPLIED =
  * The first alternative ends every number that ends in a cardinal, so read backwards, as the
  * compound rules read the number before theirs, the pattern scans the cardinals once.
  */
-const WHOLE_WORDS =
-  String.raw`(?=an?${INLINE_SPACE}+(?:${SCALE})\b|${CARD})${NOT_IN_COMPOUND}` +
-  String.raw`(?:(?:${MULTIPLIED}${INLINE_SPACE}+(?:and${INLINE_SPACE}+|(?=${CARDINAL_WORDS}(?![\w-]))))?` +
-  String.raw`${CARDINAL_WORDS}(?!${SPACE_OR_HYPHEN}(?:${SCALE})\b)|${MULTIPLIED})`;
+function wholeWords(guard: string): string {
+  return (
+    String.raw`(?=an?${INLINE_SPACE}+(?:${SCALE})\b|${CARD})${guard}` +
+    String.raw`(?:(?:${MULTIPLIED}${INLINE_SPACE}+(?:and${INLINE_SPACE}+|(?=${CARDINAL_WORDS}(?![\w-]))))?` +
+    String.raw`${CARDINAL_WORDS}(?!${SPACE_OR_HYPHEN}(?:${SCALE})\b)|${MULTIPLIED})`
+  );
+}
+
+const WHOLE_WORDS = wholeWords(NOT_IN_COMPOUND);
+
+/**
+ * A whole number in words that may start straight after `hundred to` or `hundred and`, for
+ * the second end of a range, whose `to` or `and` places it: `one hundred to two hundred`.
+ */
+export const SECOND_END_WORDS = wholeWords('');
 
 const WORD_NUMBER = [
   String.raw`(?:${CARDINAL}|\d+)${INLINE_SPACE}+and${INLINE_SPACE}+(?:${CARD}|an?)${SPACE_OR_HYPHEN}(?:${FRAC})`,
@@ -147,11 +171,13 @@ const WORD_NUMBER = [
 export const WHOLE_NUMBER = String.raw`(?:${DIGITS}|${WHOLE_WORDS})`;
 
 /**
- * Digits only. Ranges and dimensions use this rather than the full pattern, because a
- * written-out fraction contains its own hyphen: `one-half` is one number, not a range
- * running from `one` to `half`.
+ * Digits only: `3`, `1,200`, `1 1/2`, `2-3/4`, `1½`, `3/4`. A dash joins a range only between
+ * these, because a written-out fraction contains its own hyphen: `one-half` is one number,
+ * not a range running from `one` to `half`. `2-3/4` is a mixed number only where its fraction
+ * is below one, which `parseNumber` decides.
  */
 export const NUMERIC_PATTERN = [
+  String.raw`[-−]?\d+-\d+/\d+`,
   String.raw`[-−]?(?:${DIGITS})${INLINE_SPACE}+\d+/\d+`,
   String.raw`[-−]?(?:${DIGITS})${INLINE_SPACE}*${VULGAR_CLASS}`,
   String.raw`[-−]?\d+/\d+`,
@@ -233,6 +259,13 @@ function readNumber(raw: string): number | null {
   const mixed = body.match(/^(\d+)\s+(\d+)\/(\d+)$/);
   if (mixed) return sign * (Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]));
 
+  // `1-3/2` runs from 1 to 3/2, so only a fraction below one makes a mixed number.
+  const hyphenated = body.match(/^(\d+)-(\d+)\/(\d+)$/);
+  if (hyphenated) {
+    const [numerator, denominator] = [Number(hyphenated[2]), Number(hyphenated[3])];
+    return numerator < denominator ? sign * (Number(hyphenated[1]) + numerator / denominator) : null;
+  }
+
   const fraction = body.match(/^(\d+)\/(\d+)$/);
   if (fraction) return sign * (Number(fraction[1]) / Number(fraction[2]));
 
@@ -256,18 +289,24 @@ export function significantFigures(raw: string): number {
 }
 
 /**
+ * The month and day of a date in words, as the date rules read and write it, up to where its
+ * year starts: `Oct 22, ` and `22 October `.
+ */
+const DATE_BEFORE_YEAR =
+  String.raw`\b(?:(?:${MONTH_PATTERN})\.?\s+\d{1,2}(?:st|nd|rd|th)?,\s*|` +
+  String.raw`\d{1,2}(?:st|nd|rd|th)?\s+(?:${MONTH_PATTERN})\.?\s+)`;
+
+/**
  * Where a number of a measurement may start: not inside a word or a decimal. Straight after
  * `\d-`, `\d/`, `\d,` or `\d:` it is the tail of a date or of a range written tight, of a
  * fraction, of a grouped number such as `1,005`, or the minutes of a time such as `7:30`.
+ * Straight after a currency sign it is a price, and four figures straight after `Oct 22,` or
+ * `22 October` are the year of a date. The optional space after the sign matches the
+ * currency rule, which reads `$ 5` as money.
  */
-export const NUMBER_START = String.raw`(?<![\w.]|\d[-\u2013\u2014/,:])`;
-
-/**
- * Where the first number of a range may start, beyond `NUMBER_START`: not after a currency
- * sign, where it is a price. The optional space matches the currency rule, which reads
- * `$ 5` as money.
- */
-export const RANGE_START = String.raw`(?<![$£€]\s?)`;
+export const NUMBER_START =
+  String.raw`(?<![\w.]|\d[-\u2013\u2014/,:]|[$£€]\s?)` +
+  String.raw`(?!(?=\d{4}(?!\d))(?<=${DATE_BEFORE_YEAR}))`;
 
 /** `from` or `between` before a first number, which opens a range whatever its ends. */
 const RANGE_WORD_BEFORE = /\b(?:from|between)\s+$/i;

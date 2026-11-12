@@ -1,6 +1,6 @@
-import { deamericaniseCode } from '../code.js';
+import { deamericaniseCode, UnknownLanguageError } from '../code.js';
 import { deamericaniseText } from '../transform.js';
-import { CONFIDENCES, PRESETS } from '../config.js';
+import { CONFIDENCES, PRESETS, checkOptions } from '../config.js';
 import { DIALECTS } from '../dialects/index.js';
 import type { Confidence, Dialect, Options, Preset } from '../types.js';
 
@@ -93,6 +93,7 @@ function settings(raw: unknown): Options {
     }
   }
 
+  checkOptions(options);
   return options;
 }
 
@@ -100,9 +101,10 @@ function rewrite(text: string, language: string, options: Options): string {
   if (language === 'prose') return deamericaniseText(text, { syntax: 'markdown', ...options });
   try {
     return deamericaniseCode(text, { ...options, language }).text;
-  } catch {
+  } catch (error) {
     // No lexer for this language means no comments we can find, so leave it alone.
-    return text;
+    if (error instanceof UnknownLanguageError) return text;
+    throw error;
   }
 }
 

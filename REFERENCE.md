@@ -408,10 +408,15 @@ read whole is left as written. That covers `catch-twenty-two miles`, and
 `hundred` and `thousand` multiply the count before them (`a`, `an` or a cardinal of one or
 two words), and a cardinal may follow, with or without `and`: `a hundred miles` becomes
 `160 kilometres`, `one hundred and twenty feet` becomes `37 metres`, and
-`two thousand five hundred feet` and `twenty-two hundred feet` convert too. A number never
+`two thousand five hundred feet` and `twenty-two hundred feet` convert too. The count before
+`thousand` may itself be a count of hundreds, with a cardinal after it or not, so
+`a hundred thousand miles` becomes `160,000 kilometres` and
+`two hundred and fifty thousand pounds` becomes `110 tonnes`. Straight after `between`, the
+`and` in such a count joins a range, so `between one hundred and two thousand miles` becomes
+`between 160 and 3200 kilometres`. A number never
 starts after `hundred` or `thousand` with at most a comma, `and` or `to` between, except as
-the second end of a range, so `hundreds of miles`, `a few hundred feet` and
-`a hundred thousand miles` are left as written, while
+the second end of a range, so `hundreds of miles` and `a few hundred feet` are left as
+written, while
 `between one hundred and two hundred miles` becomes `between 160 and 320 kilometres`.
 `It cost a hundred pounds.` is still money.
 
@@ -432,7 +437,8 @@ with no `between` before its `and`, so `five, ten and fifteen feet` becomes
 `1.5, 3 and 4.6 metres`. A dash joins a range only between digits, since
 `one-half` and `twenty-two` are single numbers, so `five-10 miles` is left as written. So is
 a range with a fraction in words at either end, as in `two and a half to three miles`, and
-`two to three hundred feet`, which may mean 200 to 300. `half to` is an idiom, so
+`two to three hundred feet`, which may mean 200 to 300, and
+`one hundred to two hundred thousand miles`, which may mean 100,000 to 200,000. `half to` is an idiom, so
 `reduce by half to 2 quarts` converts only the quarts.
 
 A hyphen left hanging on a range's first number, as recipes write it, joins the range with
@@ -462,6 +468,24 @@ written, unless it follows a unit or a prefix as a hyphen-minus would (see below
 
 A fraction with a zero denominator, as in `5/0 inches`, is not a quantity, so it is left as
 written, and so is a height or weight it is part of, as in `5 feet 1/0 inches`.
+
+A number grouped in thousands with spaces is one number, as one grouped with commas is: one
+to three figures, then groups of exactly three after a single space, no-break space (U+00A0)
+or narrow no-break space (U+202F), the same kind throughout. So
+`The road is 1 000 miles long.` becomes `The road is 1 600 kilometres long.`, and no
+measurement starts on a later group. One or two figures after a space are a number of their
+own, so `Rooms 3 4 feet apart` becomes `Rooms 3 1.2 metres apart`, and figures that no
+number starts at lead no group, as the `98` of `10/20/98 100 feet` does not. Before a
+hyphenated size, a number grouped with spaces is one number only after a determiner such as
+`a`, `the` or `each`, or a possessive such as `their` or `Sam's`, so `a 1 500-foot tower`
+becomes `a 460 metre tower`. Otherwise its last group is the size and the figures before it
+count the noun, so `Buy 2 100-pound bags.` becomes `Buy 2 45 kilogram bags.` After `her`,
+which may own the noun or be given it, either reading may be meant, so
+`I gave her 2 100-pound bags.` is left as written. Before a spaced
+singular unit word it may be either, so `They built 3 400 foot towers.` is left as written.
+A whole number with a leading zero is a code or a name, so
+`Agent 007 feet` and `We drove 025 miles.` are left as written, while `0` and `0.5` are
+numbers.
 
 A number never continues onto the next line, so the `14` that ends `Step 14` is never taken
 as the whole part of a `1/2 gallon` that opens the next line. The rest of a measurement can
@@ -615,6 +639,13 @@ deamericaniseText('6 feet', { units: { precision: 'exact' } });        // '1.828
 deamericaniseText('6 feet', { units: { precision: 1 } });              // '1.8 metres'
 deamericaniseText('6 feet', { units: { keepOriginal: true } });        // '1.8 metres (6 feet)'
 ```
+
+A converted number groups its thousands as its source did. From a source grouped with
+commas, four figures are grouped too, so `2,025 miles` becomes `3,259 kilometres`, while
+`2025 miles` becomes `3259 kilometres`. A source grouped with spaces gets the same kind of
+space back, so `12 500 miles` becomes `20 100 kilometres`. From a source with no separator,
+five figures and more are grouped with commas, so `12500 miles` becomes `20,100 kilometres`.
+In a range or list, one grouped figure groups them all.
 
 A measurement that already gives both values is converted once, not twice. `6 feet (1.8 m)`
 becomes `1.8 m`, keeping the figure the author rounded. That needs a bracket that restates

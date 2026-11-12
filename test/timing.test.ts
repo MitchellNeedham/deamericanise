@@ -62,6 +62,22 @@ describe.skipIf(onCi)('spans held or protected beside many changes take time in 
   );
 });
 
+describe.skipIf(onCi)('a long run of grouped numbers takes time in line with its length', () => {
+  it.each`
+    piece                                      | length  | expected
+    ${'100 '}                                  | ${4000} | ${'100 100 100 '}
+    ${'1 000 miles, '}                         | ${2000} | ${'1 600 kilometres, 1 600 kilometres, '}
+    ${'two hundred and fifty thousand feet, '} | ${1000} | ${'76 kilometres, 76 kilometres, '}
+  `(
+    '"$piece", $length times and four times that',
+    ({ piece, length, expected }) => {
+      expect(convert(piece.repeat(length)).startsWith(expected)).toBe(true);
+      expect(growth(piece.repeat(length), piece.repeat(length * 4))).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});
+
 describe.skipIf(onCi)('a long chain of weights takes time in line with its length', () => {
   // Each weight's next unit is decided by walking back along the chain, once for the text.
   // Walking back from every weight takes time in the square of the chain's length, which is
@@ -124,6 +140,8 @@ const WHITESPACE_RUNS = [
   { before: 'text-align:', name: 'spaces', run: ' ', length: 100000, after: 'center', expected: 'text-align:' },
   { before: '{%', name: 'spaces', run: ' ', length: 100000, after: 'if color %}', expected: '{%' },
   { before: 'Thanks @', name: 'spaces', run: ' ', length: 100000, after: 'gray', expected: 'Thanks @' },
+  { before: 'It is 1', name: 'spaces', run: ' ', length: 30000, after: '000 miles', expected: 'It is 1' },
+  { before: 'Walk a hundred', name: 'spaces', run: ' ', length: 3000, after: 'feet', expected: 'Walk 30 metres' },
 ];
 const whitespaceText = ({ before, run, length, after }: (typeof WHITESPACE_RUNS)[number]) =>
   `${before}${run.repeat(length)}${after}`;

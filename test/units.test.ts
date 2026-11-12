@@ -8,7 +8,7 @@ import { spellingEntries } from '../src/rules/spelling/index.js';
 import { baseVocabulary } from '../src/rules/vocabulary.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
 import { FAHRENHEIT } from '../src/rules/units/fahrenheit.js';
-import { NUMERIC_PATTERN, parseNumber } from '../src/rules/units/number.js';
+import { NUMBER_START, NUMERIC_PATTERN, parseNumber } from '../src/rules/units/number.js';
 
 const convert = (input: string, options = {}) =>
   deamericaniseText(input, { categories: { spelling: false, vocabulary: false }, ...options });
@@ -1675,6 +1675,102 @@ describe('a number that is not finite', () => {
   });
 });
 
+describe('a number grouped in thousands with spaces is one number', () => {
+  it.each`
+    input                                   | expected                                     | why
+    ${'The road is 1 000 miles long.'}      | ${'The road is 1 600 kilometres long.'}      | ${'a space between the groups'}
+    ${'It weighs 1 500 pounds.'}            | ${'It weighs 680 kilograms.'}                | ${'a result of three figures'}
+    ${'We drove 12 500 miles.'}             | ${'We drove 20 100 kilometres.'}             | ${'two figures before the group'}
+    ${'We drove 1 000 000 miles.'}          | ${'We drove 1 600 000 kilometres.'}          | ${'two groups'}
+    ${'The road is 1\u00A0000 miles long.'} | ${'The road is 1\u00A0600 kilometres long.'} | ${'a no-break space'}
+    ${'The road is 1\u202F000 miles long.'} | ${'The road is 1\u202F600 kilometres long.'} | ${'a narrow no-break space'}
+    ${'We drove 1 000 to 2 000 miles.'}     | ${'We drove 1 600 to 3 200 kilometres.'}     | ${'both ends of a range'}
+    ${'a 1 000 x 2 000 foot plot'}          | ${'a 300 x 610 metre plot'}                  | ${'both sides of a dimension'}
+    ${'The 1 000-foot tower'}               | ${'The 300 metre tower'}                     | ${'a last group that is no number on its own'}
+    ${'a 1 500-foot tower'}                 | ${'a 460 metre tower'}                       | ${'a determiner before a hyphenated size'}
+    ${'the 1 500-foot tower'}               | ${'the 460 metre tower'}                     | ${'the same, with "the"'}
+    ${'their 1 500-foot tower'}             | ${'their 460 metre tower'}                   | ${'a possessive before it'}
+    ${'Buy 2 100-pound bags.'}              | ${'Buy 2 45 kilogram bags.'}                 | ${'a count, then a hyphenated size'}
+    ${'Buy 2 100-lb bags.'}                 | ${'Buy 2 45 kg bags.'}                       | ${'the same, with an abbreviation'}
+    ${'It is 1 000 miles (1 600 km) away.'} | ${'It is 1 600 km away.'}                    | ${'a metric value grouped the same way restates it'}
+    ${'Plot 4096 500 feet wide'}            | ${'Plot 4096 150 metres wide'}               | ${'four figures lead no group'}
+    ${'We drove 1 1/2 miles.'}              | ${'We drove 2.4 kilometres.'}                | ${'a mixed number'}
+    ${'Rooms 3 4 feet apart'}               | ${'Rooms 3 1.2 metres apart'}                | ${'a single figure is no group'}
+    ${'It weighs 1,500 pounds.'}            | ${'It weighs 680 kilograms.'}                | ${'a comma between the groups'}
+    ${'It is 0.5 miles away.'}              | ${'It is 800 metres away.'}                  | ${'a decimal after a zero'}
+    ${'We drove 0 to 5 miles.'}             | ${'We drove 0 to 8 kilometres.'}             | ${'a zero'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                          | why
+    ${'We drove 025 miles.'}           | ${'a leading zero'}
+    ${'Agent 007 feet'}                | ${'the same, in a code'}
+    ${'It is 007 to 012 feet.'}        | ${'at both ends of a range'}
+    ${'It weighs 07 pounds 3 ounces.'} | ${'in a weight in two units, which stays whole'}
+    ${'They built 3 400 foot towers.'} | ${'three towers of 400 feet, or towers of 3400'}
+    ${'I gave her 2 100-pound bags.'}  | ${'"her" may own the bags or be given two of them'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    text              | numbers                  | why
+    ${'1 000'}        | ${['1 000']}             | ${'one group'}
+    ${'12 345 678'}   | ${['12 345 678']}        | ${'two groups'}
+    ${'1\u00A0500'}   | ${['1\u00A0500']}        | ${'a no-break space'}
+    ${'1 000\u00A0000'} | ${['1 000']}             | ${'one kind of space throughout'}
+    ${'3 4'}          | ${['3', '4']}            | ${'one figure after the space'}
+    ${'2024 500'}     | ${['2024', '500']}       | ${'four figures before it'}
+    ${'7:30 500'}     | ${['7', '500']}          | ${'the minutes of a time before it'}
+    ${'June 5 100'}   | ${['5', '100']}          | ${'the day of a date before it'}
+  `('reads $numbers in "$text" ($why)', ({ text, numbers }) => {
+    const reads = new RegExp(`${NUMBER_START}(?:${NUMERIC_PATTERN})`, 'gi');
+    expect(text.match(reads)).toEqual(numbers);
+  });
+
+  it.each`
+    raw               | value
+    ${'1 000'}        | ${1000}
+    ${'1\u202F000'}   | ${1000}
+    ${'12 500.5'}     | ${12500.5}
+    ${'1 000 1/2'}    | ${1000.5}
+    ${'0'}            | ${0}
+    ${'0.5'}          | ${0.5}
+    ${'007'}          | ${null}
+    ${'05 1/2'}       | ${null}
+  `('reads "$raw" as $value', ({ raw, value }) => {
+    expect(parseNumber(raw)).toBe(value);
+  });
+});
+
+describe('a converted number groups its thousands as its source did', () => {
+  it.each`
+    input                             | expected                               | why
+    ${'We drove 2,025 miles.'}        | ${'We drove 3,259 kilometres.'}        | ${'four figures from a grouped source'}
+    ${'We drove 1,500 miles.'}        | ${'We drove 2,400 kilometres.'}        | ${'the same, rounded'}
+    ${'We drove 500 to 1,500 miles.'} | ${'We drove 800 to 2,400 kilometres.'} | ${'one grouped end groups both'}
+    ${'We drove 2025 miles.'}         | ${'We drove 3259 kilometres.'}         | ${'four figures from an ungrouped source'}
+    ${'We drove 12500 miles.'}        | ${'We drove 20,100 kilometres.'}       | ${'five figures, whatever the source'}
+    ${'It is 238,855 miles away.'}    | ${'It is 384,400 kilometres away.'}    | ${'six figures'}
+    ${'It cost 2,025 dollars.'}       | ${'It cost 2,025 dollars.'}            | ${'nothing to convert'}
+    ${'in 2025'}                      | ${'in 2025'}                           | ${'a year'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    units                         | input                      | expected
+    ${{ precision: 'exact' }}     | ${'We drove 2,025 miles.'} | ${'We drove 3,258.9216 kilometres.'}
+    ${{ precision: 1 }}           | ${'We drove 2,025 miles.'} | ${'We drove 3,258.9 kilometres.'}
+    ${{ precision: 'exact' }}     | ${'We drove 1 000 miles.'} | ${'We drove 1 609.344 kilometres.'}
+    ${{ keepOriginal: true }}     | ${'We drove 2,025 miles.'} | ${'We drove 3,259 kilometres (2,025 miles).'}
+  `('$input with $units -> $expected', ({ units, input, expected }) => {
+    expect(convert(input, { units })).toBe(expected);
+  });
+});
+
 describe('a range opens only on a number that can be its first end', () => {
   it.each`
     input                                    | expected                                    | why
@@ -1825,7 +1921,7 @@ describe('a year after a preposition is not a measurement', () => {
     ${'It is 2024 miles away.'}            | ${'It is 3257 kilometres away.'}            | ${'no preposition before the number'}
     ${'We drove 2024 miles in 2024.'}      | ${'We drove 3257 kilometres in 2024.'}      | ${'the year after the unit'}
     ${'In 2024 the race was 26 miles.'}    | ${'In 2024 the race was 42 kilometres.'}    | ${'no unit after the year'}
-    ${'In 2,024 miles were driven.'}       | ${'In 3257 kilometres were driven.'}        | ${'a comma'}
+    ${'In 2,024 miles were driven.'}       | ${'In 3,257 kilometres were driven.'}       | ${'a comma'}
     ${'In 3024 miles were driven.'}        | ${'In 4867 kilometres were driven.'}        | ${'four figures too large for a year'}
     ${'In 2024-mile races they tired.'}    | ${'In 3257 kilometre races they tired.'}    | ${'a hyphen ties the number to the unit'}
     ${'In 1500 ft of water it sank.'}      | ${'In 460 m of water it sank.'}             | ${'an abbreviation'}
@@ -3479,6 +3575,7 @@ describe('a measurement in underscore emphasis', () => {
     ${'Bake at __350 degrees Fahrenheit__.'} | ${'Bake at __175 degrees Celsius__.'}     | ${'a temperature spelled out'}
     ${'Bake the cake at _350F_ today.'}     | ${'Bake the cake at _175°C_ today.'}       | ${'a bare F'}
     ${'It weighs _5 pounds_.'}              | ${'It weighs _2.3 kilograms_.'}            | ${'a weight'}
+    ${'It is _1 000 miles_ away.'}          | ${'It is _1 600 kilometres_ away.'}        | ${'a number grouped with a space'}
     ${'It is _two feet_ long.'}             | ${'It is _61 centimetres_ long.'}          | ${'a number in words'}
     ${'It is _half an inch_ thick.'}        | ${'It is _1.3 centimetres_ thick.'}        | ${'half an inch'}
     ${'It is _a mile and a half_ away.'}    | ${'It is _2.4 kilometres_ away.'}          | ${'a mile and a half'}
@@ -3785,7 +3882,6 @@ describe('a written-out number with hundred or thousand', () => {
     ${'one hundred and a half feet'}              | ${'a fraction is never what follows the multiplier'}
     ${'one hundred and twenty and a half feet'}   | ${'nor after the cardinal that follows it'}
     ${'two thousand and five hundred feet'}       | ${'"and" before a second multiplier'}
-    ${'a hundred thousand miles'}                 | ${'a multiplier counted by a multiplier'}
     ${'one thousand, two hundred feet'}           | ${'a comma between the parts'}
     ${'two hundred two-foot boards'}              | ${'two hundred boards or one length'}
     ${'one hundred twenty-foot drop'}             | ${'the same, for a tens word'}
@@ -3807,6 +3903,46 @@ describe('a written-out number with hundred or thousand', () => {
     ${'five thousand and twenty'}  | ${5020}
     ${'twenty-two hundred'}        | ${2200}
     ${'hundred'}                   | ${null}
+  `('reads "$words" as $value', ({ words, value }) => {
+    expect(parseNumber(words)).toBe(value);
+  });
+});
+
+describe('a count of hundreds before thousand', () => {
+  it.each`
+    input                                                              | expected                                    | why
+    ${'a hundred thousand miles'}                                      | ${'160,000 kilometres'}                     | ${'counted by "a hundred"'}
+    ${'two hundred and fifty thousand pounds of steel'}                | ${'110 tonnes of steel'}                    | ${'with "and" in the count'}
+    ${'one hundred twenty thousand feet'}                              | ${'37 kilometres'}                          | ${'without "and"'}
+    ${'a hundred and fifty thousand miles'}                            | ${'240,000 kilometres'}                     | ${'"a hundred and" a cardinal'}
+    ${'two hundred thousand five hundred feet'}                        | ${'61 kilometres'}                          | ${'hundreds after the thousands'}
+    ${'between two hundred thousand and three hundred thousand miles'} | ${'between 320,000 and 480,000 kilometres'} | ${'both ends of a range'}
+    ${'between one hundred and two thousand miles'}                    | ${'between 160 and 3200 kilometres'}        | ${'after "between", "and" joins the range'}
+    ${'a hundred miles'}                                               | ${'160 kilometres'}                         | ${'a count of hundreds alone'}
+    ${'two thousand five hundred feet'}                                | ${'760 metres'}                             | ${'hundreds after thousands'}
+    ${'twenty-two hundred feet'}                                       | ${'670 metres'}                             | ${'a count of two words'}
+    ${'between one hundred and two hundred miles'}                     | ${'between 160 and 320 kilometres'}         | ${'a range of hundreds'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                               | why
+    ${'between one hundred and two hundred thousand miles'} | ${'no one number, and a range that may mean thousands at both ends'}
+    ${'one hundred to two hundred thousand miles'}          | ${'which may mean 100,000 to 200,000'}
+    ${'two to three hundred thousand miles'}                | ${'which may mean 200,000 to 300,000'}
+    ${'It cost a hundred thousand pounds.'}                 | ${'money'}
+    ${'hundreds of thousands of miles'}                     | ${'a plural is not a number'}
+    ${'one hundred thousand two-foot boards'}               | ${'a count of boards or one length'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    words                               | value
+    ${'a hundred thousand'}             | ${100000}
+    ${'two hundred and fifty thousand'} | ${250000}
+    ${'one hundred twenty thousand'}    | ${120000}
   `('reads "$words" as $value', ({ words, value }) => {
     expect(parseNumber(words)).toBe(value);
   });
@@ -3946,7 +4082,7 @@ describe('a fraction after a counted unit', () => {
 describe('tons, when the document says which kind', () => {
   it.each`
     input                                                        | expected                                                     | why
-    ${'The mine ships 5,000 tons a year.'}                       | ${'The mine ships 4500 tonnes a year.'}                      | ${'a US document means short tons'}
+    ${'The mine ships 5,000 tons a year.'}                       | ${'The mine ships 4,500 tonnes a year.'}                     | ${'a US document means short tons'}
     ${'Data in thousand metric tons. The mine ships 5,000 tons.'} | ${'Data in thousand metric tons. The mine ships 5,000 tons.'} | ${'this one already said metric'}
     ${'Figures in tonnes. It moved 900 tons.'}                   | ${'Figures in tonnes. It moved 900 tons.'}                    | ${'same'}
   `('$why', ({ input, expected }) => {

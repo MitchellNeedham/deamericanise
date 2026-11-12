@@ -203,6 +203,30 @@ describe('a weight in two units is one weight', () => {
   });
 });
 
+describe('a weight in two units that describes a noun stays singular', () => {
+  it.each`
+    input                         | expected                    | why
+    ${'7 pound 8 ounce babies'}   | ${'3.4 kilogram babies'}    | ${'the singular after a number above one'}
+    ${'7-pound 8-ounce babies'}   | ${'3.4 kilogram babies'}    | ${'a hyphen ties the number to the unit'}
+    ${'7 pound 1 ounce babies'}   | ${'3.2 kilogram babies'}    | ${'the pound is singular after seven'}
+    ${'our 8 pound 1 ounce baby'} | ${'our 3.66 kilogram baby'} | ${'the same, after a word that is no determiner'}
+    ${'11 stone 4 pound men'}     | ${'71.7 kilogram men'}      | ${'stone and pounds'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                   | expected
+    ${'a 7 pound 8 ounce baby'}             | ${'a 3.4 kilogram baby'}
+    ${'the 7 pound 8 ounce babies'}         | ${'the 3.4 kilogram babies'}
+    ${'7 pounds 8 ounces'}                  | ${'3.4 kilograms'}
+    ${'7 pounds 8 ounces of flour'}         | ${'3.4 kilograms of flour'}
+    ${'She was 7 pound 8 ounce when born.'} | ${'She was 3.4 kilograms when born.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
 describe('a measurement in two units reads its first number whole', () => {
   it.each`
     input                                      | expected                          | why
@@ -2562,6 +2586,79 @@ describe('a singular unit after a number above one describes the noun after it',
     ${'Dig 3 foot so it drains'}    | ${'Dig 91 centimetres so it drains'} | ${'nor is "so"'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a length that gives the size of a noun describes it', () => {
+  it.each`
+    input                                    | expected                                           | why
+    ${'a 6 foot long table'}                 | ${'a 1.8 metre long table'}                        | ${'a size between the unit and the noun'}
+    ${'the 9 inch high wall'}                | ${'the 23 centimetre high wall'}                   | ${'the same'}
+    ${'a 6-foot-tall fence'}                 | ${'a 1.8 metre tall fence'}                        | ${'hyphenated'}
+    ${'a 3 inch-thick steak'}                | ${'a 7.6 centimetre thick steak'}                  | ${'a hyphen after the unit only'}
+    ${'a 6-ft-tall fence'}                   | ${'a 1.8 m tall fence'}                            | ${'an abbreviation'}
+    ${'a 2 to 3 foot long table'}            | ${'a 61 to 91 centimetre long table'}              | ${'a range'}
+    ${'the 5-6 inch deep pans'}              | ${'the 13-15 centimetre deep pans'}                | ${'a range with a dash'}
+    ${'a 2 to 3-foot-long table'}            | ${'a 61 to 91 centimetre long table'}              | ${'a hyphenated range'}
+    ${'cut into 1/2 inch thick slices'}      | ${'cut into 1.3 centimetre thick slices'}          | ${'a fraction, which gives the size whatever its number'}
+    ${'one foot long boards'}                | ${'30 centimetre long boards'}                     | ${'and one'}
+    ${'a quarter mile long track'}           | ${'a 400 metre long track'}                        | ${'the article stays with the track'}
+    ${'two quarter-mile-long tracks'}        | ${'two 400 metre long tracks'}                     | ${'a count stays out of the size'}
+    ${'a 6 foot long by 3 foot wide table'}  | ${'a 1.8 metre long by 91 centimetre wide table'}  | ${'two sizes'}
+    ${'a 6 foot long and 3 foot wide table'} | ${'a 1.8 metre long and 91 centimetre wide table'} | ${'two sizes joined by "and"'}
+    ${'those 4 by 6 inch thick boards'}      | ${'those 10 by 15 centimetre thick boards'}        | ${'a dimension'}
+    ${'The fence is 6-foot-tall.'}           | ${'The fence is 1.8 metres tall.'}                 | ${'a hyphenated size with no noun'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                      | expected                                          | why
+    ${'6 feet long'}                           | ${'1.8 metres long'}                              | ${'no noun after the size'}
+    ${'Roll it 1/16 inch thick.'}              | ${'Roll it 1.6 millimetres thick.'}               | ${'the same'}
+    ${'a 9 inch deep-dish pie'}                | ${'a 23 centimetre deep-dish pie'}                | ${'a hyphen makes a modifier of "deep"'}
+    ${'They stood 6 feet apart'}               | ${'They stood 1.8 metres apart'}                  | ${'an adverb'}
+    ${'He is 6 foot tall.'}                    | ${'He is 1.8 metres tall.'}                       | ${'a size and a full stop'}
+    ${'The track is a quarter mile long.'}     | ${'The track is 400 metres long.'}                | ${'the article goes to the number'}
+    ${'a 6 feet long table'}                   | ${'a 1.8 metres long table'}                      | ${'a plural source stays plural'}
+    ${'Roll the dough 1/4 inch thick and cut'} | ${'Roll the dough 6.4 millimetres thick and cut'} | ${'a conjunction after the size'}
+    ${'1 pound thick bacon'}                   | ${'450 grams thick bacon'}                        | ${'only a length gives a size'}
+    ${'2 pound thick steaks'}                  | ${'910 grams thick steaks'}                       | ${'the same'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                       | expected
+    ${'He is 6 foot tall now.'}                 | ${'He is 1.8 metres tall now.'}
+    ${'He is 6 foot now.'}                      | ${'He is 1.8 metres now.'}
+    ${'The board is 6 foot long overall.'}      | ${'The board is 1.8 metres long overall.'}
+    ${'The snow lay 2 foot deep everywhere.'}   | ${'The snow lay 61 centimetres deep everywhere.'}
+    ${'The wall is 6 foot high here.'}          | ${'The wall is 1.8 metres high here.'}
+    ${'Slice it 1/4 inch thick crosswise.'}     | ${'Slice it 6.4 millimetres thick crosswise.'}
+    ${'a wall 6 foot high beside the road'}     | ${'a wall 1.8 metres high beside the road'}
+    ${'He stood 6 foot tall like his father.'}  | ${'He stood 1.8 metres tall like his father.'}
+    ${'a hedge 6 foot high which needs a trim'} | ${'a hedge 1.8 metres high which needs a trim'}
+  `('reads an adverb, preposition or pronoun after a size as no noun: $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('reads three sizes as the size of the noun after them', () => {
+    expect(convert('a 6 foot long by 3 foot wide by 2 foot high table')).toBe(
+      'a 1.8 metre long by 91 centimetre wide by 61 centimetre high table',
+    );
+  });
+
+  it('reads two sizes with no noun after them as quantities', () => {
+    expect(convert('The table is 6 foot long and 3 foot wide.')).toBe(
+      'The table is 1.8 metres long and 91 centimetres wide.',
+    );
+  });
+
+  it('keeps the original before the size', () => {
+    expect(convert('a 6-foot-tall fence', { units: { keepOriginal: true } })).toBe(
+      'a 1.8 metre (6-foot) tall fence',
+    );
   });
 });
 

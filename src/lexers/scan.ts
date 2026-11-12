@@ -37,6 +37,11 @@ export interface LexerSpec {
   strings: StringSpec[];
   /** Skip `/regex/` literals so the slashes inside them are not read as comments. */
   regexLiterals?: boolean;
+  /**
+   * The markup its comments and docstrings are written in. Defaults to `markdown`. Under `rst`,
+   * a line of tildes underlines a heading rather than opening a code fence.
+   */
+  docMarkup?: 'markdown' | 'rst';
 }
 
 /** A `/` opens a regex only where a value is expected, never after one. */

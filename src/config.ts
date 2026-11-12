@@ -1,5 +1,5 @@
 import { toPatterns } from './engine/protect.js';
-import type { Category, Confidence, LexEntry, Options, Preset, ResolvedOptions } from './types.js';
+import type { Category, Confidence, LexEntry, Options, Preset, ResolvedOptions, Syntax } from './types.js';
 import { dialectPack } from './dialects/index.js';
 
 export const CATEGORIES: Category[] = [
@@ -9,6 +9,8 @@ export const CATEGORIES: Category[] = [
 export const CONFIDENCES: Confidence[] = ['safe', 'moderate', 'risky'];
 
 export const PRESETS: Preset[] = ['read', 'localise'];
+
+export const SYNTAXES: Syntax[] = ['markdown', 'text'];
 
 /**
  * What each preset switches on.
@@ -41,6 +43,9 @@ export function resolveOptions(options: Options = {}, defaults: Partial<Options>
   const merged = { ...defaults, ...options };
   const preset = merged.preset ?? 'read';
   if (!PRESETS.includes(preset)) throw new Error(`Unknown preset: ${preset}. Expected one of ${PRESETS.join(', ')}.`);
+  if (merged.syntax !== undefined && !SYNTAXES.includes(merged.syntax)) {
+    throw new Error(`Unknown syntax: ${merged.syntax}. Expected one of ${SYNTAXES.join(', ')}.`);
+  }
   const fromPreset = PRESET_CATEGORIES[preset];
   // An explicit category always wins over the preset that suggested it.
   const categories = Object.fromEntries(
@@ -64,7 +69,8 @@ export function resolveOptions(options: Options = {}, defaults: Partial<Options>
     protectIdentifiers: merged.protectIdentifiers ?? false,
     protectCommentedCode: merged.protectCommentedCode ?? merged.protectIdentifiers ?? false,
     commentMarkers: [],
-    markdownFences: true,
+    syntax: merged.syntax,
+    parsed: false,
     unitsKeep: merged.unitsKeep ?? [],
     assumeAmerican: merged.assumeAmerican,
     minAmericanConfidence: merged.minAmericanConfidence ?? 0.5,

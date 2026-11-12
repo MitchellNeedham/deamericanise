@@ -79,7 +79,8 @@ const rule = {
     return {
       Program(): void {
         for (const comment of joinComments(sourceCode.text, sourceComments(sourceCode))) {
-          const resolved = resolveOptions({ protectIdentifiers: true, ...options });
+          // A comment follows its language's doc markup, as in `deamericaniseCode`, never `syntax`.
+          const resolved = resolveOptions({ protectIdentifiers: true, ...options, syntax: undefined });
           const found = transformProse(comment.text, resolved, comment.boundaries).changes;
           const changes = changesInSource(comment, found);
           const rangeOf = (change: Change): [number, number] => [change.start, change.end];

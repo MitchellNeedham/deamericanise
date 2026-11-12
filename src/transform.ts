@@ -40,7 +40,8 @@ export function findChanges({ text, options, signals, boundaries = [] }: Transfo
     identifiers: options.protectIdentifiers,
     commentedCode: options.protectCommentedCode,
     commentMarkers: options.commentMarkers,
-    markdownFences: options.markdownFences,
+    syntax: options.syntax,
+    parsed: options.parsed,
     extra: options.protect,
   });
   ranges.push(...boundaries);

@@ -1,13 +1,13 @@
 import { readFileSync, statSync, writeFileSync, readdirSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { parseArgs } from 'node:util';
-import { CATEGORIES, CONFIDENCES, PRESETS, matchesRuleId } from './config.js';
+import { CATEGORIES, CONFIDENCES, PRESETS, SYNTAXES, matchesRuleId } from './config.js';
 import { DIALECTS, isDialect } from './dialects/index.js';
 import { PROSE_EXTENSIONS, languageNames, lexerFor } from './lexers/index.js';
 import { ruleIds } from './rules/catalogue.js';
 import { MEASURES } from './rules/units/definitions.js';
 import { deamericaniseFile, isKnownLanguage } from './code.js';
-import type { Category, Change, Confidence, Dialect, Options, Preset, Precision } from './types.js';
+import type { Category, Change, Confidence, Dialect, Options, Preset, Precision, Syntax } from './types.js';
 
 /** Replaced at build time from package.json, which CI stamps from the release tag. */
 declare const __VERSION__: string;
@@ -59,6 +59,9 @@ Files
                          A named file of unknown type, such as settings.json, is skipped
                          unless this is given. --language md reads it as prose, and
                          --language json reads only its comments.
+      --syntax <name>    ${SYNTAXES.join(' | ')}: the markup of stdin and prose files.
+                         Defaults to the file's type, and to text for stdin.
+                         markdown also leaves indented code blocks alone.
       --docstrings       Also rewrite Python docstrings
       --no-code-guard    Rewrite comment lines that look like commented-out code too
       --list-languages   Print every language name --language accepts
@@ -197,6 +200,7 @@ export async function main(argv: string[]): Promise<number> {
         precision: { type: 'string' },
         'units-keep': { type: 'string' },
         language: { type: 'string' },
+        syntax: { type: 'string' },
         docstrings: { type: 'boolean' },
         'no-code-guard': { type: 'boolean' },
         'list-languages': { type: 'boolean' },
@@ -243,6 +247,9 @@ export async function main(argv: string[]): Promise<number> {
 
   const language = values.language;
   if (language !== undefined && !isKnownLanguage(language)) fail(`unknown language "${language}". Try --list-languages.`);
+
+  const syntax = values.syntax as Syntax | undefined;
+  if (syntax !== undefined && !SYNTAXES.includes(syntax)) fail(`unknown syntax "${syntax}". Known: ${SYNTAXES.join(', ')}`);
 
   const only = list(values.only) as Category[];
   const off = list(values.off) as Category[];
@@ -298,6 +305,7 @@ export async function main(argv: string[]): Promise<number> {
     },
     unitsKeep,
     ...(values['no-code-guard'] ? { protectCommentedCode: false } : {}),
+    ...(syntax !== undefined ? { syntax } : {}),
   };
   const fileOptions = {
     ...options,

@@ -124,6 +124,9 @@ export interface CurrencyOptions {
  */
 export type Preset = 'read' | 'localise';
 
+/** The markup a text is written in: Markdown, or plain text such as `.txt` or reStructuredText. */
+export type Syntax = 'markdown' | 'text';
+
 export interface Options {
   /** Defaults to `en-AU`. */
   dialect?: Dialect;
@@ -166,6 +169,13 @@ export interface Options {
    * dates such as `3/14/2024` ignore this. Defaults to 0.5.
    */
   minAmericanConfidence?: number;
+  /**
+   * The markup the text is written in. `markdown` also leaves indented code blocks alone.
+   * `text` reads no CommonMark fences, so a line of tildes under a heading is prose, and three
+   * backticks protect everything up to the next three. Left out, the syntax is unknown: fences
+   * are read as CommonMark reads them, and an indented line is prose.
+   */
+  syntax?: Syntax;
 }
 
 export interface ResolvedOptions {
@@ -180,12 +190,13 @@ export interface ResolvedOptions {
   protectCommentedCode: boolean;
   /** The host language's line-comment markers, set when transforming a source file. */
   commentMarkers: string[];
+  /** The text's markup, or `undefined` when it is unknown. */
+  syntax: Syntax | undefined;
   /**
-   * Read code fences by CommonMark's rule, where a line of backticks or tildes opens one. Off
-   * when transforming a prose file that is not Markdown, such as `.rst` or `.txt`, where a line
-   * of tildes underlines a heading: there three backticks protect everything up to the next three.
+   * Set by the remark plugin: the text is a node of a parsed document, so the parser has
+   * already taken out every code span and code block, and a backtick left in it is literal.
    */
-  markdownFences: boolean;
+  parsed: boolean;
   unitsKeep: string[];
   units: Required<UnitOptions> & { enabled: boolean };
   dates: Required<DateOptions> & { enabled: boolean };

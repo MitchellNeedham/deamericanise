@@ -26,6 +26,7 @@ export type {
   Result,
   Rule,
   RuleContext,
+  Syntax,
   TimeOptions,
   UnitOptions,
 } from './types.js';

@@ -1,6 +1,6 @@
-import { checkOptions } from '../config.js';
+import { checkOptions, resolveOptions } from '../config.js';
 import { detectAmerican } from '../engine/detect.js';
-import { deamericanise } from '../transform.js';
+import { transformProse } from '../transform.js';
 import type { Change, Options } from '../types.js';
 
 interface Node {
@@ -45,13 +45,14 @@ export default function remarkDeamericanise(options: RemarkOptions = {}) {
 
     // One verdict for the whole document; a single sentence is not enough to judge.
     const signals = detectAmerican(nodes.map((n) => n.value).join('\n'));
-    const resolved: Options = {
+    const resolved = resolveOptions({
       assumeAmerican: signals.confidence >= (transformOptions.minAmericanConfidence ?? 0.5),
       ...transformOptions,
-    };
+    });
+    resolved.parsed = true;
 
     for (const node of nodes) {
-      const result = deamericanise(node.value as string, resolved);
+      const result = transformProse(node.value as string, resolved);
       if (result.changes.length === 0) continue;
       if (onChange) for (const change of result.changes) onChange(change, node);
       node.value = result.text;

@@ -67,6 +67,22 @@ describe('the remark plugin', () => {
     ]);
   });
 
+  it.each`
+    input                                  | expected
+    ${'Wrap it in `the color` quotes.'}    | ${'Wrap it in `the colour` quotes.'}
+    ${'Wrap it in `the\ncolor` quotes.'}   | ${'Wrap it in `the\ncolour` quotes.'}
+    ${'```\nthe color\n```'}               | ${'```\nthe colour\n```'}
+    ${'~~~\nthe color'}                     | ${'~~~\nthe colour'}
+  `('reads a backtick or tilde left in a text node as literal: $input', ({ input, expected }) => {
+    const tree = root(paragraph(text(input as string)));
+    expect(flatten(run(tree, { assumeAmerican: true, syntax: 'markdown' }))).toEqual([expected]);
+  });
+
+  it('still protects a URL and an email address in a text node', () => {
+    const tree = root(paragraph(text('See https://example.com/color or color@favorite.org for `the color`.')));
+    expect(flatten(run(tree))).toEqual(['See https://example.com/color or color@favorite.org for `the colour`.']);
+  });
+
   it('judges American-ness across the whole document, not one node at a time', () => {
     const tree = root(
       paragraph(text('The color of the theater is gray and they canceled it.')),
@@ -161,6 +177,10 @@ describe('the ESLint plugin', () => {
     visitor.Program?.();
     return reports;
   }
+
+  it('reads a comment as its language documents it, whatever syntax says', () => {
+    expect(lint('const a = 1; // ~~~ the color\n', [{ syntax: 'text' }])).toEqual([]);
+  });
 
   it('declares itself fixable with a message and a schema', () => {
     expect(eslintPlugin.rules.comments.meta.fixable).toBe('code');

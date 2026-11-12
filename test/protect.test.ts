@@ -167,6 +167,59 @@ describe('inline code, read the way CommonMark reads it', () => {
   });
 });
 
+describe('indented code in Markdown, read the way CommonMark reads it', () => {
+  const md = (input: string) => au(input, { syntax: 'markdown' });
+
+  it.each`
+    input                                                              | expected                                                            | why
+    ${'The color.\n\n    const color = 1;\n'}                          | ${'The colour.\n\n    const color = 1;\n'}                          | ${'a block after a blank line'}
+    ${'The color.\n\n\tconst color = 1;'}                              | ${'The colour.\n\n\tconst color = 1;'}                              | ${'a tab is four columns'}
+    ${'# Color\n    const color = 1;'}                                 | ${'# Colour\n    const color = 1;'}                                 | ${'a block straight after a heading'}
+    ${'Color\n---\n    const color = 1;'}                              | ${'Colour\n---\n    const color = 1;'}                              | ${'or a setext heading'}
+    ${'```\nx\n```\n    const color = 1;\nThe color.'}                 | ${'```\nx\n```\n    const color = 1;\nThe colour.'}                 | ${'or a fence, and the next line at the margin ends it'}
+    ${'The color.\n\n    a = color;\n\n    b = color;\n\nThe color.'}  | ${'The colour.\n\n    a = color;\n\n    b = color;\n\nThe colour.'}  | ${'a blank line inside a block'}
+    ${'> The color.\n>\n>     const color = 1;'}                       | ${'> The colour.\n>\n>     const color = 1;'}                       | ${'a block in a quote'}
+    ${'1. The color.\n\n       const color = 1;'}                      | ${'1. The colour.\n\n       const color = 1;'}                      | ${'four columns past a list item'}
+    ${'-     const color = 1;\n\n  The color.'}                        | ${'-     const color = 1;\n\n  The colour.'}                        | ${'five spaces after a list marker'}
+    ${'- The color.\n\nThe color.\n\n    const color = 1;'}            | ${'- The colour.\n\nThe colour.\n\n    const color = 1;'}            | ${'after a list has ended'}
+    ${'The color.\r\n\r\n    const color = 1;\r\nThe color.'}          | ${'The colour.\r\n\r\n    const color = 1;\r\nThe colour.'}          | ${'Windows line endings'}
+  `('$why', ({ input, expected }) => {
+    expect(md(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                    | expected                                                  | why
+    ${'- The color\n    is red.'}                            | ${'- The colour\n    is red.'}                            | ${'a list item that wraps'}
+    ${'1.  Step one.\n\n    More about the color.'}          | ${'1.  Step one.\n\n    More about the colour.'}          | ${"a list item's second paragraph"}
+    ${'- a\n  - The color.\n\n    More color.'}              | ${'- a\n  - The colour.\n\n    More colour.'}              | ${"a nested list item's second paragraph"}
+    ${'The color\n    is red.'}                              | ${'The colour\n    is red.'}                              | ${'a paragraph that wraps, since indented code cannot interrupt one'}
+    ${'> The color\n    is red.'}                            | ${'> The colour\n    is red.'}                            | ${'a lazy line of a quote'}
+    ${'The color.\n\n~~~\nconst color = 1;\n~~~\n'}          | ${'The colour.\n\n~~~\nconst color = 1;\n~~~\n'}          | ${'a tilde fence'}
+    ${'````\n```\nconst color = 1;\n```\n````\nThe color.'}  | ${'````\n```\nconst color = 1;\n```\n````\nThe colour.'}  | ${'a four-backtick fence holding a three-backtick one'}
+    ${'The color.\n\n```js\nconst color = 1;\n'}            | ${'The colour.\n\n```js\nconst color = 1;\n'}            | ${'a fence that never closes'}
+  `('reads $why as before', ({ input, expected }) => {
+    expect(md(input)).toBe(expected);
+  });
+
+  it('rewrites indented code when the syntax is unknown or plain text, as before', () => {
+    const input = 'The color.\n\n    const color = 1;\n';
+    expect(au(input)).toBe('The colour.\n\n    const colour = 1;\n');
+    expect(au(input, { syntax: 'text' })).toBe('The colour.\n\n    const colour = 1;\n');
+  });
+
+  it('reads no CommonMark fences in plain text, so a tilde heading underline is prose', () => {
+    const rst = 'Colors\n~~~~~~\n\nThe color of things.\n\nBehavior\n~~~~~~~~\n';
+    expect(au(rst, { syntax: 'text' })).toBe('Colours\n~~~~~~\n\nThe colour of things.\n\nBehaviour\n~~~~~~~~\n');
+    expect(au('The color.\n\n```\nconst color = 1;\n```\n', { syntax: 'text' })).toBe(
+      'The colour.\n\n```\nconst color = 1;\n```\n',
+    );
+  });
+
+  it('names an unknown syntax rather than ignoring it', () => {
+    expect(() => au('the color', { syntax: 'md' })).toThrow('Unknown syntax: md. Expected one of markdown, text.');
+  });
+});
+
 describe('identifier protection, for comments in source files', () => {
   it.each`
     unchanged                    | why

@@ -25,7 +25,7 @@ interface Wrapped {
   module: string;
   /** Known ahead of time, so the parser can be declared without loading anything. */
   astFormat: string;
-  /** A language id from this package's lexer registry, or `prose`. */
+  /** A language id from this package's lexer registry, or `prose` for Markdown. */
   language: string;
 }
 
@@ -98,7 +98,7 @@ function settings(raw: unknown): Options {
 }
 
 function rewrite(text: string, language: string, options: Options): string {
-  if (language === 'prose') return deamericaniseText(text, options);
+  if (language === 'prose') return deamericaniseText(text, { syntax: 'markdown', ...options });
   try {
     return deamericaniseCode(text, { ...options, language }).text;
   } catch (error) {

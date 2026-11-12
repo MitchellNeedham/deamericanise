@@ -217,14 +217,6 @@ const follows =
   (v: Violation): boolean =>
     v.change !== undefined && pattern.test(v.text.slice(v.change.end));
 
-/** A second run starts a measurement on the year a first run wrote into a date in words. */
-const startsOnWrittenOutYear = (v: Violation): boolean =>
-  v.change?.category === 'units' &&
-  v.origin?.category === 'dates' &&
-  /[A-Za-z]/.test(v.origin.after) &&
-  /^\d{4}\b/.test(v.change.before) &&
-  v.origin.after.endsWith(v.change.before.slice(0, 4));
-
 const VOCABULARY = [...baseVocabulary(), ...Object.values(DIALECTS).flatMap((pack) => pack.vocabulary)];
 
 /** Must match `CONTEXT_WINDOW` in src/engine/lexicon.ts. */
@@ -341,43 +333,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
       v.origin === undefined &&
       (v.previous !== undefined || v.next !== undefined) &&
       (v.change?.category === 'vocabulary' || v.change?.category === 'spelling'),
-  },
-  {
-    issue: 197,
-    property: 'idempotence',
-    input: 'Oct 22, 2024 1/2 inch long',
-    options: localise,
-    matches: startsOnWrittenOutYear,
-  },
-  {
-    issue: 197,
-    property: 'idempotence',
-    input: 'March 13, 2024 - 250 feet',
-    options: localise,
-    matches: startsOnWrittenOutYear,
-  },
-  {
-    issue: 197,
-    property: 'idempotence',
-    input: '1/29/24 in. the ',
-    options: { dates: { format: 'long' }, times: { to24Hour: true } },
-    matches: startsOnWrittenOutYear,
-  },
-  {
-    issue: 198,
-    property: 'idempotence',
-    input: 'It was $1,000 1/2 inch wide.',
-    options: american,
-    // The amount a first run read as a measurement takes the currency mark on the second.
-    matches: (v) => {
-      const amount = /^\$\s?(\d[\d,]*(?:\.\d+)?)/.exec(v.change?.before ?? '')?.[1];
-      return (
-        v.change?.category === 'currency' &&
-        v.origin?.category === 'units' &&
-        amount !== undefined &&
-        v.origin.after.startsWith(amount)
-      );
-    },
   },
   {
     issue: 186,
@@ -683,6 +638,10 @@ describe('inputs that once broke a property', () => {
     ['Bought 3/14/2024 1/2 gallon of milk.', american],
     ['1/13/2024 1/2" ', { dates: { format: 'long' } }],
     ['September 2, 2024 - 202 1/2" ', localise],
+    ['Oct 22, 2024 1/2 inch long', localise],
+    ['March 13, 2024 - 250 feet', localise],
+    ['1/29/24 in. the ', { dates: { format: 'long' }, times: { to24Hour: true } }],
+    ['It was $1,000 1/2 inch wide.', american],
   ] satisfies Array<[string, CodeOptions]>)('%j with %j', (input, options) => {
     expect(violations(input, options)).toEqual([]);
   });

@@ -498,6 +498,81 @@ describe('a range opens only on a number that can be its first end', () => {
   });
 });
 
+describe('the year of a written-out date is not a measurement', () => {
+  const localise = { preset: 'localise' } as const;
+
+  it.each`
+    input                                  | expected                                    | why
+    ${'Oct 22, 2024 1/2 inch long'}        | ${'22 October 2024 1.3 centimetres long'}   | ${'a fraction after a date it rewrites'}
+    ${'22 October 2024 1/2 inch long'}     | ${'22 October 2024 1.3 centimetres long'}   | ${'a fraction after a date written day first'}
+    ${'22nd October 2024 1/2 inch long'}   | ${'22nd October 2024 1.3 centimetres long'} | ${'a day written as an ordinal'}
+    ${'October 22, 1850 1/2 inch long'}    | ${'October 22, 1850 1.3 centimetres long'}  | ${'a year the date rule leaves'}
+    ${'March 13, 2024 - 250 feet'}         | ${'13 March 2024 - 76 metres'}              | ${'a range after a date it rewrites'}
+    ${'13 March 2024 - 250 feet'}          | ${'13 March 2024 - 76 metres'}              | ${'a range after a date written day first'}
+    ${'Oct. 22nd, 2024 - 250 feet'}        | ${'22 October 2024 - 76 metres'}            | ${'an abbreviated month with a stop'}
+    ${'13 march 2024 - 250 feet'}          | ${'13 march 2024 - 76 metres'}              | ${'a month in lower case'}
+    ${'22 October 2024 - 350°F'}           | ${'22 October 2024 - 175°C'}                | ${'a temperature range'}
+  `('converts the quantity alone after $why', ({ input, expected }) => {
+    expect(convert(input, localise)).toBe(expected);
+  });
+
+  it.each([
+    ['Oct 22, 2024 1/2 inch long', localise],
+    ['March 13, 2024 - 250 feet', localise],
+    ['1/29/24 in. the ', { dates: { format: 'long' } }],
+  ] as const)('runs twice on %j', (input, options) => {
+    const once = convert(input, options);
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each`
+    input                                          | expected                                          | why
+    ${'In May 5-10 feet of snow fell.'}            | ${'In May 1.5-3 metres of snow fell.'}            | ${'a range after a bare month'}
+    ${'On March 13, 2024 - 25 feet of snow fell.'} | ${'On 13 March 2024 - 7.6 metres of snow fell.'}  | ${'a range refused by its size'}
+    ${'March 5, 2024'}                             | ${'5 March 2024'}                                 | ${'the date itself'}
+    ${'On Oct 22, 5 feet of snow fell.'}           | ${'On Oct 22, 1.5 metres of snow fell.'}          | ${'a number too short to be a year'}
+    ${'On 22 October 5 feet of snow fell.'}        | ${'On 22 October 1.5 metres of snow fell.'}       | ${'the same, after a date written day first'}
+  `('still converts $why', ({ input, expected }) => {
+    expect(convert(input, localise)).toBe(expected);
+  });
+});
+
+describe('a price is not a measurement', () => {
+  const american = { assumeAmerican: true } as const;
+
+  it.each`
+    unchanged                     | why
+    ${'Buy a $5 gallon of milk.'} | ${'a price before a unit word'}
+    ${'A $20 pound of coffee.'}   | ${'the same, before pound'}
+    ${'It costs $ 5 gallons.'}    | ${'a space after the sign'}
+    ${'A €5 gallon of milk.'}     | ${'another currency sign'}
+    ${'A $5 x 10 foot tarp.'}     | ${'a price before a dimension'}
+    ${'It cost $350°F.'}          | ${'a price before a temperature'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                             | expected
+    ${'Buy a $5 gallon of milk.'}     | ${'Buy a US$5 gallon of milk.'}
+    ${'A $5 x 10 foot tarp.'}         | ${'A US$5 x 10 foot tarp.'}
+    ${'It was $1,000 1/2 inch wide.'} | ${'It was US$1,000 1.3 centimetres wide.'}
+  `('leaves "$input" to the currency rule', ({ input, expected }) => {
+    const once = convert(input, american);
+    expect(once).toBe(expected);
+    expect(convert(once, american)).toBe(once);
+  });
+
+  it.each`
+    input                                  | expected                                     | options
+    ${'Price $5 - 10 inches long.'}        | ${'Price US$5 - 25 centimetres long.'}       | ${american}
+    ${'It cost $20 for 5 pounds of beef.'} | ${'It cost $20 for 2.3 kilograms of beef.'}  | ${{}}
+    ${'5 gallons'}                         | ${'19 litres'}                               | ${{}}
+  `('still converts "$input"', ({ input, expected, options }) => {
+    expect(convert(input, options)).toBe(expected);
+  });
+});
+
 describe('the minutes of a clock time are not a measurement', () => {
   it.each`
     unchanged                                | why

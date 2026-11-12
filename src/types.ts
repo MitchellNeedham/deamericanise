@@ -203,6 +203,8 @@ export interface LexEntry {
   requireAfter?: RegExp;
   forbidBefore?: RegExp;
   forbidAfter?: RegExp;
+  /** Tested against the matched text as written, so it can refuse on case. */
+  forbidMatch?: RegExp;
   /** Only fire when the document looks American. */
   needsAmerican?: boolean;
   /**

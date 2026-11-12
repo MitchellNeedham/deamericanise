@@ -676,6 +676,23 @@ describe('a Unicode hyphen reads as a hyphen', () => {
   });
 
   it.each`
+    input                                    | why
+    ${'the 40‑yard‑line'}          | ${'a conventional size'}
+    ${'a 27‑inch‑screen'}          | ${'the same, for a screen'}
+    ${'a 20‑pound‑note'}           | ${'money'}
+    ${'a 9‑inch‑round pan'}        | ${'a singular unit describing the noun after it'}
+    ${'a 1.8 metre (6‑foot) fence'}     | ${'an original in brackets after its metric value'}
+    ${'1.5‑3 m (5‑10 feet)'}       | ${'the same, for a range'}
+  `('reads the words around "$input" as around a hyphen-minus ($why)', ({ input }) => {
+    const ascii = convert(input.replace(/‑/g, '-'));
+    expect(convert(input)).toBe(ascii.replace(/-/g, '‑'));
+  });
+
+  it('collapses a metric bracket that restates a range', () => {
+    expect(convert('5‑10 feet (1.5‑3 m)')).toMatch(/^1\.5[-‑]3 m$/);
+  });
+
+  it.each`
     raw                  | value
     ${'2‑3/4'}      | ${2.75}
     ${'twenty‐two'} | ${22}

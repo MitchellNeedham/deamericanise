@@ -734,7 +734,7 @@ const MPG_FORMS = [
 const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
   temperature: [
     String.raw`[°º˚]\s*F(?:ahrenheit|\.)?`,
-    '℉',
+    String.raw`℉\.?`,
     String.raw`degrees?\s+F(?:ahrenheit|\.)?`,
     String.raw`deg\.?\s*F\.?`,
     'Fahrenheit',
@@ -982,6 +982,28 @@ const AFTER_UNIT = /(?:)/y;
 /** Whether `matched`, a measurement at `start`, ends in a stop that also ends the sentence. */
 function keepsStop(text: string, start: number, matched: string): boolean {
   return matched.endsWith('.') && endsSentence(text, start, start + matched.length, AFTER_UNIT);
+}
+
+/** `°F` or `℉` and a stop: a symbol, which has no stop of its own. */
+const SYMBOL_STOP = /(?:[°º˚]\s*F|℉)\.$/i;
+
+/** Space that stays in the paragraph, then a word in lower case, so the sentence plainly goes on. */
+const LOWER_CASE_NEXT = new RegExp(String.raw`(?=\s)${SOFT_SPACE}\p{Ll}`, 'uy');
+
+function continuesInLowerCase(text: string, at: number): boolean {
+  LOWER_CASE_NEXT.lastIndex = at;
+  return LOWER_CASE_NEXT.test(text);
+}
+
+/**
+ * Whether the stop that ends `matched`, a Fahrenheit value at `start`, stays in the text. A
+ * bare letter `F` abbreviates the scale, so its stop goes as an abbreviation's does, unless
+ * it also ends the sentence. A symbol's stop is usually the sentence's own, but authors also
+ * write `350°F. for 20 minutes`, so it goes only before a word in lower case.
+ */
+function fahrenheitKeepsStop(text: string, start: number, matched: string): boolean {
+  if (!SYMBOL_STOP.test(matched)) return keepsStop(text, start, matched);
+  return !continuesInLowerCase(text, start + matched.length);
 }
 
 /**
@@ -1925,8 +1947,8 @@ function fahrenheitReadings(
     let values = parsed as number[];
 
     const start = match.index;
-    // A stop that ends the sentence stays in the text, outside the value and any kept original.
-    const valueEnd = start + match[0].length - (keepsStop(ctx.text, start, match[0]) ? 1 : 0);
+    // A stop that stays in the text stays outside the value and any kept original.
+    const valueEnd = start + match[0].length - (fahrenheitKeepsStop(ctx.text, start, match[0]) ? 1 : 0);
     let end = valueEnd;
     const beside = wordsBeside(ctx.text, start, end);
     const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
@@ -2093,7 +2115,7 @@ function temperatureDecadeRule(): Rule {
           start,
           end,
           before: match[0],
-          after: keepsStop(ctx.text, start, match[0]) ? `${body}.` : body,
+          after: fahrenheitKeepsStop(ctx.text, start, match[0]) ? `${body}.` : body,
           ruleId: 'units.temperature.decade',
           category: 'units',
           confidence: 'risky',

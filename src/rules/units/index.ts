@@ -1729,6 +1729,8 @@ function fuelEconomyRule(): Rule {
       const economy = (mpg: number, figures: number) =>
         formatNumber(perLitre ? mpg * 0.425143707 : 235.214583 / mpg, precision, figures, maxDecimals);
       const unit = perLitre ? 'km/L' : 'L/100km';
+      // Where each range read here ends, which is where its second end's own match ends.
+      const rangeEnds = new Set<number>();
 
       range.lastIndex = 0;
       for (const match of ctx.text.matchAll(range)) {
@@ -1739,6 +1741,7 @@ function fuelEconomyRule(): Rule {
         if (low === null) continue;
         const reading = isWritten(lowRaw) ? writtenRange(ctx.text, start, lowRaw, join, highRaw) : 'read';
         if (reading === 'skip' || !canBeRange(ctx.text, start, low, high)) continue;
+        rangeEnds.add(start + matched.length);
         if (reading === 'hold' || !PLAIN_MPG.test(lowRaw) || low === 0 || high === 0) {
           changes.push(hold(start, matched, id, 35));
           continue;
@@ -1751,6 +1754,9 @@ function fuelEconomyRule(): Rule {
 
       single.lastIndex = 0;
       for (const match of ctx.text.matchAll(single)) {
+        // Its range settles it. `resolveChanges` tests every change against every hold, so a
+        // second change or hold for each range is quadratic in a long run of ranges.
+        if (rangeEnds.has(match.index + match[0].length)) continue;
         const mpg = Number(match[1]);
         if (!mpg || endsRange(ctx.text, match.index, mpg)) {
           changes.push(hold(match.index, match[0], id, 35));

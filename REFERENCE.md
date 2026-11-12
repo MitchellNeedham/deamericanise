@@ -161,8 +161,9 @@ nearest mailbox`), and otherwise the letterbox the other dialects say. A mailbox
 email or voicemail is neither, so it stays a mailbox in every dialect.
 
 `en-IE` and `en-ZA` follow British usage with local emergency numbers and a few words of
-their own. `en-CA` is the hybrid: it keeps `colour`, `centre` and `defence` but also keeps
-`-ize`, `aluminum`, `math`, `tire` and `gas`.
+their own, such as the Irish `school tour` for a field trip. `en-CA` is the hybrid: it
+keeps `colour`, `centre` and `defence` but also keeps `-ize`, `aluminum`, `math`, `tire`
+and `gas`.
 
 `en-GB` leaves miles, mph, pints and stone alone, because Britain still uses them, and a
 weight in stone and pounds stays whole. Turn a unit back on by id if you disagree:
@@ -214,8 +215,10 @@ label do not; `take out the trash` becomes rubbish but `Empty the trash in Gmail
 responder` does not. Phrases the rest of the world already says keep their words:
 `fortune cookie`, `food truck`, `my way or the highway`, `Highway 101`, `seat of your
 pants`, `ants in his pants`, `yoga pants`. In British English a `fire truck` is a fire engine
-and a `pickup truck` stays one. The verb stays too: `the dog pants heavily` keeps its `pants`,
-while `his pants were wet` becomes `his trousers were wet`.
+and a `pickup truck` stays one. Only a trailer people live or holiday in becomes a caravan:
+a `travel trailer` does, while a `boat trailer` and a `movie trailer` stay trailers. The
+verb stays too: `the dog pants heavily` keeps its `pants`, while `his pants were wet`
+becomes `his trousers were wet`.
 
 **Units.** Length, area, mass, volume, temperature, speed, pressure, power, torque and
 fuel economy. The volume measures are the US ones, which are not the imperial ones.

@@ -188,6 +188,13 @@ const EVERYDAY: Row[] = [
   ['tic-tac-toe', 'noughts and crosses'],
   ['jump rope', 'skipping rope'],
   ['trailer park', 'caravan park'],
+  ['trailer parks', 'caravan parks'],
+  ['travel trailer', 'caravan'],
+  ['travel trailers', 'caravans'],
+  ['house trailer', 'caravan'],
+  ['house trailers', 'caravans'],
+  ['camping trailer', 'caravan'],
+  ['camping trailers', 'caravans'],
 ];
 
 const EDUCATION: Row[] = [
@@ -452,7 +459,10 @@ export function baseVocabulary(): LexEntry[] {
     ...set('vocabulary.household', 'moderate', HOUSEHOLD),
     ...set('vocabulary.clothing', 'moderate', CLOTHING),
     ...set('vocabulary.everyday', 'moderate', EVERYDAY),
-    ...set('vocabulary.education', 'risky', EDUCATION),
+    ...set('vocabulary.education', 'risky', EDUCATION).map((entry) =>
+      // The replacement ends in `fees`, so a fee already after the word would be said twice.
+      entry.from === 'tuition' ? { ...entry, forbidAfter: /^\s+fees?\b/i } : entry,
+    ),
     ...GRADES,
     ...CONTEXTUAL.map((entry) => ({ ...entry, priority: 20 })),
   ].flatMap((entry) => (GATES[entry.from] ?? [{}]).map((gate) => ({ ...entry, ...gate })));

@@ -68,6 +68,47 @@ describe('words gated on their context', () => {
   });
 });
 
+describe('trailers', () => {
+  it.each`
+    input                    | expected
+    ${'a trailer park'}      | ${'a caravan park'}
+    ${'two trailer parks'}   | ${'two caravan parks'}
+    ${'a travel trailer'}    | ${'a caravan'}
+    ${'two travel trailers'} | ${'two caravans'}
+    ${'a house trailer'}     | ${'a caravan'}
+    ${'house trailers'}      | ${'caravans'}
+    ${'a camping trailer'}   | ${'a caravan'}
+    ${'camping trailers'}    | ${'caravans'}
+    ${'a tractor trailer'}   | ${'a semi-trailer'}
+    ${'a semi truck'}        | ${'a semi-trailer'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it.each([
+    'Watch the movie trailer.',
+    'We hitched the boat trailer.',
+    'a semi-trailer',
+    'a box trailer',
+    'a horse trailer',
+    'the trailer hitch',
+  ])('leaves "%s" alone', (input) => {
+    expect(au(input)).toBe(input);
+  });
+});
+
+describe('tuition', () => {
+  it.each`
+    input                   | expected
+    ${'Paid tuition.'}      | ${'Paid tuition fees.'}
+    ${'Paid tuition fees.'} | ${'Paid tuition fees.'}
+    ${'Tuition Fees'}       | ${'Tuition Fees'}
+    ${'the tuition fee'}    | ${'the tuition fee'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
 describe('school years', () => {
   it.each`
     input              | expected

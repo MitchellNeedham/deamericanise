@@ -314,14 +314,70 @@ function isBareInch(alias: string, whole: string): boolean {
 }
 
 /**
- * An apostrophe after a number, read as the foot's prime only on a side of a dimension whose
- * every side has a mark of its own, as in `2' x 6"`. Anywhere else it may close a quote.
+ * An apostrophe after a number, straight or curly, read as the foot's prime only on a side of
+ * a dimension whose every side has a mark of its own, as in `2' x 6"`. Anywhere else it may
+ * close a quote.
  */
-const FOOT_MARK = "'";
+const FOOT_MARK = "['’]";
+const isFootMark = (alias: string | undefined) => alias === "'" || alias === '’';
 const PRIME = '′';
 
 /** A quote opened straight before a number, which a `'` after the number may close: `'6'`. */
 const OPENS_QUOTE = /['‘]$/;
+
+/** A double quote mark, or a blank line. A quotation still open at a blank line is given up. */
+const QUOTE_OR_BLANK_LINE = new RegExp(
+  String.raw`["“”]|(?:\r\n|\r(?!\n)|[\n\v\f\u2028\u2029])` +
+    String.raw`${INLINE_SPACE}*(?:\r\n?|[\n\v\f\u2028\u2029])`,
+  'g',
+);
+
+/** A number ending where a mark stands. A number in words starts a word: `often` holds none. */
+const NUMBER_BEFORE_MARK = new RegExp(
+  String.raw`(?:(?<![A-Za-z])|(?![A-Za-z]))(?:${NUMBER_PATTERN})${GAP}$`,
+  'i',
+);
+
+function followsNumber(text: string, at: number): boolean {
+  const before = text.slice(Math.max(0, at - NUMBER_REACH), at);
+  if (!NUMBER_BEFORE_MARK.test(before)) return false;
+  // A spaced mark with a word straight after it opens a quotation: `6 "free" tickets`.
+  return !(/\s$/.test(before) && /[\p{L}\p{N}]/u.test(text.charAt(at + 1)));
+}
+
+let lastMarked = '';
+let lastInchMarks = new Set<number>();
+
+/**
+ * Where `text` writes the inch mark as `"` or `”`. Such a mark straight after a number is the
+ * inch mark unless a quotation is open, which it then closes: `a 6" pan`, but
+ * `He said "6" twice.` A quotation is open after an odd number of straight double quotes
+ * that are not inch marks, or after a `“` with no `”` since, counting back to a blank line.
+ * An inch mark inside a quotation cannot be told from its close, so
+ * `"It is 6" long," she said.` has none. `″` is never a quote, and needs no reading. The
+ * rules ask about one text many times in a row, so the last one is kept.
+ */
+function inchMarks(text: string): Set<number> {
+  if (text === lastMarked) return lastInchMarks;
+  const marks = new Set<number>();
+  let open = false;
+  for (const { 0: found, index } of text.matchAll(QUOTE_OR_BLANK_LINE)) {
+    if (found.length > 1) open = false;
+    else if (found === '“') open = true;
+    else if (followsNumber(text, index)) {
+      if (!open) marks.add(index);
+      open = false;
+    } else open = found === '"' && !open;
+  }
+  lastMarked = text;
+  lastInchMarks = marks;
+  return marks;
+}
+
+/** The `"` or `”` at `at` opens or closes a quotation, and is not the inch mark. */
+function isQuotationMark(text: string, at: number): boolean {
+  return (text[at] === '"' || text[at] === '”') && !inchMarks(text).has(at);
+}
 
 function unitWord(target: MetricValue, value: number): string {
   return Math.abs(value) === 1 ? target.singular : target.plural;
@@ -597,7 +653,7 @@ const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
     'Fahrenheit',
   ],
   economy: [...MPG_FORMS],
-  length: ["'"],
+  length: ["'", '’'],
 };
 for (const measure of MEASURES) {
   const dimension = dimensionOf(METRIC_INNER.exec(`1 ${measure.convert(1).symbol}`));
@@ -1049,14 +1105,15 @@ function isHeightInches(text: string, start: number): boolean {
  */
 function feetInchesRule(): Rule {
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:(?:feet|foot|ft\.?|′|')` +
+    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:(?:feet|foot|ft\.?|′|${FOOT_MARK})` +
       softGap(String.raw`(?:and(?=\s))?`) +
       String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+${HYPHEN}\d+/\d+|\d+/\d+|` +
       String.raw`${WHOLE_NUMBER}(?:${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION})?)` +
-      String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|")(?![A-Za-z])|` +
+      String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|["”])(?![A-Za-z])|` +
       String.raw`(?:feet|foot)${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER})`,
     'dgi',
   );
+  const sticky = new RegExp(pattern.source, 'iy');
 
   return {
     id: 'units.length.feet-inches',
@@ -1068,7 +1125,24 @@ function feetInchesRule(): Rule {
       const changes = refused.map((match) =>
         hold(match.index, match[0], 'units.length.feet-inches', 40),
       );
-      for (const match of found) {
+      /**
+       * The match read as far as a quotation mark after its inches, which closes a quote
+       * around the height, as in `"He is six foot two"`. A height that cannot be read
+       * without the mark is held, so its feet are not read alone.
+       */
+      const beforeQuote = (match: RegExpExecArray): RegExpExecArray | undefined => {
+        const mark = match.index + match[0].length - 1;
+        if (match[2] === undefined || !isQuotationMark(ctx.text, mark)) return match;
+        sticky.lastIndex = match.index;
+        const inner = sticky.exec(ctx.text.slice(0, mark));
+        if (inner) return inner;
+        const held = ctx.text.slice(match.index, mark).trimEnd();
+        changes.push(hold(match.index, held, 'units.length.feet-inches', 40));
+        return undefined;
+      };
+      for (const whole of found) {
+        const match = beforeQuote(whole);
+        if (match === undefined) continue;
         const feet = parseNumber(match[1]!);
         const inches = parseNumber(match[2] ?? match[3]!);
         if (match[3] !== undefined && !isInchCount(inches)) continue;
@@ -1366,6 +1440,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const low = parseNumber(lowRaw);
         const high = parseNumber(highRaw);
         if (!entry || low === null || high === null || high === 0) continue;
+        if (isQuotationMark(ctx.text, start + matched.length - 1)) continue;
         const written = isWritten(lowRaw) || isWritten(highRaw);
         const reading = written ? writtenRange(ctx.text, start, lowRaw, join, highRaw) : 'read';
         if (reading === 'skip') continue;
@@ -1451,8 +1526,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
             raw: match[number]!,
             value: parseNumber(match[number]!),
             alias,
-            entry: alias === undefined ? undefined : resolve(alias === FOOT_MARK ? PRIME : alias),
+            entry: alias === undefined ? undefined : resolve(isFootMark(alias) ? PRIME : alias),
             bareInch: alias !== undefined && isBareInch(alias, ctx.text.slice(start, sideEnd)),
+            quoted: alias !== undefined && isQuotationMark(ctx.text, sideEnd - 1),
             beforeTimes:
               next !== undefined &&
               !/by/i.test(ctx.text.slice(sideEnd, match.indices![next[0]]![0])),
@@ -1465,7 +1541,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const entry = last.entry!;
         const before = ctx.text.slice(Math.max(0, start - 24), start);
 
-        if (sides.some((s) => s.alias === FOOT_MARK)) {
+        // A side whose mark closes a quotation is a number, and converting the other sides alone
+        // would split the dimension.
+        if (sides.some((s) => s.quoted)) {
+          changes.push(hold(start, match[0], 'units.dimensions', 38));
+          continue;
+        }
+        if (sides.some((s) => isFootMark(s.alias))) {
           const lengths = sides.every((s) => !s.entry || hasSides(s.entry.measure));
           if (OPENS_QUOTE.test(before) || !lengths) continue;
           // A side with no mark of its own leaves the `'` unconfirmed, and converting the
@@ -1522,7 +1604,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const confirms = (s: (typeof sides)[number]) =>
           s !== last &&
           s.entry !== undefined &&
-          s.alias !== FOOT_MARK &&
+          !isFootMark(s.alias) &&
           (!s.bareInch || s.beforeTimes);
         if (last.bareInch && !sides.some(confirms)) continue;
         // `one by` may be a pronoun and an amount, as in `lower one by two feet`.
@@ -1580,6 +1662,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       const changes: Change[] = [];
       single.lastIndex = 0;
       for (let match: RegExpExecArray | null; (match = single.exec(ctx.text)) !== null; ) {
+        if (isQuotationMark(ctx.text, match.index + match[0].length - 1)) continue;
         const value = parseNumber(match[1]!);
         if (resolve(match[2]!) && value !== null && endsRange(ctx.text, match.index, value)) {
           // Resumes at the next character, as past a start the pattern refused, so a measurement

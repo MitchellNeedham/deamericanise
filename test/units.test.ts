@@ -1674,6 +1674,85 @@ describe('an apostrophe for feet on a side of a dimension', () => {
   });
 });
 
+describe('a double quote after a number that closes a quotation', () => {
+  it.each`
+    unchanged                                 | why
+    ${'He said "6" twice.'}                   | ${'a quoted number'}
+    ${'She said "pick 3" and left.'}          | ${'a quotation that ends in a number'}
+    ${'The sign read "Route 66" in red.'}     | ${'a name'}
+    ${'Press "1" to start.'}                  | ${'a key'}
+    ${'He said "six" twice.'}                 | ${'a number in words'}
+    ${'He said "5-10" twice.'}                | ${'a range'}
+    ${'"6" x "8"'}                            | ${'two quoted numbers'}
+    ${'the "2" x 4" board'}                   | ${'a quoted side leaves the dimension whole'}
+    ${`He said "6'2" twice.`}                 | ${'feet and inches'}
+    ${'He said "6 ft 2" twice.'}              | ${'feet and inches, held so the feet are not read alone'}
+    ${'She said "the answer is\n6" and left.'} | ${'a quotation that wraps onto the next line'}
+    ${'"It is 6" long," she said.'}           | ${'an inch mark inside a quotation reads as its close'}
+    ${'a 12" pizza'}                          | ${'a conventional size'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                          | expected                                          | why
+    ${'a 6" pan'}                                  | ${'a 15 cm pan'}                                  | ${'no quotation'}
+    ${'Cut it to 6".'}                             | ${'Cut it to 15 cm.'}                             | ${'before a stop'}
+    ${'the 2" x 4" board'}                         | ${'the 5.1 x 10 cm board'}                        | ${'an inch mark opens no quotation'}
+    ${`He is 6'2".`}                               | ${'He is 1.88 metres.'}                           | ${'feet and inches'}
+    ${'a 6" pan and a 9" dish'}                    | ${'a 15 cm pan and a 23 cm dish'}                 | ${'two inch marks on one line'}
+    ${'She said "go" and cut a 6" pan.'}           | ${'She said "go" and cut a 15 cm pan.'}           | ${'a quotation closed before the number'}
+    ${'He said "pick 3\n\nThen cut a 6" pan.'}     | ${'He said "pick 3\n\nThen cut a 15 cm pan.'}     | ${'a quotation left open before a blank line'}
+    ${'He bought 6 "free" tickets and a 6" pan.'}  | ${'He bought 6 "free" tickets and a 15 cm pan.'}  | ${'a spaced quote before a word opens a quotation'}
+    ${'He said "six foot two" twice.'}             | ${'He said "1.88 metres" twice.'}                 | ${'a height read up to the closing quote'}
+    ${'He said "6 feet 2" twice.'}                 | ${'He said "1.88 metres" twice.'}                 | ${'the same, in figures'}
+    ${'He said "a 6″ pan" today.'}                 | ${'He said "a 15 cm pan" today.'}                 | ${'a double prime is never a quote'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                         | expected
+    ${'She said "I counted 3."'}  | ${'She said "I counted 3".'}
+    ${'She said “I counted 3.”'}  | ${'She said “I counted 3”.'}
+  `('keeps the count in "$input" a count once logical quoting moves the stop', ({ input, expected }) => {
+    const once = deamericaniseText(input, { preset: 'localise' });
+    expect(once).toBe(expected);
+    expect(deamericaniseText(once, { preset: 'localise' })).toBe(once);
+  });
+});
+
+describe('feet and inch marks typed as curly quotes', () => {
+  it.each`
+    input                     | expected                       | why
+    ${'He is 6’2” tall.'}     | ${'He is 1.88 metres tall.'}   | ${'a height'}
+    ${'He is 5’ 10” tall.'}   | ${'He is 1.78 metres tall.'}   | ${'a space between the parts'}
+    ${'a 12” pan'}            | ${'a 30 cm pan'}               | ${'inches alone'}
+    ${'the 2’ x 6” shelf'}    | ${'the 61 x 15 cm shelf'}      | ${'feet beside inches'}
+    ${'a 2’ x 4’ sheet'}      | ${'a 0.61 x 1.2 m sheet'}      | ${'feet on every side'}
+    ${'the 2” x 4” board'}    | ${'the 5.1 x 10 cm board'}     | ${'inches on every side'}
+    ${'She’s 6’2”.'}          | ${'She’s 1.88 metres.'}        | ${'after an apostrophe'}
+    ${'She’s 6 feet tall.'}   | ${'She’s 1.8 metres tall.'}    | ${'an apostrophe that is no mark'}
+    ${`He is 6'2" tall.`}     | ${'He is 1.88 metres tall.'}   | ${'straight marks'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                       | why
+    ${'He said “6” twice.'}         | ${'a quoted number'}
+    ${'He said “pick 3” and left.'} | ${'a quotation that ends in a number'}
+    ${'He said “6’2” twice.'}       | ${'a quoted height'}
+    ${'He said “pick 3" and left.'} | ${'a curly quotation closed by a straight mark'}
+    ${'the ‘6’ x 4’ panel'}         | ${'a quoted number, though a dimension follows'}
+    ${'‘2 x 4’'}                    | ${'a quoted dimension with no unit'}
+    ${'a 6’ fence'}                 | ${'an apostrophe alone after a number'}
+    ${'2’ x 4'}                     | ${'no mark on the last side'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
 describe('a spaced "in" on every side of a dimension', () => {
   it.each`
     input                    | expected                 | why
@@ -1960,6 +2039,7 @@ describe('an imperial original in brackets after its metric value', () => {
     ${'It is 1.8 meters (6 ft) tall.'}                         | ${'any spelling or symbol'}
     ${'It is 1.88 metres (6 feet 2 inches) tall.'}             | ${'feet and inches'}
     ${`It is 1.88 m (6'2") tall.`}                             | ${'feet and inches in symbols'}
+    ${'It is 1.88 m (6’2”) tall.'}                             | ${'feet and inches in curly marks'}
     ${'It is 1.8 m (5 ft 11 in) tall.'}                        | ${'abbreviated'}
     ${'It weighs 71.7 kg (11st 4lb).'}                         | ${'stone and pounds'}
     ${'a 1.8 metre (6-foot) fence'}                            | ${'attributive'}

@@ -135,7 +135,7 @@ export const MEASURES: Measure[] = [
     id: 'units.length.inch',
     keep: 'inch',
     words: ['inches', 'inch'],
-    abbrevs: ['in.', 'in', '″', '"'],
+    abbrevs: ['in.', 'in', '″', '"', '”'],
     convert: (v) => metricLength(v * 0.0254),
     conventional: INCH_CONVENTIONS,
     otherSense: startsNoun('inch', /^[\s-]+worms?\b/i),

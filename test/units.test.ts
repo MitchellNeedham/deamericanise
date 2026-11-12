@@ -3734,7 +3734,26 @@ describe('Fahrenheit decades', () => {
     ${'highs in the upper 80s degrees today'}      | ${'highs between 31 and 32°C today'}
     ${'temperatures in the 80s and 90s degrees'}   | ${'temperatures between 27 and 37°C'}
     ${'highs in the 80s degrees F today'}          | ${'highs between 27 and 32°C today'}
+    ${'Highs in the mid-80s.'}                     | ${'Highs between 29 and 30°C.'}
+    ${'Highs in the mid 80s.'}                     | ${'Highs between 29 and 30°C.'}
+    ${'highs in the\n   80s'}                      | ${'highs between 27 and 32°C'}
   `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                               | why
+    ${'Highs in the 70s or 80s.'}          | ${'Highs between 21 and 32°C.'}        | ${'or'}
+    ${'Highs in the 70s and 80s.'}         | ${'Highs between 21 and 32°C.'}        | ${'and'}
+    ${'Highs in the 70s to 80s.'}          | ${'Highs between 21 and 32°C.'}        | ${'to'}
+    ${'highs in the 70s\u201480s'}         | ${'highs between 21 and 32°C'}         | ${'an em dash'}
+    ${'highs in the low 70s or upper 80s'} | ${'highs between 21 and 32°C'}         | ${'two banded decades'}
+    ${'highs in the 70s or 80s °F'}        | ${'highs between 21 and 32°C'}         | ${'a Fahrenheit unit after the pair'}
+    ${'highs in the 70s or 80s degrees'}   | ${'highs between 21 and 32°C'}         | ${'a bare degrees after the pair'}
+    ${'highs in the 70s or\n80s'}          | ${'highs between 21 and 32°C'}         | ${'the pair wrapped across lines'}
+    ${'highs in the 100s or 110s'}         | ${'highs between 38 and 48°C'}         | ${'decades of three figures'}
+    ${'Highs in the 70s or so.'}           | ${'Highs between 21 and 26°C or so.'}  | ${'no second decade after or'}
+  `('reads two decades joined as a range does: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 
@@ -3744,8 +3763,50 @@ describe('Fahrenheit decades', () => {
     );
   });
 
-  it('leaves the degrees of a Celsius unit after a decade to that unit', () => {
-    expect(convert('temperatures in the 20s degrees Celsius')).toContain('degrees Celsius');
+  it.each`
+    input                                          | why
+    ${'temperatures in the 30s Celsius'}           | ${'Celsius'}
+    ${'temperatures in the 20s degrees Celsius'}   | ${'degrees Celsius, whose degrees is no bare unit'}
+    ${'highs in the 20s °C'}                       | ${'a degree sign and C'}
+    ${'highs in the 30s ºC'}                       | ${'a phone keyboard degree sign'}
+    ${'highs in the 30s ℃'}                        | ${'the Celsius sign'}
+    ${'highs in the 30s centigrade'}               | ${'centigrade'}
+    ${'highs in the 30s degrees centigrade'}       | ${'degrees centigrade'}
+    ${'highs in the 30s degrees C'}                | ${'degrees C'}
+    ${'highs in the 30s deg C'}                    | ${'deg C'}
+    ${'highs in the 30s C'}                        | ${'a bare upper case C'}
+    ${'highs in the 30s celsius'}                  | ${'the word in lower case'}
+    ${'highs in the low 30s Celsius'}              | ${'a banded decade'}
+    ${'highs in the 20s and 30s Celsius'}          | ${'two decades'}
+    ${'highs in the 20s or 30s °C'}                | ${'two decades joined by or'}
+    ${'highs in the 30s\nCelsius'}                 | ${'the unit on the next line'}
+  `('leaves a decade with a Celsius unit as written: $input ($why)', ({ input }) => {
+    expect(convert(input)).toBe(input);
+  });
+
+  it('leaves a decade with a Celsius unit as written under localise', () => {
+    const input = 'temperatures in the 30s Celsius';
+    expect(deamericaniseText(input, { preset: 'localise' })).toBe(input);
+  });
+
+  /** The spans the decade rule holds as written in `text`. */
+  const decadeHolds = (text: string): string[] => {
+    const resolved = resolveOptions({});
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold && c.ruleId === 'units.temperature.decade')
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                                         | span
+    ${'temperatures in the 30s Celsius today'}    | ${'in the 30s Celsius'}
+    ${'highs in the 20s degrees Celsius'}         | ${'in the 20s degrees Celsius'}
+    ${'highs in the 20s or 30s °C'}               | ${'in the 20s or 30s °C'}
+    ${'highs in the 30s C'}                       | ${'in the 30s C'}
+  `('holds "$span" whole', ({ input, span }) => {
+    expect(decadeHolds(input)).toEqual([span]);
   });
 
   // The decade of the calendar is the far commoner reading, so these must all survive.
@@ -3763,6 +3824,7 @@ describe('Fahrenheit decades', () => {
     ${'Interest rates in the 80s hit records.'}      | ${'no temperature context'}
     ${'a 1.70s delay in the forecast'}               | ${'part of a decimal'}
     ${'Ford trucks from the 70s F series'}           | ${'a bare F is a letter, not a marker'}
+    ${'Lows in the -20s overnight.'}                 | ${'a minus sign, which no band explains'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });

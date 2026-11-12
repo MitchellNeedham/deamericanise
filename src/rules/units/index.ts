@@ -17,6 +17,7 @@ import {
   FRACTION_WORDS,
   HYPHEN,
   INLINE_SPACE,
+  MEASUREMENT_START,
   NOT_IN_COMPOUND,
   NUMBER_PATTERN,
   NUMBER_START,
@@ -1187,11 +1188,18 @@ function pushMeasurement(
  */
 const UNSIGNED_NUMBER = String.raw`(?:(?![-−])(?:${NUMERIC_PATTERN})|${WHOLE_NUMBER})`;
 
-const STARTS_HERE = new RegExp(NUMBER_START, 'y');
+/**
+ * The first number of a measurement in two units, found anywhere outside a word or a decimal,
+ * even inside a longer number as the `seven` of `five-seven` is, so that `splitByStart` can
+ * hold what `MEASUREMENT_START` refuses.
+ */
+const FIRST_NUMBER = String.raw`(?<![\w.])(?:(?![-−])(?:${NUMERIC_PATTERN})|${SECOND_END_WORDS})`;
+
+const STARTS_HERE = new RegExp(MEASUREMENT_START, 'iy');
 
 /**
- * The matches of `pattern`, which starts more loosely than `NUMBER_START`, split by whether
- * `NUMBER_START` lets each one's number start where it stands. Past a refused match the
+ * The matches of `pattern`, which starts more loosely than `MEASUREMENT_START`, split by
+ * whether it lets each one's number start where it stands. Past a refused match the
  * search resumes one character on, so a measurement inside it is still found, as the
  * `1/2 pounds 3 ounces` of `7:30 1/2 pounds 3 ounces` is. A refused match with none inside
  * it is for the rule to hold, so that no other rule converts a piece of it, as the single
@@ -1392,7 +1400,7 @@ const UNIT_OF_ITS_OWN =
  */
 function feetInchesRule(): Rule {
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})` +
+    String.raw`(${FIRST_NUMBER})` +
       String.raw`(?:(?:${GAP}(?:feet|foot|ft\.?)|${SOFT_SPACE}(?:′|${FOOT_MARK}))` +
       String.raw`(?:${HYPHEN}|${softGap(String.raw`(?:and(?=\s))?`)})` +
       String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+${HYPHEN}\d+/\d+|\d+/\d+|` +
@@ -1495,12 +1503,6 @@ const ORDINAL = /^(?:\d*[02-9])?1st(?![a-z])/i;
  * no sides, so the number in `2 x 4 lb 8 oz bags` counts the bags.
  */
 function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule[] {
-  // A written-out number never starts inside another, such as the `two` of `twenty-two`.
-  // The lookbehind runs only before a letter, and takes a run of spaces whole, because each
-  // place it tries inside the run costs a walk over the rest of it.
-  const START =
-    String.raw`(?<![\w.])` +
-    String.raw`(?:(?![A-Za-z])|(?=[A-Za-z])(?<![A-Za-z]-)(?<!\b(?:${WHOLE_NUMBER})(?<![-\s])\s+))`;
   const AND = softGap(String.raw`(?:and(?=\s))?`);
   const unitOf = (m: Measure) =>
     String.raw`(${alternate([...m.words, ...m.abbrevs, ...(m.compoundAbbrevs ?? [])])})(?![A-Za-z])`;
@@ -1510,7 +1512,7 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
     const part = (unit: string) => String.raw`${AND}(${UNSIGNED_NUMBER})${GAP}${unit}`;
     const optional = rest.reduceRight((inner, unit) => `(?:${part(unit)}${inner})?`, '');
     const pattern = new RegExp(
-      String.raw`${START}(${UNSIGNED_NUMBER})${GAP}${largest}${part(next!)}${optional}`,
+      String.raw`(${FIRST_NUMBER})${GAP}${largest}${part(next!)}${optional}`,
       'dgi',
     );
     const sided = hasSides(compound.measures[0]!);

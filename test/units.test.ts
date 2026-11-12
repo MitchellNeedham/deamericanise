@@ -431,6 +431,59 @@ describe('a measurement in two units reads its first number whole', () => {
   });
 });
 
+describe('a measurement starts only where a number can', () => {
+  it.each`
+    unchanged                                    | why
+    ${'catch-22 feet'}                           | ${'digits after a letter and a hyphen are part of a name'}
+    ${'COVID-19 miles'}                          | ${'the same, in capitals'}
+    ${'F-150 pounds'}                            | ${'the same, after one letter'}
+    ${'the B-52 feet'}                           | ${'the same, after a determiner'}
+    ${'catch-22°F'}                              | ${'a temperature after a name'}
+    ${'catch-22 feet 2 inches'}                  | ${'a height after a name'}
+    ${'the B-52 feet 2 inches'}                  | ${'the same, after a determiner'}
+    ${'catch-22 pounds 8 ounces'}                | ${'a weight after a name'}
+    ${'a 5-by-7-inch photo'}                     | ${'the second side of a hyphenated dimension'}
+    ${'five-7 pounds'}                           | ${'digits after a number in words and a hyphen'}
+    ${'a catch-22 situation'}                    | ${'a name with no unit'}
+    ${'five-seven pounds eight ounces'}          | ${'a weight in words after a word and a hyphen'}
+    ${'catch-twenty-two pounds eight ounces'}    | ${'the same, after a name'}
+    ${'twenty-twenty pounds eight ounces'}       | ${'the same, after a tens word'}
+    ${'two thousand, seven pounds eight ounces'} | ${'a weight in words after thousand and a comma'}
+    ${'five-six feet 2 inches'}                  | ${'a height after a word and a hyphen'}
+    ${'five-six feet two inches'}                | ${'the same, in words'}
+    ${'catch-twenty-two miles'}                  | ${'a hyphenated word the table cannot read'}
+    ${'twenty five-pound bags'}                  | ${'twenty bags or one weight'}
+  `('leaves "$unchanged" whole ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                          | expected                         | why
+    ${'Week 3 seven pounds eight ounces'}          | ${'Week 3 3.4 kilograms'}        | ${'a weight in words after a number in digits'}
+    ${'Day five seven pounds eight ounces'}        | ${'Day five 3.4 kilograms'}      | ${'the same, after a number in words'}
+    ${'Room 12 eleven stone four pounds'}          | ${'Room 12 71.7 kilograms'}      | ${'stone and pounds'}
+    ${'Week 3 six feet two inches'}                | ${'Week 3 1.88 metres'}          | ${'a height'}
+    ${'Week 3 7 pounds 8 ounces'}                  | ${'Week 3 3.4 kilograms'}        | ${'a weight in digits'}
+    ${'Week 3 seven pounds'}                       | ${'Week 3 3.2 kilograms'}        | ${'pounds on their own'}
+    ${'twenty two pounds eight ounces'}            | ${'10.2 kilograms'}              | ${'a number of two words'}
+    ${'twenty-two pounds eight ounces'}            | ${'10.2 kilograms'}              | ${'the same, hyphenated'}
+    ${'one hundred and seven pounds eight ounces'} | ${'48.8 kilograms'}              | ${'a number with hundred and'}
+    ${'two hundred pounds eight ounces'}           | ${'90.9 kilograms'}              | ${'a number with hundred'}
+    ${'seven pounds eight ounces'}                 | ${'3.4 kilograms'}               | ${'a weight in words'}
+    ${'a 7-pound 8-ounce baby'}                    | ${'a 3.4 kilogram baby'}         | ${'hyphens between numbers and units'}
+    ${'a 6-foot fence'}                            | ${'a 1.8 metre fence'}           | ${'the same, before a noun'}
+    ${'-5°F'}                                      | ${'-20.6°C'}                     | ${'a minus sign'}
+    ${'It fell to -5°F.'}                          | ${'It fell to -20.6°C.'}         | ${'the same, after a word'}
+    ${'5ft-6ft'}                                   | ${'1.5 m-1.8 m'}                 | ${'a range with its unit on both ends'}
+    ${'5 ft-6 ft'}                                 | ${'1.5 m-1.8 m'}                 | ${'the same, spaced'}
+    ${'5 sq ft-6 sq ft'}                           | ${'0.46 m²-0.56 m²'}             | ${'the same, with a unit of two words'}
+    ${'60 miles per hour-70 miles per hour'}       | ${'97 kilometres per hour-110 kilometres per hour'} | ${'the same, with a unit of three words'}
+    ${'two feet-6 feet'}                           | ${'61 centimetres-1.8 metres'}   | ${'the same, after a number in words'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
 describe('a long run of whitespace takes time in line with its length', () => {
   // Generous, since each of these takes a few milliseconds. A pattern that walks the run from
   // every place in it, or tries every split of it, takes several seconds.

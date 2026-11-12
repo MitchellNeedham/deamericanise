@@ -311,7 +311,8 @@ A weight in two units is one weight, as a height in feet and inches is one heigh
 `11 stone 4 pounds 8 ounces` becomes `71.9 kilograms`. The first part can be a fraction, a
 mixed number or a decimal, so `1 1/2 pounds 3 ounces` becomes `765 grams` and
 `2.5 feet 3 inches` becomes `83.8 centimetres`. Any part can be a whole number in words, so
-`six feet two inches` becomes `1.88 metres`. After `foot` or `feet` the inch word can be
+`six feet two inches` becomes `1.88 metres`, and `Week 3 seven pounds eight ounces` becomes
+`Week 3 3.4 kilograms`. After `foot` or `feet` the inch word can be
 left out where nothing that could be a noun follows: before punctuation, the end of the
 text, or a word that cannot open a noun, such as a preposition or a conjunction. So
 `He is six foot two.` becomes `He is 1.88 metres.` and `6 foot 4 with long arms` becomes
@@ -341,7 +342,8 @@ the whole weight is left as written, so an `en-GB` `11 stone 4 pounds` never bec
 converts it. A weight or height at the end of a range, as in `7-8 lb 4 oz`,
 `5 to 6 feet 2 inches` or `five to seven pounds eight ounces`, is left as written too, since
 its first end could be in either unit. So is a height or weight that starts where no
-measurement can (see below), as in `At 7:30 feet 2 inches`.
+measurement can (see below), as in `At 7:30 feet 2 inches` and `catch-22 feet 2 inches`, or
+whose first number in words is the tail of a longer one, as in `five-seven pounds eight ounces`.
 `st` is read only in such a weight, because `1st` on its own is an ordinal.
 A weight in two units describes a noun as one unit does, so `7 pound 8 ounce babies` becomes
 `3.4 kilogram babies`.
@@ -398,6 +400,11 @@ wrap: `6` at the end of one line and `feet` at the start of the next still conve
 does a range or dimension broken at its `to`, `-` or `x`. Nothing joins across a blank line
 or into a line that opens a list item, heading, quote or table row, so `Serves 4` followed
 by `- 2 pounds beef` is a serving count and a bullet, not a range.
+
+A measurement never starts straight after a word and `-`, which join a name to its number, so
+`catch-22 feet` and `F-150 pounds` are left as written. A prefix is such a word too, so
+`a sub-2 pound tent` is left as written, as `a sub-two pound tent` is. A unit before the
+hyphen ends a quantity, so `5ft-6ft` and `5 ft-6 ft` still become `1.5 m-1.8 m`.
 
 A measurement never starts straight after `-`, `/`, `,` or `:` following a digit or a vulgar
 fraction, where the number is the tail of a date, a fraction, a grouped number or a clock

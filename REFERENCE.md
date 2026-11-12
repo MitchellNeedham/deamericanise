@@ -362,6 +362,14 @@ rule rewrites any part of it.
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
 surrounding text is American enough to trust; see below. Output is ISO by default, with `dmy` and `long` available.
 
+A `dmy` date whose day is 12 or under, such as `04/03/2024`, reads as an ambiguous
+month-first date again. So a second run forced American with `assumeAmerican: true`
+(`--assume-american`) over `dmy` output swaps that date back. Detect mode leaves it alone
+where the first run removed the American evidence, but not where that evidence survives,
+as the named date in `Filed March 5, 2024. Due 03/04/2024.` does under the default preset.
+`long` and `iso` write a date no second run can read the other way round, so use one of
+them with `--write` and the plugins.
+
 The same separator has to appear twice, so `3.22-1000` is a range, not a date. A dotted
 date needs a four-figure year, because `1.13.24` is far more often a version number, and
 no dotted date straight after a version word such as `version`, `v`, `release`, `Node` or
@@ -486,6 +494,9 @@ answer rather than an obvious one. Override it, or skip the question entirely:
 deamericaniseText(text, { assumeAmerican: true });
 deamericaniseText(text, { minAmericanConfidence: 0.4 });
 ```
+
+A forced verdict reads the tool's own `dmy` output as American too, so a second forced run
+swaps back a `dmy` date whose day is 12 or under; see Dates above.
 
 ## What it will not touch
 

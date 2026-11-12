@@ -7,6 +7,7 @@ import { patternRules } from '../src/rules/index.js';
 import { spellingEntries } from '../src/rules/spelling/index.js';
 import { baseVocabulary } from '../src/rules/vocabulary.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
+import { FAHRENHEIT } from '../src/rules/units/fahrenheit.js';
 import { NUMERIC_PATTERN, parseNumber } from '../src/rules/units/number.js';
 
 const convert = (input: string, options = {}) =>
@@ -1876,6 +1877,68 @@ describe('a value paired with its metric value by a slash or "or"', () => {
   });
 });
 
+describe('markup on a measurement given in both systems', () => {
+  it.each`
+    input                                       | expected                                   | why
+    ${'It is **6 feet** (1.8 m) tall.'}         | ${'It is **1.8 m** tall.'}                 | ${'bold closes on the metric value'}
+    ${'It is 6 feet *(1.8 m)* tall.'}           | ${'It is 1.8 m tall.'}                     | ${'emphasis on the bracket goes with it'}
+    ${'It is 6 feet (*1.8 m*) tall.'}           | ${'It is 1.8 m tall.'}                     | ${'emphasis inside the bracket goes too'}
+    ${'It is **6 feet** *(1.8 m)* tall.'}       | ${'It is **1.8 m** tall.'}                 | ${'both'}
+    ${'It is **6 feet (1.8 m)** tall.'}         | ${'It is **1.8 m** tall.'}                 | ${'bold around both'}
+    ${'It is **6 feet**\n(1.8 m) tall.'}        | ${'It is **1.8 m** tall.'}                 | ${'bold and a wrapped line'}
+    ${'Bake at **350°F**/180°C.'}               | ${'Bake at **180°C**.'}                    | ${'a slash after bold'}
+    ${'Bake at **350°F**/**180°C**.'}           | ${'Bake at **180°C**.'}                    | ${'both values bold'}
+    ${'Bake at 350°F (_175 degrees Celsius_).'} | ${'Bake at 175 degrees Celsius.'}          | ${'an underscore after the written-out Celsius'}
+    ${'It was **20°F** (11°C) warmer.'}         | ${'It was **11°C** warmer.'}               | ${'a change in temperature'}
+    ${'It is 6 feet (1.8 m) tall.'}             | ${'It is 1.8 m tall.'}                     | ${'no markup'}
+    ${'Bake at 350°F/180°C.'}                   | ${'Bake at 180°C.'}                        | ${'the same, joined by a slash'}
+    ${'It is 6 feet\n\n(1.8 m) tall.'}          | ${'It is 1.8 metres\n\n(1.8 m) tall.'}     | ${'a blank line ends the measurement'}
+    ${'It is **6 feet**\n\n(1.8 m) tall.'}      | ${'It is **1.8 metres**\n\n(1.8 m) tall.'} | ${'the same, after bold'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+    expect(convert(input, { syntax: 'markdown' })).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                                    | why
+    ${'It is <b>1.8 metres</b> (6 feet) tall.'}                  | ${'an HTML tag closes on the metric value'}
+    ${'It is 1.8 metres <i>(6 feet)</i> tall.'}                  | ${'an HTML tag opens on the bracket'}
+    ${'It is 1.8 metres *(6 feet)* tall.'}                       | ${'emphasis on the bracket'}
+    ${'It is 1.8 metres (*6 feet*) tall.'}                       | ${'emphasis inside the bracket'}
+    ${'It is 1.8 metres (about *6 feet*) tall.'}                 | ${'the same, after a word of approximation'}
+    ${'Bake at _175 degrees Celsius_ (350 degrees Fahrenheit).'} | ${'an underscore after the written-out Celsius'}
+    ${'Bake at _175 degrees C_ (350 degrees F).'}                | ${'the same, abbreviated'}
+    ${'Bake at **180°C**/350°F.'}                                | ${'a slash after bold'}
+    ${'Bake at **180°C**/**350°F**.'}                            | ${'both values bold'}
+    ${'Bake at <b>180°C</b>/350°F.'}                             | ${'a slash after an HTML tag'}
+    ${'It is <b>6 feet</b> (1.8 m) tall.'}                       | ${'no change can rewrite across a tag, so the pair is held'}
+    ${'It is <b>6 feet 2 inches</b> (1.88 m) tall.'}             | ${'the same, and no piece of it converts'}
+    ${'Bake at <b>350°F</b>/180°C.'}                             | ${'the same, joined by a slash'}
+    ${'It is **1.8 metres** (6 feet) tall.'}                     | ${'bold closes on the metric value'}
+    ${'Bake at 180°C/350°F.'}                                    | ${'no markup'}
+    ${'Bake at 175°C (350°F).'}                                  | ${'the same, in brackets'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+    expect(convert(unchanged, { syntax: 'markdown' })).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                      | expected                                                   | why
+    ${'The rope is 2 metres long (the old one was ten feet).'} | ${'The rope is 2 metres long (the old one was 3 metres).'} | ${'a bracket that says more'}
+    ${'It is 1.8 metres (*6 feet* for the old one) tall.'}     | ${'It is 1.8 metres (*1.8 metres* for the old one) tall.'} | ${'the same, with emphasis inside'}
+    ${'It is <div>1.8 metres</div> (6 feet) tall.'}            | ${'It is <div>1.8 metres</div> (1.8 metres) tall.'}        | ${'a block tag ends the metric value'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+    expect(convert(input, { syntax: 'markdown' })).toBe(expected);
+  });
+
+  it('holds only the imperial value of a pair it cannot collapse across a tag', () => {
+    expect(deamericaniseText('It is <b>6 feet</b> (1.8 meters) tall.')).toBe(
+      'It is <b>6 feet</b> (1.8 metres) tall.',
+    );
+  });
+});
+
 describe('a Celsius value written with a bare C', () => {
   it.each`
     input                               | expected                  | why
@@ -1907,6 +1970,104 @@ describe('a Celsius value written with a bare C', () => {
     ${'Bake at 350°F (180c).'}             | ${'Bake at 175°C (180c).'}                  | ${'a lower case c'}
     ${'Bake at 350°F (180  C).'}           | ${'Bake at 175°C (180  C).'}                | ${'more than one space'}
   `('does not read a bare C in $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a temperature with a degree sign before two slashes is no path', () => {
+  it.each`
+    input                                        | expected                              | why
+    ${'Cook it at 225°F/low/slow.'}              | ${'Cook it at 105°C/low/slow.'}       | ${'two words after it'}
+    ${'Set it to 350°F/fan/bake.'}               | ${'Set it to 175°C/fan/bake.'}        | ${'the same'}
+    ${'Preheat the oven to 350°F/180C/gas 4.'}   | ${'Preheat the oven to 180C/gas 4.'}  | ${'the British trio with a bare C'}
+    ${'Cook it at 225°F/low.'}                   | ${'Cook it at 105°C/low.'}            | ${'one word after it'}
+    ${'Cook it at 225°F / low / slow.'}          | ${'Cook it at 105°C / low / slow.'}   | ${'spaced'}
+    ${'Preheat the oven to 350°F/180°C/gas 4.'}  | ${'Preheat the oven to 180°C/gas 4.'} | ${'the trio with both values marked'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                     | why
+    ${'Preheat the oven to 180°C/350°F/gas 4.'}   | ${'the Fahrenheit value restates the Celsius one'}
+    ${'Preheat the oven to 180C/350°F/gas 4.'}    | ${'the same, after a bare C'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+/** The alternatives at the top level of a pattern's source. */
+function topLevelAlternatives(source: string): string[] {
+  const alternatives = [''];
+  let depth = 0;
+  let inClass = false;
+  for (let i = 0; i < source.length; i++) {
+    let token = source[i]!;
+    if (token === '\\') token += source[++i];
+    else if (inClass) inClass = token !== ']';
+    else if (token === '[') inClass = true;
+    else if (token === '(') depth++;
+    else if (token === ')') depth--;
+    else if (token === '|' && depth === 0) {
+      alternatives.push('');
+      continue;
+    }
+    alternatives[alternatives.length - 1] += token;
+  }
+  return alternatives;
+}
+
+describe('a Celsius value in each form a Fahrenheit value is read in', () => {
+  // Each Fahrenheit form, then the Celsius form written the same way.
+  const FORMS = [
+    ['°F', '°C'],
+    ['ºF', 'ºC'],
+    ['˚F', '˚C'],
+    ['℉', '℃'],
+    ['°Fahrenheit', '°Celsius'],
+    [' degrees Fahrenheit', ' degrees Celsius'],
+    [' degrees F', ' degrees C'],
+    [' deg F', ' deg C'],
+    [' deg. F', ' deg. C'],
+    ['degF', 'degC'],
+    [' Fahrenheit', ' Celsius'],
+  ];
+
+  it('pairs every form of FAHRENHEIT with a Celsius form', () => {
+    for (const alternative of topLevelAlternatives(FAHRENHEIT)) {
+      const form = new RegExp(`(?:${alternative})$`, 'i');
+      expect(FORMS.some(([fahrenheit]) => form.test(`350${fahrenheit}`)), alternative).toBe(true);
+    }
+  });
+
+  it.each(FORMS)('leaves 350%s alone after the 180%s it restates', (fahrenheit, celsius) => {
+    for (const unchanged of [
+      `Bake at 180${celsius} (350${fahrenheit}).`,
+      `Bake at 180${celsius}/350${fahrenheit}.`,
+      `Heat to 180${celsius} or 350${fahrenheit}.`,
+    ]) {
+      expect(convert(unchanged)).toBe(unchanged);
+    }
+  });
+
+  it.each(FORMS)('collapses 350%s into the 180%s after it', (fahrenheit, celsius) => {
+    expect(convert(`Bake at 350${fahrenheit} (180${celsius}).`)).toBe(`Bake at 180${celsius}.`);
+    expect(convert(`Bake at 350${fahrenheit}/180${celsius}.`)).toBe(`Bake at 180${celsius}.`);
+  });
+
+  it.each`
+    input                                        | expected
+    ${'Bake at 350°F (180 degrees centigrade).'} | ${'Bake at 180 degrees centigrade.'}
+    ${'Bake at 350°F (180 centigrade).'}         | ${'Bake at 180 centigrade.'}
+    ${'Bake at 350°F (180 degrees Centigrade).'} | ${'Bake at 180 degrees Centigrade.'}
+    ${'Bake at 180 centigrade (350°F).'}         | ${'Bake at 180 centigrade (350°F).'}
+    ${'Bake at 180 degrees centigrade/350°F.'}   | ${'Bake at 180 degrees centigrade/350°F.'}
+    ${'Bake at 350°F (160℃).'}                   | ${'Bake at 175°C (160℃).'}
+    ${'Bake at 350°F (2 kg).'}                   | ${'Bake at 175°C (2 kg).'}
+    ${'Bake at 350 deg F.'}                      | ${'Bake at 175°C.'}
+    ${'Bake at 175°C (350°F).'}                  | ${'Bake at 175°C (350°F).'}
+    ${'Bake at 350°F (160°C).'}                  | ${'Bake at 175°C (160°C).'}
+  `('reads centigrade too, and no further: $input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 });

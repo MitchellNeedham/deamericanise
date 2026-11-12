@@ -5,10 +5,6 @@ export interface Range {
   end: number;
 }
 
-function overlaps(a: Range, b: Range): boolean {
-  return a.start < b.end && b.start < a.end;
-}
-
 /**
  * The part of the source a change rewrites, without the text it writes back unchanged at
  * either end, such as the `colo` and `r` that `color` keeps when it becomes `colour`.
@@ -23,10 +19,68 @@ function rewritten(change: Change): Range {
   return { start: change.start + head, end: change.end - tail };
 }
 
-/** `change` would rewrite some of `held` and leave the rest as written. */
-function splits(change: Change, held: Range): boolean {
+/**
+ * Spans indexed by where they start, so a question about the spans that start before some
+ * point takes time in the logarithm of their number. Spans can be added after the index is
+ * built, but only at a start given to the constructor.
+ */
+class SpanIndex {
+  private readonly starts: number[];
+  /** A Fenwick tree over `starts` of the greatest end among the spans added. */
+  private readonly ends: number[];
+
+  constructor(starts: number[]) {
+    this.starts = [...new Set(starts)].sort((a, b) => a - b);
+    this.ends = this.starts.map(() => -Infinity);
+  }
+
+  static of(spans: Range[]): SpanIndex {
+    const index = new SpanIndex(spans.map((s) => s.start));
+    for (const span of spans) index.add(span);
+    return index;
+  }
+
+  add({ start, end }: Range): void {
+    for (let i = this.countBefore(start); i < this.ends.length; i |= i + 1) {
+      this.ends[i] = Math.max(this.ends[i]!, end);
+    }
+  }
+
+  /** The greatest end among the spans added that start before `point`. */
+  endBefore(point: number): number {
+    let end = -Infinity;
+    for (let i = this.countBefore(point) - 1; i >= 0; i = (i & (i + 1)) - 1) {
+      end = Math.max(end, this.ends[i]!);
+    }
+    return end;
+  }
+
+  /** Some span added overlaps `range`. */
+  overlaps(range: Range): boolean {
+    return this.endBefore(range.end) > range.start;
+  }
+
+  private countBefore(point: number): number {
+    let low = 0;
+    let high = this.starts.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (this.starts[middle]! < point) low = middle + 1;
+      else high = middle;
+    }
+    return low;
+  }
+}
+
+/**
+ * `change` would rewrite some of a held span and leave the rest as written. A held span it
+ * splits overlaps what it rewrites and either starts before the change or ends after it.
+ */
+function splitsHeld(change: Change, held: SpanIndex): boolean {
+  const { start, end } = rewritten(change);
   return (
-    overlaps(rewritten(change), held) && (change.start > held.start || change.end < held.end)
+    held.endBefore(Math.min(end, change.start)) > start ||
+    held.endBefore(end) > Math.max(start, change.end)
   );
 }
 
@@ -37,13 +91,10 @@ function splits(change: Change, held: Range): boolean {
  * priority of the change that would split it.
  */
 export function resolveChanges(candidates: Change[], protectedRanges: Range[]): Change[] {
-  const held = candidates.filter((c) => c.hold);
+  const held = SpanIndex.of(candidates.filter((c) => c.hold));
+  const guarded = SpanIndex.of(protectedRanges);
   const viable = candidates.filter(
-    (c) =>
-      !c.hold &&
-      c.before !== c.after &&
-      !protectedRanges.some((p) => overlaps(c, p)) &&
-      !held.some((h) => splits(c, h)),
+    (c) => !c.hold && c.before !== c.after && !guarded.overlaps(c) && !splitsHeld(c, held),
   );
 
   const ranked = [...viable].sort((a, b) => {
@@ -54,9 +105,12 @@ export function resolveChanges(candidates: Change[], protectedRanges: Range[]): 
     return a.start - b.start;
   });
 
+  const taken = new SpanIndex(viable.map((c) => c.start));
   const accepted: Change[] = [];
   for (const candidate of ranked) {
-    if (!accepted.some((a) => overlaps(a, candidate))) accepted.push(candidate);
+    if (taken.overlaps(candidate)) continue;
+    taken.add(candidate);
+    accepted.push(candidate);
   }
 
   return accepted.sort((a, b) => a.start - b.start);

@@ -20,6 +20,12 @@ const SKIPPED = new Set([
 /** Generic font families that draw every character at the same width. */
 const MONOSPACE = new Set(['monospace', 'ui-monospace']);
 
+/**
+ * `white-space` values that keep every space as written, and the `white-space-collapse` values
+ * a browser may list there when no single keyword names the pair.
+ */
+const KEEPS_SPACES = new Set(['pre', 'pre-wrap', 'break-spaces', 'preserve', 'preserve-spaces']);
+
 /** A change that crosses the edge of one of these would move words into or out of it. */
 const ANCHORS = new Set(['a', 'button', 'label']);
 
@@ -122,8 +128,8 @@ export function rootScope(document: Document | null): Scope {
   };
 }
 
-/** Pass `joins` when `joinsRun(element)` is already known, so the style is read only once. */
-export function enter(parent: Scope, element: Element, joins?: boolean): Scope {
+/** Pass `flow` when `flowOf(element)` is already known, so the style is read only once. */
+export function enter(parent: Scope, element: Element, flow?: Flow): Scope {
   const lang = element.getAttribute('lang') ?? element.getAttribute('xml:lang');
   const wholePage = element.namespaceURI === HTML_NS && PAGE_ELEMENTS.has(element.localName);
 
@@ -150,8 +156,13 @@ export function enter(parent: Scope, element: Element, joins?: boolean): Scope {
       parent.skippedTag ||
       SKIPPED.has(element.localName) ||
       namesCodeRole(element.getAttribute('role')) ||
-      (!foreign && !(joins ?? joinsRun(element)) && drawnAsCode(element)),
+      (!foreign && skippedAsCode(element, flow ?? flowOf(element))),
   };
+}
+
+function skippedAsCode(element: Element, flow: Flow): boolean {
+  if (flow === 'joins') return false;
+  return flow === 'code' || drawnAsCode(element);
 }
 
 /** Whether a `role` value includes the ARIA `code` role. */
@@ -171,6 +182,21 @@ function drawnAsCode(element: Element): boolean {
   const style = view.getComputedStyle(element);
   const whiteSpace = style.whiteSpace;
   if (whiteSpace === '' || whiteSpace === 'normal') return false;
+  return inMonospace(style);
+}
+
+/**
+ * Whether the page draws an inline element as inline code: in a font that falls back to a
+ * generic monospace family, with every space kept. A page set wholly in a monospace font keeps
+ * a phone number or a measurement on one line with `nowrap`, so that alone is not enough.
+ */
+function drawnAsInlineCode(style: CSSStyleDeclaration): boolean {
+  const whiteSpace = style.whiteSpace;
+  if (whiteSpace === '' || whiteSpace === 'normal') return false;
+  return whiteSpace.split(' ').some((value) => KEEPS_SPACES.has(value)) && inMonospace(style);
+}
+
+function inMonospace(style: CSSStyleDeclaration): boolean {
   // A quoted name is a font called "monospace", not the generic family.
   const unquoted = style.fontFamily.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""');
   return unquoted.split(',').some((family) => MONOSPACE.has(family.trim().toLowerCase()));
@@ -190,9 +216,20 @@ export function scopeOf(node: Node): Scope {
   return scope;
 }
 
+/**
+ * How an element's text sits among the text around it: `joins` flows on from it, `ends` ends
+ * the run, and `code` is an inline element drawn as inline code, which ends the run too. An
+ * element that ends the run for any other reason may still be drawn as code.
+ */
+export type Flow = 'joins' | 'ends' | 'code';
+
 /** Whether an element's text flows on from the text around it. */
 export function joinsRun(element: Element): boolean {
-  return (
+  return flowOf(element) === 'joins';
+}
+
+function flowOf(element: Element): Flow {
+  const inline =
     element.namespaceURI === HTML_NS &&
     INLINE.has(element.localName) &&
     !element.hasAttribute('lang') &&
@@ -200,21 +237,23 @@ export function joinsRun(element: Element): boolean {
     !element.hasAttribute('translate') &&
     !element.hasAttribute('contenteditable') &&
     !element.classList.contains('notranslate') &&
-    !namesCodeRole(element.getAttribute('role')) &&
-    laidOutInline(element)
-  );
+    !namesCodeRole(element.getAttribute('role'));
+  return inline ? inlineFlow(element) : 'ends';
 }
 
 /**
- * Whether the browser lays the element out inside the line around it. A span that is a flex
- * item, or styled as a block or an inline-block, sits in a box of its own, so text on either
- * side of its edge never reads as one word. Without styles to go on, the tag decides.
+ * How the browser lays out an inline element. A span that is a flex item, or styled as a
+ * block or an inline-block, sits in a box of its own, so text on either side of its edge never
+ * reads as one word. A span drawn as inline code ends the run the way `code` does. Without
+ * styles to go on, the tag decides.
  */
-function laidOutInline(element: Element): boolean {
+function inlineFlow(element: Element): Flow {
   const view = element.ownerDocument.defaultView;
-  if (!view) return true;
-  const display = view.getComputedStyle(element).display;
-  return display === '' || display === 'inline' || display === 'contents';
+  if (!view) return 'joins';
+  const style = view.getComputedStyle(element);
+  const display = style.display;
+  if (display !== '' && display !== 'inline' && display !== 'contents') return 'ends';
+  return drawnAsInlineCode(style) ? 'code' : 'joins';
 }
 
 /**
@@ -250,8 +289,9 @@ export function containersAndElementsIn(
   for (let child = node.firstChild; child; child = child.nextSibling) {
     if (child.nodeType !== 1) continue;
     const element = child as Element;
-    const inline = joinsRun(element);
-    containersAndElementsIn(element, enter(scope, element, inline), containers, elements, shadowRootOf, inline);
+    const flow = flowOf(element);
+    const inner = enter(scope, element, flow);
+    containersAndElementsIn(element, inner, containers, elements, shadowRootOf, flow === 'joins');
   }
   const root = isElement ? shadowRootOf(node as Element) : null;
   if (root) containersAndElementsIn(root, scope, containers, elements, shadowRootOf);

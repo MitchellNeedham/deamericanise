@@ -13,6 +13,11 @@ export interface Measure {
   keep: string;
   /** Written-out forms, longest first. */
   words: string[];
+  /**
+   * The forms in `words` that are only ever singular, as `inch` is. A form that is its own
+   * plural, as `stone` is, is not one.
+   */
+  singular: string[];
   /** Abbreviations. Matched case-sensitively where case carries meaning. */
   abbrevs: string[];
   /**
@@ -149,24 +154,13 @@ function startsNoun(word: string, nouns: RegExp) {
 
 const poundCake = startsNoun('pound', /^[\s-]+cakes?\b/i);
 
-/**
- * Word forms that are grammatically singular. A singular unit next to a number that is
- * not one is being used attributively (`a 9 inch dish`), and its replacement should stay
- * singular too.
- */
-export const SINGULAR_WORDS = new Set([
-  'inch', 'foot', 'yard', 'mile', 'fathom', 'acre', 'square foot', 'sq foot',
-  'ounce', 'pound', 'ton', 'fluid ounce', 'gallon', 'quart', 'pint', 'cup',
-  'tablespoon', 'teaspoon', 'cubic foot', 'mile per hour', 'mile an hour',
-  'pound per square inch', 'foot pound', 'pound foot',
-]);
-
 export const MEASURES: Measure[] = [
   // ----- length -----
   {
     id: 'units.length.inch',
     keep: 'inch',
     words: ['inches', 'inch'],
+    singular: ['inch'],
     abbrevs: ['in.', 'in', '″', '"', '”'],
     convert: (v) => metricLength(v * 0.0254),
     conventional: INCH_CONVENTIONS,
@@ -176,6 +170,7 @@ export const MEASURES: Measure[] = [
     id: 'units.length.foot',
     keep: 'foot',
     words: ['feet', 'foot'],
+    singular: ['foot'],
     abbrevs: ['ft.', 'ft', '′'],
     convert: (v) => metricLength(v * 0.3048),
     otherSense: startsNoun('foot', /^[\s-]+(?:soldiers?|traffic)\b/i),
@@ -184,16 +179,19 @@ export const MEASURES: Measure[] = [
     id: 'units.length.yard',
     keep: 'yard',
     words: ['yards', 'yard'],
+    singular: ['yard'],
     abbrevs: ['yds', 'yd'],
     convert: (v) => metricLength(v * 0.9144),
     // A gridiron yard line and the 40 yard dash are names for things, not lengths. There
     // is no 37 metre line painted on any field.
     conventional: { after: /^[\s-]*(?:lines?|dash|markers?)\b/i },
+    otherSense: startsNoun('yard', /^[\s-]+sales?\b/i),
   },
   {
     id: 'units.length.mile',
     keep: 'mile',
     words: ['miles', 'mile'],
+    singular: ['mile'],
     abbrevs: ['mi'],
     convert: (v) => metricLength(v * 1609.344),
   },
@@ -201,6 +199,7 @@ export const MEASURES: Measure[] = [
     id: 'units.length.fathom',
     keep: 'fathom',
     words: ['fathoms', 'fathom'],
+    singular: ['fathom'],
     abbrevs: [],
     convert: (v) => metricLength(v * 1.8288),
   },
@@ -210,6 +209,7 @@ export const MEASURES: Measure[] = [
     id: 'units.area.acre',
     keep: 'acre',
     words: ['acres', 'acre'],
+    singular: ['acre'],
     abbrevs: [],
     convert: (v) => metricArea(v * 4046.856),
   },
@@ -217,6 +217,7 @@ export const MEASURES: Measure[] = [
     id: 'units.area.square-foot',
     keep: 'square-foot',
     words: ['square feet', 'square foot', 'sq feet', 'sq foot'],
+    singular: ['square foot', 'sq foot'],
     abbrevs: ['sq ft', 'sqft', 'ft²'],
     convert: (v) => metricArea(v * 0.09290304),
   },
@@ -224,6 +225,7 @@ export const MEASURES: Measure[] = [
     id: 'units.area.square-mile',
     keep: 'square-mile',
     words: ['square miles', 'square mile', 'sq miles', 'sq mile'],
+    singular: ['square mile', 'sq mile'],
     abbrevs: ['sq mi', 'mi²'],
     convert: (v) => metricArea(v * 2_589_988.11),
   },
@@ -233,6 +235,7 @@ export const MEASURES: Measure[] = [
     id: 'units.mass.ounce',
     keep: 'ounce',
     words: ['ounces', 'ounce'],
+    singular: ['ounce'],
     abbrevs: ['oz.', 'oz'],
     convert: (v) => metricMass(v * 28.349523125),
   },
@@ -240,6 +243,7 @@ export const MEASURES: Measure[] = [
     id: 'units.mass.pound',
     keep: 'pound',
     words: ['pounds', 'pound'],
+    singular: ['pound'],
     abbrevs: ['lbs.', 'lbs', 'lb.', 'lb'],
     convert: (v) => metricMass(v * 453.59237),
     // Fighting weight classes are designations. The 147-pound division is called that
@@ -254,6 +258,7 @@ export const MEASURES: Measure[] = [
     id: 'units.mass.stone',
     keep: 'stone',
     words: ['stone'],
+    singular: [],
     abbrevs: [],
     compoundAbbrevs: ['st'],
     convert: (v) => metricMass(v * 6350.29318),
@@ -262,6 +267,7 @@ export const MEASURES: Measure[] = [
     id: 'units.mass.ton',
     keep: 'ton',
     words: ['tons', 'ton'],
+    singular: ['ton'],
     abbrevs: [],
     // The US short ton. A document that also says `metric ton` or `tonne` is measuring in
     // those already, and reading its tons as short tons would be plainly wrong.
@@ -274,6 +280,7 @@ export const MEASURES: Measure[] = [
     id: 'units.volume.fluid-ounce',
     keep: 'fluid-ounce',
     words: ['fluid ounces', 'fluid ounce'],
+    singular: ['fluid ounce'],
     abbrevs: ['fl oz', 'fl. oz.', 'floz'],
     convert: (v) => metricVolume(v * 29.5735295625),
   },
@@ -281,6 +288,7 @@ export const MEASURES: Measure[] = [
     id: 'units.volume.gallon',
     keep: 'gallon',
     words: ['gallons', 'gallon'],
+    singular: ['gallon'],
     abbrevs: ['gal'],
     convert: (v) => metricVolume(v * 3785.411784),
   },
@@ -288,6 +296,7 @@ export const MEASURES: Measure[] = [
     id: 'units.volume.quart',
     keep: 'quart',
     words: ['quarts', 'quart'],
+    singular: ['quart'],
     abbrevs: ['qt'],
     convert: (v) => metricVolume(v * 946.352946),
   },
@@ -295,6 +304,7 @@ export const MEASURES: Measure[] = [
     id: 'units.volume.pint',
     keep: 'pint',
     words: ['pints', 'pint'],
+    singular: ['pint'],
     // `pt` is left out: `12pt` is a font size far more often than a pint.
     abbrevs: [],
     convert: (v) => metricVolume(v * 473.176473),
@@ -306,6 +316,7 @@ export const MEASURES: Measure[] = [
     keep: 'cup',
     keptByDefault: true,
     words: ['cups', 'cup'],
+    singular: ['cup'],
     abbrevs: [],
     convert: (v) => metricVolume(v * 236.5882365),
   },
@@ -316,6 +327,7 @@ export const MEASURES: Measure[] = [
     keep: 'tablespoon',
     keptByDefault: true,
     words: ['tablespoons', 'tablespoon'],
+    singular: ['tablespoon'],
     abbrevs: ['tbsp', 'tbs'],
     convert: (v) => metricVolume(v * 14.78676478),
   },
@@ -325,6 +337,7 @@ export const MEASURES: Measure[] = [
     keep: 'teaspoon',
     keptByDefault: true,
     words: ['teaspoons', 'teaspoon'],
+    singular: ['teaspoon'],
     abbrevs: ['tsp'],
     convert: (v) => metricVolume(v * 4.92892159),
   },
@@ -332,6 +345,7 @@ export const MEASURES: Measure[] = [
     id: 'units.volume.cubic-foot',
     keep: 'cubic-foot',
     words: ['cubic feet', 'cubic foot'],
+    singular: ['cubic foot'],
     abbrevs: ['cu ft', 'ft³'],
     convert: (v) => metricVolume(v * 28_316.8466),
   },
@@ -341,6 +355,7 @@ export const MEASURES: Measure[] = [
     id: 'units.speed.mph',
     keep: 'mph',
     words: ['miles per hour', 'miles an hour', 'mile per hour', 'mile an hour'],
+    singular: ['mile per hour', 'mile an hour'],
     abbrevs: ['mph', 'MPH'],
     convert: (v) => m(v * 1.609344, 'km/h', 'kilometre per hour', 'kilometres per hour'),
   },
@@ -348,6 +363,7 @@ export const MEASURES: Measure[] = [
     id: 'units.pressure.psi',
     keep: 'psi',
     words: ['pounds per square inch', 'pound per square inch'],
+    singular: ['pound per square inch'],
     abbrevs: ['psi', 'PSI'],
     convert: (v) => m(v * 6.89475729, 'kPa', 'kilopascal', 'kilopascals'),
   },
@@ -355,6 +371,7 @@ export const MEASURES: Measure[] = [
     id: 'units.power.horsepower',
     keep: 'horsepower',
     words: ['horsepower'],
+    singular: [],
     abbrevs: ['hp'],
     convert: (v) => m(v * 0.745699872, 'kW', 'kilowatt', 'kilowatts'),
   },
@@ -362,6 +379,7 @@ export const MEASURES: Measure[] = [
     id: 'units.energy.btu',
     keep: 'btu',
     words: ['british thermal units', 'british thermal unit'],
+    singular: ['british thermal unit'],
     abbrevs: ['BTU', 'BTUs'],
     convert: (v) => m(v * 1.05505585, 'kJ', 'kilojoule', 'kilojoules'),
   },
@@ -372,12 +390,20 @@ export const MEASURES: Measure[] = [
       'foot-pounds', 'foot pounds', 'foot-pound', 'foot pound', 'pound-feet', 'pound feet',
       'pound-foot', 'pound foot',
     ],
+    singular: ['foot-pound', 'foot pound', 'pound-foot', 'pound foot'],
     // `lb ft` has to be listed, or the mass rule claims the number first and the
     // torque silently becomes a weight.
     abbrevs: ['ft-lb', 'ft-lbs', 'ft lb', 'ft lbs', 'lb-ft', 'lb ft', 'lbft', 'lb.ft'],
     convert: (v) => m(v * 1.3558179483, 'N·m', 'newton metre', 'newton metres'),
   },
 ];
+
+/**
+ * Word forms that are grammatically singular. A singular unit next to a number that is
+ * not one is being used attributively (`a 9 inch dish`), and its replacement should stay
+ * singular too.
+ */
+export const SINGULAR_WORDS = new Set(MEASURES.flatMap((measure) => measure.singular));
 
 /** One measurement written in descending units of one dimension, as `11 stone 4 pounds` is. */
 export interface Compound {

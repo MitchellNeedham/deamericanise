@@ -151,6 +151,53 @@ describe('month-first long dates, which only move under localise', () => {
     expect(long(unchanged)).toBe(unchanged);
   });
 
+  it.each`
+    input                                               | expected
+    ${'On March 1, 1900 the fire started.'}             | ${'On 1 March 1900 the fire started.'}
+    ${'On March 5, 2024 in Paris.'}                     | ${'On 5 March 2024 in Paris.'}
+    ${'"Filed March 5, 2024" was all it said.'}         | ${'"Filed 5 March 2024" was all it said.'}
+    ${'On March 5, 1959 Miles Davis recorded it.'}      | ${'On 5 March 1959 Miles Davis recorded it.'}
+    ${'On March 5, 2024 L.A. was hit.'}                 | ${'On 5 March 2024 L.A. was hit.'}
+    ${'On March 5, 2024 t-shirts sold out.'}            | ${'On 5 March 2024 t-shirts sold out.'}
+    ${'On May 5, 2024 yard sales were held.'}           | ${'On 5 May 2024 yard sales were held.'}
+    ${'On March 1st, 1900 square kilometres burned.'}   | ${'On 1 March, 1900 square kilometres burned.'}
+  `('still reads the year in $input', ({ input, expected }) => {
+    expect(long(input)).toBe(expected);
+  });
+
+  // Four figures that start a quantity or a numeric date are not the year of the date before them.
+  it.each`
+    unchanged                                         | why
+    ${'On March 1, 1900 square kilometres burned.'}   | ${'a unit word'}
+    ${'On March 1, 1900 km² burned.'}                 | ${'a unit symbol'}
+    ${'On March 1, 1900-mile trip.'}                  | ${'a unit after a hyphen'}
+    ${'On March 1, 1900\nsquare kilometres burned.'} | ${'a unit on the next line'}
+    ${'On March 1, 1925°C.'}                          | ${'a temperature'}
+    ${'On March 1, 1900 meters of fence.'}            | ${'a metric unit in the American spelling'}
+    ${'On March 1, 1900.5 hectares burned.'}          | ${'a decimal'}
+    ${'May 24, 2024-03-28'}                           | ${'an ISO date'}
+    ${'May 24, 2024/03/28'}                           | ${'a numeric date'}
+  `('leaves $unchanged alone ($why)', ({ unchanged }) => {
+    expect(long(unchanged)).toBe(unchanged);
+  });
+
+  it.each([
+    'On March 1, 732 square miles burned.',
+    'On March 1, 1900 square kilometres burned.',
+    'On March 5, 1500 foot-pounds.',
+    'May 24, 3/28/2024',
+  ])('gives the same output on a second run over %j', (input) => {
+    const localise = { preset: 'localise' } as const;
+    const once = deamericaniseText(input, localise);
+    expect(once).not.toMatch(/\d March \d{4}/);
+    expect(deamericaniseText(once, localise)).toBe(once);
+  });
+
+  it('leaves a quantity after a month and day as written', () => {
+    const text = 'On March 1, 1900 square kilometres burned.';
+    expect(deamericaniseText(text, { preset: 'localise' })).toBe(text);
+  });
+
   it('can be switched off inside localise', () => {
     expect(long('March 5, 2024', { dates: { reorderLongDates: false } })).toBe('March 5, 2024');
   });
@@ -207,6 +254,11 @@ describe('a named month pins the order for the numeric dates around it', () => {
     ${'version 3/14/2024'}            | ${1}     | ${0}   | ${0}       | ${0}
     ${'Build 14-3-2024'}              | ${0}     | ${1}   | ${0}       | ${0}
     ${'version 3.14.2024'}            | ${0}     | ${0}   | ${0}       | ${0}
+    ${'Filed Sep. 1, 1939'}           | ${0}     | ${0}   | ${1}       | ${0}
+    ${'Filed February 30, 2024'}      | ${0}     | ${0}   | ${0}       | ${0}
+    ${'March 1, 1900 hectares'}       | ${0}     | ${0}   | ${0}       | ${0}
+    ${'May 24, 2024-03-28'}           | ${0}     | ${0}   | ${0}       | ${0}
+    ${'May 24, 2024/03/28'}           | ${0}     | ${0}   | ${0}       | ${0}
     ${'due 2/30/2024'}                | ${0}     | ${0}   | ${0}       | ${0}
     ${'see /3/14/2024/'}              | ${0}     | ${0}   | ${0}       | ${0}
   `('counts $input', ({ input, numMonth, numDay, namedMonth, namedDay }) => {
@@ -229,6 +281,19 @@ describe('a named month pins the order for the numeric dates around it', () => {
     const { changes, signals } = deamericanise(input, { assumeAmerican: false });
     const unambiguous = changes.filter((c) => c.ruleId === 'dates.numeric' && c.confidence === 'safe');
     expect(signals.unambiguousMonthFirstDates).toBe(unambiguous.length);
+  });
+
+  it.each([
+    'Filed March 5, 2024',
+    'Filed Mar. 5, 2024 and Sep 1st, 1939',
+    'Filed February 30, 2024',
+    'On March 1, 1900 square kilometres burned.',
+    'On March 1, 1925°C and May 24, 2024-03-28',
+    'On March 1st, 1900 hectares burned.',
+  ])('counts as named month-first exactly the dates the rule reorders in %j', (input) => {
+    const { changes, signals } = deamericanise(input, { preset: 'localise', assumeAmerican: false });
+    const withYear = changes.filter((c) => c.ruleId === 'dates.long' && /\d{4}$/.test(c.before));
+    expect(signals.namedMonthFirstDates).toBe(withYear.length);
   });
 
   it('treats one unambiguous American date as near-conclusive on its own', () => {

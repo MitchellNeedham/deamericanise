@@ -1,4 +1,5 @@
 import type { Change, Rule, RuleContext } from '../types.js';
+import { MEASURES, SINGULAR_WORDS } from './units/definitions.js';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -160,21 +161,109 @@ function numericDateRule(): Rule {
   };
 }
 
+function escape(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Unit abbreviations that are something else straight after a year: the preposition in
+ * `March 5, 2024 in Paris` and the closing quote in `"Filed March 5, 2024"`.
+ */
+const NOT_UNITS_AFTER_A_YEAR = new Set(['in', 'in.', '"']);
+
+/** Covers every band a metric conversion picks its unit from, millimetres to tonnes. */
+const MAGNITUDES = Array.from({ length: 16 }, (_, i) => 10 ** (i - 6));
+
+const METRIC = MEASURES.flatMap((measure) => MAGNITUDES.map((magnitude) => measure.convert(magnitude)));
+
+/**
+ * The forms a quantity of more than one is written in: the imperial forms the unit rules
+ * read, the metric forms their conversions write, and the temperatures and fuel economy
+ * that have rules of their own.
+ */
+const QUANTITY_UNITS = [
+  ...MEASURES.flatMap((measure) => [
+    ...measure.words.filter((word) => !SINGULAR_WORDS.has(word)),
+    ...measure.abbrevs.filter((abbrev) => !NOT_UNITS_AFTER_A_YEAR.has(abbrev)),
+  ]),
+  ...METRIC.flatMap(({ symbol, plural }) => [symbol, plural]),
+  'mpg', 'degrees Celsius', 'degrees Fahrenheit', 'degrees C', 'degrees F',
+];
+
+/**
+ * Singular unit words. Straight after four figures one names a thing, as `yard` does in
+ * `May 5, 2024 yard sales`, unless a hyphen joins it to them, as in `1900-mile`.
+ */
+const SINGULAR_UNITS = [...SINGULAR_WORDS, ...METRIC.map(({ singular }) => singular), 'degree Celsius'];
+
+/**
+ * Any of `units` in either spelling, matched case-sensitively, so the name in
+ * `March 5, 1959 Miles Davis` is not a unit. A symbol that a stop or hyphen joins to more
+ * letters is part of a word, as in `L.A.` and `t-shirts`.
+ */
+function unitPattern(units: string[]): string {
+  const spellings = new Set(units.flatMap((unit) => [unit, unit.replace(/(met|lit)re/g, '$1er')]));
+  const alternation = [...spellings].sort((a, b) => b.length - a.length).map(escape).join('|');
+  return String.raw`(?:${alternation})(?![A-Za-z]|[-.][A-Za-z])`;
+}
+
+/**
+ * What makes the four figures after `March 5,` something other than a year: the rest of a
+ * numeric date or of a longer number, as in `2024-03-28` and `1900.5`, or a unit, as in
+ * `1900 square kilometres`, `1900°C` or `1900-mile`. The unit may wrap onto the next line.
+ */
+const NOT_A_YEAR = new RegExp(
+  String.raw`[-/.]\d|-${unitPattern([...QUANTITY_UNITS, ...SINGULAR_UNITS])}|` +
+    String.raw`[^\S\n]*(?:\n[^\S\n]*)?(?:${unitPattern(QUANTITY_UNITS)}|[°℉℃])`,
+  'y',
+);
+
+const LONG_DATE = new RegExp(
+  String.raw`(?<![\w])(${MONTH_PATTERN})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,\s*((?:19|20)\d\d)(?![\w])`,
+  'g',
+);
+
+function monthNumber(name: string): number {
+  const lower = name.toLowerCase();
+  return MONTHS.findIndex((m) => m.toLowerCase().startsWith(lower.slice(0, 3))) + 1;
+}
+
+/** A month-first date with a named month and a year, such as `March 5, 2024`. */
+export interface LongDate {
+  start: number;
+  end: number;
+  month: number;
+  day: number;
+  year: number;
+}
+
+/**
+ * Every real month-first date written with a named month and a year, as `March 5, 2024`
+ * and `Sep. 1st, 1939` are. Four figures followed by the rest of a numeric date or by a
+ * unit are not its year, so `May 24, 2024-03-28` and `March 1, 1900 square kilometres`
+ * hold no date. The long date rule reorders these dates and detection counts them, so
+ * the two always agree on what is a date.
+ */
+export function* longDates(text: string): Generator<LongDate> {
+  for (const match of text.matchAll(LONG_DATE)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    NOT_A_YEAR.lastIndex = end;
+    if (NOT_A_YEAR.test(text)) continue;
+
+    const month = monthNumber(match[1]!);
+    const day = Number(match[2]);
+    const year = Number(match[3]);
+    if (isRealDate(year, month, day)) yield { start, end, month, day, year };
+  }
+}
+
 /** `March 5, 2024` and `Mar. 5th` are American orderings whatever the rest of the text says. */
 function longDateRule(): Rule {
-  const withYear = new RegExp(
-    String.raw`(?<![\w])(${MONTH_PATTERN})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,\s*((?:19|20)\d\d)(?![\w])`,
-    'g',
-  );
   const withoutYear = new RegExp(
     String.raw`(?<![\w])(${MONTH_PATTERN})\.?\s+(\d{1,2})(?:st|nd|rd|th)(?![\w])`,
     'g',
   );
-
-  function monthNumber(name: string): number {
-    const lower = name.toLowerCase();
-    return MONTHS.findIndex((m) => m.toLowerCase().startsWith(lower.slice(0, 3))) + 1;
-  }
 
   return {
     id: 'dates.long',
@@ -185,15 +274,11 @@ function longDateRule(): Rule {
       if (!ctx.options.dates.reorderLongDates) return [];
       const changes: Change[] = [];
 
-      for (const match of ctx.text.matchAll(withYear)) {
-        const month = monthNumber(match[1]!);
-        const day = Number(match[2]);
-        const year = Number(match[3]);
-        if (!isRealDate(year, month, day)) continue;
+      for (const { start, end, month, day, year } of longDates(ctx.text)) {
         changes.push({
-          start: match.index,
-          end: match.index + match[0].length,
-          before: match[0],
+          start,
+          end,
+          before: ctx.text.slice(start, end),
           after: formatDate(year, month, day, ctx.options.dates.format === 'iso' ? 'long' : ctx.options.dates.format),
           ruleId: 'dates.long',
           category: 'dates',

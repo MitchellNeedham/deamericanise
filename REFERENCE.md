@@ -374,7 +374,9 @@ written with dots, so a slash or hyphen date after one of those words is still a
 is local convention rather than translation, and waits for `localise` (or
 `dates: { reorderLongDates: true }`). It is still read as evidence: a named month written
 first is about the strongest signal there is that a document is American, and it settles
-the ambiguous numeric dates around it.
+the ambiguous numeric dates around it. Four figures followed by a unit or by the rest of a
+numeric date are not its year, so `On March 1, 1900 square kilometres burned.` and
+`May 24, 2024-03-28` stay as written and count for nothing.
 
 **Times and currency.** `3:00 P.M.` becomes `3:00pm`; a 12-hour clock is
 normal outside America too, so only the styling goes. The last stop stays when it also
@@ -466,7 +468,8 @@ Pounds count as `imperial units` only where the unit rules read them as a weight
 
 A numeric date counts as month-first or day-first in exactly the forms the date rule
 reads, so `3/14/2024` counts as month-first and `14/3/2024` as day-first, while the range
-`3.22-1000` and the version in `Node 14.2.10` count for neither.
+`3.22-1000` and the version in `Node 14.2.10` count for neither. A named date counts as
+month-first in exactly the forms the long date rule reorders, `Sep. 1, 1939` among them.
 
 Ambiguous dates ask a narrower question first, because a document writes its dates one way
 round: a sibling date that states its own order, whether by a day above 12 or by a named

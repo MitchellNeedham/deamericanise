@@ -266,6 +266,33 @@ becomes `cut into 1.3 centimetre thick slices`, and `a 6-foot-tall fence` become
 `a 1.8 metre tall fence`. A size with no noun after it leaves the unit plural, so
 `6 feet long` becomes `1.8 metres long`.
 
+An ounce or a ton measures something else where the words beside it say so. An ounce of a
+drink is a fluid ounce, so `Drink 16 oz of water.` becomes `Drink 470 mL of water.`, and so
+are `a 12 oz can of soda` and `a 16-oz pint glass of beer`. An ounce of gold, silver, platinum,
+palladium or bullion is a troy ounce of 31.1 grams, so `16 oz of gold` becomes `500 g of gold`,
+and `troy ounces`, `troy oz`, `ozt` and `oz t` are troy ounces wherever they stand. A ton of
+air conditioning is a ton of refrigeration (`12,000 BTU` an hour), so
+`a 3-ton central AC unit` becomes `an 11 kilowatt central AC unit`. Circuit boards are ordered
+by the ounces of copper on them the world over, so `2 oz copper` is left as written, and so
+is an ounce in a sentence that names a PCB, FR-4 or a circuit board. A change in another
+sense goes under the id of the measure it converts as, such as `units.volume.fluid-ounce`,
+so `rules` and `unitsKeep` switch it with that measure, and its note says how the unit was
+read.
+
+A metric value the author gives after the quantity decides the sense by its dimension, so
+`8 oz (240 mL) of milk` becomes `240 mL of milk` and `8 oz (230 g) of milk` becomes
+`230 g of milk`. Otherwise the phrase after the unit decides: an optional `of`, at most two
+words that are not function words, and then the thing measured. A container is read
+through to what it holds, so `a 15 oz can of beans` stays a weight. The thing has to end
+the phrase, or describe a noun that keeps its sense such as the `unit` of `AC unit`, so
+`8 oz cream cheese`, `8 oz milk chocolate` and `12 oz coffee beans` are weights, as are
+`sour cream`, `ice cream`, `baking soda` and `ground coffee`. A phrase that names any other
+thing keeps the unit's own sense, as `The AC is in a 3-ton truck` and
+`Dissolve 2 oz of sugar in water` do. Only where nothing after the quantity names a thing do
+the words before the number count, across at most a noun such as `unit` and three function
+words, as in `AC units of 2 to 5 tons` and `Copper weight: 2 oz`, and then, for copper, the
+rest of the sentence. `tonnage` says nothing, since a ship's tonnage is a weight.
+
 A unit of more than one word is read in the singular as well as the plural, so
 `half a pound per square inch` becomes `3.4 kilopascals` and `1 mile per hour` becomes
 `1.6 kilometres per hour`. In the singular it describes a noun as a one-word unit does, so

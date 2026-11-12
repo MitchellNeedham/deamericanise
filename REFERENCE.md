@@ -399,8 +399,9 @@ a sentence. `Cook until the chicken
 reaches 165F` becomes `73.9°C`, while `Apartment 3F`, `seat 23F`, `the Boeing 777F`,
 `#33F`, `F-150` and the courtesy figure in `180C/350F/gas 4` stay as they are.
 
-A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `175 Celsius`),
-and as a bare upper case `C` after a number of two or three figures with at most one space.
+A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `175℃`,
+`175 deg C`, `175 Celsius`), as `175 centigrade` or `175 degrees centigrade`, and as a bare
+upper case `C` after a number of two or three figures with at most one space.
 So `Bake at 350°F (180C)` becomes `Bake at 180C` and `180C/350°F/gas 4` stays as it is,
 while `Apartment 3C (65°F)` is a flat and its temperature converts.
 

@@ -7,6 +7,7 @@ import { patternRules } from '../src/rules/index.js';
 import { spellingEntries } from '../src/rules/spelling/index.js';
 import { baseVocabulary } from '../src/rules/vocabulary.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
+import { FAHRENHEIT } from '../src/rules/units/fahrenheit.js';
 import { NUMERIC_PATTERN, parseNumber } from '../src/rules/units/number.js';
 
 const convert = (input: string, options = {}) =>
@@ -1907,6 +1908,82 @@ describe('a Celsius value written with a bare C', () => {
     ${'Bake at 350°F (180c).'}             | ${'Bake at 175°C (180c).'}                  | ${'a lower case c'}
     ${'Bake at 350°F (180  C).'}           | ${'Bake at 175°C (180  C).'}                | ${'more than one space'}
   `('does not read a bare C in $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+/** The alternatives at the top level of a pattern's source. */
+function topLevelAlternatives(source: string): string[] {
+  const alternatives = [''];
+  let depth = 0;
+  let inClass = false;
+  for (let i = 0; i < source.length; i++) {
+    let token = source[i]!;
+    if (token === '\\') token += source[++i];
+    else if (inClass) inClass = token !== ']';
+    else if (token === '[') inClass = true;
+    else if (token === '(') depth++;
+    else if (token === ')') depth--;
+    else if (token === '|' && depth === 0) {
+      alternatives.push('');
+      continue;
+    }
+    alternatives[alternatives.length - 1] += token;
+  }
+  return alternatives;
+}
+
+describe('a Celsius value in each form a Fahrenheit value is read in', () => {
+  // Each Fahrenheit form, then the Celsius form written the same way.
+  const FORMS = [
+    ['°F', '°C'],
+    ['ºF', 'ºC'],
+    ['˚F', '˚C'],
+    ['℉', '℃'],
+    ['°Fahrenheit', '°Celsius'],
+    [' degrees Fahrenheit', ' degrees Celsius'],
+    [' degrees F', ' degrees C'],
+    [' deg F', ' deg C'],
+    [' deg. F', ' deg. C'],
+    ['degF', 'degC'],
+    [' Fahrenheit', ' Celsius'],
+  ];
+
+  it('pairs every form of FAHRENHEIT with a Celsius form', () => {
+    for (const alternative of topLevelAlternatives(FAHRENHEIT)) {
+      const form = new RegExp(`(?:${alternative})$`, 'i');
+      expect(FORMS.some(([fahrenheit]) => form.test(`350${fahrenheit}`)), alternative).toBe(true);
+    }
+  });
+
+  it.each(FORMS)('leaves 350%s alone after the 180%s it restates', (fahrenheit, celsius) => {
+    for (const unchanged of [
+      `Bake at 180${celsius} (350${fahrenheit}).`,
+      `Bake at 180${celsius}/350${fahrenheit}.`,
+      `Heat to 180${celsius} or 350${fahrenheit}.`,
+    ]) {
+      expect(convert(unchanged)).toBe(unchanged);
+    }
+  });
+
+  it.each(FORMS)('collapses 350%s into the 180%s after it', (fahrenheit, celsius) => {
+    expect(convert(`Bake at 350${fahrenheit} (180${celsius}).`)).toBe(`Bake at 180${celsius}.`);
+    expect(convert(`Bake at 350${fahrenheit}/180${celsius}.`)).toBe(`Bake at 180${celsius}.`);
+  });
+
+  it.each`
+    input                                        | expected
+    ${'Bake at 350°F (180 degrees centigrade).'} | ${'Bake at 180 degrees centigrade.'}
+    ${'Bake at 350°F (180 centigrade).'}         | ${'Bake at 180 centigrade.'}
+    ${'Bake at 350°F (180 degrees Centigrade).'} | ${'Bake at 180 degrees Centigrade.'}
+    ${'Bake at 180 centigrade (350°F).'}         | ${'Bake at 180 centigrade (350°F).'}
+    ${'Bake at 180 degrees centigrade/350°F.'}   | ${'Bake at 180 degrees centigrade/350°F.'}
+    ${'Bake at 350°F (160℃).'}                   | ${'Bake at 175°C (160℃).'}
+    ${'Bake at 350°F (2 kg).'}                   | ${'Bake at 175°C (2 kg).'}
+    ${'Bake at 350 deg F.'}                      | ${'Bake at 175°C.'}
+    ${'Bake at 175°C (350°F).'}                  | ${'Bake at 175°C (350°F).'}
+    ${'Bake at 350°F (160°C).'}                  | ${'Bake at 175°C (160°C).'}
+  `('reads centigrade too, and no further: $input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 });

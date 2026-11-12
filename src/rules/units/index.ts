@@ -375,7 +375,11 @@ const BASE = times(1);
  */
 const METRIC_UNITS = {
   temperature: [
-    [String.raw`degrees?\s+(?:Celsius|C)\b|[°º˚]\s*C(?:elsius\b)?|Celsius\b`, BASE],
+    [
+      String.raw`degrees?\s+(?:Celsius|C)\b|[°º˚]\s*C(?:elsius\b)?|Celsius\b|℃|deg\.?\s*C\b|` +
+        String.raw`(?:degrees?\s+)?[Cc]entigrade\b`,
+      BASE,
+    ],
     [String.raw`C\b`, BASE, BARE_CELSIUS_FIGURE],
   ],
   speed: [[String.raw`(?:kilometres?|kilometers?)\s+per\s+hour|km/h`, BASE]],

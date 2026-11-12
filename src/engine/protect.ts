@@ -134,6 +134,9 @@ function collectFencedCode(text: string, into: Range[]): void {
   if (open) into.push({ start: open.start, end: text.length });
 }
 
+/** Fenced code in a prose file that is not Markdown: three backticks, to the next three anywhere. */
+const BACKTICK_PAIRS = /`{3}[\s\S]*?`{3}/g;
+
 const STRUCTURAL: RegExp[] = [
   /\bhttps?:\/\/\S+/g,
   /\bwww\.\S+/g,
@@ -187,6 +190,8 @@ export interface ProtectOptions {
   commentedCode: boolean;
   /** The host language's line-comment markers, for spotting a double-commented line. */
   commentMarkers: string[];
+  /** Read code fences by CommonMark's rule. Off for a prose file that is not Markdown. */
+  markdownFences: boolean;
   extra: RegExp[];
 }
 
@@ -203,7 +208,8 @@ function collect(text: string, patterns: RegExp[], into: Range[]): void {
 export function protectedRanges(text: string, options: ProtectOptions): Range[] {
   const ranges: Range[] = [];
   collect(text, [IGNORE_BLOCK, IGNORE_LINE, ...STRUCTURAL], ranges);
-  collectFencedCode(text, ranges);
+  if (options.markdownFences) collectFencedCode(text, ranges);
+  else collect(text, [BACKTICK_PAIRS], ranges);
   if (options.properNouns) collect(text, PROPER_NOUNS, ranges);
   if (options.identifiers) {
     collect(text, IDENTIFIERS, ranges);

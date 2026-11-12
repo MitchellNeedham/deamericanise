@@ -1,3 +1,4 @@
+import { checkOptions } from '../config.js';
 import { agreesWith } from '../engine/articles.js';
 import { deamericanise } from '../transform.js';
 import type { Change, Options } from '../types.js';
@@ -56,6 +57,7 @@ const rule = {
 
   create(context: Context) {
     const options = (context.options[0] ?? {}) as Options;
+    checkOptions(options);
     const sourceCode = context.sourceCode ?? context.getSourceCode?.();
     if (!sourceCode) return {};
 

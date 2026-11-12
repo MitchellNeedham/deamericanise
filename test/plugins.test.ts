@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import remarkDeamericanise from '../src/plugins/remark.js';
 import eslintPlugin from '../src/plugins/eslint.js';
 
@@ -21,6 +21,16 @@ function flatten(node: Node): string[] {
   if (node.value !== undefined) return [node.value];
   return (node.children ?? []).flatMap(flatten);
 }
+
+const EXPECTED_DIALECTS = 'Expected one of en-AU, en-GB, en-NZ, en-IE, en-ZA, en-CA.';
+
+const REJECTED = [
+  { options: { dialect: 'en-XX' }, message: `Unknown dialect: en-XX. ${EXPECTED_DIALECTS}` },
+  { options: { dialect: 'toString' }, message: `Unknown dialect: toString. ${EXPECTED_DIALECTS}` },
+  { options: { preset: 'Localise' }, message: 'Unknown preset: Localise. Expected one of read, localise.' },
+];
+
+const VALID = [{ dialect: 'en-GB', preset: 'localise' }, { categories: { spelling: false } }, {}];
 
 describe('the remark plugin', () => {
   it.each`
@@ -90,6 +100,17 @@ describe('the remark plugin', () => {
   it('names an unknown preset rather than failing deep inside', () => {
     const tree = root(paragraph(text('the color')));
     expect(() => run(tree, { preset: 'Localise' })).toThrow('Unknown preset: Localise. Expected one of read, localise.');
+  });
+
+  it.each(REJECTED)('rejects $options when attached, before any document', ({ options, message }) => {
+    expect(() => remarkDeamericanise(options as never)).toThrow(message);
+    expect(() => run(root({ type: 'code', value: 'color' }), options)).toThrow(message);
+  });
+
+  it.each(VALID)('leaves a document with no prose alone under $options', (options) => {
+    const tree = root({ type: 'code', value: 'color' }, { type: 'thematicBreak' });
+    expect(run(tree, options)).toBe(tree);
+    expect(flatten(tree)).toEqual(['color']);
   });
 });
 
@@ -202,6 +223,34 @@ describe('the ESLint plugin', () => {
     expect(() => lint(source, [{ preset: 'Localise' }])).toThrow(
       'Unknown preset: Localise. Expected one of read, localise.',
     );
+  });
+
+  it.each(REJECTED)('rejects $options when the rule is created, before any comment', ({ options, message }) => {
+    const getAllComments = vi.fn(() => []);
+    const context = {
+      options: [options],
+      sourceCode: { getAllComments, getLocFromIndex: () => ({ line: 1, column: 0 }) },
+      report: vi.fn(),
+    };
+    expect(() => eslintPlugin.rules.comments.create(context as never)).toThrow(message);
+    expect(getAllComments).not.toHaveBeenCalled();
+  });
+
+  it.each(VALID)('reports nothing in a file with no comments under $options', (options) => {
+    const report = vi.fn();
+    const context = {
+      options: [options],
+      sourceCode: { getAllComments: () => [], getLocFromIndex: () => ({ line: 1, column: 0 }) },
+      report,
+    };
+    const visitor = eslintPlugin.rules.comments.create(context as never) as { Program?: () => void };
+    visitor.Program?.();
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  it('takes a dialect and preset in its options', () => {
+    const reports = lint('const a = 1; // the sidewalk\n', [{ dialect: 'en-GB', preset: 'localise' }]);
+    expect(reports.map((r) => r.data)).toEqual([{ before: 'sidewalk', after: 'pavement' }]);
   });
 
   it('ships a flat-config preset', () => {

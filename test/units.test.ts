@@ -3746,7 +3746,7 @@ describe('Fahrenheit decades', () => {
     ${'Highs in the 70s or 80s.'}          | ${'Highs between 21 and 32°C.'}        | ${'or'}
     ${'Highs in the 70s and 80s.'}         | ${'Highs between 21 and 32°C.'}        | ${'and'}
     ${'Highs in the 70s to 80s.'}          | ${'Highs between 21 and 32°C.'}        | ${'to'}
-    ${'highs in the 70s—80s'}              | ${'highs between 21 and 32°C'}         | ${'an em dash'}
+    ${'highs in the 70s\u201480s'}         | ${'highs between 21 and 32°C'}         | ${'an em dash'}
     ${'highs in the low 70s or upper 80s'} | ${'highs between 21 and 32°C'}         | ${'two banded decades'}
     ${'highs in the 70s or 80s °F'}        | ${'highs between 21 and 32°C'}         | ${'a Fahrenheit unit after the pair'}
     ${'highs in the 70s or 80s degrees'}   | ${'highs between 21 and 32°C'}         | ${'a bare degrees after the pair'}

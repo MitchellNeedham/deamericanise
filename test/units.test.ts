@@ -1133,6 +1133,15 @@ describe('a year after a preposition is not a measurement', () => {
     ${'Until 1999 square miles were mapped by hand.'} | ${'a unit of two words, after "until"'}
     ${'During 2020 miles driven fell.'}           | ${'after "during"'}
     ${'Before\n1990 acres were farmed here.'}     | ${'across a line that wraps'}
+    ${'By 2025 miles of track will open.'}        | ${'"of" after the unit'}
+    ${'In 5 yard sales we sold it.'}              | ${'a compound noun, whatever the number'}
+    ${'In 1500 feet of water, it lies.'}          | ${'a quantity that opens the sentence reads as a year'}
+    ${'Last year, in 2024 miles were driven.'}    | ${'after a comma'}
+    ${'Note: in 2024 miles were driven.'}         | ${'after a colon'}
+    ${'It rained; in 2024 miles were driven.'}    | ${'after a semicolon'}
+    ${'It rained.\nIn 2024 miles were driven.'}   | ${'at the start of a line'}
+    ${'He said, "In 2024 miles were driven."'}    | ${'after an opening quote'}
+    ${'It rained. (In 2024 miles were driven.)'}  | ${'after a stop and an opening bracket'}
     ${'a 2024 yard dash'}                         | ${'no preposition before the number'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
@@ -1147,15 +1156,29 @@ describe('a year after a preposition is not a measurement', () => {
     ${'In 3024 miles were driven.'}        | ${'In 4867 kilometres were driven.'}        | ${'four figures too large for a year'}
     ${'In 2024-mile races they tired.'}    | ${'In 3257 kilometre races they tired.'}    | ${'a hyphen ties the number to the unit'}
     ${'In 1500 ft of water it sank.'}      | ${'In 460 m of water it sank.'}             | ${'an abbreviation'}
+    ${'In 1500 ft of water.'}              | ${'In 460 m of water.'}                     | ${'the same, ending the sentence'}
     ${'It rose by 1200 feet.'}             | ${'It rose by 370 metres.'}                 | ${'a unit that ends the sentence'}
     ${'In 1000 feet, turn right.'}         | ${'In 300 metres, turn right.'}             | ${'a unit before a comma'}
     ${'within 2024 miles of here'}         | ${'within 3257 kilometres of here'}         | ${'"in" inside a word'}
-    ${'Faults fell to 1 in 2000 miles driven.'} | ${'Faults fell to 1 in 3200 kilometres driven.'} | ${'a number before the preposition'}
+    ${'The wreck lies in 1500 feet of water.'} | ${'The wreck lies in 460 metres of water.'} | ${'a preposition inside the clause'}
+    ${'Traffic grew in 2024 miles of road.'} | ${'Traffic grew in 3257 kilometres of road.'} | ${'the same, though it may be a year'}
+    ${'Faults fell to 1 in 2000 miles driven.'} | ${'Faults fell to 1 in 3200 kilometres driven.'} | ${'the same, after a number'}
   `('still converts $input ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 
-  it.each(['It was 4 ft 1 in 1000 ounces later.', 'six foot one in 1000 ounces later'])(
+  it('keeps reading the year of a date before a singular unit of two words under localise', () => {
+    expect(convert('On May 5, 2024 square mile parks opened.', { preset: 'localise' })).toBe(
+      'On 5 May 2024 square mile parks opened.',
+    );
+  });
+
+  it.each([
+    'It was 4 ft 1 in 1000 ounces later.',
+    'six foot one in 1000 ounces later',
+    'It was 4 ft 1\nin 1000 ounces later.',
+    'six foot one\nin 1000 ounces later',
+  ])(
     'gives the same output on a second run over %j, where "in" may be the inch',
     (input) => {
       const once = convert(input);

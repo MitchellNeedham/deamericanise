@@ -1,7 +1,7 @@
 import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
-import { endsSentence } from '../sentence.js';
+import { CLOSING, OPENING, endsSentence } from '../sentence.js';
 import {
   COMPOUNDS,
   MEASURES,
@@ -407,7 +407,16 @@ function countsSizedNoun(text: string, start: number, raw: string, gap: string, 
   return !ONE_OF_A_NOUN_BEFORE.test(before) && !SIZE_IN_A_LIST_BEFORE.test(before);
 }
 
-const YEAR_PREPOSITION_BEFORE = /(?<=(?<![\w-])(in|by|since|until|before|after|during)\s+)/diy;
+/**
+ * A preposition that takes a year, opening a sentence or clause, straight before where a number
+ * starts: at the start of the text or a line, or after a stop, comma, semicolon or colon, with
+ * only spaces and opening quotes or brackets between.
+ */
+const YEAR_PREPOSITION_BEFORE = new RegExp(
+  String.raw`(?<=(?:^|[\n\r]|[.!?…]${CLOSING}*\s|[,;:])[^\S\n\r]*${OPENING}*` +
+    String.raw`(in|by|since|until|before|after|during)\s+)`,
+  'diy',
+);
 
 /** Punctuation or the end of the text, after which a unit word starts no noun. */
 const CLOSES_CLAUSE = /\s*(?:[,.;:!?)\]]|$)/y;
@@ -415,8 +424,10 @@ const CLOSES_CLAUSE = /\s*(?:[,.;:!?)\]]|$)/y;
 /**
  * Whether the number `raw`, spaced before the unit word that ends at `end`, may be a year, as
  * `2024` is in `In 2024 yard sales rose` and `In 2024 miles were driven`: four figures from 1000
- * to 2999 straight after a preposition that takes a year. A unit word that closes the clause
- * names no thing the year could date, so `It rose by 1200 feet.` is a quantity.
+ * to 2999 straight after a preposition that takes a year and opens a sentence or clause. In the
+ * middle of a clause they are a quantity, as in `The wreck lies in 1500 feet of water.`, and so
+ * they are before a unit word that closes the clause, which names no thing the year could
+ * date: `It rose by 1200 feet.`
  */
 function mayBeYear(text: string, start: number, raw: string, gap: string, end: number): boolean {
   if (!/^[12]\d{3}$/.test(raw) || !/^\s+$/.test(gap)) return false;
@@ -425,10 +436,10 @@ function mayBeYear(text: string, start: number, raw: string, gap: string, end: n
   YEAR_PREPOSITION_BEFORE.lastIndex = start;
   const preposition = YEAR_PREPOSITION_BEFORE.exec(text);
   if (preposition === null) return false;
-  // After a number, `in` may be the inch of a height and `by` a dimension's join, so the
-  // reading would change once a first run converts that number.
-  const at = preposition.indices![1]![0];
-  return !NUMBER_BEFORE_MARK.test(text.slice(Math.max(0, at - NUMBER_REACH), at));
+  // After a number on the line above, `in` may be the inch of a wrapped height and `by` a
+  // dimension's join, so the reading would change once a first run converts that number.
+  NUMBER_ENDS_HERE.lastIndex = preposition.indices![1]![0];
+  return !NUMBER_ENDS_HERE.test(text);
 }
 
 /** `6 in` is usually the preposition. `6in` never is. */
@@ -455,11 +466,17 @@ const QUOTE_OR_BLANK_LINE = new RegExp(
   'g',
 );
 
-/** A number ending where a mark stands. A number in words starts a word: `often` holds none. */
-const NUMBER_BEFORE_MARK = new RegExp(
-  String.raw`(?:(?<![A-Za-z])|(?![A-Za-z]))(?:${NUMBER_PATTERN})${GAP}$`,
-  'i',
-);
+/** A number and the gap after it. A number in words starts a word: `often` holds none. */
+const NUMBER_AND_GAP = String.raw`(?:(?<![A-Za-z])|(?![A-Za-z]))(?:${NUMBER_PATTERN})${GAP}`;
+
+/** A number ending where a mark stands. */
+const NUMBER_BEFORE_MARK = new RegExp(`${NUMBER_AND_GAP}$`, 'i');
+
+/**
+ * A number ending at `lastIndex`. It reads the whole text, so a gap that wraps onto the line
+ * of `lastIndex` is seen as the soft break it is.
+ */
+const NUMBER_ENDS_HERE = new RegExp(`(?<=${NUMBER_AND_GAP})`, 'iy');
 
 function followsNumber(text: string, at: number): boolean {
   const before = text.slice(Math.max(0, at - NUMBER_REACH), at);

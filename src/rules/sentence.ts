@@ -1,6 +1,9 @@
 /** A closing quote or bracket that can stand between a stop and the sentence after it. */
 export const CLOSING = String.raw`[)\]}"'’”»]`;
 
+/** An opening quote or bracket that can stand before the first word of a sentence. */
+export const OPENING = String.raw`[([{"'‘“«]`;
+
 const CLOSERS = new RegExp(`${CLOSING}*`, 'y');
 
 /** A line break that starts a new paragraph, list item or heading. */
@@ -8,7 +11,7 @@ const BREAK = String.raw`\n[^\S\n]*(?:\n|(?:[-*+]|\d+[.)]|#{1,6})[^\S\n])`;
 const BLOCK_BREAK = new RegExp(BREAK, 'y');
 const BLOCK_END = new RegExp(String.raw`\s*$|[^\S\n]*${BREAK}`, 'y');
 
-const NEXT_WORD = /\s+[([{"'‘“«]*(?=\p{Lu}(?!\p{Lu}))/uy;
+const NEXT_WORD = new RegExp(String.raw`\s+${OPENING}*(?=\p{Lu}(?!\p{Lu}))`, 'uy');
 
 /**
  * Whether the stop just before `end` is also the sentence's full stop. It is when nothing

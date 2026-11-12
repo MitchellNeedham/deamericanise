@@ -1,3 +1,7 @@
+import { DIALECTS } from '../../dialects/index.js';
+import { toPattern } from '../../engine/lexicon.js';
+import { spellingEntries } from '../spelling/index.js';
+import { baseVocabulary } from '../vocabulary.js';
 import { INLINE_SPACE, NUMBER_START, SOFT_SPACE, canBeRange, parseNumber, softGap } from './number.js';
 
 /** `°F`, `℉`, `degrees Fahrenheit` and the like: Fahrenheit written as a unit. */
@@ -28,17 +32,28 @@ const BARE_VALUE = /^[-−]?[1-9]\d{1,2}(?:\.\d+)?$/;
 /** A hex colour such as `#33F`, or a designation such as `A330-200F` or `MiG-21F`. */
 const DESIGNATION = /(?:#|(?<!\w)[A-Za-z]\w*[-–])$/;
 
+const HEAT_WORDS =
+  String.raw`temperatures?|temps?|degrees|thermometers?|thermostats?|fevers?|weather|forecasts?|` +
+  String.raw`highs|lows|freezing|humidity|ovens?|pre-?heat(?:s|ed|ing)?|heat(?:s|ed|ing)?|` +
+  String.raw`bak(?:e|es|ed|ing)|roast(?:s|ed|ing)?|broil(?:s|ed|ing)?|grill(?:s|ed|ing)?|` +
+  String.raw`fr(?:y|ies|ied|ying)|cook(?:s|ed|ing)?|simmer(?:s|ed|ing)?|boil(?:s|ed|ing)?`;
+const HEAT_WORD = new RegExp(String.raw`\b(?:${HEAT_WORDS})\b`, 'i');
+
+/** The American words the lexicon rewrites into a word about heat, as `cookie sheet` into `baking tray`. */
+const AMERICAN_HEAT_WORDS = [
+  ...new Set(
+    [...spellingEntries(), ...baseVocabulary(), ...Object.values(DIALECTS).flatMap((pack) => pack.vocabulary)]
+      .filter((entry) => HEAT_WORD.test(entry.to))
+      .map((entry) => toPattern(entry.from)),
+  ),
+];
+
 /**
  * Words that put a bare `F` in a sentence about heat. Without one, `350F` is as likely a
- * seat, a size or a model as a temperature.
+ * seat, a size or a model as a temperature. Every rule reads the input, so an American word
+ * counts wherever its replacement would.
  */
-const ABOUT_HEAT = new RegExp(
-  String.raw`\b(?:temperatures?|temps?|degrees|thermometers?|thermostats?|fevers?|weather|forecasts?|` +
-    String.raw`highs|lows|freezing|humidity|ovens?|pre-?heat(?:s|ed|ing)?|heat(?:s|ed|ing)?|` +
-    String.raw`bak(?:e|es|ed|ing)|roast(?:s|ed|ing)?|broil(?:s|ed|ing)?|grill(?:s|ed|ing)?|` +
-    String.raw`fr(?:y|ies|ied|ying)|cook(?:s|ed|ing)?|simmer(?:s|ed|ing)?|boil(?:s|ed|ing)?)\b`,
-  'i',
-);
+const ABOUT_HEAT = new RegExp(String.raw`\b(?:${[HEAT_WORDS, ...AMERICAN_HEAT_WORDS].join('|')})\b`, 'i');
 
 /** A Celsius value beside a bare `F` makes it the courtesy figure, as in `180C/350F/gas 4`. */
 const CELSIUS = /\d(?:\s*[°º˚]\s*|\s?)C\b|℃|\b[Cc](?:elsius|entigrade)\b/;

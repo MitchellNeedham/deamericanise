@@ -542,6 +542,13 @@ function restatesConversion(
   });
 }
 
+/** Miles per US gallon, in every form the fuel economy rule reads. */
+const MPG_FORMS = [
+  'mpg',
+  String.raw`miles(?:\s+per\s+|${HYPHEN}per${HYPHEN})gallon`,
+  String.raw`(?:miles|mi)\s*/\s*(?:gallon|gal)`,
+];
+
 /**
  * Imperial units by the dimension of what they convert to: every unit in MEASURES, and
  * the forms that only the feet-and-inches, temperature and fuel economy rules read.
@@ -554,7 +561,7 @@ const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
     String.raw`deg\.?\s*F`,
     'Fahrenheit',
   ],
-  economy: ['mpg', String.raw`miles\s+per\s+gallon`],
+  economy: [...MPG_FORMS],
   length: ["'"],
 };
 for (const measure of MEASURES) {
@@ -1694,29 +1701,63 @@ function coinSizeRule(): Rule {
   };
 }
 
+/**
+ * `30 mpg`, `30 miles per gallon` and `30 mi/gal` become litres per 100 km, or km per litre.
+ * A range converts both ends, in the order the source gives them, since litres per 100 km
+ * fall as miles per gallon rise: `20 to 30 mpg` becomes `12 to 7.8 L/100km`. A range or
+ * figure the rule cannot convert whole is held, so the length rule never reads its `miles`.
+ */
 function fuelEconomyRule(): Rule {
-  const pattern = new RegExp(
-    String.raw`${NUMBER_START}(\d+(?:\.\d+)?)\s*(mpg|miles per gallon)(?![A-Za-z])`,
-    'gi',
-  );
+  const id = 'units.economy.mpg';
+  const MPG = String.raw`\d+(?:\.\d+)?`;
+  const PLAIN_MPG = new RegExp(`^(?:${MPG})$`);
+  const UNIT = String.raw`${GAP}(?:${MPG_FORMS.join('|')})(?![A-Za-z])`;
+  const single = new RegExp(String.raw`${NUMBER_START}(${MPG})${UNIT}`, 'gi');
+  // Must start where the range rule starts, so the two read the same ranges.
+  const START = String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})${NOT_SECOND_OF_PAIR}|(?!${NUMERIC_FIRST}))`;
+  const range = new RegExp(String.raw`${START}(${NUMBER_PATTERN})(${RANGE_JOIN})(${MPG})${UNIT}`, 'gi');
 
   return {
-    id: 'units.economy.mpg',
+    id,
     category: 'units',
     confidence: 'moderate',
     priority: 35,
     find(ctx) {
       const changes: Change[] = [];
-      pattern.lastIndex = 0;
-      for (const match of ctx.text.matchAll(pattern)) {
+      const perLitre = ctx.options.units.fuelEconomy === 'km-per-l';
+      const { precision, maxDecimals } = ctx.options.units;
+      const economy = (mpg: number, figures: number) =>
+        formatNumber(perLitre ? mpg * 0.425143707 : 235.214583 / mpg, precision, figures, maxDecimals);
+      const unit = perLitre ? 'km/L' : 'L/100km';
+
+      range.lastIndex = 0;
+      for (const match of ctx.text.matchAll(range)) {
+        const [matched, lowRaw, join, highRaw] = [match[0], match[1]!, match[2]!, match[3]!];
+        const start = match.index;
+        const low = parseNumber(lowRaw);
+        const high = Number(highRaw);
+        if (low === null) continue;
+        const reading = isWritten(lowRaw) ? writtenRange(ctx.text, start, lowRaw, join, highRaw) : 'read';
+        if (reading === 'skip' || !canBeRange(ctx.text, start, low, high)) continue;
+        if (reading === 'hold' || !PLAIN_MPG.test(lowRaw) || low === 0 || high === 0) {
+          changes.push(hold(start, matched, id, 35));
+          continue;
+        }
+        const figures = Math.max(2, significantFigures(lowRaw), significantFigures(highRaw));
+        const separator = /to/i.test(join) ? ' to ' : /and/i.test(join) ? ' and ' : '-';
+        const body = `${economy(low, figures)}${separator}${economy(high, figures)} ${unit}`;
+        pushMeasurement(ctx, changes, start, matched, body, id, 35);
+      }
+
+      single.lastIndex = 0;
+      for (const match of ctx.text.matchAll(single)) {
         const mpg = Number(match[1]);
-        if (!mpg) continue;
-        const perLitre = ctx.options.units.fuelEconomy === 'km-per-l';
-        const value = perLitre ? mpg * 0.425143707 : 235.214583 / mpg;
-        const { precision, maxDecimals } = ctx.options.units;
-        const number = formatNumber(value, precision, Math.max(2, significantFigures(match[1]!)), maxDecimals);
-        const body = `${number} ${perLitre ? 'km/L' : 'L/100km'}`;
-        pushMeasurement(ctx, changes, match.index, match[0], body, 'units.economy.mpg', 35);
+        if (!mpg || endsRange(ctx.text, match.index, mpg)) {
+          changes.push(hold(match.index, match[0], id, 35));
+          continue;
+        }
+        const body = `${economy(mpg, Math.max(2, significantFigures(match[1]!)))} ${unit}`;
+        pushMeasurement(ctx, changes, match.index, match[0], body, id, 35);
       }
       return changes;
     },

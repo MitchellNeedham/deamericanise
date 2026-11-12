@@ -65,15 +65,16 @@ export const SPACE_GROUPED =
 const DIGITS = String.raw`${groupedBy(',')}|${SPACE_GROUPED}|\d+`;
 
 const COUNT_THEN_GROUP = new RegExp(
-  String.raw`^\d{1,3}(?:${GROUP_SPACE}\d{3})*${GROUP_SPACE}[1-9]\d\d(?:\.\d+)?$`,
+  String.raw`^\d{1,3}(?:${GROUP_SPACE}\d{3})*${GROUP_SPACE}(?=[1-9]\d\d(?:\.\d+)?$)`,
 );
 
 /**
- * Whether `raw`, grouped with spaces, may instead be a count and then a number, as `2 100` is
- * in `2 100-pound bags`: its last group is a number of its own, with no leading zero.
+ * Where the last group of `raw`, grouped with spaces, starts, where that group is a number of
+ * its own, with no leading zero, so the groups before it may be a count: 2 in `2 100`. Null
+ * where `raw` is no such number.
  */
-export function mayBeCountAndNumber(raw: string): boolean {
-  return COUNT_THEN_GROUP.test(raw);
+export function countBeforeGroup(raw: string): number | null {
+  return COUNT_THEN_GROUP.exec(raw)?.[0].length ?? null;
 }
 
 const LINE_BREAK = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;

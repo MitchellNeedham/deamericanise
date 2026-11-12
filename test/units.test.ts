@@ -1569,7 +1569,11 @@ describe('a number grouped in thousands with spaces is one number', () => {
     ${'We drove 1 000 to 2 000 miles.'}     | ${'We drove 1 600 to 3 200 kilometres.'}     | ${'both ends of a range'}
     ${'a 1 000 x 2 000 foot plot'}          | ${'a 300 x 610 metre plot'}                  | ${'both sides of a dimension'}
     ${'The 1 000-foot tower'}               | ${'The 300 metre tower'}                     | ${'a last group that is no number on its own'}
-    ${'a 1 500-foot tower'}                 | ${'a 460 metre tower'}                       | ${'a determiner that takes one tower'}
+    ${'a 1 500-foot tower'}                 | ${'a 460 metre tower'}                       | ${'a determiner before a hyphenated size'}
+    ${'the 1 500-foot tower'}               | ${'the 460 metre tower'}                     | ${'the same, with "the"'}
+    ${'their 1 500-foot tower'}             | ${'their 460 metre tower'}                   | ${'a possessive before it'}
+    ${'Buy 2 100-pound bags.'}              | ${'Buy 2 45 kilogram bags.'}                 | ${'a count, then a hyphenated size'}
+    ${'Buy 2 100-lb bags.'}                 | ${'Buy 2 45 kg bags.'}                       | ${'the same, with an abbreviation'}
     ${'It is 1 000 miles (1 600 km) away.'} | ${'It is 1 600 km away.'}                    | ${'a metric value grouped the same way restates it'}
     ${'Plot 4096 500 feet wide'}            | ${'Plot 4096 150 metres wide'}               | ${'four figures lead no group'}
     ${'We drove 1 1/2 miles.'}              | ${'We drove 2.4 kilometres.'}                | ${'a mixed number'}
@@ -1587,8 +1591,8 @@ describe('a number grouped in thousands with spaces is one number', () => {
     ${'Agent 007 feet'}                | ${'the same, in a code'}
     ${'It is 007 to 012 feet.'}        | ${'at both ends of a range'}
     ${'It weighs 07 pounds 3 ounces.'} | ${'in a weight in two units, which stays whole'}
-    ${'He bought 2 100-pound bags.'}   | ${'two bags of 100 pounds, or bags of 2100'}
-    ${'They built 3 400 foot towers.'} | ${'the same, with a singular unit word'}
+    ${'They built 3 400 foot towers.'} | ${'three towers of 400 feet, or towers of 3400'}
+    ${'I gave her 2 100-pound bags.'}  | ${'"her" may own the bags or be given two of them'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });

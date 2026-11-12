@@ -30,11 +30,11 @@ import {
   SPACE_GROUPED,
   WHOLE_NUMBER,
   canBeRange,
+  countBeforeGroup,
   formatNumber,
   formatTemperature,
   isOvenSetting,
   listReader,
-  mayBeCountAndNumber,
   parseNumber,
   plainHyphens,
   significantFigures,
@@ -545,11 +545,42 @@ function countsSizedNoun(text: string, start: number, raw: string, gap: string, 
   return !ONE_OF_A_NOUN_BEFORE.test(before) && !SIZE_IN_A_LIST_BEFORE.test(before);
 }
 
+/** A possessive before a number, as in `their 1 500-foot tower` and `Sam's 1 500-foot yacht`. */
+const POSSESSIVE_BEFORE = new RegExp(
+  String.raw`(?:\b(?:my|your|his|its|our|their)|` +
+    String.raw`\b(?!(?:it|that|there|here|what|who|he|she|let)['’]s)[A-Za-z]+['’]s)\s+$`,
+  'i',
+);
+
+/** `her`, a possessive or the object of a verb, as in `her 1 500-foot yacht` and `gave her 2 bags`. */
+const HER_BEFORE = /\bher\s+$/i;
+
 /**
- * Whether the number `raw`, grouped with spaces before the unit `entry` that ends at `end`,
- * may be a count of the noun the measurement describes and then the measurement's own number,
- * as in `2 100-pound bags`, which may be two `100-pound` bags. A plural unit word describes no
- * noun, and a determiner that takes one of a noun leaves no count, as in `a 1 500-foot tower`.
+ * Where the size's number starts in the number `raw`, grouped with spaces before a hyphenated
+ * size, as in `2 100-pound bags`: the groups before its last are a count of the noun, and the
+ * last is the size. After a determiner or a possessive the groups are one number, as in
+ * `a 1 500-foot tower`, and after `her` they may be either, which is `unclear`. Null where `raw`
+ * is not a count and a size, or is one number.
+ */
+function countBeforeSize(
+  text: string,
+  start: number,
+  raw: string,
+  gap: string,
+): number | 'unclear' | null {
+  if (!plainHyphens(gap).includes('-')) return null;
+  const cut = countBeforeGroup(raw);
+  if (cut === null) return null;
+  const before = text.slice(Math.max(0, start - 24), start);
+  if (HER_BEFORE.test(before)) return 'unclear';
+  return DETERMINER_BEFORE.test(before) || POSSESSIVE_BEFORE.test(before) ? null : cut;
+}
+
+/**
+ * Whether the number `raw`, grouped with spaces before the unit `entry` that ends at `end` and
+ * spaced from it, may be a count of the noun the measurement describes and then the
+ * measurement's own number, as in `3 400 foot towers`. A plural unit word describes no noun,
+ * and a determiner that takes one of a noun leaves no count, as in `a 1 500 foot tower`.
  */
 function mayCountNoun(
   text: string,
@@ -560,7 +591,8 @@ function mayCountNoun(
   gap: string,
   end: number,
 ): boolean {
-  if (!mayBeCountAndNumber(raw) || (entry.isWord && !entry.isSingular)) return false;
+  if (countBeforeGroup(raw) === null || plainHyphens(gap).includes('-')) return false;
+  if (entry.isWord && !entry.isSingular) return false;
   if (ONE_OF_A_NOUN_BEFORE.test(text.slice(Math.max(0, start - 24), start))) return false;
   return describesNoun(text, start, value, gap, end);
 }
@@ -2004,6 +2036,15 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     ) {
       const cut = count[0].length;
       pushSingle(ctx, changes, start + cut, matched.slice(cut), raw.slice(cut), alias);
+      return;
+    }
+    const groups = countBeforeSize(ctx.text, start, raw, gap);
+    if (groups === 'unclear') {
+      changes.push(hold(start, matched, entry.measure.id, 30));
+      return;
+    }
+    if (groups !== null) {
+      pushSingle(ctx, changes, start + groups, matched.slice(groups), raw.slice(groups), alias);
       return;
     }
     if (entry.isSingular && countsSizedNoun(ctx.text, start, raw, gap, start + matched.length)) {

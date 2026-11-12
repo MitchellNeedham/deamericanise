@@ -427,10 +427,15 @@ or narrow no-break space (U+202F), the same kind throughout. So
 `The road is 1 000 miles long.` becomes `The road is 1 600 kilometres long.`, and no
 measurement starts on a later group. One or two figures after a space are a number of their
 own, so `Rooms 3 4 feet apart` becomes `Rooms 3 1.2 metres apart`, and figures that no
-number starts at lead no group, as the `98` of `10/20/98 100 feet` does not. Before a unit
-that describes a noun, a number grouped with spaces may be a count and then a size, so
-`He bought 2 100-pound bags.` is left as written, while `a 1 500-foot tower` and
-`the 1 000-foot tower` convert. A whole number with a leading zero is a code or a name, so
+number starts at lead no group, as the `98` of `10/20/98 100 feet` does not. Before a
+hyphenated size, a number grouped with spaces is one number only after a determiner such as
+`a`, `the` or `each`, or a possessive such as `their` or `Sam's`, so `a 1 500-foot tower`
+becomes `a 460 metre tower`. Otherwise its last group is the size and the figures before it
+count the noun, so `Buy 2 100-pound bags.` becomes `Buy 2 45 kilogram bags.` After `her`,
+which may own the noun or be given it, either reading may be meant, so
+`I gave her 2 100-pound bags.` is left as written. Before a spaced
+singular unit word it may be either, so `They built 3 400 foot towers.` is left as written.
+A whole number with a leading zero is a code or a name, so
 `Agent 007 feet` and `We drove 025 miles.` are left as written, while `0` and `0.5` are
 numbers.
 

@@ -248,7 +248,11 @@ Dimensions move as a set, because converting half of a pair is worse than leavin
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 `22 x 28 centimetres`, both ends sharing the unit chosen for the larger. Each side is read
 in its own unit, so `2 feet x 6 inches` becomes `61 x 15 centimetres` and `10 ft x 12 in`
-becomes `3 x 0.3 m`, where the `in` is the unit because the side before it has one. Sides
+becomes `3 x 0.3 m`, where the `in` is the unit because the side before it has one. An `in`
+before `x` and another number is the unit too, so `4 in x 6 in` becomes `10 x 15 cm`, while
+`6 in by 5 in the morning` stays as written. An apostrophe straight after a number is feet
+on a side, when every side has a mark of its own: `2' x 6"` becomes `61 x 15 cm` and
+`2' x 4'` becomes `0.61 x 1.2 m`, while a quoted `'6'` stays a number. Sides
 that measure different things, as in `2 feet x 6 pounds`, convert as two measurements.
 Only a length has sides. Before any other unit a bare number is a count, and the quantity
 after it converts on its own: `2 x 4 oz cans` becomes `2 x 110 g cans`, and
@@ -260,7 +264,9 @@ A side may be a whole number in words: `a ten by twelve foot room` becomes
 words on any side, as in `two and a half by three feet`, leaves the dimension as written. So
 does `one by two feet`, since `one` may be a pronoun with `by` giving an amount. After a word
 such as `each`, `all` or `that one`, only the amount converts: `raise each one by two inches`
-becomes `raise each one by 5.1 centimetres`.
+becomes `raise each one by 5.1 centimetres`, and `raise all 4 by 6 inches` becomes
+`raise all 4 by 15 centimetres`. A pair in digits before a noun describes it, so
+`those 4 by 6 inch photos` becomes `those 10 by 15 centimetre photos`.
 
 A weight in two units is one weight, as a height in feet and inches is one height:
 `7 pounds 8 ounces` becomes `3.4 kilograms`, `11st 4lb` becomes `71.7 kg`, and

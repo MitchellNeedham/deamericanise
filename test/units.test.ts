@@ -912,6 +912,99 @@ describe('a dimension with a different unit on each side', () => {
   });
 });
 
+describe('an apostrophe for feet on a side of a dimension', () => {
+  it.each`
+    input                    | expected                         | why
+    ${`the 2' x 6" shelf`}   | ${'the 61 x 15 cm shelf'}        | ${'feet beside inches'}
+    ${`a 2' x 4' sheet`}     | ${'a 0.61 x 1.2 m sheet'}        | ${'feet on every side'}
+    ${`a 2' x 4' x 8' box`}  | ${'a 0.61 x 1.2 x 2.4 m box'}    | ${'three sides'}
+    ${`2'x6"`}               | ${'61 x 15 cm'}                  | ${'no spaces'}
+    ${`2' × 4'`}             | ${'0.61 × 1.2 m'}                | ${'the multiplication sign'}
+    ${`2' by 4'`}            | ${'0.61 by 1.2 m'}               | ${'joined by "by"'}
+    ${`2' x 4 feet`}         | ${'0.61 x 1.2 metres'}           | ${'beside a unit written out'}
+    ${`2' x 6 in x 3 in`}    | ${'61 x 15 x 7.6 cm'}            | ${'beside an "in" that another side confirms'}
+    ${`He is 6'2" tall.`}    | ${'He is 1.88 metres tall.'}     | ${'feet and inches are still one height'}
+    ${'a 5′ x 8′ rug'}       | ${'a 1.5 x 2.4 m rug'}           | ${'prime marks'}
+    ${`'6' x 4 ft`}          | ${`'6' x 1.2 m`}                 | ${'a quoted number beside a side with a unit'}
+    ${`2' x 4 oz`}           | ${`2' x 110 g`}                  | ${'a side that is not a length'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                | why
+    ${`She said '6' twice.`} | ${'a quoted number'}
+    ${`the '6' x 4' panel`}  | ${'a quoted number, though a dimension follows'}
+    ${`'2 x 4'`}             | ${'a quoted dimension with no unit'}
+    ${`2' x 4`}              | ${'no mark on the last side'}
+    ${`10 x 12' x 6"`}       | ${'no mark on the first side, so no side converts'}
+    ${`2 ' x 4 '`}           | ${'a spaced apostrophe'}
+    ${`2' x 4 in`}           | ${'an apostrophe cannot confirm a bare "in"'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    options                                      | why
+    ${{ unitsKeep: ['foot'] }}                   | ${'the foot is kept'}
+    ${{ rules: { 'units.length.foot': false } }} | ${'the foot is switched off'}
+  `('leaves the feet alone when $why', ({ options }) => {
+    expect(convert(`a 2' x 4' sheet`, options)).toBe(`a 2' x 4' sheet`);
+  });
+});
+
+describe('a spaced "in" on every side of a dimension', () => {
+  it.each`
+    input                    | expected                 | why
+    ${'4 in x 6 in photo'}   | ${'10 x 15 cm photo'}    | ${'"in" before "x" and a number is the unit'}
+    ${'6 in x 6 in tiles'}   | ${'15 x 15 cm tiles'}    | ${'equal sides'}
+    ${'4 in × 6 in'}         | ${'10 × 15 cm'}          | ${'the multiplication sign'}
+    ${'4 in x 6 in x 2 in'}  | ${'10 x 15 x 5.1 cm'}    | ${'three sides'}
+    ${'4in x 6in photo'}     | ${'10 x 15 cm photo'}    | ${'no spaces'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                     | why
+    ${'6 in total'}               | ${'the preposition'}
+    ${'10 x 12 in'}               | ${'one "in", with no other unit'}
+    ${'6 in by 5 in the morning'} | ${'"by" may join two prepositions'}
+    ${'4 in by 6 in'}             | ${'the same with nothing after'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a count in digits before "by" and an amount', () => {
+  it.each`
+    input                               | expected                                | why
+    ${'Raise all 4 by 6 inches.'}       | ${'Raise all 4 by 15 centimetres.'}     | ${'"all" makes the number a noun'}
+    ${'Move each 2 by 3 feet.'}         | ${'Move each 2 by 91 centimetres.'}     | ${'"each"'}
+    ${'Lower these 2 by 3 feet.'}       | ${'Lower these 2 by 91 centimetres.'}   | ${'"these"'}
+    ${'Shift both 1 by 2 inches.'}      | ${'Shift both 1 by 5.1 centimetres.'}   | ${'"both" before one'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                               | expected                                | why
+    ${'a 4 by 6 inch photo'}            | ${'a 10 by 15 centimetre photo'}        | ${'no noun word before the pair'}
+    ${'The room is 10 by 12 feet.'}     | ${'The room is 3 by 3.7 metres.'}       | ${'the same, plural'}
+    ${'each 4 ft by 6 ft panel'}        | ${'each 1.2 by 1.8 m panel'}            | ${'a side with its own unit is never a noun'}
+    ${'those 4 by 6 inch photos'}       | ${'those 10 by 15 centimetre photos'}   | ${'a pair before a noun describes it'}
+    ${'all 4 by 6 ft panels'}           | ${'all 1.2 by 1.8 m panels'}            | ${'the same, abbreviated'}
+    ${'all 4 x 6 inch photos'}          | ${'all 10 x 15 centimetre photos'}      | ${'"x" never gives an amount'}
+    ${'raise all four by six inches'}   | ${'raise all four by 15 centimetres'}   | ${'a count in words'}
+  `('still converts $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('leaves three sides after a noun word alone', () => {
+    expect(convert('Raise all 4 by 6 by 8 inches.')).toBe('Raise all 4 by 6 by 8 inches.');
+  });
+});
+
 describe('a count before a weight or volume', () => {
   it.each`
     input                                      | expected                                       | why

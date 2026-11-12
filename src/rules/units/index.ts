@@ -223,6 +223,16 @@ function isBareInch(alias: string, whole: string): boolean {
   return alias.toLowerCase() === 'in' && /\s$/.test(whole.slice(0, whole.length - alias.length));
 }
 
+/**
+ * An apostrophe after a number, read as the foot's prime only on a side of a dimension whose
+ * every side has a mark of its own, as in `2' x 6"`. Anywhere else it may close a quote.
+ */
+const FOOT_MARK = "'";
+const PRIME = '′';
+
+/** A quote opened straight before a number, which a `'` after the number may close: `'6'`. */
+const OPENS_QUOTE = /['‘]$/;
+
 function unitWord(target: MetricValue, value: number): string {
   return Math.abs(value) === 1 ? target.singular : target.plural;
 }
@@ -825,12 +835,17 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     'gi',
   );
 
+  // A spaced `'`, or one after a word, is a quote mark. One before a digit starts the inches
+  // of `6'2"`, which `feetInchesRule` reads.
+  const SIDE_UNIT = byAlias.has(PRIME)
+    ? String.raw`${alternation}|(?<![\sA-Za-z-])${FOOT_MARK}(?!\d)`
+    : alternation;
   // An optional unit after an inner number, so `8.5" x 11"` and `10 ft x 12 ft` both match.
-  const INNER_UNIT = String.raw`(?:${GAP}(${alternation}))?`;
+  const INNER_UNIT = String.raw`(?:${GAP}(${SIDE_UNIT}))?`;
   const dimensions = new RegExp(
     String.raw`${START}(${NUMBER_PATTERN})${INNER_UNIT}${DIMENSION_JOIN}(${NUMBER_PATTERN})` +
       String.raw`(?:${INNER_UNIT}${DIMENSION_JOIN}(${NUMBER_PATTERN}))?` +
-      String.raw`${GAP}(${alternation})(?![A-Za-z])`,
+      String.raw`${GAP}(${SIDE_UNIT})(?![A-Za-z])`,
     'dgi',
   );
 
@@ -1006,28 +1021,55 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         // The groups holding each side's number and the unit written straight after it.
         const groups: Array<[number, number]> =
           match[5] === undefined ? [[1, 2], [3, 6]] : [[1, 2], [3, 4], [5, 6]];
-        const sides = groups.map(([number, unit]) => {
+        const sides = groups.map(([number, unit], i) => {
           const alias = match[unit];
-          const upToUnit = alias === undefined ? '' : ctx.text.slice(start, match.indices![unit]![1]);
+          const sideEnd = match.indices![alias === undefined ? number : unit]![1];
+          const next = groups[i + 1];
           return {
             raw: match[number]!,
             value: parseNumber(match[number]!),
             alias,
-            entry: alias === undefined ? undefined : resolve(alias),
-            bareInch: alias !== undefined && isBareInch(alias, upToUnit),
+            entry: alias === undefined ? undefined : resolve(alias === FOOT_MARK ? PRIME : alias),
+            bareInch: alias !== undefined && isBareInch(alias, ctx.text.slice(start, sideEnd)),
+            beforeTimes:
+              next !== undefined &&
+              !/by/i.test(ctx.text.slice(sideEnd, match.indices![next[0]]![0])),
           };
         });
         if (sides.some((s) => s.value === null || (s.alias !== undefined && !s.entry))) continue;
         if (sides.some((s) => isUncounted(s.raw))) continue;
         const first = sides[0]!;
-        // A number in words with no unit of its own may be a noun, with `by` giving an amount.
-        const mayBeNoun = /\bby\b/i.test(match[0]) && isWritten(first.raw) && !first.alias;
-        const one = /^one$/i.test(first.raw);
-        const before = ctx.text.slice(Math.max(0, start - 24), start);
-        const noun = NUMBER_AS_NOUN.test(before) || (one && ONE_AS_NOUN.test(before));
-        if (mayBeNoun && noun) continue;
         const last = sides[sides.length - 1]!;
         const entry = last.entry!;
+        const before = ctx.text.slice(Math.max(0, start - 24), start);
+
+        if (sides.some((s) => s.alias === FOOT_MARK)) {
+          const lengths = sides.every((s) => !s.entry || hasSides(s.entry.measure));
+          if (OPENS_QUOTE.test(before) || !lengths) continue;
+          // A side with no mark of its own leaves the `'` unconfirmed, and converting the
+          // other sides alone would split the dimension.
+          if (sides.some((s) => !s.entry)) {
+            changes.push(hold(start, match[0], 'units.dimensions', 38));
+            continue;
+          }
+        }
+
+        // A number with no unit of its own may be a noun, with `by` giving an amount. A pair
+        // in digits before a noun describes it, as in `those 4 by 6 inch photos`.
+        const describes =
+          !(entry.isWord && !entry.isSingular) && MODIFIES_A_NOUN.test(ctx.text.slice(end));
+        const mayBeNoun =
+          /\bby\b/i.test(match[0]) && !first.alias && (isWritten(first.raw) || !describes);
+        const one = /^one$/i.test(first.raw);
+        const noun = NUMBER_AS_NOUN.test(before) || (one && ONE_AS_NOUN.test(before));
+        if (mayBeNoun && noun) {
+          // The single rule never reads a number in digits straight after `4 by`.
+          if (sides.length === 2) {
+            const from = match.indices![groups[1]![0]]![0];
+            pushSingle(ctx, changes, from, ctx.text.slice(from, end), last.raw, last.alias!);
+          }
+          continue;
+        }
 
         // A side with no unit of its own takes the next one written, as in `10 x 12 feet`.
         const units: Alias[] = [];
@@ -1051,8 +1093,16 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           }
           continue;
         }
-        // Beside an earlier side with a unit of its own, as in `10 ft x 12 in`, `in` is the unit.
-        if (last.bareInch && !sides.some((s) => s !== last && s.entry && !s.bareInch)) continue;
+        // A last `in` is the unit beside an earlier side with a unit of its own, as in
+        // `10 ft x 12 in`, and an `in` before `x` and another number is one, as in
+        // `4 in x 6 in`. Before `by` it may be the preposition: `6 in by 5 in the morning`. A
+        // `'` needs the other sides to confirm it, so it cannot confirm an `in`.
+        const confirms = (s: (typeof sides)[number]) =>
+          s !== last &&
+          s.entry !== undefined &&
+          s.alias !== FOOT_MARK &&
+          (!s.bareInch || s.beforeTimes);
+        if (last.bareInch && !sides.some(confirms)) continue;
         // `one by` may be a pronoun and an amount, as in `lower one by two feet`.
         if (sides.some((s) => !READABLE_NUMBER.test(s.raw)) || (mayBeNoun && one)) {
           changes.push(hold(start, match[0], entry.measure.id, 38));

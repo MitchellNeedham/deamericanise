@@ -666,11 +666,28 @@ can hold prose and an `@example` at once, and doc tags keep their operands: the 
 
 Turn it off with `protectCommentedCode: false` or `--no-code-guard`.
 
-One limitation to know about when writing comments: a backtick span that wraps is
-protected only where its next line reads as more of the same paragraph. Each `//` line is
-a comment of its own, and a block comment line that starts with `*` reads as a list item,
-so a span that wraps onto either is not protected, and the words inside it will be
-rewritten. Keep a backtick span on one line there.
+### How a comment is read
+
+A comment is read the way its author wrote it. A block comment is one text, and so is a run
+of line comments on consecutive lines with the same marker at the same column. A comment
+after code joins only the comments lined up beneath it. Each line's marker (`//`, `#`, `///`,
+`//!`) and the `*` that starts each line of a `/*` comment are taken out first, so the text
+is Markdown: a line left holding only `//` or `*` is a blank line that ends a paragraph, a
+backtick span or a fence may wrap from one line to the next, and an article that ends one
+line agrees with the word that starts the next.
+
+```
+/**                          /// ```
+ * Use `the                  /// let color = 1;      <- all left alone
+ * color` here.              /// ```
+ */
+```
+
+The `*` is taken out only when every line after the first starts with one, so a block
+comment that leaves it off a line can hold a `*` bullet list. As in Markdown, a stray
+backtick pairs with the next one in its paragraph. A change never reaches across the marker
+that starts the next line, since its replacement could not put the marker back, so `It is 6`
+above `feet tall.` is left as written.
 
 ## Integrations
 
@@ -719,7 +736,8 @@ just that word, so `--fix` never rewrites more than it flagged. An article fixed
 replacement is reported with it, as one problem whose one fix covers both words, so a quick
 fix in the editor never leaves `a eraser` or `an rubber`. The editor shows
 `"an eraser" is American English. Use "a rubber".` `deamericanise.configs.recommended` is
-there if you want the defaults.
+there if you want the defaults. Comments are read as `deamericaniseCode` reads them (see
+[How a comment is read](#how-a-comment-is-read)), so a run of `//` lines is one text.
 
 ### Prettier
 

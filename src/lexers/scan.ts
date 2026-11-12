@@ -3,6 +3,13 @@ export interface Span {
   end: number;
 }
 
+/** A comment's text, with the delimiter that opened it. */
+export interface SourceComment extends Span {
+  /** `doc` is a documentation string, such as a Python docstring. */
+  kind: 'line' | 'block' | 'doc';
+  open: string;
+}
+
 export interface StringSpec {
   open: string;
   close: string;
@@ -54,7 +61,12 @@ function startsWith(source: string, index: number, token: string): boolean {
  * Only the comment spans come back, so `// not a comment` inside a string stays put.
  */
 export function scanComments(source: string, spec: LexerSpec, includeDocs = false): Span[] {
-  const spans: Span[] = [];
+  return scanSourceComments(source, spec, includeDocs).map(({ start, end }) => ({ start, end }));
+}
+
+/** `scanComments`, with what opened each comment. */
+export function scanSourceComments(source: string, spec: LexerSpec, includeDocs = false): SourceComment[] {
+  const spans: SourceComment[] = [];
   const blocks = [...spec.blockComments].sort((a, b) => b[0].length - a[0].length);
   const lines = [...spec.lineComments].sort((a, b) => b.length - a.length);
   const strings = [...spec.strings].sort((a, b) => b.open.length - a.open.length);
@@ -81,7 +93,7 @@ export function scanComments(source: string, spec: LexerSpec, includeDocs = fals
         }
       }
       const contentEnd = depth === 0 ? j - close.length : n;
-      spans.push({ start: contentStart, end: contentEnd });
+      spans.push({ start: contentStart, end: contentEnd, kind: 'block', open });
       i = j;
       continue outer;
     }
@@ -91,7 +103,7 @@ export function scanComments(source: string, spec: LexerSpec, includeDocs = fals
       const contentStart = i + marker.length;
       const newline = source.indexOf('\n', contentStart);
       const end = newline === -1 ? n : newline;
-      spans.push({ start: contentStart, end });
+      spans.push({ start: contentStart, end, kind: 'line', open: marker });
       i = end;
       continue outer;
     }
@@ -120,7 +132,7 @@ export function scanComments(source: string, spec: LexerSpec, includeDocs = fals
         j++;
       }
       if (includeDocs && string.doc && closed) {
-        spans.push({ start: contentStart, end: j - string.close.length });
+        spans.push({ start: contentStart, end: j - string.close.length, kind: 'doc', open: string.open });
       }
       i = closed ? j : contentStart;
       continue outer;

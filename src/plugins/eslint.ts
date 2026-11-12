@@ -1,6 +1,8 @@
-import { checkOptions } from '../config.js';
+import { checkOptions, resolveOptions } from '../config.js';
 import { agreesWith } from '../engine/articles.js';
-import { deamericanise } from '../transform.js';
+import { changesInSource, joinComments } from '../lexers/join.js';
+import type { SourceComment } from '../lexers/scan.js';
+import { transformProse } from '../transform.js';
 import type { Change, Options } from '../types.js';
 
 interface Comment {
@@ -15,6 +17,7 @@ interface Position {
 }
 
 interface SourceCode {
+  text: string;
   getAllComments(): Comment[];
   getLocFromIndex(index: number): Position;
 }
@@ -41,6 +44,18 @@ interface Context {
  */
 const MARKER_LENGTH = 2;
 
+function sourceComments(sourceCode: SourceCode): SourceComment[] {
+  return sourceCode.getAllComments().flatMap((comment): SourceComment[] => {
+    if (!comment.range) return [];
+    const [marker] = comment.range;
+    const start = marker + MARKER_LENGTH;
+    const end = start + comment.value.length;
+    return comment.type === 'Block'
+      ? [{ kind: 'block', open: '/*', start, end }]
+      : [{ kind: 'line', open: sourceCode.text.slice(marker, start), start, end }];
+  });
+}
+
 const rule = {
   meta: {
     type: 'suggestion' as const,
@@ -63,11 +78,11 @@ const rule = {
 
     return {
       Program(): void {
-        for (const comment of sourceCode.getAllComments()) {
-          if (!comment.range) continue;
-          const { changes } = deamericanise(comment.value, { protectIdentifiers: true, ...options });
-          const base = comment.range[0] + MARKER_LENGTH;
-          const rangeOf = (change: Change): [number, number] => [base + change.start, base + change.end];
+        for (const comment of joinComments(sourceCode.text, sourceComments(sourceCode))) {
+          const resolved = resolveOptions({ protectIdentifiers: true, ...options });
+          const found = transformProse(comment.text, resolved, comment.boundaries).changes;
+          const changes = changesInSource(comment, found);
+          const rangeOf = (change: Change): [number, number] => [change.start, change.end];
 
           for (const change of changes) {
             // Reported with the replacement it agrees with, so no quick fix applies one alone.

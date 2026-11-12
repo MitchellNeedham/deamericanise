@@ -229,6 +229,29 @@ describe('a hyphenated height is one height', () => {
     expect(convert(input)).toBe(expected);
   });
 
+  it.each`
+    input                       | expected                              | why
+    ${'5 feet-6 feet tall'}     | ${'1.5 metres-1.8 metres tall'}       | ${'the same unit after the hyphen'}
+    ${'5 foot-6 foot fence'}    | ${'1.5 metres-1.8 metre fence'}       | ${'before a noun'}
+    ${'two feet-6 feet'}        | ${'61 centimetres-1.8 metres'}        | ${'feet in words'}
+    ${'5 feet-6 ft'}            | ${'1.5 metres-1.8 m'}                 | ${'an abbreviation after the hyphen'}
+    ${'5 feet-6 yards'}         | ${'1.5 metres-5.5 metres'}            | ${'another unit after the hyphen'}
+    ${'5 feet-6 metres'}        | ${'1.5 metres-6 metres'}              | ${'a metric unit after the hyphen'}
+    ${'2 feet-18 inches'}       | ${'61 centimetres-46 centimetres'}    | ${'more inches than a foot holds'}
+  `('reads no inches from a number with a unit of its own: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                           | expected                        | why
+    ${'six feet-two'}               | ${'1.88 metres'}                | ${'after "feet"'}
+    ${'a 5-foot-10 man'}            | ${'a 1.78 metre man'}           | ${'ten inches'}
+    ${'She is 5 foot-6 and slim.'}  | ${'She is 1.68 metres and slim.'} | ${'before a conjunction'}
+    ${'It is 5 feet-6 inches.'}     | ${'It is 1.68 metres.'}         | ${'with its inch word'}
+  `('reads a height hyphenated to its inches: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
   it('leaves a hyphenated height at the end of a range as written', () => {
     expect(convert('He is five to six-foot-two.')).toBe('He is five to six-foot-two.');
   });

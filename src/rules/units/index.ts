@@ -1240,6 +1240,15 @@ const OBJECT_AFTER = new RegExp(
 const INCH_UNIT = new RegExp(String.raw`^((?:\s|${HYPHEN})*)(.*)$`, 's');
 
 /**
+ * A unit straight after a number: one the rules read, or a metric one. A number after
+ * `feet-` with a unit of its own ends a range, as the `6` of `5 feet-6 feet` does, and is
+ * no inches.
+ */
+const UNIT_OF_ITS_OWN =
+  String.raw`(?=\s)${SOFT_SPACE}(?:${UNIT_FORMS}|` +
+  String.raw`${Object.values(METRIC_UNITS).flat().map(afterFigure).join('|')})(?![A-Za-z\d])`;
+
+/**
  * `6 feet 2 inches`, `6'2"`, `5 ft 11 in`, `six feet two inches`, `six foot two` and
  * `six-foot-two` collapse into a single metric height.
  */
@@ -1254,7 +1263,7 @@ function feetInchesRule(): Rule {
       String.raw`(?:${GAP}(?:inches|inch|in\.?)|${SOFT_SPACE}(?:″|["”]))(?![A-Za-z])|` +
       String.raw`${GAP}(?:feet|foot)(?:${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER}|` +
       // A hyphen makes the height one word, so a noun may follow it: `a six-foot-two man`.
-      String.raw`${HYPHEN}(\d+|${WORDS_AFTER_HYPHEN})(?!\w|${HYPHEN}|[.,/:]\d)))`,
+      String.raw`${HYPHEN}(\d+|${WORDS_AFTER_HYPHEN})(?!\w|${HYPHEN}|[.,/:]\d|${UNIT_OF_ITS_OWN})))`,
     'dgi',
   );
   const sticky = new RegExp(pattern.source, 'iy');
@@ -1291,6 +1300,11 @@ function feetInchesRule(): Rule {
         const bare = match[3] ?? match[4];
         const inches = parseNumber(match[2] ?? bare!);
         if (bare !== undefined && !isInchCount(inches)) continue;
+        // Hyphened to the foot word, only a number of inches below a foot makes a height, so
+        // `2 feet-18 inches` stays two lengths.
+        const tied =
+          match[2] !== undefined && TIGHT_HYPHEN.test(ctx.text.charAt(match.indices![2]![0] - 1));
+        if (tied && !(inches !== null && inches < 12)) continue;
         if (feet === null || inches === null || endsRangeWhole(ctx.text, match.index, match[1]!)) {
           changes.push(hold(match.index, match[0], 'units.length.feet-inches', 40));
           continue;

@@ -381,6 +381,8 @@ ends the sentence, so `It starts at 3 P.M. Bring snacks.` becomes
 `8 P.M. ET`, loses it. `times: { to24Hour: true }` gives `15:00` if you want it.
 Amounts are never converted, because exchange rates move; a bare
 `$500` becomes `US$500` when the text is American. 
+A scale stays with the amount only as a whole word: `$5 million` and `$50k` become
+`US$5 million` and `US$50k`, and the word after `$50 modernizing` is still respelt.
 
 **Punctuation** (`localise` only). House style rather than comprehension, so it waits to
 be asked for. `U.S.` becomes `US`, and punctuation that is not part of a quotation moves

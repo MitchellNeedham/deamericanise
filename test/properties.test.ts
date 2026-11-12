@@ -272,29 +272,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     matches: (v) => v.change?.ruleId === 'units.temperature.fahrenheit',
   },
   {
-    issue: 156,
-    property: 'paragraphs',
-    input: 'It was $5\n\nThen it rose.',
-    options: american,
-    matches: (v) => v.change?.ruleId === 'currency.disambiguate',
-  },
-  {
-    issue: 156,
-    property: 'idempotence',
-    input: 'Spend $50 modernizing the kitchen.',
-    options: american,
-    // The amount took the first letter of the next word as its scale, and kept that word from changing.
-    matches: (v) => v.origin?.ruleId === 'currency.disambiguate' && v.change?.category !== 'currency',
-  },
-  {
-    issue: 156,
-    property: 'idempotence',
-    input: 'We sold $5 bell peppers.',
-    options: { ...localise, ...american },
-    // The amount lost the overlap with the next word on the first run, and takes the space after it.
-    matches: (v) => v.change?.ruleId === 'currency.disambiguate' && v.origin === undefined && /\s$/.test(v.change.before),
-  },
-  {
     issue: 157,
     property: 'idempotence',
     input: 'grade 10 feet',

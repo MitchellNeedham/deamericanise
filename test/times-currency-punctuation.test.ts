@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deamericaniseText } from '../src/index.js';
+import { deamericanise, deamericaniseText } from '../src/index.js';
 
 const only = (category: 'times' | 'currency' | 'punctuation') => (input: string, options = {}) =>
   deamericaniseText(input, {
@@ -129,6 +129,42 @@ describe('currency', () => {
     ${'NZ$20'}     | ${'already pinned'}
   `('leaves $unchanged alone ($why)', ({ unchanged }) => {
     expect(money(unchanged, american)).toBe(unchanged);
+  });
+
+  it.each`
+    input                           | before
+    ${'$5'}                         | ${'$5'}
+    ${'$5 million'}                 | ${'$5 million'}
+    ${'$5 billion'}                 | ${'$5 billion'}
+    ${'$5 Million'}                 | ${'$5 Million'}
+    ${'$5 MILLION'}                 | ${'$5 MILLION'}
+    ${'$5M'}                        | ${'$5M'}
+    ${'$5m'}                        | ${'$5m'}
+    ${'$50K'}                       | ${'$50K'}
+    ${'$50k'}                       | ${'$50k'}
+    ${'$50k-$80k'}                  | ${'$50k'}
+    ${'$5 millionaire'}             | ${'$5'}
+    ${'$5 Kroner'}                  | ${'$5'}
+    ${'a $5 Kölsch'}                | ${'$5'}
+    ${'$5bn'}                       | ${'$5'}
+    ${'$5 a gallon'}                | ${'$5'}
+    ${'It cost $5, then $6.'}       | ${'$5'}
+    ${'It was $5\nmillion'}         | ${'$5'}
+    ${'It was $5\n\nThen it rose.'} | ${'$5'}
+  `('ends the change for $input at the number or a whole scale word', ({ input, before }) => {
+    const [change] = deamericanise(input, american).changes;
+    expect(change?.before).toBe(before);
+  });
+
+  it.each`
+    input                                   | options                                | expected
+    ${'Spend $50 modernizing the kitchen.'} | ${american}                            | ${'Spend US$50 modernising the kitchen.'}
+    ${'It was $5 mustache wax.'}            | ${american}                            | ${'It was US$5 moustache wax.'}
+    ${'Two $5 medalists.'}                  | ${american}                            | ${'Two US$5 medallists.'}
+    ${'A $5 beveled edge.'}                 | ${american}                            | ${'A US$5 bevelled edge.'}
+    ${'We sold $5 bell peppers.'}           | ${{ ...american, preset: 'localise' }} | ${'We sold US$5 capsicums.'}
+  `('leaves the word after $input to its own rule', ({ input, options, expected }) => {
+    expect(deamericaniseText(input, options)).toBe(expected);
   });
 
   it('says nothing when the text does not look American', () => {

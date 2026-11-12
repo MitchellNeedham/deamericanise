@@ -424,9 +424,11 @@ Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F`, `degrees Fahrenheit` o
 A bare letter `F`, as in `degrees F`, `deg F` or `350 F`, takes the stop after it as an
 abbreviation does, so `Bake at 350 degrees F. for 20 minutes` becomes
 `Bake at 175 degrees Celsius for 20 minutes`, while a stop that also ends the sentence
-stays, and so does one before a figure or a bracket. `°F` is a symbol, which takes no stop,
-so the stop in `- 350°F.` or `Bake at 350°F. for 20 minutes` is the sentence's own and
-stays. A spelled-out value keeps the author's singular
+stays, and so does one before a figure or a bracket. `°F` and `℉` are symbols, whose stop
+is usually the sentence's own, so it goes only where a word in lower case carries the
+sentence on: `Bake at 350°F. for 20 minutes` becomes `Bake at 175°C for 20 minutes`, while
+`- 350°F.`, `"Bake at 350°F." he said` and `It was 90°F. Then it rained.` keep their stop.
+The word `Fahrenheit` takes no stop. A spelled-out value keeps the author's singular
 where it describes the noun after it, so `a 350 degree F oven` becomes
 `a 175 degree Celsius oven`, while `Preheat to 350 degrees F` keeps the plural.
 The word alone does not count after a whole number of four figures, which reads as a year

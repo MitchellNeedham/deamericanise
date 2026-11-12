@@ -732,9 +732,19 @@ keeps putting back is left to it after three attempts.
 
 **Left alone:**
 
-- `code`, `pre`, `kbd`, `samp`, `script`, `style`, `noscript`, `template`, `textarea`,
-  `input`, `select`, `iframe`, `object`, `canvas`, `audio`, `video`, SVG and MathML.
-  Attributes on these elements are still rewritten.
+- `code`, `pre`, `kbd`, `samp`, `tt`, `xmp`, `listing`, `plaintext`, `script`, `style`,
+  `noscript`, `template`, `textarea`, `input`, `select`, `iframe`, `object`, `canvas`,
+  `audio`, `video`, SVG and MathML, and any element with `role="code"`, which also ends the
+  run. Attributes on these elements are still rewritten.
+- Code drawn as code, whatever its markup: an element that starts a run of its own, whose
+  computed `font-family` falls back to the generic `monospace` or `ui-monospace`, and whose
+  `white-space` is anything but `normal`. That finds code views that lay out each line in a
+  `div`, `td` or `span`, such as GitHub's file view and Monaco, which keeps its lines
+  unwrapped with `nowrap`. Prose that keeps its white space in a proportional font, as chat
+  apps show it, still converts, and so does a heading in a monospace font that wraps as
+  usual. On a page set wholly in a monospace font, a label kept on one line with `nowrap` is
+  left alone too. The styles are read again once the page's stylesheets have loaded, and
+  attributes are still rewritten.
 - Anything editable: `contenteditable`, and a document in design mode. Text that becomes
   editable after it was rewritten gets its original back.
 - Anything marked `translate="no"` or `class="notranslate"`, the markers sites already use
@@ -857,6 +867,9 @@ ones it accepts, such as `Unknown preset: Localise. Expected one of read, locali
   the start of the next, or `two and a` then `half feet`, is not read as one. The fraction
   converts on its own and the written-out number is left as written. A web page is read the
   way it is usually laid out, with a line break in its source counting as a space.
+- On a web page, only an element that starts a run of its own is checked for being drawn as
+  code. A `span` inside a sentence that is set in a monospace font, with no `code` element
+  or `role="code"` to mark it, is read as part of the sentence.
 - `a third mile` is read as a fraction, though it can also mean one more mile after two.
   The same goes for `a fourth`, `an eighth` and `a sixteenth`.
 - A line that ends in a number and a line that opens with a unit word are read as one

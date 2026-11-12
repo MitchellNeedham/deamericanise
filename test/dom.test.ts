@@ -227,6 +227,86 @@ describe('runs of text in a laid-out page', () => {
     rewriter.stop();
     host.remove();
   });
+
+  describe('code the page draws as code', () => {
+    it.each([
+      [
+        'a file view that lays out each line in a div',
+        '<style>.react-file-line { font-family: ui-monospace, SFMono-Regular, monospace; white-space: pre; }</style>' +
+          '<div class="react-code-lines"><div id="LC1" class="react-code-text react-file-line">' +
+          '<span class="pl-k">const</span> <span class="pl-c1">color</span> = <span class="pl-s">"gray"</span>; ' +
+          '<span class="pl-c">// center the dialog</span></div></div>',
+      ],
+      [
+        'a diff that lays out each line in a table cell',
+        '<style>.blob-code { font-family: "Monaspace Neon", ui-monospace, monospace; white-space: pre-wrap; }</style>' +
+          '<table class="diff-table"><tbody><tr><td class="blob-code blob-code-addition">' +
+          '<span class="blob-code-inner blob-code-marker" data-code-marker="+">  ' +
+          '<span class="pl-c">// Normalize the color before we center it</span></span></td></tr></tbody></table>',
+      ],
+      [
+        'an editor that draws its lines unwrapped with non-breaking spaces',
+        '<style>.view-line { font-family: "Droid Sans Mono", "monospace", monospace; white-space: nowrap; }</style>' +
+          '<div class="monaco-editor"><div class="view-lines"><div class="view-line">' +
+          '<span><span class="mtk1">//&nbsp;center&nbsp;the&nbsp;color</span></span></div></div></div>',
+      ],
+    ])('leaves alone %s', (_, body) => {
+      const host = laidOut(body);
+      deamericaniseDom(host, { assumeAmerican: true });
+      expect(host.innerHTML).toBe(body);
+      host.remove();
+    });
+
+    it('leaves alone a span laid out as a block and drawn as code', () => {
+      const line = '<span style="display: block; font-family: monospace; white-space: pre">the color</span>';
+      const host = laidOut(`<div>The color${line}ful theater</div>`);
+      deamericaniseDom(host);
+      expect(host.innerHTML).toBe(`<div>The colour${line}ful theatre</div>`);
+      host.remove();
+    });
+
+    it('still rewrites the title of an element drawn as code', () => {
+      const host = laidOut('<div style="font-family: monospace; white-space: pre" title="favorite color">color</div>');
+      deamericaniseDom(host);
+      expect(host.innerHTML).toBe(
+        '<div style="font-family: monospace; white-space: pre" title="favourite colour">color</div>',
+      );
+      host.remove();
+    });
+
+    it.each([
+      [
+        'prose that keeps its white space in a proportional font',
+        '<div style="font-family: -apple-system, Helvetica, sans-serif; white-space: pre-wrap">',
+      ],
+      ['a heading in a monospace font that wraps as usual', '<h1 style="font-family: ui-monospace, monospace; white-space: normal">'],
+      ['a paragraph in a monospace font', '<p style="font-family: monospace">'],
+      ['a font named monospace that is not the generic family', '<div style="font-family: &quot;monospace&quot;, Arial; white-space: pre">'],
+    ])('still converts %s', (_, open) => {
+      const close = `</${open.slice(1, open.indexOf(' '))}>`;
+      const host = laidOut(`${open}Center the color, my favorite.${close}`);
+      deamericaniseDom(host);
+      expect(host.textContent).toBe('Centre the colour, my favourite.');
+      host.remove();
+    });
+
+    it('puts the original back once the stylesheets that draw it as code have loaded', () => {
+      const host = laidOut('<div class="line">// center the color</div><p>the color</p>');
+      Object.defineProperty(document, 'readyState', { configurable: true, get: () => 'interactive' });
+      const rewriter = new DomRewriter(host);
+      rewriter.watch();
+      Reflect.deleteProperty(document, 'readyState');
+      expect(host.textContent).toBe('// centre the colourthe colour');
+
+      const line = host.querySelector('div')!;
+      line.style.fontFamily = 'ui-monospace, monospace';
+      line.style.whiteSpace = 'pre';
+      window.dispatchEvent(new Event('load'));
+      expect(host.textContent).toBe('// center the colorthe colour');
+      rewriter.stop();
+      host.remove();
+    });
+  });
 });
 
 describe('spreading changes over nodes', () => {
@@ -292,6 +372,28 @@ describe('what is left alone', () => {
     ['notranslate', '<p class="notranslate">the color</p>', '<p class="notranslate">the color</p>'],
     ['another language', '<p lang="fr">the color</p>', '<p lang="fr">the color</p>'],
     ['svg', '<svg><text>the color</text></svg>', '<svg><text>the color</text></svg>'],
+    ['tt', '<p>Run <tt>color --center</tt> to center it.</p>', '<p>Run <tt>color --center</tt> to centre it.</p>'],
+    [
+      'role="code"',
+      '<p>Set <span role="code">behavior: center</span> on the dialog.</p>',
+      '<p>Set <span role="code">behavior: center</span> on the dialogue.</p>',
+    ],
+    ['role="code" among other roles', '<p><span role="Code note">color</span></p>', '<p><span role="Code note">color</span></p>'],
+    [
+      'xmp and listing',
+      '<xmp>// center the color</xmp><listing>// center the color</listing>',
+      '<xmp>// center the color</xmp><listing>// center the color</listing>',
+    ],
+    ['plaintext', '<plaintext>// center the color', '<plaintext>// center the color</body></html></plaintext>'],
+    [
+      'code hosts that mark their lines with pre and code',
+      '<code class="diff-text"><span class="pl-c">// center the color</span></code>' +
+        '<pre class="rd-line-text">// center the color</pre>' +
+        '<pre class="code highlight"><code><span class="line">// center the color</span></code></pre>',
+      '<code class="diff-text"><span class="pl-c">// center the color</span></code>' +
+        '<pre class="rd-line-text">// center the color</pre>' +
+        '<pre class="code highlight"><code><span class="line">// center the color</span></code></pre>',
+    ],
   ])('%s', (_, input, expected) => {
     expect(rewrite(input)).toBe(expected);
   });
@@ -300,6 +402,13 @@ describe('what is left alone', () => {
     expect(rewrite('<p>It is 6 feet <code>x</code> 2 inches.</p>')).toBe(
       '<p>It is 1.8 metres <code>x</code> 5.1 centimetres.</p>',
     );
+  });
+
+  it.each([
+    ['tt', '<tt>color</tt>'],
+    ['role="code"', '<span role="code">color</span>'],
+  ])('never moves a word into or out of %s', (_, code) => {
+    expect(rewrite(`<p>A ${code}ful theater</p>`)).toBe(`<p>A ${code}ful theatre</p>`);
   });
 
   it('honours an opt-in inside an opt-out', () => {
@@ -394,6 +503,12 @@ describe('attributes', () => {
     const doc = parse('<html lang="en-US"><head><link rel="alternate stylesheet" title="Gray"></head></html>');
     deamericaniseDom(doc);
     expect(doc.head.innerHTML).toBe('<link rel="alternate stylesheet" title="Gray">');
+  });
+
+  it('rewrites them on code the page marks', () => {
+    expect(rewrite('<tt title="favorite color">color</tt> <span role="code" title="gray">gray</span>')).toBe(
+      '<tt title="favourite colour">color</tt> <span role="code" title="grey">gray</span>',
+    );
   });
 
   it('follows the same opt-outs as text', () => {
@@ -525,6 +640,17 @@ describe('following a page', () => {
     doc.querySelector('div')!.removeAttribute('contenteditable');
     rewriter.flush();
     expect(doc.body.innerHTML).toBe('<div class="notranslate"><p>the color</p></div>');
+  });
+
+  it('follows a role that marks text as code', () => {
+    const [doc, rewriter] = watched('<p>The <span>theater</span> color</p>');
+    const span = doc.querySelector('span')!;
+    span.setAttribute('role', 'code');
+    rewriter.flush();
+    expect(doc.body.innerHTML).toBe('<p>The <span role="code">theater</span> colour</p>');
+    span.setAttribute('role', 'note');
+    rewriter.flush();
+    expect(doc.body.innerHTML).toBe('<p>The <span role="note">theatre</span> colour</p>');
   });
 
   it('re-reads every run with new options', () => {

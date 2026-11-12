@@ -11,6 +11,7 @@ import {
   hostOf,
   joinsRun,
   lastRunIsOpen,
+  namesCodeRole,
   ownAttributes,
   ownRuns,
   ownTextNodes,
@@ -158,7 +159,7 @@ export class DomRewriter {
     if (this.observer) return;
     this.loading = this.document.readyState === 'loading';
     if (this.loading) this.document.addEventListener('DOMContentLoaded', this.onLoaded);
-    // Stylesheets that arrive after the HTML can change which elements sit inline.
+    // Stylesheets that arrive after the HTML can change which elements sit inline or read as code.
     if (this.document.readyState !== 'complete') {
       this.document.defaultView?.addEventListener('load', this.onStyled);
     }
@@ -370,6 +371,9 @@ export class DomRewriter {
     if (name === 'class') {
       const before = (record.oldValue ?? '').split(/\s+/).includes('notranslate');
       if (before === element.classList.contains('notranslate')) return;
+    }
+    if (name === 'role' && namesCodeRole(record.oldValue) === namesCodeRole(element.getAttribute('role'))) {
+      return;
     }
     this.dirtySubtrees.add(element);
     if (element !== this.root) this.dirtyContainers.add(containerOf(element, this.root));

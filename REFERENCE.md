@@ -371,10 +371,12 @@ are.
 
 Fuel economy is read as `mpg`, `miles per gallon`, `miles-per-gallon`, `miles/gallon` or
 `mi/gal`, so `30 miles/gallon` becomes `7.8 L/100km`, never kilometres per gallon, and
-`7.8 L/100km (30 mi/gal)` is a restatement. A range converts at both ends, in the order the
-source gives them, since litres per 100 km fall as miles per gallon rise: `20 to 30 mpg`
-becomes `12 to 7.8 L/100km`. A range of fuel economy with a first end in words or a fraction,
-or an end of zero, as in `twenty to 30 mpg`, is left as written.
+`7.8 L/100km (30 mi/gal)` is a restatement. A range converts at both ends and gives the
+smaller number first, though litres per 100 km fall as miles per gallon rise: `20 to 30 mpg`
+becomes `7.8 to 12 L/100km`, and `8.5 to 13 km/L` with `fuelEconomy: 'km-per-l'`. After
+`from` the order shows a direction, so it stays: `improved from 20 to 30 mpg` becomes
+`improved from 12 to 7.8 L/100km`. A range of fuel economy with a first end in words or a
+fraction, or an end of zero, as in `twenty to 30 mpg`, is left as written.
 
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
 `Bake at 175-190°C`. A temperature range wraps and stops at a new block as the others do,

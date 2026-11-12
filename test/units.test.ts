@@ -272,7 +272,7 @@ describe('a long run of fuel economy ranges takes time in line with its length',
 
   it.each`
     range                    | length   | expected
-    ${'20 to 30 mpg, '}      | ${10000} | ${'12 to 7.8 L/100km, 12 to 7.8 L/100km, '}
+    ${'20 to 30 mpg, '}      | ${10000} | ${'7.8 to 12 L/100km, 7.8 to 12 L/100km, '}
     ${'twenty to 30 mpg, '}  | ${16000} | ${'twenty to 30 mpg, twenty to 30 mpg, '}
   `('"$range", $length times', ({ range, length, expected }) => {
     const text = (n: number) => range.repeat(n);
@@ -674,13 +674,16 @@ describe('fuel economy', () => {
 
   it.each`
     input                                                | expected                                     | why
-    ${'It does 20 to 30 mpg on the highway'}             | ${'It does 12 to 7.8 L/100km on the highway'} | ${'to'}
-    ${'It does 20 - 30 mpg on the highway'}              | ${'It does 12-7.8 L/100km on the highway'}   | ${'a spaced dash'}
-    ${'It does 20-30 mpg on the highway'}                | ${'It does 12-7.8 L/100km on the highway'}   | ${'a tight dash'}
-    ${'between 25 and 30 miles per gallon'}              | ${'between 9.4 and 7.8 L/100km'}             | ${'and after between'}
-    ${'It does 30 to 20 mpg on the highway'}             | ${'It does 7.8 to 12 L/100km on the highway'} | ${'the source order'}
-    ${'It does 20 to 30 mi/gal on the highway'}          | ${'It does 12 to 7.8 L/100km on the highway'} | ${'not a range of lengths'}
-    ${'It does 25 to 30 mpg (9.4 to 7.8 L/100km) here'}  | ${'It does 9.4 to 7.8 L/100km here'}         | ${'a bracket that restates it'}
+    ${'It does 20 to 30 mpg on the highway'}             | ${'It does 7.8 to 12 L/100km on the highway'} | ${'to, the smaller first'}
+    ${'It does 20 - 30 mpg on the highway'}              | ${'It does 7.8-12 L/100km on the highway'}   | ${'a spaced dash'}
+    ${'It does 20-30 mpg on the highway'}                | ${'It does 7.8-12 L/100km on the highway'}   | ${'a tight dash'}
+    ${'between 25 and 30 miles per gallon'}              | ${'between 7.8 and 9.4 L/100km'}             | ${'and after between'}
+    ${'It does 30 to 20 mpg on the highway'}             | ${'It does 7.8 to 12 L/100km on the highway'} | ${'falling, the smaller first too'}
+    ${'It does 20 to 30 mi/gal on the highway'}          | ${'It does 7.8 to 12 L/100km on the highway'} | ${'not a range of lengths'}
+    ${'Economy improved from 20 to 30 mpg here'}         | ${'Economy improved from 12 to 7.8 L/100km here'} | ${'from shows a direction'}
+    ${'Economy fell from 30 to 20 mpg here'}             | ${'Economy fell from 7.8 to 12 L/100km here'} | ${'the same, falling'}
+    ${'It does 25 to 30 mpg (7.8 to 9.4 L/100km) here'}  | ${'It does 7.8 to 9.4 L/100km here'}         | ${'a bracket that restates it'}
+    ${'It does 25 to 30 mpg (9.4 to 7.8 L/100km) here'}  | ${'It does 9.4 to 7.8 L/100km here'}         | ${'the same, in the source order'}
     ${'It fell by half to 30 mpg on the hill'}           | ${'It fell by half to 7.8 L/100km on the hill'} | ${'half to is an idiom'}
   `('reads a range: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
@@ -702,22 +705,27 @@ describe('fuel economy', () => {
   });
 
   it.each`
-    input                                     | expected
-    ${'It does 30 miles/gallon on the road'}  | ${'It does 13 km/L on the road'}
-    ${'It does 20 to 30 mpg on the road'}     | ${'It does 8.5 to 13 km/L on the road'}
+    input                                          | expected
+    ${'It does 30 miles/gallon on the road'}       | ${'It does 13 km/L on the road'}
+    ${'It does 20 to 30 mpg on the road'}          | ${'It does 8.5 to 13 km/L on the road'}
+    ${'It does 30 to 20 mpg on the road'}          | ${'It does 8.5 to 13 km/L on the road'}
+    ${'Economy improved from 20 to 30 mpg here'}   | ${'Economy improved from 8.5 to 13 km/L here'}
+    ${'Economy fell from 30 to 20 mpg here'}       | ${'Economy fell from 13 to 8.5 km/L here'}
   `('in km per litre: $input -> $expected', ({ input, expected }) => {
     expect(convert(input, { units: { fuelEconomy: 'km-per-l' } })).toBe(expected);
   });
 
-  it.each(['It does 30 miles/gallon on the road', 'It does 20 to 30 mpg on the road'])(
-    'runs twice on a kept original of %j without converting it again',
-    (input) => {
-      const options = { units: { keepOriginal: true } };
-      const once = convert(input, options);
-      expect(once).not.toBe(input);
-      expect(convert(once, options)).toBe(once);
-    },
-  );
+  it.each`
+    input                                          | expected
+    ${'It does 30 miles/gallon on the road'}       | ${'It does 7.8 L/100km (30 miles/gallon) on the road'}
+    ${'It does 20 to 30 mpg on the road'}          | ${'It does 7.8 to 12 L/100km (20 to 30 mpg) on the road'}
+    ${'Economy improved from 20 to 30 mpg here'}   | ${'Economy improved from 12 to 7.8 L/100km (20 to 30 mpg) here'}
+  `('keeps the original of $input, and runs twice without converting it again', ({ input, expected }) => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert(input, options);
+    expect(once).toBe(expected);
+    expect(convert(once, options)).toBe(once);
+  });
 
   it.each`
     input                               | expected

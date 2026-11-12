@@ -1703,9 +1703,11 @@ function coinSizeRule(): Rule {
 
 /**
  * `30 mpg`, `30 miles per gallon` and `30 mi/gal` become litres per 100 km, or km per litre.
- * A range converts both ends, in the order the source gives them, since litres per 100 km
- * fall as miles per gallon rise: `20 to 30 mpg` becomes `12 to 7.8 L/100km`. A range or
- * figure the rule cannot convert whole is held, so the length rule never reads its `miles`.
+ * A range converts both ends and gives the smaller first, though litres per 100 km fall as
+ * miles per gallon rise: `20 to 30 mpg` becomes `7.8 to 12 L/100km`. After `from` the order
+ * shows a direction, so it stays: `from 20 to 30 mpg` becomes `from 12 to 7.8 L/100km`. A
+ * range or figure the rule cannot convert whole is held, so the length rule never reads its
+ * `miles`.
  */
 function fuelEconomyRule(): Rule {
   const id = 'units.economy.mpg';
@@ -1716,6 +1718,7 @@ function fuelEconomyRule(): Rule {
   // Must start where the range rule starts, so the two read the same ranges.
   const START = String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})${NOT_SECOND_OF_PAIR}|(?!${NUMERIC_FIRST}))`;
   const range = new RegExp(String.raw`${START}(${NUMBER_PATTERN})(${RANGE_JOIN})(${MPG})${UNIT}`, 'gi');
+  const FROM_BEFORE = /\bfrom\s+$/i;
 
   return {
     id,
@@ -1726,8 +1729,9 @@ function fuelEconomyRule(): Rule {
       const changes: Change[] = [];
       const perLitre = ctx.options.units.fuelEconomy === 'km-per-l';
       const { precision, maxDecimals } = ctx.options.units;
+      const rate = (mpg: number) => (perLitre ? mpg * 0.425143707 : 235.214583 / mpg);
       const economy = (mpg: number, figures: number) =>
-        formatNumber(perLitre ? mpg * 0.425143707 : 235.214583 / mpg, precision, figures, maxDecimals);
+        formatNumber(rate(mpg), precision, figures, maxDecimals);
       const unit = perLitre ? 'km/L' : 'L/100km';
       // Where each range read here ends, which is where its second end's own match ends.
       const rangeEnds = new Set<number>();
@@ -1748,8 +1752,18 @@ function fuelEconomyRule(): Rule {
         }
         const figures = Math.max(2, significantFigures(lowRaw), significantFigures(highRaw));
         const separator = /to/i.test(join) ? ' to ' : /and/i.test(join) ? ' and ' : '-';
-        const body = `${economy(low, figures)}${separator}${economy(high, figures)} ${unit}`;
-        pushMeasurement(ctx, changes, start, matched, body, id, 35);
+        const write = (first: number, second: number) =>
+          `${economy(first, figures)}${separator}${economy(second, figures)} ${unit}`;
+        const end = start + matched.length;
+        const asWritten = write(low, high);
+        const keepOrder =
+          rate(low) <= rate(high) ||
+          FROM_BEFORE.test(ctx.text.slice(Math.max(0, start - 16), start)) ||
+          // An author's own metric value may give the ends in the source's order, and
+          // `pushMeasurement` keeps it in place of the conversion.
+          redundantMetric(ctx, end, asWritten, id) !== null ||
+          followsItsMetric(ctx, start, end, asWritten, id);
+        pushMeasurement(ctx, changes, start, matched, keepOrder ? asWritten : write(high, low), id, 35);
       }
 
       single.lastIndex = 0;

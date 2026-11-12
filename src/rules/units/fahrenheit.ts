@@ -1,4 +1,4 @@
-import { INLINE_SPACE } from './number.js';
+import { INLINE_SPACE, NUMBER_START, RANGE_START, canBeRange, parseNumber } from './number.js';
 
 /** `°F`, `℉`, `degrees Fahrenheit` and the like: Fahrenheit written as a unit. */
 export const FAHRENHEIT = String.raw`°\s*F\b|℉|°\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|degrees?\s+F\b|deg\.?\s*F\b`;
@@ -12,7 +12,7 @@ const BARE = String.raw`${INLINE_SPACE}?F(?![\w'’]|[-–][A-Za-z])`;
  * `350 to 375°F`, `between 60 and 70°F`. `and` joins a range only after `between`.
  */
 const PATTERN = new RegExp(
-  String.raw`(?<![\w.])(?:(${DEGREES})(\s*(?:-|\u2013|\u2014|to)\s*|(?<=\bbetween\s+${DEGREES})\s+and\s+))?` +
+  String.raw`${NUMBER_START}(?:${RANGE_START}(${DEGREES})(\s*(?:-|\u2013|\u2014|to)\s*|(?<=\bbetween\s+${DEGREES})\s+and\s+))?` +
     String.raw`(${DEGREES})(?:\s*(${FAHRENHEIT})|(${BARE}))`,
   'gi',
 );
@@ -67,7 +67,15 @@ function bareIsFahrenheit(text: string, match: RegExpExecArray): boolean {
  * counts them, so the two always agree on what is Fahrenheit.
  */
 export function* fahrenheitTemperatures(text: string): Generator<RegExpExecArray> {
-  for (const match of text.matchAll(PATTERN)) {
+  const pattern = new RegExp(PATTERN);
+  for (let match: RegExpExecArray | null; (match = pattern.exec(text)) !== null; ) {
+    const low = match[1] === undefined ? null : parseNumber(match[1]);
+    if (low !== null && !canBeRange(text, match.index, low, parseNumber(match[3]!)!)) {
+      // The scan goes on as past a start the pattern refused, so the second number can still
+      // be a temperature of its own.
+      pattern.lastIndex = match.index + 1;
+      continue;
+    }
     if (match[5] === undefined || bareIsFahrenheit(text, match)) yield match;
   }
 }

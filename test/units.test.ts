@@ -383,6 +383,91 @@ describe('a number that is not finite', () => {
   });
 });
 
+describe('a range opens only on a number that can be its first end', () => {
+  it.each`
+    input                                    | expected                                    | why
+    ${'In 2024 - 5 feet of snow fell.'}      | ${'In 2024 - 1.5 metres of snow fell.'}     | ${'a year more than ten times the second number'}
+    ${'In 2024 to 5 feet of snow fell.'}     | ${'In 2024 to 1.5 metres of snow fell.'}    | ${'the same, joined by "to"'}
+    ${'Since 1999 - 50°F has been normal.'}  | ${'Since 1999 - 10°C has been normal.'}     | ${'the same, before a temperature'}
+    ${'£5 - 10 inches long.'}                | ${'£5 - 25 centimetres long.'}              | ${'a price'}
+    ${'It cost $1,005 - 10 feet of cable.'}  | ${'It cost $1,005 - 3 metres of cable.'}    | ${'the tail of a price grouped with a comma'}
+    ${'2024-01-13 - 0°F'}                    | ${'2024-01-13 - -17.8°C'}                   | ${'the day of an ISO date'}
+    ${'2024-01-13 - 5 feet'}                 | ${'2024-01-13 - 1.5 metres'}                | ${'the same, before a length'}
+    ${'On 13/4/2024 - 1 inch fell.'}         | ${'On 13/4/2024 - 2.5 centimetres fell.'}   | ${'the year of a numeric date'}
+    ${'At 6:00 - 50°F and sunny.'}           | ${'At 6:00 - 10°C and sunny.'}              | ${'the minutes of a time'}
+  `('converts the second number alone after $why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('leaves a price before a range to the currency rule', () => {
+    expect(convert('Price $5 - 10 inches long.', { assumeAmerican: true })).toBe(
+      'Price US$5 - 25 centimetres long.',
+    );
+  });
+
+  it.each`
+    unchanged           | why
+    ${'$5-10 feet'}     | ${'a price range written tight'}
+    ${'In 2024-5 feet'} | ${'a span of years written tight'}
+    ${'12-3/4 inch'}    | ${'a fraction straight after a dash, once its range is refused'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                     | expected                                      | why
+    ${'5-10 feet'}                            | ${'1.5-3 metres'}                             | ${'a range'}
+    ${'5 - 10 feet'}                          | ${'1.5-3 metres'}                             | ${'with a spaced dash'}
+    ${'50-60°F'}                              | ${'10-16°C'}                                  | ${'a temperature range'}
+    ${'between 60 and 70°F'}                  | ${'between 16 and 21°C'}                      | ${'joined by "and"'}
+    ${'The water dropped from 10 to 5 feet.'} | ${'The water dropped from 3 to 1.5 metres.'}  | ${'a falling range'}
+    ${'100-10 feet'}                          | ${'30-3 metres'}                              | ${'a first number exactly ten times the second'}
+    ${'Visibility fell from 10 to 0.5 miles.'} | ${'Visibility fell from 16,000 to 800 metres.'} | ${'a steeper fall opened by "from"'}
+    ${'Temperatures fell from 50 to 4°F.'}    | ${'Temperatures fell from 10 to -16°C.'}      | ${'the same, in Fahrenheit'}
+    ${'between 30 and 2 feet'}                | ${'between 910 and 61 centimetres'}           | ${'the same, opened by "between"'}
+    ${'from -50 to 2°F'}                      | ${'from -46 to -17°C'}                        | ${'a negative first number'}
+    ${'Lows of 10 to 0°F tonight.'}           | ${'Lows of -12 to -18°C tonight.'}            | ${'a second number of zero'}
+    ${'Bought 2024-03-14 1/2 gallon'}         | ${'Bought 2024-03-14 1.9 litres'}             | ${'a fraction after a date'}
+  `('still converts $why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('converts a fraction after a numeric date it rewrites', () => {
+    expect(convert('Bought 3/14/2024 1/2 gallon', { assumeAmerican: true })).toBe(
+      'Bought 2024-03-14 1.9 litres',
+    );
+  });
+});
+
+describe('the minutes of a clock time are not a measurement', () => {
+  it.each`
+    unchanged                                | why
+    ${'She ran a 7:30 mile pace.'}           | ${'a running pace'}
+    ${'Hold 8:15 miles for the tempo run.'}  | ${'a pace before a plural unit'}
+    ${'At 18:00 pound the cutlets thin.'}    | ${'a 24-hour time before a verb'}
+    ${'At 7:30 F the oven was hot.'}         | ${'a bare F after a time'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                        | expected                                         | why
+    ${'30 miles'}                                | ${'48 kilometres'}                               | ${'a measurement'}
+    ${'a 30 mile drive'}                         | ${'a 48 kilometre drive'}                        | ${'an attributive measurement'}
+    ${'Gates open at 7:30. 5 miles of parking.'} | ${'Gates open at 7:30. 8 kilometres of parking.'} | ${'a measurement after a time'}
+    ${'Distance:5 miles'}                        | ${'Distance:8 kilometres'}                       | ${'a colon after a word'}
+  `('still converts $why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('runs twice on a time it wrote in 24-hour form', () => {
+    const clock = { times: { to24Hour: true } };
+    const once = convert('At 6:00 PM pound the cutlets thin.', clock);
+    expect(once).toBe('At 18:00 pound the cutlets thin.');
+    expect(convert(once, clock)).toBe(once);
+  });
+});
+
 describe('precision options', () => {
   it.each`
     precision      | input        | expected

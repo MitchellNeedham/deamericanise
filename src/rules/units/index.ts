@@ -15,9 +15,12 @@ import {
   INLINE_SPACE,
   NOT_IN_COMPOUND,
   NUMBER_PATTERN,
+  NUMBER_START,
   NUMERIC_PATTERN,
+  RANGE_START,
   SOFT_SPACE,
   WHOLE_NUMBER,
+  canBeRange,
   formatNumber,
   formatTemperature,
   isOvenSetting,
@@ -37,6 +40,25 @@ const DIMENSION_JOIN = softGap('(?:x|×|by)');
  * pair does not match as a whole: `14 1/2 gallon` in `2024-03-14 1/2 gallon`.
  */
 const NOT_SECOND_OF_PAIR = String.raw`(?<!\d${softGap(String.raw`(?:[-\u2013\u2014]|to|and|x|×|by)`)})`;
+
+/** A range's first number and its join, ending where the range's second number starts. */
+const RANGE_BEFORE = new RegExp(
+  String.raw`(?<=${NUMBER_START}${RANGE_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=[\d\-−])`,
+  'dy',
+);
+
+/**
+ * The number at `start` is the second end of a range, as the `10` of `5 - 10 feet` is, and
+ * not a measurement of its own, even where the range does not match as a whole. A first
+ * number that cannot open the range leaves it free: `Price $5 - 10 inches`, `In 2024 - 5 feet`.
+ */
+function endsRange(text: string, start: number, value: number): boolean {
+  RANGE_BEFORE.lastIndex = start;
+  const before = RANGE_BEFORE.exec(text);
+  if (before === null) return false;
+  const low = parseNumber(before[1]!);
+  return low === null || canBeRange(text, before.indices![1]![0], low, value);
+}
 
 function escape(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -687,13 +709,17 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
   const S = INLINE_SPACE;
   // The pair guard can only apply before a digit, and is too costly to run at every word.
-  const START = String.raw`(?<![\w.])(?:(?=[\d\-−])${NOT_SECOND_OF_PAIR}|(?![\d\-−]))`;
+  const START = String.raw`${NUMBER_START}(?:(?=[\d\-−])${NOT_SECOND_OF_PAIR}|(?![\d\-−]))`;
+  // Only a dimension's second number is refused here. `endsRange` judges a range's, which
+  // needs both numbers.
+  const SINGLE_START =
+    String.raw`${NUMBER_START}(?:(?=[\d\-−])(?<!\d${DIMENSION_JOIN})|(?![\d\-−]))`;
   const single = new RegExp(
-    String.raw`${START}(${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])`,
+    String.raw`${SINGLE_START}(${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
   const range = new RegExp(
-    String.raw`${START}(${NUMERIC_PATTERN})${RANGE_JOIN}(${NUMERIC_PATTERN})` +
+    String.raw`${START}${RANGE_START}(${NUMERIC_PATTERN})${RANGE_JOIN}(${NUMERIC_PATTERN})` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
@@ -812,6 +838,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const low = parseNumber(match[1]!);
         const high = parseNumber(match[2]!);
         if (!entry || low === null || high === null || high === 0) continue;
+        if (!canBeRange(ctx.text, match.index, low, high)) continue;
         const start = match.index;
         if (isOtherSense(ctx, entry, start, start + match[0].length)) {
           changes.push(hold(start, match[0], entry.measure.id, 35));
@@ -954,7 +981,14 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     find(ctx: RuleContext) {
       const changes: Change[] = [];
       single.lastIndex = 0;
-      for (const match of ctx.text.matchAll(single)) {
+      for (let match: RegExpExecArray | null; (match = single.exec(ctx.text)) !== null; ) {
+        const value = parseNumber(match[1]!);
+        if (resolve(match[2]!) && value !== null && endsRange(ctx.text, match.index, value)) {
+          // Resumes at the next character, as past a start the pattern refused, so a measurement
+          // that starts inside this match is still found.
+          single.lastIndex = match.index + 1;
+          continue;
+        }
         pushSingle(ctx, changes, match.index, match[0], match[1]!, match[2]!);
       }
 

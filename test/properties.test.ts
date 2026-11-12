@@ -217,6 +217,14 @@ const follows =
   (v: Violation): boolean =>
     v.change !== undefined && pattern.test(v.text.slice(v.change.end));
 
+/** A second run starts a measurement on the year a first run wrote into a date in words. */
+const startsOnWrittenOutYear = (v: Violation): boolean =>
+  v.change?.category === 'units' &&
+  v.origin?.category === 'dates' &&
+  /[A-Za-z]/.test(v.origin.after) &&
+  /^\d{4}\b/.test(v.change.before) &&
+  v.origin.after.endsWith(v.change.before.slice(0, 4));
+
 const VOCABULARY = [...baseVocabulary(), ...Object.values(DIALECTS).flatMap((pack) => pack.vocabulary)];
 
 /** Must match `CONTEXT_WINDOW` in src/engine/lexicon.ts. */
@@ -255,31 +263,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     options: { units: { keepOriginal: true } },
     // The second run converts the original that `keepOriginal` put in brackets.
     matches: (v) => v.change !== undefined && v.origin?.after.endsWith(`(${v.change.before})`) === true,
-  },
-  {
-    issue: 154,
-    property: 'idempotence',
-    input: '1/13/2024 - 0°F',
-    options: american,
-    matches: (v) => v.change?.category === 'units' && v.origin?.category === 'dates',
-  },
-  {
-    issue: 154,
-    property: 'idempotence',
-    input: 'Price $5 - 10 inches long.',
-    options: american,
-    matches: (v) => v.change?.category === 'currency' && v.origin?.category === 'units',
-  },
-  {
-    issue: 154,
-    property: 'idempotence',
-    input: '// On 13/4/2024 - 1 inch fell. On 1-13-2024 it cost $971.\n',
-    options: { language: 'ts' },
-    // The first run broke up a day-first date, so the second run reads the text as more American.
-    matches: (v) =>
-      v.verdicts !== undefined &&
-      (v.verdicts[1].unambiguousDayFirstDates < v.verdicts[0].unambiguousDayFirstDates ||
-        v.verdicts[1].namedDayFirstDates < v.verdicts[0].namedDayFirstDates),
   },
   {
     issue: 155,
@@ -333,13 +316,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     matches: (v) => v.change?.ruleId === 'dates.numeric' && v.origin?.ruleId === 'dates.numeric',
   },
   {
-    issue: 69,
-    property: 'idempotence',
-    input: 'Bought 3/14/2024 1/2 gallon of milk.',
-    options: american,
-    matches: (v) => v.change?.category === 'units' && precedes(/\d{4}-\d\d-\d\d\s+$/)(v),
-  },
-  {
     issue: 88,
     property: 'idempotence',
     input: 'half a mile May 3, 2024',
@@ -351,13 +327,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
       /^[a-z]/i.test(v.change.before) &&
       v.origin === undefined &&
       follows(/^[\s-]+\d/)(v),
-  },
-  {
-    issue: 164,
-    property: 'idempotence',
-    input: 'At 6:00 PM pound the cutlets thin.',
-    options: { times: { to24Hour: true } },
-    matches: (v) => v.change?.category === 'units' && precedes(/\d:$/)(v),
   },
   {
     issue: 165,
@@ -403,6 +372,43 @@ const KNOWN_FAILURES: KnownFailure[] = [
       v.origin === undefined &&
       (v.previous !== undefined || v.next !== undefined) &&
       (v.change?.category === 'vocabulary' || v.change?.category === 'spelling'),
+  },
+  {
+    issue: 197,
+    property: 'idempotence',
+    input: 'Oct 22, 2024 1/2 inch long',
+    options: localise,
+    matches: startsOnWrittenOutYear,
+  },
+  {
+    issue: 197,
+    property: 'idempotence',
+    input: 'March 13, 2024 - 250 feet',
+    options: localise,
+    matches: startsOnWrittenOutYear,
+  },
+  {
+    issue: 197,
+    property: 'idempotence',
+    input: '1/29/24 in. the ',
+    options: { dates: { format: 'long' }, times: { to24Hour: true } },
+    matches: startsOnWrittenOutYear,
+  },
+  {
+    issue: 198,
+    property: 'idempotence',
+    input: 'It was $1,000 1/2 inch wide.',
+    options: american,
+    // The amount a first run read as a measurement takes the currency mark on the second.
+    matches: (v) => {
+      const amount = /^\$\s?(\d[\d,]*(?:\.\d+)?)/.exec(v.change?.before ?? '')?.[1];
+      return (
+        v.change?.category === 'currency' &&
+        v.origin?.category === 'units' &&
+        amount !== undefined &&
+        v.origin.after.startsWith(amount)
+      );
+    },
   },
   {
     issue: 186,
@@ -701,6 +707,13 @@ describe('inputs that once broke a property', () => {
     ['It is 1.8 metres (6 feet) tall.', { units: { keepOriginal: true } }],
     ['Step 14\n\n1/2 gallon of milk.', {}],
     ['Step 14\n1/2 gallon of milk.', american],
+    ['1/13/2024 - 0°F', american],
+    ['Price $5 - 10 inches long.', american],
+    ['// On 13/4/2024 - 1 inch fell. On 1-13-2024 it cost $971.\n', { language: 'ts' }],
+    ['At 6:00 PM pound the cutlets thin.', { times: { to24Hour: true } }],
+    ['Bought 3/14/2024 1/2 gallon of milk.', american],
+    ['1/13/2024 1/2" ', { dates: { format: 'long' } }],
+    ['September 2, 2024 - 202 1/2" ', localise],
   ] satisfies Array<[string, CodeOptions]>)('%j with %j', (input, options) => {
     expect(violations(input, options)).toEqual([]);
   });

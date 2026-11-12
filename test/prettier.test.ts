@@ -52,6 +52,7 @@ describe('the Prettier plugin against real Prettier', () => {
     ${'mdx'}      | ${'Set the theme:\n\n    theme.color = "gray";\n'}       | ${'Set the theme:\n\n    theme.color = "gray";\n'}
     ${'markdown'} | ${'1. Step one.\n\n   More about the color.\n'}         | ${'1. Step one.\n\n   More about the colour.\n'}
     ${'markdown'} | ${'The color.\n\n<pre>\nconst color = "gray";\n</pre>\n'} | ${'The colour.\n\n<pre>\nconst color = "gray";\n</pre>\n'}
+    ${'markdown'} | ${'<div align="center">\n<pre>\nThe color\n</pre>\n</div>\n'} | ${'<div align="center">\n<pre>\nThe color\n</pre>\n</div>\n'}
   `('reads $parser as Markdown, so indented code and a pre block are left alone: $source', async ({ parser, source, expected }) => {
     expect(await format(source as string, { parser: parser as string })).toBe(expected);
   });

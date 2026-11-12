@@ -244,6 +244,19 @@ fuel economy. The volume measures are the US ones, which are not the imperial on
 180 lbs         -> 82 kg             10 acres   -> 4 hectares
 ```
 
+A unit that describes the noun after it stays singular: `a 9 inch dish` becomes
+`a 23 centimetre dish`, and so do `9 inch pans`, `the 5-6 inch pans` and `one-inch slices`.
+A determiner, a hyphen tying the number to the unit, or the singular after a number above
+one says so. One and a fraction take the singular anyway, so `one quart small onions` and
+`1/2 pound ground beef` keep a plural unit, read as quantities with the `of` left out. A
+preposition, a size, an adverb of place, slope or time, a pronoun, a conjunction, a number
+or a date after the unit is no noun: `a quarter mile later` becomes `400 metres later`, and
+`a mile and a half back` becomes `2.4 kilometres back`. A count before an attributive
+measurement counts the noun, so `two quarter-pound burgers` becomes `two 110 gram burgers`.
+A unit that starts a noun leaves the number counting it, so `Bake 1 pound cake`,
+`6 foot soldiers`, `foot traffic` and `8 inch worms` are left as written, while
+`a 2-pound cake` becomes `a 910 gram cake`.
+
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 `22 x 28 centimetres`, both ends sharing the unit chosen for the larger. Each side is read
@@ -977,6 +990,11 @@ rejected the same way.
   or `role="code"` to mark it, is read as part of the sentence.
 - `a third mile` is read as a fraction, though it can also mean one more mile after two.
   The same goes for `a fourth`, `an eighth` and `a sixteenth`.
+- A word after a unit that is an adverb in one phrase and an adjective in another is always
+  read the same way. `inside`, `outside` and `overhead` are adverbs, so `a 2 inch inside
+  diameter` becomes `a 5.1 centimetres inside diameter`, and `round` describes a noun, so
+  `a quarter mile round the bend` becomes `a 400 metre round the bend`. `a 2 pound cake` is
+  left as written, because it may be a pound cake.
 - A line that ends in a number and a line that opens with a unit word are read as one
   measurement, so `Track 7` above `Miles Davis` becomes `Track 11 kilometres Davis`. A
   blank line or a list marker between them keeps them apart.

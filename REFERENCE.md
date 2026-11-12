@@ -631,7 +631,7 @@ deamericaniseText(text, { confidence: ['safe', 'moderate'] });
 deamericaniseText(text, { rules: { 'spelling.contextual.*': false } });
 deamericaniseText(text, { rules: { 'vocabulary.contextual.autumn': false } });
 
-// A single unit
+// A single unit, by key or by name: 'inch', 'inches' and 'in' all keep inches
 deamericaniseText(text, { unitsKeep: ['mile', 'pint'] });
 ```
 
@@ -653,7 +653,8 @@ The three confidence tiers mean:
 
 - **safe**: no plausible false positive. `colour`, `aluminium`, `organise`.
 - **moderate**: a wordlist that could collide with a name. Most vocabulary and all units.
-- **risky**: a guess about what a word means. `tyre`, `cheque`, `autumn`, logical quoting.
+- **risky**: a guess about what a word means. `tyre`, `cheque`, `autumn`, logical quoting,
+  and the emergency number.
 
 ## Source files
 
@@ -944,7 +945,7 @@ there each root needs the rules in its own styles.
 | `protectProperNouns` | `true` | The built-in name list |
 | `protectIdentifiers` | `false` (`true` for code) | camelCase, snake_case, kebab API names, dotted names |
 | `syntax` | unknown | `markdown` or `text`: how code fences and indented code are read |
-| `unitsKeep` | `[]` | Units to leave alone, by key |
+| `unitsKeep` | `[]` | Units to leave alone, by key (`inch`, `square-foot`) or by name (`inches`, `in`), in any case |
 | `units.precision` | `'natural'` | `natural`, `exact`, or a number of decimal places |
 | `units.keepOriginal` | `false` | Write `1.8 metres (6 ft)` |
 | `units.fuelEconomy` | `'l-per-100km'` | Or `km-per-l` |
@@ -958,10 +959,12 @@ there each root needs the rules in its own styles.
 
 `units`, `dates`, `times` and `currency` each accept `false` to switch the category off.
 
-A `dialect`, `preset` or `syntax` outside its list throws an `Error` that names the value
-and the ones it accepts, such as `Unknown preset: Localise. Expected one of read, localise.`
-Only the ids in `DIALECTS` are dialects, so a name every object has, such as `toString`, is
-rejected the same way.
+A `dialect`, `preset` or `syntax` outside its list, or a `unitsKeep` entry that names no
+unit, throws an `Error` that names the value and the ones it accepts, such as `Unknown
+preset: Localise. Expected one of read, localise.` For a unit, those are the unit keys. It
+throws even when there is no text to read, such as a source file with no comments or a page
+with no prose. Only the ids in `DIALECTS` are dialects, so a name every object has, such as
+`toString`, is rejected the same way.
 
 ## Known limits
 

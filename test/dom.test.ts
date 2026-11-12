@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { DomRewriter, deamericaniseDom } from '../src/dom/index.js';
 import type { DomOptions } from '../src/dom/index.js';
 import { distribute } from '../src/dom/distribute.js';
-import type { Change } from '../src/index.js';
+import { DIALECTS } from '../src/index.js';
+import type { Change, Dialect } from '../src/index.js';
 
 // A path, not a URL: under jsdom `URL` is jsdom's own, which `node:fs` rejects.
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'html');
@@ -1152,5 +1153,28 @@ describe('a page with shadow roots', () => {
       expect(serialiseDeep(streamed)).toBe(serialiseDeep(whole));
       expect(located(streamed, rewriter)).toEqual(located(whole, once));
     }
+  });
+});
+
+describe('options it rejects', () => {
+  const unknownDialect = 'Unknown dialect: en-XX. Expected one of en-AU, en-GB, en-NZ, en-IE, en-ZA, en-CA.';
+  const noProse = '<pre>color</pre>';
+
+  it('rejects an unknown dialect on a page with no prose', () => {
+    const dialect = 'en-XX' as Dialect;
+    expect(() => deamericaniseDom(page(noProse), { dialect })).toThrow(unknownDialect);
+    expect(() => new DomRewriter(page(noProse), { dialect })).toThrow(unknownDialect);
+  });
+
+  it('rejects a unitsKeep entry that names no unit on a page with no prose', () => {
+    expect(() => deamericaniseDom(page(noProse), { unitsKeep: ['furlong'] })).toThrow('Unknown unit: furlong.');
+  });
+
+  it.each(Object.keys(DIALECTS))('leaves a page with no prose unchanged under %s', (id) => {
+    expect(rewrite(noProse, { dialect: id as Dialect })).toBe(noProse);
+  });
+
+  it('keeps a unit named the way a person writes it', () => {
+    expect(rewrite('<p>It is 6 inches wide.</p>', { unitsKeep: ['inches'] })).toBe('<p>It is 6 inches wide.</p>');
   });
 });

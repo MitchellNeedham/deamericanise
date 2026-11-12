@@ -1,6 +1,7 @@
 import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
+import { endsSentence } from '../sentence.js';
 import {
   COMPOUNDS,
   MEASURES,
@@ -825,9 +826,19 @@ function redundantMetric(
 }
 
 /**
+ * Any capitalised word after a unit's stop starts a new sentence, a number in words included,
+ * as in `It weighs 5 lb. One bag is enough.` It has to accept every word the bare F's
+ * `OPENER` accepts there, or a stop that ends a bare F's sentence would go, and the second run
+ * would read a longer sentence.
+ */
+const AFTER_UNIT = /(?:)/y;
+
+/**
  * Records one converted measurement, collapsing a redundant parenthetical or pair if there
  * is one. A measurement that is itself the parenthetical after its metric value is not
- * recorded, and one paired after the metric value it restates is held as written.
+ * recorded, and one paired after the metric value it restates is held as written. The stop
+ * of an abbreviation such as `in.` goes with it, unless it also ends the sentence, when the
+ * metric value takes it.
  */
 function pushMeasurement(
   ctx: RuleContext,
@@ -864,7 +875,9 @@ function pushMeasurement(
     });
     return;
   }
-  changes.push(change(start, matched, withOriginal(ctx, body, matched), ruleId, priority));
+  let after = withOriginal(ctx, body, matched);
+  if (matched.endsWith('.') && endsSentence(ctx.text, start, start + matched.length, AFTER_UNIT)) after += '.';
+  changes.push(change(start, matched, after, ruleId, priority));
 }
 
 /**

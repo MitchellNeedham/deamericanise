@@ -478,6 +478,13 @@ outranks it. `lb` and `lbs` are never money, and `respectConventions: false` doe
 convert money. An amount of money is held whole, as a conventional size is, so no other
 rule rewrites any part of it.
 
+An abbreviation's stop goes with it, so `It is 12 in. long.` becomes `It is 30 cm long.` and
+`Add 5 lb. of beef.` becomes `Add 2.3 kg of beef.` The stop stays when it also ends the
+sentence, as a time's does, so `The fence is 6 ft. It is new.` becomes
+`The fence is 1.8 m. It is new.` Any capitalised word after the stop starts a new sentence,
+a number in words included, but a word in capitals does not, so `Buy a 6 ft. HDMI cable.`
+becomes `Buy a 1.8 m HDMI cable.`
+
 **Dates.** `3/14/2024` becomes `2024-03-14` without needing to be told anything, because
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
 surrounding text is American enough to trust; see below. Output is ISO by default, with `dmy` and `long` available.

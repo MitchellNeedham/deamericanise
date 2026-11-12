@@ -1262,8 +1262,14 @@ const ENDS_IN_S = String.raw`(?=[\w%-]*[^\W\dsu]s${WORD_END})`;
  */
 const LEAD = String.raw`\)?(?:${WORD_GAP}\([^()\n]{1,40}\))?${WORD_GAP}`;
 
-/** The words after a quantity name what it measures or describes, as in `8 oz of beef`. */
-const NAMES_A_THING = new RegExp(String.raw`${LEAD}(?:of${WORD_GAP}${ARTICLE})?${NOUN_START}`, 'iy');
+/** `of` and what the quantity measures, as in `3 tons of gravel`. */
+const OF_A_THING = new RegExp(String.raw`${LEAD}of${WORD_GAP}${ARTICLE}${NOUN_START}`, 'iy');
+
+/**
+ * A word that may be the noun a quantity describes, as in `a 3-ton truck`. A plural unit word
+ * describes none, so the word after `3 tons` in `AC units of 3 tons cool the hall` is a verb.
+ */
+const NOUN_AFTER = new RegExp(String.raw`${LEAD}${NOUN_START}`, 'iy');
 
 /** `names` as one pattern, each read with a space or a hyphen between its words. */
 const namePattern = (names: string[]) =>
@@ -1319,12 +1325,19 @@ const SENSES = new Map(
 
 /**
  * The sense of `measure` that the words beside the quantity from `start` to `end` give its
- * unit, or undefined where they give none. A metric value after the quantity names the sense
- * by its dimension. Then the phrase after the unit decides, and where it names a thing that no
- * sense has, the unit keeps its own sense. Only where nothing follows do the words before the
- * number count, and then the sentence.
+ * unit, written as a plural word where `plural` says so, or undefined where they give none. A
+ * metric value after the quantity names the sense by its dimension. Then the phrase after the
+ * unit decides, and where it names a thing that no sense has, the unit keeps its own sense.
+ * Only where nothing after it names a thing do the words before the number count, and then
+ * the sentence.
  */
-function senseAt(text: string, measure: Measure, start: number, end: number): SenseReader | undefined {
+function senseAt(
+  text: string,
+  measure: Measure,
+  start: number,
+  end: number,
+  plural: boolean,
+): SenseReader | undefined {
   const readers = SENSES.get(measure);
   if (readers === undefined) return undefined;
   const plain = contextText(text);
@@ -1340,8 +1353,9 @@ function senseAt(text: string, measure: Measure, start: number, end: number): Se
       reader.after.lastIndex = end;
       if (reader.after.test(plain)) return reader;
     }
-    NAMES_A_THING.lastIndex = end;
-    if (NAMES_A_THING.test(plain)) return undefined;
+    OF_A_THING.lastIndex = end;
+    NOUN_AFTER.lastIndex = end;
+    if (OF_A_THING.test(plain) || (!plural && NOUN_AFTER.test(plain))) return undefined;
   }
   const before = plain.slice(Math.max(0, start - CONTEXT_WINDOW), start);
   const named = readers.find((reader) => reader.before?.test(before));
@@ -2045,7 +2059,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
    * want of a conversion or because its measure is kept.
    */
   const inSense = (ctx: RuleContext, entry: Alias, start: number, end: number): Alias | null => {
-    const sense = senseAt(ctx.text, entry.measure, start, end);
+    const sense = senseAt(ctx.text, entry.measure, start, end, entry.isWord && !entry.isSingular);
     if (sense === undefined) return entry;
     if (sense.measure === undefined || isKept(sense.measure, skip, forced)) return null;
     return { ...entry, measure: sense.measure, note: sense.note };

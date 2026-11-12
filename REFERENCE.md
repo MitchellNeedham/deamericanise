@@ -500,6 +500,11 @@ A scale stays with the amount only as a whole word: `$5 million` and `$50k` beco
 be asked for. `U.S.` becomes `US`, and punctuation that is not part of a quotation moves
 outside the closing quote.
 
+Logical quoting moves only the stop or comma, so the quotation's last word is still
+rewritten: `He said "The color is gray."` becomes `He said "The colour is grey".` A quote
+mark with a letter or digit straight after it closes nothing, so `Acme Inc.'s` keeps its
+stop.
+
 An initialism keeps its last stop when that stop also ends the sentence, as a time does,
 so `She moved to the U.S. It was cold.` becomes `She moved to the US. It was cold.` A
 capital after an initialism is more often the rest of a name, so `the U.S. Army` becomes

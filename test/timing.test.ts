@@ -90,7 +90,7 @@ describe.skipIf(onCi)('TeX, maths, front matter and dollar variables take time i
     ${'\\textcolor{gray}{gray word} '}   | ${{}}                           | ${(s: string) => s}                    | ${'\\textcolor{gray}{grey word} \\textcolor{gray}{grey word} '}
     ${'$x$ gray '}                       | ${markdown}                     | ${(s: string) => s}                    | ${'$x$ grey $x$ grey '}
     ${'$5 gray '}                        | ${{ ...markdown, ...american }} | ${(s: string) => s}                    | ${'US$5 grey US$5 grey '}
-    ${'$1 and $2 '}                      | ${american}                     | ${(s: string) => s}                    | ${'$1 and $2 $1 and $2 '}
+    ${'$1 in sed '}                      | ${american}                     | ${(s: string) => s}                    | ${'$1 in sed $1 in sed '}
     ${'title: The gray cat\n'}           | ${markdown}                     | ${(s: string) => `---\n${s}---\n`}     | ${'---\ntitle: The grey cat\ntitle: The grey cat\n'}
   `(
     '"$piece", 2000 times and four times that',

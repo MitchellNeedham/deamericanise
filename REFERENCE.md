@@ -644,12 +644,12 @@ Amounts are never converted, because exchange rates move; a bare
 A scale stays with the amount only as a whole word: `$5 million` and `$50k` become
 `US$5 million` and `US$50k`, and the word after `$50 modernizing` is still respelt.
 A `$` and one figure, with no decimal, comma or scale, is a variable rather than an amount
-in a sentence about code, one with a word such as `capture`, `group`, `match`, `regex`,
-`replacement`, `argument`, `parameter`, `shell`, `script`, `variable`, `sed`, `awk`, `bash`
-or `perl`. It is one too beside another variable: a name or sign such as `$HOME`, `${name}`
-or `$@`, or another figure when one of the two is `$0` or `$1`, since positional variables
-count from there. So `Swap $1 and $2.` stays as written, while `It cost $5, then $6.`
-becomes `It cost US$5, then US$6.` and `It costs $1.` becomes `It costs US$1.`
+in a sentence about code: one that says `capture group`, `regex`, `regular expression`,
+`replacement string`, `back-reference`, `script name`, `sed`, `awk`, `bash` or `perl`, or
+names a variable such as `$HOME`, `${name}` or `$@`. Words that prices share, such as
+`group` or `match`, are no sign, and nor is another figure, so `Swap $1 and $2 in sed.`
+stays as written while `Group tickets cost $5.` becomes `Group tickets cost US$5.` and
+`Kids pay $1 and adults pay $2.` becomes `Kids pay US$1 and adults pay US$2.`
 
 **Punctuation** (`localise` only). House style rather than comprehension, so it waits to
 be asked for. `U.S.` becomes `US`, and punctuation that is not part of a quotation moves

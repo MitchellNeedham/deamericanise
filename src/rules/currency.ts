@@ -1,24 +1,16 @@
 import type { Change, Rule, RuleContext } from '../types.js';
 import { sentenceBounds } from './sentence.js';
 
-const SCALE = String.raw`[^\S\n]?(billion|million|trillion|thousand|[BMK])(?![\p{L}\p{N}])`;
-
-// Ends at the last digit or a whole scale word: the text after it may belong to another rule.
-const bareDollar = new RegExp(String.raw`(?<![A-Za-z$])\$\s?(\d(?:[\d,]*\d)?(?:\.\d+)?)(?:${SCALE})?`, 'giu');
-
-/** `$` and one figure that `bareDollar` reads with no decimal, comma or scale after it. */
-const figureVariable = (figures: string) =>
-  new RegExp(String.raw`(?<![A-Za-z$])\$${figures}(?![\d,]*\d|\.\d|${SCALE})`, 'iu');
-
-const ANY_FIGURE = figureVariable(String.raw`\d`);
-const FIRST_FIGURE = figureVariable('[01]');
-
-/** Words that put a sentence about code, where `$1` names a capture group or an argument. */
+/**
+ * Words and phrases that put a sentence about code, where `$1` names a capture group or a
+ * script's argument. Each is one that prose about prices never uses, so `Group tickets cost $5.`
+ * keeps its currency.
+ */
 const ABOUT_CODE = new RegExp(
   String.raw`\b(?:${[
-    'captur(?:e[ds]?|ing)', 'groups?', 'match(?:e[ds]|ing)?', 'regex(?:e?s|ps?)?',
-    'regular expressions?', 'replacements?', 'back-?references?', 'arguments?', 'parameters?',
-    'positional', 'shells?', 'scripts?', 'scripting', 'variables?', 'sed', 'awk', 'bash', 'perl',
+    String.raw`captur(?:e|ing)\s+groups?`, 'regex(?:e?s|ps?)?', String.raw`regular\s+expressions?`,
+    String.raw`replacement\s+strings?`, 'back-?references?', String.raw`script\s+names?`,
+    'sed', 'awk', 'bash', 'perl',
   ].join('|')})\b`,
   'i',
 );
@@ -33,17 +25,16 @@ const REACH = 120;
 
 /**
  * Whether `$` and one figure, with no decimal, comma or scale, is a variable such as a capture
- * group or a script's argument rather than an amount. It is in a sentence about code, or one
- * that names another variable. Positional variables count from `$0` or `$1`, so another figure
- * counts only beside one of those, and `It cost $5, then $6.` is two amounts.
+ * group or a script's argument rather than an amount: its sentence is about code, or names a
+ * variable such as `$HOME`. Another figure alone is no sign, so `Kids pay $1 and adults pay $2.`
+ * is two amounts.
  */
 function isVariable(text: string, match: RegExpMatchArray): boolean {
   if (match[0].length !== 2) return false;
   const start = match.index!;
   const [from, to] = sentenceBounds(text, start, start + 2, ANY_OPENER, REACH);
   const around = `${text.slice(from, start)} ${text.slice(start + 2, to)}`;
-  if (ABOUT_CODE.test(around) || NAMED_VARIABLE.test(around)) return true;
-  return (match[1] === '0' || match[1] === '1' ? ANY_FIGURE : FIRST_FIGURE).test(around);
+  return ABOUT_CODE.test(around) || NAMED_VARIABLE.test(around);
 }
 
 /**
@@ -52,6 +43,9 @@ function isVariable(text: string, match: RegExpMatchArray): boolean {
  * actually gets wrong.
  */
 export function currencyRules(): Rule[] {
+  // Ends at the last digit or a whole scale word: the text after it may belong to another rule.
+  const bareDollar =
+    /(?<![A-Za-z$])\$\s?(\d(?:[\d,]*\d)?(?:\.\d+)?)(?:[^\S\n]?(billion|million|trillion|thousand|[BMK])(?![\p{L}\p{N}]))?/giu;
   const spelled = /(?<![\w-])(\d[\d,]*(?:\.\d+)?)\s+dollars(?![\w-])/gi;
 
   const rule: Rule = {

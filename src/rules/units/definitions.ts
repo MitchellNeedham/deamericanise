@@ -33,8 +33,8 @@ export interface Measure {
   ambiguousWhen?: RegExp;
   /**
    * Whether the written-out unit in the quantity `text.slice(start, end)` is being used in
-   * another sense, such as `pounds` for money. Checked whatever `respectConventions` says,
-   * because what it finds is not a measurement at all.
+   * another sense, such as `pounds` for money or the `pound` of `pound cake`. Checked
+   * whatever `respectConventions` says, because what it finds is not a measurement at all.
    */
   otherSense?: (text: string, start: number, end: number) => boolean;
   /**
@@ -105,6 +105,20 @@ const INCH_CONVENTIONS = {
 };
 
 /**
+ * Whether the singular unit word `word`, ending the quantity `text.slice(start, end)`, is
+ * the first part of a noun that `nouns` finds after it, as `pound` is in `Bake 1 pound cake`.
+ * The number then counts the noun. A hyphen ties a unit to its number, so `a 2-pound cake`
+ * is a weight.
+ */
+function startsNoun(word: string, nouns: RegExp) {
+  const unit = new RegExp(String.raw`(?<![-A-Za-z])${word}$`, 'i');
+  return (text: string, start: number, end: number): boolean =>
+    unit.test(text.slice(start, end)) && nouns.test(text.slice(end, end + 40));
+}
+
+const poundCake = startsNoun('pound', /^[\s-]+cakes?\b/i);
+
+/**
  * Word forms that are grammatically singular. A singular unit next to a number that is
  * not one is being used attributively (`a 9 inch dish`), and its replacement should stay
  * singular too.
@@ -124,6 +138,7 @@ export const MEASURES: Measure[] = [
     abbrevs: ['in.', 'in', '″', '"'],
     convert: (v) => metricLength(v * 0.0254),
     conventional: INCH_CONVENTIONS,
+    otherSense: startsNoun('inch', /^[\s-]+worms?\b/i),
   },
   {
     id: 'units.length.foot',
@@ -131,6 +146,7 @@ export const MEASURES: Measure[] = [
     words: ['feet', 'foot'],
     abbrevs: ['ft.', 'ft', '′'],
     convert: (v) => metricLength(v * 0.3048),
+    otherSense: startsNoun('foot', /^[\s-]+(?:soldiers?|traffic)\b/i),
   },
   {
     id: 'units.length.yard',
@@ -199,7 +215,8 @@ export const MEASURES: Measure[] = [
     conventional: {
       after: /^[\s-]*(?:divisions?|classes|class|limits?|bouts?|titles?|champions?|weight)\b/i,
     },
-    otherSense: isMoney,
+    otherSense: (text, start, end) =>
+      isMoney(text, start, end) || poundCake(text, start, end),
   },
   {
     id: 'units.mass.stone',

@@ -277,19 +277,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     matches: (v) => v.change?.ruleId === 'dates.numeric' && v.origin?.ruleId === 'dates.numeric',
   },
   {
-    issue: 88,
-    property: 'idempotence',
-    input: 'half a mile May 3, 2024',
-    options: localise,
-    // A written-out quantity the first run left because a word followed it, which that run
-    // then rewrote into something starting with a number.
-    matches: (v) =>
-      v.change?.category === 'units' &&
-      /^[a-z]/i.test(v.change.before) &&
-      v.origin === undefined &&
-      follows(/^[\s-]+\d/)(v),
-  },
-  {
     issue: 165,
     property: 'idempotence',
     input: 'Temperatures at 6 p.m. were 10F.',

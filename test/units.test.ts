@@ -2304,7 +2304,7 @@ describe('American designations that only look like measurements', () => {
   });
 });
 
-describe('an attributive singular needs a determiner', () => {
+describe('an attributive singular after one needs a determiner', () => {
   const quarts = (input: string) => convert(input, { rules: { 'units.volume.quart': true } });
 
   it.each`
@@ -2316,6 +2316,165 @@ describe('an attributive singular needs a determiner', () => {
     ${'one quart of large cucumbers'} | ${'950 millilitres of large cucumbers'} | ${'and it now matches the spelled-out form'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(quarts(input)).toBe(expected);
+  });
+});
+
+describe('a singular unit after a number above one describes the noun after it', () => {
+  it.each`
+    input                          | expected                           | why
+    ${'9 inch pans'}               | ${'23 centimetre pans'}            | ${'no determiner, but the singular says so'}
+    ${'10 pound turkeys'}          | ${'4.5 kilogram turkeys'}          | ${'the same, for mass'}
+    ${'the 5-6 inch pans'}         | ${'the 13-15 centimetre pans'}     | ${'a range after a determiner'}
+    ${'5-6 inch pans'}             | ${'13-15 centimetre pans'}         | ${'a range on its own'}
+    ${'the 5 to 6 inch pans'}      | ${'the 13 to 15 centimetre pans'}  | ${'a range joined by "to"'}
+    ${'cut in one-inch slices'}    | ${'cut in 2.5 centimetre slices'}  | ${'a hyphen ties one to its unit'}
+    ${'two 1-inch boards'}         | ${'two 2.5 centimetre boards'}     | ${'the same, after a count'}
+    ${'a 9 inch deep-dish pie'}    | ${'a 23 centimetre deep-dish pie'} | ${'a hyphen makes a modifier of "deep"'}
+    ${'a 2 mile off-road trail'}   | ${'a 3.2 kilometre off-road trail'} | ${'and of "off"'}
+    ${'a 9 inch round pan'}        | ${'a 23 centimetre round pan'}     | ${'"round" describes the pan'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                           | expected                            | why
+    ${'1/2 pound ground beef'}      | ${'230 grams ground beef'}          | ${'a fraction takes the singular anyway'}
+    ${'1/2-1 inch gravel'}          | ${'1.3-2.5 centimetres gravel'}     | ${'so does a range that ends in one'}
+    ${'0.5 inch'}                   | ${'1.3 centimetres'}                | ${'no noun after'}
+    ${'5 inches of rain'}           | ${'13 centimetres of rain'}         | ${'a plural source'}
+    ${'Dig 3 foot then stop'}       | ${'Dig 91 centimetres then stop'}   | ${'a conjunction is no noun'}
+    ${'He was 6 foot when he left'} | ${'He was 1.8 metres when he left'} | ${'nor is "when"'}
+    ${'9 inch is plenty'}           | ${'23 centimetres is plenty'}       | ${'nor is a verb'}
+    ${'Cut 9 inch this time'}       | ${'Cut 23 centimetres this time'}   | ${'nor is a determiner'}
+    ${'Dig 3 foot so it drains'}    | ${'Dig 91 centimetres so it drains'} | ${'nor is "so"'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a distance before an adverb of time or place is a quantity', () => {
+  it.each`
+    input                                 | expected                            | why
+    ${'a quarter mile later we stopped'}  | ${'400 metres later we stopped'}    | ${'later'}
+    ${'a quarter mile earlier'}           | ${'400 metres earlier'}             | ${'earlier'}
+    ${'half a mile later'}                | ${'800 metres later'}               | ${'the unit inside the number'}
+    ${'a quarter mile before the bridge'} | ${'400 metres before the bridge'}   | ${'before'}
+    ${'a quarter mile after the turn'}    | ${'400 metres after the turn'}      | ${'after'}
+    ${'two miles and a half later'}       | ${'4 kilometres later'}             | ${'a fraction after the unit'}
+  `('time: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                 | expected                            | why
+    ${'a quarter mile back'}              | ${'400 metres back'}                | ${'back'}
+    ${'a mile and a half back'}           | ${'2.4 kilometres back'}            | ${'the unit inside the number'}
+    ${'a quarter mile out'}               | ${'400 metres out'}                 | ${'out'}
+    ${'a quarter mile off'}               | ${'400 metres off'}                 | ${'off'}
+    ${'a quarter mile around'}            | ${'400 metres around'}              | ${'around'}
+    ${'a quarter mile over'}              | ${'400 metres over'}                | ${'over'}
+    ${'a quarter mile overhead'}          | ${'400 metres overhead'}            | ${'overhead'}
+    ${'a quarter mile above the lake'}    | ${'400 metres above the lake'}      | ${'above'}
+    ${'a quarter mile below the summit'}  | ${'400 metres below the summit'}    | ${'below'}
+    ${'a quarter mile inside the gate'}   | ${'400 metres inside the gate'}     | ${'inside'}
+    ${'a quarter mile outside town'}      | ${'400 metres outside town'}        | ${'outside'}
+    ${'a quarter mile inland'}            | ${'400 metres inland'}              | ${'inland'}
+    ${'a quarter mile offshore'}          | ${'400 metres offshore'}            | ${'offshore'}
+  `('place: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                           | expected                    | why
+    ${'a quarter mile uphill'}      | ${'400 metres uphill'}      | ${'uphill'}
+    ${'a quarter mile downhill'}    | ${'400 metres downhill'}    | ${'downhill'}
+    ${'a quarter mile upstream'}    | ${'400 metres upstream'}    | ${'upstream'}
+    ${'half a mile downstream'}     | ${'800 metres downstream'}  | ${'downstream'}
+  `('slope: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                             | expected                         | why
+    ${'a quarter-mile track'}         | ${'a 400 metre track'}           | ${'a noun after keeps the article for itself'}
+    ${'a 9 inch dish'}                | ${'a 23 centimetre dish'}        | ${'the same'}
+    ${'a quarter mile away'}          | ${'400 metres away'}             | ${'a direction'}
+    ${'half a pound cake'}            | ${'half a pound cake'}           | ${'the noun after claims the fraction'}
+    ${'a mile and a half hour later'} | ${'a mile and a half hour later'} | ${'the same'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('reads a date after a distance as no noun, so one run converts both', () => {
+    expect(convert('half a mile May 3, 2024')).toBe('800 metres May 3, 2024');
+    expect(convert('half a mile May 3, 2024', { preset: 'localise' })).toBe('800 metres 3 May 2024');
+  });
+
+  it.each`
+    input                          | expected
+    ${'a quarter mile one way'}    | ${'400 metres one way'}
+    ${'half a mile two feet away'} | ${'800 metres 61 centimetres away'}
+  `('reads a number in words after a distance as no noun: $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a unit that is part of a noun', () => {
+  it.each`
+    unchanged                        | why
+    ${'Bake 1 pound cake'}           | ${'a pound cake is a cake'}
+    ${'Send in 6 foot soldiers'}     | ${'the number counts the soldiers'}
+    ${'heavy foot traffic'}          | ${'foot traffic'}
+    ${'Count 8 inch worms'}          | ${'inch worms'}
+    ${'two 1 pound cakes'}           | ${'after a count'}
+    ${'Bake 2-3 pound cakes'}        | ${'after a range'}
+    ${'Bake a 2 pound cake'}         | ${'with no hyphen it may be a pound cake'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                     | expected                    | why
+    ${'Bake a 2-pound cake'}  | ${'Bake a 910 gram cake'}   | ${'a hyphen ties the unit to its number'}
+    ${'a 6-foot soldier'}     | ${'a 1.8 metre soldier'}    | ${'the same'}
+    ${'2 pounds of cake'}     | ${'910 grams of cake'}      | ${'a plural unit starts no noun'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  /** The spans the unit rules hold as written in `text`. */
+  const held = (text: string, options: Options = {}): string[] => {
+    const resolved = resolveOptions(options);
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold)
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                       | span
+    ${'Bake 1 pound cake'}      | ${'1 pound'}
+    ${'Send in 6 foot soldiers'} | ${'6 foot'}
+    ${'Bake 2-3 pound cakes'}   | ${'2-3 pound'}
+  `('holds $span whole, even with respectConventions off', ({ input, span }) => {
+    expect(held(input)).toContain(span);
+    expect(held(input, { units: { respectConventions: false } })).toContain(span);
+  });
+});
+
+describe('a count before an attributive measurement stays out of it', () => {
+  it.each`
+    input                              | expected                         | why
+    ${'two quarter-pound burgers'}     | ${'two 110 gram burgers'}        | ${'two burgers of a quarter pound each'}
+    ${'three quarter-pound burgers'}   | ${'three 110 gram burgers'}      | ${'not three quarters of a pound'}
+    ${'two half-gallon jugs'}          | ${'two 1.9 litre jugs'}          | ${'not two halves'}
+    ${'two quarter-mile tracks'}       | ${'two 400 metre tracks'}        | ${'a length'}
+    ${'three-quarter-pound burgers'}   | ${'340 gram burgers'}            | ${'a count hyphenated to the fraction is part of it'}
+    ${'three quarter-inch pipes'}      | ${'three quarter-inch pipes'}    | ${'a pipe size is held, and the count stays out of it'}
+    ${'three 2-inch screws'}           | ${'three 2-inch screws'}         | ${'a fastener size'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
   });
 });
 

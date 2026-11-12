@@ -804,6 +804,8 @@ describe('fuel economy', () => {
     range                   | read
     ${'20 to 30 mpg, '}     | ${'converted'}
     ${'twenty to 30 mpg, '} | ${'held'}
+    ${'20, 25 or 30 mpg; '} | ${'converted, as a list'}
+    ${'twenty, 25 or 30 mpg; '} | ${'held, as a list'}
   `('gives one change for each range, $read: "$range"', ({ range }) => {
     expect(economyChanges(range.repeat(50))).toHaveLength(50);
   });
@@ -948,6 +950,157 @@ describe('fractions and ranges', () => {
     ${'between 5 and 10 miles'} | ${'between 8 and 16 kilometres'}
   `('$input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a range joined by "or"', () => {
+  it.each`
+    input                               | expected                                 | why
+    ${'It is 5 or 6 feet long.'}        | ${'It is 1.5 or 1.8 metres long.'}       | ${'a length'}
+    ${'Use 2 or 3 pounds of beef.'}     | ${'Use 0.91 or 1.4 kilograms of beef.'}  | ${'a weight'}
+    ${'It is two or three feet long.'}  | ${'It is 61 or 91 centimetres long.'}    | ${'in words'}
+    ${'Use a 2 or 3 inch dish.'}        | ${'Use a 5.1 or 7.6 centimetre dish.'}   | ${'describing a noun'}
+    ${'It is 5 or\n6 feet long.'}       | ${'It is 1.5 or 1.8 metres long.'}       | ${'broken at its "or"'}
+    ${'Bake at 350 or 375°F.'}          | ${'Bake at 175 or 190°C.'}               | ${'a temperature'}
+    ${'He is 6 foot 2 or 6 foot 4.'}    | ${'He is 1.88 metres or 1.93 metres.'}   | ${'two heights with no inch word'}
+  `('converts both figures: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                     | expected                                         | why
+    ${'It does 20 or 30 mpg on the highway'}  | ${'It does 7.8 or 12 L/100km on the highway'}    | ${'the smaller first'}
+    ${'It went from 20 or 30 mpg to 40 mpg'}  | ${'It went from 12 or 7.8 L/100km to 5.9 L/100km'} | ${'in the source order after "from"'}
+  `('converts fuel economy joined by "or": $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                              | why
+    ${'It costs 10 or 20 pounds.'}         | ${'money'}
+    ${'It is two or three hundred feet.'}  | ${'which may mean 200 or 300'}
+    ${'He is 5 or 6 feet 2 inches tall.'}  | ${'a height that ends the range'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                               | expected
+    ${'Bake at gas mark 4 or 350°F.'}   | ${'Bake at gas mark 4 or 175°C.'}
+    ${'Bake at Gas 4 or 350°F.'}        | ${'Bake at Gas 4 or 175°C.'}
+  `('reads a gas mark before "or" as no first end: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected
+    ${'5 to 10 feet'}                      | ${'1.5 to 3 metres'}
+    ${'Bake at 350°F or until golden.'}    | ${'Bake at 175°C or until golden.'}
+    ${'Cut 3 metres or 6 feet of rope.'}   | ${'Cut 3 metres or 1.8 metres of rope.'}
+  `('still gives $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('takes the author figure for a range joined by "or"', () => {
+    expect(convert('Cut 5 or 6 feet (1.5 or 1.8 m) of rope.')).toBe('Cut 1.5 or 1.8 m of rope.');
+  });
+
+  it('keeps the original of a range joined by "or", and runs twice without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('It is 5 or 6 feet long.', options);
+    expect(once).toBe('It is 1.5 or 1.8 metres (5 or 6 feet) long.');
+    expect(convert(once, options)).toBe(once);
+  });
+});
+
+describe('a list of figures before one unit', () => {
+  it.each`
+    input                                        | expected                                          | why
+    ${'It comes in 5, 10 and 15 feet.'}          | ${'It comes in 1.5, 3 and 4.6 metres.'}           | ${'ending in "and"'}
+    ${'It comes in 5, 10, and 15 feet.'}         | ${'It comes in 1.5, 3, and 4.6 metres.'}          | ${'with a comma before "and"'}
+    ${'Cut it to 2, 4 or 6 inches.'}             | ${'Cut it to 5.1, 10 or 15 centimetres.'}         | ${'ending in "or"'}
+    ${'Cut it to 2, 4, or 6 inches.'}            | ${'Cut it to 5.1, 10, or 15 centimetres.'}        | ${'with a comma before "or"'}
+    ${'Sizes: 4, 6, 8 inches.'}                  | ${'Sizes: 10, 15, 20 centimetres.'}               | ${'commas alone'}
+    ${'Buy 2, 3, 4 or 5 pounds of beef.'}        | ${'Buy 0.91, 1.4, 1.8 or 2.3 kilograms of beef.'} | ${'four figures'}
+    ${'It drops 15, 10 or 5 feet.'}              | ${'It drops 4.6, 3 or 1.5 metres.'}               | ${'a list that falls'}
+    ${'It comes in five, ten and fifteen feet.'} | ${'It comes in 1.5, 3 and 4.6 metres.'}           | ${'figures in words'}
+    ${'Use a 2, 4 or 6 inch dish.'}              | ${'Use a 5.1, 10 or 15 centimetre dish.'}         | ${'describing a noun'}
+    ${'It comes in ½, ¾ or 1 inch.'}             | ${'It comes in 1.3, 1.9 or 2.5 centimetres.'}     | ${'fractions'}
+    ${'It comes in 5,\n10 and 15 feet.'}         | ${'It comes in 1.5, 3 and 4.6 metres.'}           | ${'wrapped after a comma'}
+    ${'Bake at 325, 350 or 375°F.'}              | ${'Bake at 165, 175 or 190°C.'}                   | ${'temperatures'}
+    ${'Bake at 325, 350 and 375°F.'}             | ${'Bake at 165, 175 and 190°C.'}                  | ${'temperatures ending in "and"'}
+    ${'Bake at 325, 350, 375°F.'}                | ${'Bake at 165, 175, 190°C.'}                     | ${'temperatures with commas alone'}
+    ${'Temperatures fell 10, 15 or 20°F.'}       | ${'Temperatures fell 5.6, 8.3 or 11°C.'}          | ${'changes in temperature'}
+    ${'Lows of 30, 20 or 10°F tonight.'}         | ${'Lows of -1.1, -6.7 or -12°C tonight.'}         | ${'temperatures that fall'}
+    ${'He is 6 foot 2, 6 foot 4 or 6 foot 6.'}   | ${'He is 1.88 metres, 1.93 metres or 1.98 metres.'} | ${'heights with no inch word'}
+  `('converts every figure: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                          | expected                                          | why
+    ${'Models do 20, 25 or 30 mpg on the highway'} | ${'Models do 7.8, 9.4 or 12 L/100km on the highway'} | ${'the smallest first'}
+    ${'Models do 20, 25, 30 mpg on the highway'}   | ${'Models do 7.8, 9.4, 12 L/100km on the highway'}   | ${'commas alone'}
+  `('converts every figure of fuel economy: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('converts a list of fuel economy in km per litre', () => {
+    expect(convert('Models do 20, 25 or 30 mpg here', { units: { fuelEconomy: 'km-per-l' } })).toBe(
+      'Models do 8.5, 11 or 13 km/L here',
+    );
+  });
+
+  it.each`
+    input                                          | expected                                          | why
+    ${'In 2024, 5 and 10 feet of snow fell.'}      | ${'In 2024, 1.5 and 3 metres of snow fell.'}      | ${'a year more than ten times the next figure'}
+    ${'On Oct 22, 5, 10 and 15 feet of snow fell.'} | ${'On Oct 22, 1.5, 3 and 4.6 metres of snow fell.'} | ${'the day of a date'}
+    ${'Serves 4, 2 pounds beef'}                   | ${'Serves 4, 910 grams beef'}                     | ${'one figure before a comma'}
+    ${'Serves 4, 2 or 3 pounds beef'}              | ${'Serves 4, 0.91 or 1.4 kilograms beef'}         | ${'a count out of the order of the list'}
+  `('starts the list after a figure it cannot take: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                  | why
+    ${'It costs 5, 10 or 20 pounds.'}          | ${'money'}
+    ${'It costs 5, 10, 20 pounds.'}            | ${'money, with commas alone'}
+    ${'It is two, three or four hundred feet.'} | ${'which may mean 200, 300 or 400'}
+    ${'It is 5, 6, 7 feet 2 inches.'}          | ${'a height that ends the list'}
+    ${'It weighs 4, 5 or 6 pounds 8 ounces.'}  | ${'a weight that ends the list'}
+    ${'It is 1 to 2, 4 or 6 feet.'}            | ${'a list that starts as the second end of a range'}
+    ${'Models do twenty, 25 or 30 mpg here'}   | ${'fuel economy with a figure in words'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                    | expected
+    ${'It is 5 feet, 10 feet and 15 feet.'}  | ${'It is 1.5 metres, 3 metres and 4.6 metres.'}
+    ${'between 5 and 10 miles'}              | ${'between 8 and 16 kilometres'}
+    ${'5-10 feet'}                           | ${'1.5-3 metres'}
+  `('still gives $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                 | expected
+    ${'Cut 5, 10 or 15 feet (1.5, 3 or 4.6 m) of rope.'}  | ${'Cut 1.5, 3 or 4.6 m of rope.'}
+    ${'Bake at 325, 350 or 375°F (165, 175 or 190°C).'}   | ${'Bake at 165, 175 or 190°C.'}
+  `('takes the author figures for a list: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected
+    ${'It comes in 5, 10 and 15 feet.'}    | ${'It comes in 1.5, 3 and 4.6 metres (5, 10 and 15 feet).'}
+    ${'Sizes: 4, 6, 8 inches.'}            | ${'Sizes: 10, 15, 20 centimetres (4, 6, 8 inches).'}
+    ${'Bake at 325, 350 or 375°F.'}        | ${'Bake at 165, 175 or 190°C (325, 350 or 375°F).'}
+  `('keeps the original of $input, and runs twice without converting it again', ({ input, expected }) => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert(input, options);
+    expect(once).toBe(expected);
+    expect(convert(once, options)).toBe(once);
   });
 });
 

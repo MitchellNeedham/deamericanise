@@ -298,7 +298,7 @@ const KNOWN_FAILURES: KnownFailure[] = [
       v.next.before.endsWith('in.'),
   },
   {
-    issue: 287,
+    issue: 282,
     property: 'idempotence',
     input: 'Gate 10F. December 1, 2024 the oven broke.',
     options: localise,

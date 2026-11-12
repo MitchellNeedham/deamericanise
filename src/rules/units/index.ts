@@ -1253,6 +1253,8 @@ const WORD_END = String.raw`(?![\w-])`;
 const FUNCTION_WORD = String.raw`(?:${NOT_A_NOUN.join('|')})${WORD_END}`;
 /** A word that may modify the noun after it: no function word, and no possessive. */
 const MODIFIER = String.raw`(?!${FUNCTION_WORD})[A-Za-z\d][\w%]*(?:-[\w%]+)*`;
+/** A word ending in a lone `s`, as a plural or a verb such as `needs` does, and `glass` does not. */
+const ENDS_IN_S = String.raw`(?=[\w%-]*[^\W\dsu]s${WORD_END})`;
 
 /**
  * From a unit to the word after it, past the bracket the quantity may close, as in
@@ -1282,20 +1284,21 @@ function senseReader(sense: Sense): SenseReader {
   const heads = sense.heads ?? [];
   const except = sense.except ? String.raw`(?!(?:${namePattern(sense.except)})${WORD_END})` : '';
   const word = String.raw`${except}${MODIFIER}${WORD_GAP}`;
-  const endsPhrase = String.raw`${WORD_END}(?!${WORD_GAP}${NOUN_START})`;
+  // A word in `s` is a plural or a verb. Before another word it is the noun measured, as in
+  // `3-ton trucks need AC`, and after one a verb, as in `a 3-ton truck needs AC`.
+  const words = String.raw`(?:(?:(?!${ENDS_IN_S})${word}){1,2}|${word})?`;
   const head = heads.length > 0 ? String.raw`${WORD_GAP}(?:${namePattern(heads)})` : '';
-  const describes = head ? String.raw`(?:${head}${WORD_END}|${endsPhrase})` : endsPhrase;
   const holders = sense.things.filter((thing) => heads.includes(thing));
   const describers = sense.things.filter((thing) => !heads.includes(thing));
   const thing = [
-    ...(describers.length > 0 ? [`(?:${namePattern(describers)})${describes}`] : []),
-    ...(holders.length > 0 ? [`(?:${namePattern(holders)})${endsPhrase}`] : []),
+    ...(describers.length > 0 ? [`(?:${namePattern(describers)})${WORD_END}`] : []),
+    ...(holders.length > 0 ? [`(?:${namePattern(holders)})${WORD_END}(?!${head}${WORD_END})`] : []),
   ].join('|');
   const vessel = sense.vessels
-    ? String.raw`(?:(?:${namePattern(sense.vessels)})${WORD_GAP}of${WORD_GAP}${ARTICLE}(?:${word}){0,2})?`
+    ? String.raw`(?:(?:${namePattern(sense.vessels)})${WORD_GAP}of${WORD_GAP}${ARTICLE}${words})?`
     : '';
   const after = new RegExp(
-    String.raw`${LEAD}(?:of${WORD_GAP}${ARTICLE})?(?:${word}){0,2}${vessel}${except}(?:${thing})`,
+    String.raw`${LEAD}(?:of${WORD_GAP}${ARTICLE})?${words}${vessel}${except}(?:${thing})`,
     'iy',
   );
   const before =

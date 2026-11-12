@@ -68,19 +68,23 @@ export interface Sense {
   note?: string;
   /**
    * What the quantity measures or describes in this sense, in the phrase after the unit:
-   * after an optional `of`, with at most two words between that are not function words, as
-   * `milk` in `8 oz of whole milk` and `AC` in `a 3-ton central AC unit`.
+   * after an optional `of`, with at most two words between that are not function words, and
+   * whatever follows, as `milk` in `Add 8 oz of whole milk slowly` and `AC` in
+   * `a 3-ton central AC unit`.
    */
   things: string[];
   /**
-   * Nouns one of `things` may describe in turn, as `unit` in `AC unit`. Any other noun after
-   * a thing makes it describe that noun, so `cream cheese` is a cheese. A head that is one of
-   * `things` too is a vessel, and takes no head of its own: `a 16 oz glass jar` is a jar.
+   * Nouns one of `things` may describe, as `unit` in `AC units of 2 to 5 tons`, where they
+   * stand between the thing and the number. One of `things` before one is its material, as
+   * `glass` is in `a 16 oz glass jar`.
    */
   heads?: string[];
   /** Nouns read through to what they hold, as the `can` of `a 12 oz can of soda`. */
   vessels?: string[];
-  /** Names that hold one of `things` or a word before it and are no such thing: `sour cream`. */
+  /**
+   * Names that hold one of `things` and are another thing, as `sour cream` and `cream cheese`
+   * are solids.
+   */
   except?: string[];
   /**
    * Words before the number that say so, with at most one of `heads` and three function words
@@ -212,11 +216,14 @@ const DRINKWARE = ['glass', 'mug', 'tumbler', 'pint', 'shot'];
 const VESSELS = ['can', 'bottle', 'cup', 'carton', 'jug', 'jar', 'keg', 'pitcher', 'flask', 'carafe'];
 
 /** Solids named for a liquid. */
-const NOT_LIQUIDS = [
-  'sour cream', 'ice cream', 'whipped cream', 'clotted cream', 'baking soda', 'caustic soda',
-  'washing soda', 'ground coffee', 'instant coffee', 'bean coffee', 'powdered milk', 'dried milk',
-  'dry milk', 'condensed milk',
-];
+const NOT_LIQUIDS = withPlurals([
+  'sour cream', 'ice cream', 'whipped cream', 'clotted cream', 'cream cheese', 'cream puff',
+  'cream cracker', 'milk chocolate', 'milk powder', 'powdered milk', 'dried milk', 'dry milk',
+  'condensed milk', 'baking soda', 'caustic soda', 'washing soda', 'soda cracker', 'soda bread',
+  'ground coffee', 'instant coffee', 'bean coffee', 'coffee bean', 'coffee ground', 'coffee cake',
+  'water chestnut', 'water cracker', 'beer bread', 'rum cake', 'rum ball', 'wine gum', 'stock cube',
+  'oil paint',
+]);
 
 const FLUID_OUNCES: Sense = {
   as: 'units.volume.fluid-ounce',
@@ -231,13 +238,16 @@ const TROY_OUNCES: Sense = {
   as: 'units.mass.troy-ounce',
   note: 'read as troy ounces, in which precious metals are weighed',
   things: ['gold', 'silver', 'platinum', 'palladium', 'bullion'],
-  heads: withPlurals(['coin', 'bar', 'round', 'ingot', 'nugget', 'wafer']),
+  except: withPlurals(['silver polish', 'silver paint', 'gold paint', 'silver nitrate']),
 };
 
 /** A circuit board's copper, which boards are ordered by in ounces per square foot. */
 const COPPER_WEIGHT: Sense = {
   things: ['copper', 'cu', 'cladding', 'copper clad'],
   heads: withPlurals(['weight', 'thickness', 'pour', 'layer', 'plane', 'trace', 'foil', 'plating', 'board', 'pcb']),
+  except: withPlurals([
+    'copper sulfate', 'copper sulphate', 'copper oxide', 'copper wire', 'copper pipe', 'copper tube',
+  ]),
   before: ['copper', 'cu'],
   sentence: withPlurals(['pcb', 'fr-4', 'fr4', 'circuit board', 'printed circuit']),
 };
@@ -259,6 +269,7 @@ const TONS_OF_COOLING: Sense = {
   heads: withPlurals([
     'unit', 'system', 'capacity', 'load', 'size', 'rating', 'tower', 'plant', 'equipment', 'coil',
   ]),
+  except: withPlurals(['hvac truck', 'hvac van', 'ac adapter']),
   before: withPlurals(COOLED),
 };
 

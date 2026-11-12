@@ -1142,6 +1142,13 @@ describe('a year after a preposition is not a measurement', () => {
     ${'It rained.\nIn 2024 miles were driven.'}   | ${'at the start of a line'}
     ${'He said, "In 2024 miles were driven."'}    | ${'after an opening quote'}
     ${'It rained. (In 2024 miles were driven.)'}  | ${'after a stop and an opening bracket'}
+    ${'- In 2024 miles were driven.'}             | ${'opening a list item'}
+    ${'* In 2024 miles were driven.'}             | ${'the same, after "*"'}
+    ${'+ Since 2019 mile markers have been added.'} | ${'the same, after "+"'}
+    ${'1. In 2024 miles were driven.'}            | ${'the same, after a number and a stop'}
+    ${'2) By 2025 miles of track will open.'}     | ${'the same, after a number and a bracket'}
+    ${'Notes:\n- In 2024 miles were driven.'}     | ${'a list item on a later line'}
+    ${'Notes\n  2) By 2025 miles of track will open.'} | ${'an indented list item'}
     ${'a 2024 yard dash'}                         | ${'no preposition before the number'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
@@ -1163,6 +1170,9 @@ describe('a year after a preposition is not a measurement', () => {
     ${'The wreck lies in 1500 feet of water.'} | ${'The wreck lies in 460 metres of water.'} | ${'a preposition inside the clause'}
     ${'Traffic grew in 2024 miles of road.'} | ${'Traffic grew in 3257 kilometres of road.'} | ${'the same, though it may be a year'}
     ${'Faults fell to 1 in 2000 miles driven.'} | ${'Faults fell to 1 in 3200 kilometres driven.'} | ${'the same, after a number'}
+    ${'It ended (in 2024 miles were driven).'} | ${'It ended (in 3257 kilometres were driven).'} | ${'an opening bracket inside a sentence'}
+    ${'a well-known in 2024 miles fact'}    | ${'a well-known in 3257 kilometres fact'}  | ${'a hyphen inside the line is no list marker'}
+    ${'Notes - In 2024 miles were driven.'} | ${'Notes - In 3257 kilometres were driven.'} | ${'nor is a spaced dash'}
   `('still converts $input ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });

@@ -1,7 +1,7 @@
 import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
-import { CLOSING, OPENING, endsSentence } from '../sentence.js';
+import { CLOSING, LIST_MARKER, OPENING, endsSentence } from '../sentence.js';
 import {
   COMPOUNDS,
   MEASURES,
@@ -409,11 +409,12 @@ function countsSizedNoun(text: string, start: number, raw: string, gap: string, 
 
 /**
  * A preposition that takes a year, opening a sentence or clause, straight before where a number
- * starts: at the start of the text or a line, or after a stop, comma, semicolon or colon, with
- * only spaces and opening quotes or brackets between.
+ * starts: at the start of the text or a line, or of a list item there, or after a stop, comma,
+ * semicolon or colon, with only spaces and opening quotes or brackets between.
  */
 const YEAR_PREPOSITION_BEFORE = new RegExp(
-  String.raw`(?<=(?:^|[\n\r]|[.!?…]${CLOSING}*\s|[,;:])[^\S\n\r]*${OPENING}*` +
+  String.raw`(?<=(?:(?:^|[\n\r])(?:[^\S\n\r]*${LIST_MARKER})?|[.!?…]${CLOSING}*\s|[,;:])` +
+    String.raw`[^\S\n\r]*${OPENING}*` +
     String.raw`(in|by|since|until|before|after|during)\s+)`,
   'diy',
 );

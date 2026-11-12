@@ -6,8 +6,11 @@ export const OPENING = String.raw`[([{"'‘“«]`;
 
 const CLOSERS = new RegExp(`${CLOSING}*`, 'y');
 
+/** A list item's marker and the space after it, as in `- ` and `2) `. */
+export const LIST_MARKER = String.raw`(?:[-*+]|\d+[.)])[^\S\n]`;
+
 /** A line break that starts a new paragraph, list item or heading. */
-const BREAK = String.raw`\n[^\S\n]*(?:\n|(?:[-*+]|\d+[.)]|#{1,6})[^\S\n])`;
+const BREAK = String.raw`\n[^\S\n]*(?:\n|${LIST_MARKER}|#{1,6}[^\S\n])`;
 const BLOCK_BREAK = new RegExp(BREAK, 'y');
 const BLOCK_END = new RegExp(String.raw`\s*$|[^\S\n]*${BREAK}`, 'y');
 

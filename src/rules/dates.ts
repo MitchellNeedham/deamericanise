@@ -63,15 +63,72 @@ function ambiguousNote(ctx: RuleContext): string {
   return `read as month-first because the surrounding text looks American (confidence ${ctx.signals.confidence.toFixed(2)})`;
 }
 
+// The trailing guard is only `(?!\d)`; a full stop after `03/04/2024.` ends a sentence.
+// A longer run such as `1/2/3/4` is rejected below by looking for a repeated separator.
+const NUMERIC_DATE = /(?<![\w/\-.])(\d{1,2})([/\-.])(\d{1,2})\2(\d{4}|\d{2})(?!\d)/g;
+
+/** A word that a version number follows, as in `version 1.13.24` or `Python 3.12.1`. */
+const VERSION_WORD = /^(?:v\.?|ver\.?|version|release|build|firmware|kernel|node(?:\.?js)?|npm|python|php|perl)$/i;
+
+/**
+ * The word that ends where the whitespace before `index` begins, with any stops in it.
+ * Empty when no whitespace comes right before `index`.
+ */
+function wordBefore(text: string, index: number): string {
+  let end = index;
+  while (end > 0 && /\s/.test(text[end - 1]!)) end--;
+  if (end === index) return '';
+  let start = end;
+  while (start > 0 && /[\w.]/.test(text[start - 1]!)) start--;
+  return text.slice(start, end);
+}
+
+/** A numeric date such as `3/14/2024` or `25.12.2023`, with the readings that fit it. */
+export interface NumericDate {
+  start: number;
+  end: number;
+  /** The first and second numbers as written. */
+  first: number;
+  second: number;
+  /** The year, with two figures expanded to four. */
+  year: number;
+  /** Whether it is a real date read month-first. */
+  monthFirst: boolean;
+  /** Whether it is a real date read day-first. */
+  dayFirst: boolean;
+}
+
+/**
+ * Every numeric date in the text that is a real date read one way round or the other.
+ * The same separator joins all three parts. A dotted date needs a four-figure year,
+ * because `1.13.24` is far more often a version, and nothing after a version word such
+ * as `version` or `Python` is a date. The numeric date rule converts the month-first
+ * ones and detection counts the ones that fit only one reading, so the two always agree
+ * on what is a date.
+ */
+export function* numericDates(text: string): Generator<NumericDate> {
+  for (const match of text.matchAll(NUMERIC_DATE)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    const separator = match[2]!;
+    if (text[end] === separator) continue;
+    if (separator === '.' && match[4]!.length !== 4) continue;
+    if (VERSION_WORD.test(wordBefore(text, start))) continue;
+
+    const first = Number(match[1]);
+    const second = Number(match[3]);
+    const year = expandYear(match[4]!);
+    const monthFirst = isRealDate(year, first, second);
+    const dayFirst = isRealDate(year, second, first);
+    if (monthFirst || dayFirst) yield { start, end, first, second, year, monthFirst, dayFirst };
+  }
+}
+
 /**
  * `3/14/2024` is unambiguous: no month is 14. `03/04/2024` is not, so it waits for
  * evidence.
  */
 function numericDateRule(): Rule {
-  // The trailing guard is only `(?!\d)`; a full stop after `03/04/2024.` ends a sentence.
-  // A longer run such as `1/2/3/4` is rejected below by looking for a repeated separator.
-  const pattern = /(?<![\w/\-.])(\d{1,2})([/\-.])(\d{1,2})\2(\d{4}|\d{2})(?!\d)/g;
-
   return {
     id: 'dates.numeric',
     category: 'dates',
@@ -79,27 +136,17 @@ function numericDateRule(): Rule {
     priority: 45,
     find(ctx: RuleContext): Change[] {
       const changes: Change[] = [];
-      pattern.lastIndex = 0;
 
-      for (const match of ctx.text.matchAll(pattern)) {
-        const end = match.index + match[0].length;
-        if (ctx.text[end] === match[2]) continue;
+      for (const { start, end, first, second, year, monthFirst, dayFirst } of numericDates(ctx.text)) {
+        if (!monthFirst) continue;
 
-        const first = Number(match[1]);
-        const second = Number(match[3]);
-        const year = expandYear(match[4]!);
-
-        const monthFirstWorks = isRealDate(year, first, second);
-        const dayFirstWorks = isRealDate(year, second, first);
-        if (!monthFirstWorks) continue;
-
-        const ambiguous = monthFirstWorks && dayFirstWorks;
+        const ambiguous = dayFirst;
         if (ambiguous && !readsMonthFirst(ctx)) continue;
 
         changes.push({
-          start: match.index,
+          start,
           end,
-          before: match[0],
+          before: ctx.text.slice(start, end),
           after: formatDate(year, first, second, ctx.options.dates.format),
           ruleId: 'dates.numeric',
           category: 'dates',

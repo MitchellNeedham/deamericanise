@@ -104,6 +104,17 @@ describe('inline code inside a comment', () => {
   });
 });
 
+describe('a fenced example inside a block comment', () => {
+  it.each`
+    source                                                                                   | expected                                                                                  | why
+    ${'/**\n * Prints:\n * ```text\n * the color\n * ```\n * The color is red.\n */'}         | ${'/**\n * Prints:\n * ```text\n * the color\n * ```\n * The colour is red.\n */'}         | ${'the closing line repeats the star'}
+    ${'/*\n * ~~~\n * the color\n * ~~~\n * The color is red.\n */'}                          | ${'/*\n * ~~~\n * the color\n * ~~~\n * The colour is red.\n */'}                          | ${'a tilde fence'}
+    ${'/**\n *\n *     ```text\n *     the color\n *     ```\n *\n * The color is red.\n */'}  | ${'/**\n *\n *     ```text\n *     the color\n *     ```\n *\n * The colour is red.\n */'}  | ${'a fence indented past the star'}
+  `('$why', ({ source, expected }) => {
+    expect(rewrite('ts', source)).toBe(expected);
+  });
+});
+
 describe('a comment that ends on an initialism', () => {
   it.each`
     language    | source                                         | expected
@@ -135,6 +146,27 @@ describe('picking the handler from a filename', () => {
     const source = 'The color is red.\n\n```js\nconst color = 1;\n```\n';
     expect(deamericaniseFile('README.md', source).text)
       .toBe('The colour is red.\n\n```js\nconst color = 1;\n```\n');
+  });
+});
+
+describe("a prose file's type decides how its code fences are read", () => {
+  const rst = 'Colors\n~~~~~~\n\nThe color of things.\n\nBehavior\n~~~~~~~~\n\nMore color.\n';
+  const rstOut = 'Colours\n~~~~~~\n\nThe colour of things.\n\nBehaviour\n~~~~~~~~\n\nMore colour.\n';
+  const tildeFence = 'The color.\n\n~~~\nconst color = 1;\n~~~\n';
+  const tildeFenceOut = 'The colour.\n\n~~~\nconst color = 1;\n~~~\n';
+
+  it.each`
+    filename        | language     | source                                                       | expected                                                      | why
+    ${'guide.rst'}  | ${undefined} | ${rst}                                                       | ${rstOut}                                                     | ${'a tilde heading underline in reStructuredText'}
+    ${'story.txt'}  | ${undefined} | ${'The color of the sky.\n\n~~~\n\nThe color of the sea.\n'} | ${'The colour of the sky.\n\n~~~\n\nThe colour of the sea.\n'} | ${'a tilde divider in plain text'}
+    ${'notes.txt'}  | ${undefined} | ${'The color.\n\n```\nconst color = 1;\n```\n'}              | ${'The colour.\n\n```\nconst color = 1;\n```\n'}              | ${'a backtick block in plain text, protected as before'}
+    ${'stdin'}      | ${'rst'}     | ${rst}                                                       | ${rstOut}                                                     | ${'a prose language other than Markdown'}
+    ${'README.md'}  | ${undefined} | ${tildeFence}                                                | ${tildeFenceOut}                                              | ${'a tilde fence in Markdown'}
+    ${'page.mdx'}   | ${undefined} | ${'````\n```\nconst color = 1;\n```\n````\nThe color.'}      | ${'````\n```\nconst color = 1;\n```\n````\nThe colour.'}     | ${'a four-backtick fence in MDX'}
+    ${'stdin'}      | ${'md'}      | ${tildeFence}                                                | ${tildeFenceOut}                                              | ${'the Markdown language'}
+    ${'notes.data'} | ${undefined} | ${tildeFence}                                                | ${tildeFenceOut}                                              | ${'an unknown type reads as deamericaniseText does'}
+  `('$why', ({ filename, language, source, expected }) => {
+    expect(deamericaniseFile(filename, source, language ? { language } : {}).text).toBe(expected);
   });
 });
 

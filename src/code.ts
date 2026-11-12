@@ -2,7 +2,7 @@ import { applyChanges, offsetChanges } from './engine/apply.js';
 import { detectAmerican } from './engine/detect.js';
 import { resolveOptions } from './config.js';
 import { commentSpans, lexerFor, PROSE_EXTENSIONS } from './lexers/index.js';
-import { deamericanise, findChanges } from './transform.js';
+import { findChanges, transformProse } from './transform.js';
 import type { Change, Options, Result } from './types.js';
 
 export interface CodeOptions extends Options {
@@ -62,6 +62,21 @@ function isProseLanguage(language: string): boolean {
   return PROSE_EXTENSIONS.has(language.replace(/^\./, '').toLowerCase());
 }
 
+const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdx']);
+
+/**
+ * Rewrites a prose file of the given type. A prose type other than Markdown, such as `rst` or
+ * `txt`, turns off CommonMark's fences, since a line of tildes there underlines a heading or
+ * divides sections. A type that is not a prose type says nothing, so it is read as
+ * `deamericanise` reads text.
+ */
+function deamericaniseProse(source: string, type: string, options: CodeOptions): Result {
+  const resolved = resolveOptions(proseOptions(options));
+  const cleaned = type.replace(/^\./, '').toLowerCase();
+  resolved.markdownFences = MARKDOWN_EXTENSIONS.has(cleaned) || !PROSE_EXTENSIONS.has(cleaned);
+  return transformProse(source, resolved);
+}
+
 /** Whether `deamericaniseFile` accepts this as `language`: a prose type or a name `lexerFor` knows. */
 export function isKnownLanguage(language: string): boolean {
   return isProseLanguage(language) || Boolean(lexerFor(language));
@@ -74,11 +89,11 @@ export function isKnownLanguage(language: string): boolean {
  */
 export function deamericaniseFile(filename: string, source: string, options: CodeOptions = {}): Result {
   if (options.language !== undefined) {
-    if (isProseLanguage(options.language)) return deamericanise(source, proseOptions(options));
+    if (isProseLanguage(options.language)) return deamericaniseProse(source, options.language, options);
     return deamericaniseCode(source, options);
   }
   const extension = filename.split('.').pop()?.toLowerCase() ?? '';
   const isProse = PROSE_EXTENSIONS.has(extension) || !lexerFor(filename);
-  if (isProse) return deamericanise(source, proseOptions(options));
+  if (isProse) return deamericaniseProse(source, extension, options);
   return deamericaniseCode(source, { ...options, language: filename });
 }

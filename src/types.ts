@@ -180,6 +180,12 @@ export interface ResolvedOptions {
   protectCommentedCode: boolean;
   /** The host language's line-comment markers, set when transforming a source file. */
   commentMarkers: string[];
+  /**
+   * Read code fences by CommonMark's rule, where a line of backticks or tildes opens one. Off
+   * when transforming a prose file that is not Markdown, such as `.rst` or `.txt`, where a line
+   * of tildes underlines a heading: there three backticks protect everything up to the next three.
+   */
+  markdownFences: boolean;
   unitsKeep: string[];
   units: Required<UnitOptions> & { enabled: boolean };
   dates: Required<DateOptions> & { enabled: boolean };
@@ -203,6 +209,8 @@ export interface LexEntry {
   requireAfter?: RegExp;
   forbidBefore?: RegExp;
   forbidAfter?: RegExp;
+  /** Tested against the matched text as written, so it can refuse on case. */
+  forbidMatch?: RegExp;
   /** Only fire when the document looks American. */
   needsAmerican?: boolean;
   /**

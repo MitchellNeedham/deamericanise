@@ -51,6 +51,34 @@ describe('structure that is never prose', () => {
   });
 });
 
+describe('fenced code, read the way CommonMark reads it', () => {
+  it.each`
+    input                                                                     | expected                                                                   | why
+    ${'The color.\n\n~~~\nconst color = 1;\n~~~\n'}                           | ${'The colour.\n\n~~~\nconst color = 1;\n~~~\n'}                           | ${'a tilde fence'}
+    ${'The color.\n\n````\n```\nconst color = 1;\n```\n````\n'}               | ${'The colour.\n\n````\n```\nconst color = 1;\n```\n````\n'}               | ${'four backticks around three'}
+    ${'~~~~\n~~~\nconst color = 1;\n~~~\n~~~~\nThe color.'}                   | ${'~~~~\n~~~\nconst color = 1;\n~~~\n~~~~\nThe colour.'}                   | ${'four tildes around three'}
+    ${'```js\nconst color = 1;\n```\nThe color.'}                             | ${'```js\nconst color = 1;\n```\nThe colour.'}                             | ${'an info string'}
+    ${'The color:\n```\nconst color = 1;\n```\nThe color.'}                   | ${'The colour:\n```\nconst color = 1;\n```\nThe colour.'}                   | ${'a fence straight after a paragraph line'}
+    ${'The color.\n\n```js\nconst color = 1;\n'}                              | ${'The colour.\n\n```js\nconst color = 1;\n'}                              | ${'a fence that never closes runs to the end'}
+    ${'```\nconst color = 1;\n``` x\nconst color = 2;\n```\nThe color.'}      | ${'```\nconst color = 1;\n``` x\nconst color = 2;\n```\nThe colour.'}      | ${'a run with text after it does not close'}
+    ${'```\nconst color = 1;\n~~~\nconst color = 2;\n```\nThe color.'}        | ${'```\nconst color = 1;\n~~~\nconst color = 2;\n```\nThe colour.'}        | ${'nor does the other character'}
+    ${'````\nconst color = 1;\n```\nconst color = 2;\n````\nThe color.'}      | ${'````\nconst color = 1;\n```\nconst color = 2;\n````\nThe colour.'}      | ${'nor a shorter run'}
+    ${'```\nconst color = 1;\n    ```\nconst color = 2;\n```\nThe color.'}    | ${'```\nconst color = 1;\n    ```\nconst color = 2;\n```\nThe colour.'}    | ${'nor a run four spaces further in'}
+    ${'```md\n> ```\n> the color\n> ```\n```\nThe color.'}                   | ${'```md\n> ```\n> the color\n> ```\n```\nThe colour.'}                   | ${'nor a run behind a quote marker the fence lacks'}
+    ${'~~~ a ``` ~~~\nconst color = 1;\n~~~\nThe color.'}                      | ${'~~~ a ``` ~~~\nconst color = 1;\n~~~\nThe colour.'}                      | ${'a tilde info string may hold backticks and tildes'}
+    ${'> ```\n> const color = 1;\n> ```\n> The color.'}                       | ${'> ```\n> const color = 1;\n> ```\n> The colour.'}                       | ${'a fence in a quote'}
+    ${'1. Step\n\n    ```sh\n    color=1\n    ```\n\nThe color.'}             | ${'1. Step\n\n    ```sh\n    color=1\n    ```\n\nThe colour.'}             | ${'a fence four spaces into a list item'}
+    ${'10. Step\n\n       ~~~\n       color=1\n    ~~~\nThe color.'}           | ${'10. Step\n\n       ~~~\n       color=1\n    ~~~\nThe colour.'}           | ${'a closing line further out than the opening one'}
+    ${'- ```js\n  const color = 1;\n  ```\n- The color.'}                      | ${'- ```js\n  const color = 1;\n  ```\n- The colour.'}                      | ${'a fence on the list marker line'}
+    ${'```\r\nconst color = 1;\r\n```\r\nThe color.'}                         | ${'```\r\nconst color = 1;\r\n```\r\nThe colour.'}                         | ${'Windows line endings'}
+    ${'Use ```the color``` here.'}                                            | ${'Use ```the color``` here.'}                                            | ${'three backticks inline stay a code span'}
+    ${'```the color```\nThe color.'}                                          | ${'```the color```\nThe colour.'}                                          | ${'and open no fence at the start of a line'}
+    ${'- The color\n    is red.'}                                             | ${'- The colour\n    is red.'}                                             | ${'an indented list continuation is prose'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
 describe('inline code, read the way CommonMark reads it', () => {
   it.each`
     unchanged                                                                           | why

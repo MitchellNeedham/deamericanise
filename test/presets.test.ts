@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deamericaniseText } from '../src/index.js';
+import { deamericaniseCode, deamericaniseText, resolveOptions } from '../src/index.js';
+import type { Preset } from '../src/index.js';
 
 const read = (input: string) => deamericaniseText(input);
 const localise = (input: string) => deamericaniseText(input, { preset: 'localise' });
@@ -82,5 +83,30 @@ describe('the preset applies to source files too', () => {
   it('leaves vocabulary in comments alone by default', () => {
     expect(deamericaniseText('// the color of the sidewalk', { protectIdentifiers: true }))
       .toBe('// the colour of the sidewalk');
+  });
+});
+
+describe('a preset it does not know', () => {
+  const message = (preset: string) => `Unknown preset: ${preset}. Expected one of read, localise.`;
+
+  it.each(['Localise', 'LOCALISE', 'localize', 'Read', '', 'nonsense', 'constructor', 'toString'])(
+    'rejects "%s" by name, listing the presets',
+    (preset) => {
+      expect(() => deamericaniseText('the color', { preset: preset as Preset })).toThrow(message(preset));
+      expect(() => deamericaniseCode('// the color', { language: 'ts', preset: preset as Preset })).toThrow(
+        message(preset),
+      );
+      expect(() => resolveOptions({ preset: preset as Preset })).toThrow(message(preset));
+    },
+  );
+
+  it.each`
+    options                     | input                   | expected
+    ${{ preset: 'read' }}       | ${'the color sidewalk'} | ${'the colour sidewalk'}
+    ${{ preset: 'localise' }}   | ${'the color sidewalk'} | ${'the colour footpath'}
+    ${{ preset: undefined }}    | ${'the color sidewalk'} | ${'the colour sidewalk'}
+    ${{}}                       | ${'the color sidewalk'} | ${'the colour sidewalk'}
+  `('still runs $options as before', ({ options, input, expected }) => {
+    expect(deamericaniseText(input, options)).toBe(expected);
   });
 });

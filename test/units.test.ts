@@ -3999,6 +3999,22 @@ describe('inches of mercury', () => {
     expect(convert(input)).toBe(expected);
   });
 
+  it.each`
+    input                                   | expected                                | why
+    ${'Set the altimeter to 30 inHg.'}      | ${'Set the altimeter to 1016 hPa.'}     | ${'more figures than the source gives'}
+    ${'Set it between 29.9 and 30.1 inHg.'} | ${'Set it between 1013 and 1019 hPa.'}  | ${'each end of a range'}
+    ${'Try 29.92, 30.00 or 30.12 inHg.'}    | ${'Try 1013, 1016 or 1020 hPa.'}        | ${'each figure of a list'}
+    ${'It reads to within 0.01 inHg.'}      | ${'It reads to within 0.34 hPa.'}       | ${'no value under one is written as zero'}
+  `('writes whole hectopascals: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('honours a precision the options set', () => {
+    expect(convert('Set the altimeter to 29.92 inHg.', { units: { precision: 2 } })).toBe(
+      'Set the altimeter to 1013.21 hPa.',
+    );
+  });
+
   it('honours unitsKeep', () => {
     expect(convert('Set the altimeter to 29.92 inHg.', { unitsKeep: ['inHg'] })).toBe(
       'Set the altimeter to 29.92 inHg.',

@@ -522,7 +522,10 @@ becomes `180 degrees celsius`, but a lone `C` only in upper case, after a degree
 
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
-source and never claims more accuracy than was written down. `exact` and a fixed number of
+source and never claims more accuracy than was written down. Inches of mercury are the
+exception: an altimeter setting is read in whole hectopascals, so `30 inHg` becomes
+`1016 hPa` and each end of a range is whole too, while a value under one hectopascal keeps
+the figures, as `0.01 inHg` becomes `0.34 hPa`. `exact` and a fixed number of
 decimal places are both available, as is keeping the original alongside:
 
 ```ts

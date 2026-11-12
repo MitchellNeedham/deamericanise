@@ -1,5 +1,5 @@
 import { buildGate, resolveOptions, type Gate } from '../../config.js';
-import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
+import type { Change, Confidence, Precision, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
 import { CLOSING, LIST_MARKER, OPENING, endsSentence } from '../sentence.js';
 import {
@@ -710,6 +710,25 @@ function change(
  */
 function hold(start: number, matched: string, ruleId: string, priority: number): Change {
   return { ...change(start, matched, matched, ruleId, priority), hold: true };
+}
+
+/**
+ * `value`, in the metric unit `measure` converts to, as the unit rules write it. A measure with
+ * `decimals` takes that many places under `natural` precision, unless they would write a value
+ * that is not zero as zero.
+ */
+function formatIn(
+  measure: Measure,
+  value: number,
+  precision: Precision,
+  figures: number,
+  maxDecimals: number,
+): string {
+  if (precision === 'natural' && measure.decimals !== undefined) {
+    const fixed = formatNumber(value, measure.decimals, figures, maxDecimals);
+    if (value === 0 || Number(fixed.replace(/,/g, '')) !== 0) return fixed;
+  }
+  return formatNumber(value, precision, figures, maxDecimals);
 }
 
 function withOriginal(ctx: RuleContext, body: string, original: string): string {
@@ -1946,7 +1965,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
     const target = entry.measure.convert(value);
     const { precision, maxDecimals } = ctx.options.units;
-    const number = formatNumber(target.value, precision, significantFigures(matched), maxDecimals);
+    const number = formatIn(
+      entry.measure,
+      target.value,
+      precision,
+      significantFigures(matched),
+      maxDecimals,
+    );
     const body = `${number} ${unitWord(target, Number(number.replace(/,/g, '')))}`;
     pushMeasurement(ctx, changes, start, matched, body, entry.measure.id, 30);
   };
@@ -2001,7 +2026,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
     const target = entry.measure.convert(value);
     const { precision, maxDecimals } = ctx.options.units;
-    const number = formatNumber(target.value, precision, significantFigures(raw), maxDecimals);
+    const number = formatIn(
+      entry.measure,
+      target.value,
+      precision,
+      significantFigures(raw),
+      maxDecimals,
+    );
     const numberStart = start + (/^an?\s+/i.exec(raw)?.[0].length ?? 0);
     const attributive =
       entry.isWord &&
@@ -2086,9 +2117,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const figures = Math.max(...raws.map(significantFigures));
         const { precision, maxDecimals } = ctx.options.units;
         const texts = [...earlier.map((figure) => figure.value), low].map((value) =>
-          formatNumber(value * perSourceUnit, precision, figures, maxDecimals),
+          formatIn(entry.measure, value * perSourceUnit, precision, figures, maxDecimals),
         );
-        texts.push(formatNumber(target.value, precision, figures, maxDecimals));
+        texts.push(formatIn(entry.measure, target.value, precision, figures, maxDecimals));
         const gap = pair.slice(lowRaw.length + join.length + highRaw.length, -alias.length);
         const attributive = entry.isSingular && describesNoun(ctx.text, start, high, gap, end);
         const unit = entry.isWord

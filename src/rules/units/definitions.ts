@@ -48,6 +48,11 @@ export interface Measure {
    * all, merely imperial-descended and used everywhere.
    */
   keptByDefault?: boolean;
+  /**
+   * Decimal places the metric value is written to under `natural` precision, whatever figures
+   * the source gives, as an altimeter setting is read in whole hectopascals.
+   */
+  decimals?: number;
 }
 
 /** A context where a unit is the worldwide convention, read around one measurement. */
@@ -460,6 +465,7 @@ export const MEASURES: Measure[] = [
     singular: ['inch of mercury'],
     abbrevs: ['inHg', 'in. Hg', 'in Hg'],
     convert: (v) => m(v * 33.8639, 'hPa', 'hectopascal', 'hectopascals'),
+    decimals: 0,
   },
   {
     id: 'units.power.horsepower',

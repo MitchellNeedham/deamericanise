@@ -80,6 +80,11 @@ the run before anything is read, with `unknown language "..."` on stderr and exi
 and a commented file such as `tsconfig.json` has just its comments rewritten. A `.json`
 file is still skipped unless it is forced this way.
 
+`--syntax markdown` or `--syntax text` names the markup of stdin and of every prose file
+read, as the `syntax` option does (see [What it will not touch](#what-it-will-not-touch)).
+Without it, the file's type decides, and stdin is plain text unless `--language md` is
+given. Any other value stops the run with `unknown syntax "..."` and exit status 2.
+
 `--rule` and `--units-keep` are checked up front, as `--language` is. A `--rule` pattern
 has to match a rule id of at least one dialect, so a command line shared across dialects
 still runs under `en-CA`, which has no `dialect.*` rules. `--units-keep` takes a unit's
@@ -125,6 +130,10 @@ Apply the two together or not at all, because either one alone leaves `a eraser`
 extension, which is what the CLI uses. It reads any file it has no lexer for as prose, JSON
 included, so choose the files before calling it. The CLI does that with the test described
 under [Command line](#command-line).
+
+It also sets `syntax` from the extension: `md`, `markdown` and `mdx` are `markdown`, and
+`txt`, `rst` and the other prose types are `text`. Any other name, such as `CHANGELOG`,
+leaves the syntax unknown. A `syntax` option wins over the extension.
 
 A `language` option overrides the filename, as `--language` does. A prose type such as `md`
 reads the source as prose, any other value has to name a lexer, and an unknown one throws
@@ -494,9 +503,18 @@ deamericaniseText(text, { minAmericanConfidence: 0.4 });
   escaped as `` \` ``, protects nothing. A fenced code block opens on a line that starts with
   three or more backticks or tildes and closes on a line of the same character at least as
   long, so a fence of four backticks can hold one of three. A fence that never closes runs to
-  the end of the text. A prose file that is not Markdown, such as `.rst` or `.txt`, has no
-  such fences, since a line of tildes there underlines a heading: three backticks protect
-  everything up to the next three.
+  the end of the text. The `syntax` option says how the text is marked up:
+
+  | `syntax` | |
+  | --- | --- |
+  | `'markdown'` | Fences as above, and indented code blocks as CommonMark reads them |
+  | `'text'` | No such fences, since a line of tildes underlines a heading in `.rst` or `.txt`: three backticks protect everything up to the next three |
+  | none (default) | Fences as above, and an indented line is prose |
+
+  An indented code block is a run of lines four or more columns past the content of the list
+  item or quote it sits in, after a blank line or a block that is not a paragraph. A line
+  indented that far inside a paragraph continues it, so a list item's wrapped line or second
+  paragraph is still rewritten.
 - **Identifiers,** when `protectIdentifiers` is on (the default for source files):
   `normalizeInput`, `MAX_COLOR_VALUE`, `background-color`, `theme.colors.gray`,
   `--color-scheme`, `getColor()`.
@@ -571,6 +589,12 @@ Clojure and other Lisps, Erlang, LaTeX, HTML/XML/Vue/Svelte, INI, Visual Basic a
 Python docstrings are off by default, on the grounds that a docstring is a string literal
 and something may be asserting on it. `docstrings: true` includes them.
 
+Comments are read in the markup their language documents in, whatever `syntax` says. That
+is Markdown for most languages, so a tilde or backtick fence protects its example. Python's
+docstrings are reStructuredText by convention, so Python reads as `syntax: 'text'` does,
+and a line of tildes underlines a heading. `LexerSpec.docMarkup` sets this per language.
+Indented lines in a comment are prose.
+
 `lexerFor` accepts an id, an extension, a filename or a common alias, so `ruby`, `rb`,
 `shell`, `golang`, `c++` and `Dockerfile` all resolve. `languageNames()` lists the lot,
 and `--list-languages` prints them with the prose types added.
@@ -630,6 +654,9 @@ const file = await unified()
 
 Pass `onChange` to report changes instead of, or as well as, applying them.
 
+A backtick or tilde left in a text node is literal, since the parser has already taken out
+every code span and block, so it protects nothing and `syntax` has no effect.
+
 ### ESLint
 
 ```js
@@ -668,8 +695,9 @@ export default {
 
 Prettier owns the parsers, so the plugin wraps the built-in ones and rewrites the source
 in `preprocess`, before Prettier records the text its printers work from. Markdown, MDX,
-JavaScript, TypeScript, CSS, SCSS, Less, YAML, HTML and Vue are covered: markdown is
-handled as prose, the rest have only their comments touched.
+JavaScript, TypeScript, CSS, SCSS, Less, YAML, HTML and Vue are covered: Markdown and MDX
+are handled as prose with `syntax: 'markdown'`, so indented code is left alone, and the
+rest have only their comments touched.
 
 Prettier validates option types and has no object type, so the two settings people
 actually change are flat and anything else goes through `deamericaniseOptions` as JSON.
@@ -797,6 +825,7 @@ there each root needs the rules in its own styles.
 | `protect` | `[]` | Strings or patterns never to rewrite |
 | `protectProperNouns` | `true` | The built-in name list |
 | `protectIdentifiers` | `false` (`true` for code) | camelCase, snake_case, kebab API names, dotted paths |
+| `syntax` | unknown | `markdown` or `text`: how code fences and indented code are read |
 | `unitsKeep` | `[]` | Units to leave alone, by key |
 | `units.precision` | `'natural'` | `natural`, `exact`, or a number of decimal places |
 | `units.keepOriginal` | `false` | Write `1.8 metres (6 ft)` |
@@ -811,8 +840,8 @@ there each root needs the rules in its own styles.
 
 `units`, `dates`, `times` and `currency` each accept `false` to switch the category off.
 
-A `dialect` or `preset` outside its list throws an `Error` that names the value and the
-ones it accepts, such as `Unknown preset: Localise. Expected one of read, localise.`
+A `dialect`, `preset` or `syntax` outside its list throws an `Error` that names the value
+and the ones it accepts, such as `Unknown preset: Localise. Expected one of read, localise.`
 
 ## Known limits
 
@@ -828,11 +857,13 @@ ones it accepts, such as `Unknown preset: Localise. Expected one of read, locali
   therefore not protected. The remark plugin reads the real structure.
 - Outside the remark plugin, a fence is read from its own lines, without the list items and
   quotes around it. A fence that a list item or quote ends without a closing line therefore
-  runs on to the next line that would close it, or to the end of the text. Comments and
-  docstrings are read as Markdown, so a tilde heading underline in a reStructuredText
-  docstring leaves the text up to the next one as written.
-- Outside the remark plugin, an indented code block is rewritten like the prose around it:
-  telling it from indented prose needs to know the text is Markdown.
+  runs on to the next line that would close it, or to the end of the text. A comment in a
+  language that documents in Markdown is read that way, so a tilde heading underline in a
+  reStructuredText block comment there leaves the text up to the next one as written.
+- Outside the remark plugin, an indented code block is rewritten like the prose around it
+  unless the text is known to be Markdown: a Markdown file, `syntax: 'markdown'`, or
+  Prettier's Markdown parser. So `deamericaniseText` with no `syntax`, stdin without
+  `--language md` or `--syntax markdown`, and comments rewrite it.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`
   or `keepOriginal` where the numbers matter.
 - A number that a hard wrap splits, such as `1` at the end of one line and `1/2 gallons` at

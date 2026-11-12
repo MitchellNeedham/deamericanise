@@ -1,5 +1,6 @@
 import { buildGate, type Gate } from '../../config.js';
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
+import { MONTH_PATTERN } from '../dates.js';
 import {
   COMPOUNDS,
   MEASURES,
@@ -8,7 +9,7 @@ import {
   type Measure,
   type MetricValue,
 } from './definitions.js';
-import { FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
+import { BARE_CELSIUS_FIGURE, FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
 import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
@@ -202,19 +203,81 @@ export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: num
 }
 
 /**
- * A singular unit is modifying the noun after it only when a determiner opens the phrase:
- * `a 9 inch dish` describes the dish, so it takes the singular. `one quart small onions`
- * is an ingredient quantity with the `of` left out, and `one` is itself the determiner,
- * so it stays plural and reads the same as `one quart of small onions` would. A count
- * opens the phrase as a determiner does, so `2 x 4 ounce cans` keeps the singular.
+ * A determiner opening the phrase, as in `a 9 inch dish`. A count opens it as a determiner
+ * does, so `2 x 4 ounce cans` keeps the singular.
  */
 const DETERMINER_BEFORE = /(?:\b(?:a|an|the|this|that|each|every|per|another)\s+|\d\s*[x×]\s*)$/i;
 
+/**
+ * Words that cannot open a noun straight after a measurement: prepositions, sizes and
+ * comparisons, adverbs of place, slope and time, pronouns, determiners, conjunctions and
+ * auxiliary verbs. A unit before one is a quantity, as in `a quarter mile later` and
+ * `6 foot when he left`. A hyphen after one makes a modifier of it, as in `deep-dish`.
+ */
+const NOT_A_NOUN = [
+  'of', 'in', 'on', 'at', 'by', 'for', 'and', 'or', 'to', 'from', 'with', 'per', 'into',
+  'through', 'across', 'past', 'along', 'beyond', 'behind', 'about', 'against', 'among',
+  'between', 'during', 'near', 'onto', 'toward', 'towards', 'under', 'underneath', 'beneath',
+  'upon', 'via', 'within', 'without',
+  'thick', 'wide', 'long', 'tall', 'deep', 'high', 'short', 'further', 'farther', 'more',
+  'less', 'longer', 'shorter', 'wider', 'taller', 'deeper', 'higher', 'closer', 'too',
+  'enough', 'apiece', 'each', 'only',
+  'away', 'apart', 'down', 'up', 'north', 'south', 'east', 'west', 'ahead', 'back', 'out',
+  'off', 'around', 'over', 'overhead', 'above', 'below', 'inside', 'outside', 'inland',
+  'offshore',
+  'uphill', 'downhill', 'upstream', 'downstream',
+  'later', 'earlier', 'ago', 'before', 'after',
+  'i', 'me', 'he', 'him', 'she', 'it', 'we', 'us', 'they', 'them', 'you',
+  'a', 'an', 'the', 'this', 'that', 'these', 'those', 'his', 'her', 'its', 'their', 'my',
+  'our', 'your', 'some', 'any', 'no', 'all', 'both', 'every',
+  'but', 'so', 'if', 'when', 'while', 'as', 'than', 'because', 'since', 'until', 'unless',
+  'though', 'although', 'whereas', 'whether', 'where', 'then', 'yet', 'nor',
+  'is', 'are', 'was', 'were', 'be', 'been', 'am', 'has', 'have', 'had', 'does', 'did',
+  'will', 'would', 'should', 'could',
+];
+
+/** Every unit the rules read. */
+const UNIT_FORMS = alternate(MEASURES.flatMap((measure) => [...measure.words, ...measure.abbrevs]));
+
+/**
+ * A word straight after a measurement that may be a noun it describes. A number in words,
+ * alone or with its unit (`one-inch`, `onelbs`), or a date is not one. Another rule may
+ * rewrite either to start with a digit, so reading it as a noun would leave the measurement
+ * to a second run.
+ */
 const MODIFIES_A_NOUN = new RegExp(
-  String.raw`^[\s-]+(?!(?:of|in|on|at|by|for|and|or|to|from|with|per|thick|wide|long|tall|deep|high|` +
-    String.raw`across|away|apart|each|only|down|up|north|south|east|west|ahead|behind|past|along|` +
-    String.raw`beyond|into|through|short|further|farther|more|less|longer|shorter|wider|taller|` +
-    String.raw`deeper|higher|closer)\b)[a-z]`,
+  String.raw`^[\s-]+(?!(?:${NOT_A_NOUN.join('|')}|(?:${NUMBER_PATTERN})(?:${GAP}(?:${UNIT_FORMS}))?)` +
+    String.raw`(?![\w-])|(?:${MONTH_PATTERN})\.?\s+\d)[a-z]`,
+  'i',
+);
+
+/**
+ * Whether the singular unit word ending at `end` describes the noun after it, so its metric
+ * unit stays singular too: `a 9 inch dish`, `9 inch pans`, `one-inch slices`. The unit
+ * follows a number worth `value` that starts at `numberStart`, across `gap`. A determiner
+ * opening the phrase says so, as does a hyphen tying the number to the unit, or the singular
+ * after a number above one, which would otherwise take the plural. One and a fraction take
+ * the singular anyway, so `one quart small onions` and `1/2 pound ground beef` are
+ * quantities with the `of` left out, read as `one quart of small onions` would be.
+ */
+function describesNoun(
+  text: string,
+  numberStart: number,
+  value: number,
+  gap: string,
+  end: number,
+): boolean {
+  if (!MODIFIES_A_NOUN.test(text.slice(end))) return false;
+  return (
+    Math.abs(value) > 1 ||
+    gap.includes('-') ||
+    DETERMINER_BEFORE.test(text.slice(Math.max(0, numberStart - 24), numberStart))
+  );
+}
+
+/** The count of `two quarter`: a cardinal, then a space and a singular fraction word. */
+const COUNT_APART = new RegExp(
+  String.raw`^(?!an?\s)[a-z]+${INLINE_SPACE}+(?=(?:half|quarter|third|fourth|eighth|sixteenth)$)`,
   'i',
 );
 
@@ -222,6 +285,16 @@ const MODIFIES_A_NOUN = new RegExp(
 function isBareInch(alias: string, whole: string): boolean {
   return alias.toLowerCase() === 'in' && /\s$/.test(whole.slice(0, whole.length - alias.length));
 }
+
+/**
+ * An apostrophe after a number, read as the foot's prime only on a side of a dimension whose
+ * every side has a mark of its own, as in `2' x 6"`. Anywhere else it may close a quote.
+ */
+const FOOT_MARK = "'";
+const PRIME = '′';
+
+/** A quote opened straight before a number, which a `'` after the number may close: `'6'`. */
+const OPENS_QUOTE = /['‘]$/;
 
 function unitWord(target: MetricValue, value: number): string {
   return Math.abs(value) === 1 ? target.singular : target.plural;
@@ -263,18 +336,25 @@ function withOriginal(ctx: RuleContext, body: string, original: string): string 
 }
 
 
-/** A metric unit's forms, and what a value in it comes to in its dimension's base unit. */
-type MetricUnit = [forms: string, toBase: (value: number) => number];
+/**
+ * A metric unit's forms, what a value in it comes to in its dimension's base unit, and,
+ * for forms that are a unit only after the right figure, what has to stand before them.
+ */
+type MetricUnit = [forms: string, toBase: (value: number) => number, figure?: string];
 
 const times = (factor: number) => (value: number) => value * factor;
 const BASE = times(1);
 
 /**
- * Metric units by dimension, in every form the unit rules write them and in the American
- * spellings. Each key names a capture group, which is how a match reports its dimension.
+ * Metric units by dimension, in every form the unit rules write them, in the American
+ * spellings, and in the shorthand of a hand-written temperature such as `180C` or `180ºC`.
+ * Each key names a capture group, which is how a match reports its dimension.
  */
 const METRIC_UNITS = {
-  temperature: [[String.raw`degrees?\s+(?:Celsius|C)\b|°\s*C`, BASE]],
+  temperature: [
+    [String.raw`degrees?\s+(?:Celsius|C)\b|[°º˚]\s*C(?:elsius\b)?|Celsius\b`, BASE],
+    [String.raw`C\b`, BASE, BARE_CELSIUS_FIGURE],
+  ],
   speed: [[String.raw`(?:kilometres?|kilometers?)\s+per\s+hour|km/h`, BASE]],
   torque: [[String.raw`newton[\s-]+(?:metres?|meters?)|N·m|Nm`, BASE]],
   area: [
@@ -309,11 +389,14 @@ const METRIC_UNITS = {
 
 type Dimension = keyof typeof METRIC_UNITS;
 
+// `METRIC_FORMS` reads a unit apart from its figure, so the figure a form needs is checked here.
+const afterFigure = ([forms, , figure]: MetricUnit) => (figure ? `(?<=${figure})(?:${forms})` : forms);
+
 const METRIC_NUMBER = String.raw`[-−]?\d[\d,]*(?:\.\d+)?`;
 const METRIC_VALUE =
   String.raw`${METRIC_NUMBER}(?:\s*(?:-|–|—|to|and|x|×|by)\s*${METRIC_NUMBER})*\s*-?\s*` +
   `(?:${Object.entries(METRIC_UNITS)
-    .map(([dimension, units]) => `(?<${dimension}>${units.map(([forms]) => forms).join('|')})`)
+    .map(([dimension, units]) => `(?<${dimension}>${units.map(afterFigure).join('|')})`)
     .join('|')})`;
 
 /**
@@ -322,8 +405,15 @@ const METRIC_VALUE =
  */
 const METRIC_INNER = new RegExp(String.raw`^\s*${METRIC_VALUE}\s*$`);
 
-/** A metric measurement ending the text before a parenthetical. */
-const METRIC_BEFORE = new RegExp(String.raw`(?<![\w.])${METRIC_VALUE}\s*$`);
+/**
+ * A metric measurement just before a parenthetical, in text that runs to the opening
+ * bracket. Markdown emphasis or code may close between them, as in `**1.8 metres** (6 feet)`,
+ * and so may a line break that only wraps the paragraph. An opening `_` is emphasis, not
+ * part of a word the measurement starts inside.
+ */
+const METRIC_BEFORE = new RegExp(
+  String.raw`(?<![A-Za-z\d.]_*)${METRIC_VALUE}[*_\`]*${SOFT_SPACE}\($`,
+);
 
 function dimensionOf(match: RegExpMatchArray | null): Dimension | undefined {
   const groups = match?.groups ?? {};
@@ -435,10 +525,11 @@ function restatesConversion(
  */
 const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
   temperature: [
-    String.raw`°\s*F(?:ahrenheit)?`,
+    String.raw`[°º˚]\s*F(?:ahrenheit)?`,
     '℉',
     String.raw`degrees?\s+F(?:ahrenheit)?`,
     String.raw`deg\.?\s*F`,
+    'Fahrenheit',
   ],
   economy: ['mpg', String.raw`miles\s+per\s+gallon`],
   length: ["'"],
@@ -456,19 +547,48 @@ const UNIT_OF = Object.entries(IMPERIAL_UNITS).map(([dimension, units]) => ({
   pattern: new RegExp(`^(?:${units.join('|')})$`, 'i'),
 }));
 
-const JOINER = String.raw`[-–—]|(?:to|and|x|×|by)(?![A-Za-z])`;
+/**
+ * The words of a quantity before its unit where the unit sits inside it: the `half an` of
+ * `half an inch` and the `one-fourth of a` of `one-fourth of a pound`. The first group holds
+ * `half`, the second any other fraction.
+ */
+const FRACTION_OF =
+  String.raw`(?:((?:an?${INLINE_SPACE}+)?half)|(${FRACTION_WORDS})${INLINE_SPACE}+of)` +
+  String.raw`${INLINE_SPACE}+an?(?=\s)`;
 
 /**
- * One piece of an imperial measurement: a unit, a number, or what joins them. A unit has
- * to be followed by another piece or the end, which is what reads `40 miles per gallon`
- * as fuel economy and not as a length followed by a stray `per`.
+ * The count before the unit in `a mile and a half` and `two inches and a quarter`. A count
+ * straight after `/` or `-` is the tail of `1 1/2` or `twenty-two`, not a number.
+ */
+const COUNT_BEFORE_FRACTION = String.raw`an?(?=\s)|(?<![-−/])${WHOLE_NUMBER}`;
+
+/** The fraction after the unit in `a mile and a half`, in its group. */
+const AND_FRACTION = String.raw`and${INLINE_SPACE}+(${COUNTED_FRACTION})`;
+
+/**
+ * A number as the measurement rules read one: on its own, and in the words around a unit
+ * in `half an inch` and `a mile and a half`. `half an` comes before `half`, and `a quarter`
+ * before `a`, because the first alternative to match is the one taken.
+ */
+const PIECE_NUMBER = [FRACTION_OF, AND_FRACTION, NUMBER_PATTERN, COUNT_BEFORE_FRACTION].join('|');
+
+const JOINER = String.raw`[-–—]|(?:to|and|x|×|by)(?![A-Za-z])`;
+
+const IMPERIAL_UNIT = Object.values(IMPERIAL_UNITS)
+  .flat()
+  // Longest first, so `lb-ft` is torque and not `lb` joined to `ft`.
+  .sort((a, b) => b.length - a.length)
+  .join('|');
+
+/**
+ * One piece of an imperial measurement: a unit, a number, or what joins them. A unit or a
+ * number has to be followed by another piece or the end. That reads `40 miles per gallon`
+ * as fuel economy and not as a length followed by a stray `per`, and reads `a quartersq ft`
+ * as `a quarter` and `sq ft`, where `a quarters` would leave `q ft` over.
  */
 const MEASUREMENT_PIECE = new RegExp(
-  String.raw`\s*(?:(?:${Object.values(IMPERIAL_UNITS)
-    .flat()
-    // Longest first, so `lb-ft` is torque and not `lb` joined to `ft`.
-    .sort((a, b) => b.length - a.length)
-    .join('|')})(?=\s*(?:$|${NUMBER_PATTERN}|${JOINER}))|${NUMBER_PATTERN}|${JOINER})`,
+  String.raw`\s*(?:(?:${IMPERIAL_UNIT})(?=\s*(?:$|${PIECE_NUMBER}|${JOINER}))|` +
+    String.raw`(?:${PIECE_NUMBER})(?=\s*(?:$|${IMPERIAL_UNIT}|${PIECE_NUMBER}|${JOINER}))|${JOINER})`,
   'giy',
 );
 
@@ -511,7 +631,8 @@ function restatesMetric(ctx: RuleContext, start: number, end: number): boolean {
   const dimension = measurementDimension(inside);
   if (dimension === undefined) return false;
   const bracket = start - head.length + open;
-  const before = ctx.text.slice(Math.max(0, bracket - CONTEXT_WINDOW), bracket);
+  // Through the `(`, so a line break before it can see that its next line opens no new block.
+  const before = ctx.text.slice(Math.max(0, bracket - CONTEXT_WINDOW), bracket + 1);
   return dimensionOf(METRIC_BEFORE.exec(before)) === dimension;
 }
 
@@ -550,6 +671,27 @@ function restatesBody(metric: string, body: string, ruleId: string): boolean {
   return restatesConversion(given, converted, ruleId === ABSOLUTE_ID);
 }
 
+interface PairedMetric {
+  /** Where the metric value starts in the text. */
+  start: number;
+  metric: string;
+  dimension: Dimension | undefined;
+}
+
+/** The metric value joined by `/` or `or` before the measurement from `start` to `end`. */
+function metricPairedBefore(text: string, start: number, end: number): PairedMetric | undefined {
+  const from = Math.max(0, start - CONTEXT_WINDOW);
+  if (!ENDS_IN_JOIN.test(text.slice(from, start))) return undefined;
+  // The window runs on to `end` so a line break in the join can see that the next line
+  // holds the measurement and opens no new block.
+  for (const match of text.slice(from, end).matchAll(METRIC_PAIRED_BEFORE)) {
+    if (from + match.index + match[0].length === start) {
+      return { start: from + match.index, metric: match[1]!, dimension: dimensionOf(match) };
+    }
+  }
+  return undefined;
+}
+
 /** `180°C/350°F` and `180°C or 350°F` give the imperial value after the metric one it restates. */
 function followsItsMetric(
   ctx: RuleContext,
@@ -558,14 +700,8 @@ function followsItsMetric(
   body: string,
   ruleId: string,
 ): boolean {
-  const from = Math.max(0, start - CONTEXT_WINDOW);
-  if (!ENDS_IN_JOIN.test(ctx.text.slice(from, start))) return false;
-  // The window runs on to `end` so a line break in the join can see that the next line
-  // holds the measurement and opens no new block.
-  for (const match of ctx.text.slice(from, end).matchAll(METRIC_PAIRED_BEFORE)) {
-    if (from + match.index + match[0].length === start) return restatesBody(match[1]!, body, ruleId);
-  }
-  return false;
+  const paired = metricPairedBefore(ctx.text, start, end);
+  return paired !== undefined && restatesBody(paired.metric, body, ruleId);
 }
 
 /**
@@ -625,10 +761,11 @@ function pushMeasurement(
 }
 
 /**
- * A number of a measurement in two units, in any shape the single rule reads but unsigned. A
- * minus before the first number stays outside the match, where it negates the whole.
+ * A number of a measurement in two units: in digits, in any shape the single rule reads but
+ * unsigned, or a whole number in words. A minus before the first number stays outside the
+ * match, where it negates the whole.
  */
-const UNSIGNED_NUMBER = String.raw`(?![-−])(?:${NUMERIC_PATTERN})`;
+const UNSIGNED_NUMBER = String.raw`(?:(?![-−])(?:${NUMERIC_PATTERN})|${WHOLE_NUMBER})`;
 
 const STARTS_HERE = new RegExp(NUMBER_START, 'y');
 
@@ -666,13 +803,59 @@ function splitByStart(
   return { found, refused };
 }
 
-/** `6 feet 2 inches`, `6'2"` and `5 ft 11 in` collapse into a single metric height. */
+/** A range's first number and its join, ending where the range's second number starts. */
+const RANGE_OPENING = new RegExp(
+  String.raw`(?<=${NUMBER_START}(${NUMBER_PATTERN})(${RANGE_JOIN}))`,
+  'diy',
+);
+
+/**
+ * The measurement in two units at `start`, whose first number is `first`, ends a range that
+ * the range rule reads or holds, as in `7-8 lb 4 oz` and `five to six feet two inches`.
+ * Whether the range's first end is `7` or `7 lb` cannot be told, so the measurement is held,
+ * the range rule's change splits the hold and is dropped, and the whole range stays as written.
+ */
+function endsRangeWhole(text: string, start: number, first: string): boolean {
+  RANGE_OPENING.lastIndex = start;
+  const opening = RANGE_OPENING.exec(text);
+  if (opening === null) return false;
+  const [lowRaw, join] = [opening[1]!, opening[2]!];
+  const lowStart = opening.indices![1]![0];
+  const written = isWritten(lowRaw) || isWritten(first);
+  if (written && writtenRange(text, lowStart, lowRaw, join, first) === 'skip') return false;
+  const low = parseNumber(lowRaw);
+  const high = parseNumber(first);
+  return low === null || high === null || canBeRange(text, lowStart, low, high);
+}
+
+const LINE_END = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
+
+/**
+ * Where inches may go without their word after `foot` or `feet`, as in `six foot two`: before
+ * nothing that could be a noun. That is punctuation, `tall`, the end of the text, or the end
+ * of a line where the next line is blank or starts with something other than a word, such as
+ * a list marker.
+ */
+const NO_NOUN_AFTER =
+  String.raw`(?=[.,;:!?)\]"'”’]+(?!\w)|${SOFT_SPACE}tall\b|` +
+  String.raw`${INLINE_SPACE}*(?:$|${LINE_END}${INLINE_SPACE}*(?:$|${LINE_END}|[^\sA-Za-z])))`;
+
+/** Inches written without their word: a whole number from 1 to 11. */
+const isInchCount = (value: number | null) =>
+  value !== null && Number.isInteger(value) && value >= 1 && value <= 11;
+
+/**
+ * `6 feet 2 inches`, `6'2"`, `5 ft 11 in`, `six feet two inches` and `six foot two` collapse
+ * into a single metric height.
+ */
 function feetInchesRule(): Rule {
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:feet|foot|ft\.?|′|')` +
+    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:(?:feet|foot|ft\.?|′|')` +
       softGap(String.raw`(?:and(?=\s))?`) +
-      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+-\d+/\d+|\d+/\d+)` +
-      String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|")(?![A-Za-z])`,
+      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+-\d+/\d+|\d+/\d+|` +
+      String.raw`${WHOLE_NUMBER}(?:${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION})?)` +
+      String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|")(?![A-Za-z])|` +
+      String.raw`(?:feet|foot)${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER})`,
     'gi',
   );
 
@@ -688,8 +871,9 @@ function feetInchesRule(): Rule {
       );
       for (const match of found) {
         const feet = parseNumber(match[1]!);
-        const inches = parseNumber(match[2]!);
-        if (feet === null || inches === null) {
+        const inches = parseNumber(match[2] ?? match[3]!);
+        if (match[3] !== undefined && !isInchCount(inches)) continue;
+        if (feet === null || inches === null || endsRangeWhole(ctx.text, match.index, match[1]!)) {
           changes.push(hold(match.index, match[0], 'units.length.feet-inches', 40));
           continue;
         }
@@ -710,7 +894,6 @@ function feetInchesRule(): Rule {
 }
 
 const NOT_SECOND = new RegExp(NOT_SECOND_OF_PAIR, 'y');
-const NOT_END_OF_RANGE = new RegExp(String.raw`(?<!\d${RANGE_JOIN})`, 'y');
 
 /** `1st`, `21st` and `101st` are ordinals. `11st` is not. */
 const ORDINAL = /^(?:\d*[02-9])?1st(?![a-z])/i;
@@ -726,22 +909,21 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
   // The lookbehind runs only before a letter, and takes a run of spaces whole, because each
   // place it tries inside the run costs a walk over the rest of it.
   const START =
-    String.raw`(?<![\w.])(?<![A-Za-z]-)` +
-    String.raw`(?:(?![A-Za-z])|(?=[A-Za-z])(?<!\b(?:${WHOLE_NUMBER})(?<![-\s])[-\s]+))`;
-  const NUMBER = String.raw`(?:${UNSIGNED_NUMBER}|${WHOLE_NUMBER})`;
+    String.raw`(?<![\w.])` +
+    String.raw`(?:(?![A-Za-z])|(?=[A-Za-z])(?<![A-Za-z]-)(?<!\b(?:${WHOLE_NUMBER})(?<![-\s])\s+))`;
   const AND = softGap(String.raw`(?:and(?=\s))?`);
   const unitOf = (m: Measure) =>
     String.raw`(${alternate([...m.words, ...m.abbrevs, ...(m.compoundAbbrevs ?? [])])})(?![A-Za-z])`;
 
   return COMPOUNDS.map((compound): Rule => {
     const [largest, next, ...rest] = compound.measures.map(unitOf);
-    const part = (unit: string) => String.raw`${AND}(${NUMBER})${GAP}${unit}`;
+    const part = (unit: string) => String.raw`${AND}(${UNSIGNED_NUMBER})${GAP}${unit}`;
     const optional = rest.reduceRight((inner, unit) => `(?:${part(unit)}${inner})?`, '');
     const pattern = new RegExp(
-      String.raw`${START}(${NUMBER})${GAP}${largest}${part(next!)}${optional}`,
+      String.raw`${START}(${UNSIGNED_NUMBER})${GAP}${largest}${part(next!)}${optional}`,
       'gi',
     );
-    const notSecond = hasSides(compound.measures[0]!) ? NOT_SECOND : NOT_END_OF_RANGE;
+    const sided = hasSides(compound.measures[0]!);
 
     return {
       id: compound.id,
@@ -763,10 +945,12 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
           }
 
           const start = match.index;
-          notSecond.lastIndex = start;
+          NOT_SECOND.lastIndex = start;
           const kept =
             forced[compound.id] !== true && parts.some((p) => isKept(p.measure, skip, forced));
-          if (kept || !notSecond.test(ctx.text)) {
+          const second =
+            endsRangeWhole(ctx.text, start, match[1]!) || (sided && !NOT_SECOND.test(ctx.text));
+          if (kept || second) {
             changes.push(hold(start, match[0], compound.id, 40));
             continue;
           }
@@ -825,12 +1009,17 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     'gi',
   );
 
+  // A spaced `'`, or one after a word, is a quote mark. One before a digit starts the inches
+  // of `6'2"`, which `feetInchesRule` reads.
+  const SIDE_UNIT = byAlias.has(PRIME)
+    ? String.raw`${alternation}|(?<![\sA-Za-z-])${FOOT_MARK}(?!\d)`
+    : alternation;
   // An optional unit after an inner number, so `8.5" x 11"` and `10 ft x 12 ft` both match.
-  const INNER_UNIT = String.raw`(?:${GAP}(${alternation}))?`;
+  const INNER_UNIT = String.raw`(?:${GAP}(${SIDE_UNIT}))?`;
   const dimensions = new RegExp(
     String.raw`${START}(${NUMBER_PATTERN})${INNER_UNIT}${DIMENSION_JOIN}(${NUMBER_PATTERN})` +
       String.raw`(?:${INNER_UNIT}${DIMENSION_JOIN}(${NUMBER_PATTERN}))?` +
-      String.raw`${GAP}(${alternation})(?![A-Za-z])`,
+      String.raw`${GAP}(${SIDE_UNIT})(?![A-Za-z])`,
     'dgi',
   );
 
@@ -838,14 +1027,12 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   // `NOT_IN_COMPOUND` walks back over the spaces before it, so it runs only before a letter.
   const fractionOf = new RegExp(
     String.raw`(?<![\w.])(?=[A-Za-z])${NOT_IN_COMPOUND}` +
-      String.raw`(?:((?:an?${S}+)?half)|(${FRACTION_WORDS})${S}+of)` +
-      String.raw`${S}+an?(?=\s)${SOFT_SPACE}(${words})(?![\w-])`,
+      String.raw`${FRACTION_OF}${SOFT_SPACE}(${words})(?![\w-])`,
     'gi',
   );
-  // A count straight after `/` or `-` is the tail of `1 1/2` or `twenty-two`, not a number.
   const andAFraction = new RegExp(
-    String.raw`${START}(an?(?=\s)|(?<![-−/])${WHOLE_NUMBER})${SOFT_SPACE}(${words})` +
-      String.raw`${S}+and${S}+(${COUNTED_FRACTION})(?![\w-])`,
+    String.raw`${START}(${COUNT_BEFORE_FRACTION})${SOFT_SPACE}(${words})` +
+      String.raw`${S}+${AND_FRACTION}(?![\w-])`,
     'gi',
   );
 
@@ -894,6 +1081,14 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     const entry = resolve(alias);
     const value = parseNumber(raw);
     if (!entry || value === null) return;
+    // The hyphen ties the fraction to the unit, so the count before them counts the noun,
+    // as in `two quarter-pound burgers`.
+    const count = entry.isSingular && matched[raw.length] === '-' ? COUNT_APART.exec(raw) : null;
+    if (count && MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) {
+      const cut = count[0].length;
+      pushSingle(ctx, changes, start + cut, matched.slice(cut), raw.slice(cut), alias);
+      return;
+    }
     if (isOtherSense(ctx, entry, start, start + matched.length)) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
@@ -909,14 +1104,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     const { precision, maxDecimals } = ctx.options.units;
     const number = formatNumber(target.value, precision, significantFigures(raw), maxDecimals);
     const numberStart = start + (/^an?\s+/i.exec(raw)?.[0].length ?? 0);
-    // A singular unit modifying a following noun is attributive: `a 9 inch dish`,
-    // `a 3/8 inch bolt`. What follows decides, not the value, because a fraction is
-    // just as attributive. `1/2 gallon of milk` and `1/16 inch thick` are not.
+    const gap = matched.slice(raw.length, matched.length - alias.length);
     const attributive =
       entry.isWord &&
       entry.isSingular &&
-      DETERMINER_BEFORE.test(ctx.text.slice(Math.max(0, numberStart - 24), numberStart)) &&
-      MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length));
+      describesNoun(ctx.text, numberStart, value, gap, start + matched.length);
     const unit = entry.isWord
       ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
       : ` ${target.symbol}`;
@@ -970,7 +1162,12 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const lowText = formatNumber(low * perSourceUnit, precision, figures, maxDecimals);
         const highText = formatNumber(target.value, precision, figures, maxDecimals);
         const separator = /to/i.test(join) ? ' to ' : /and/i.test(join) ? ' and ' : '-';
-        const unit = entry.isWord ? ` ${target.plural}` : ` ${target.symbol}`;
+        const gap = matched.slice(lowRaw.length + join.length + highRaw.length, -alias.length);
+        const attributive =
+          entry.isSingular && describesNoun(ctx.text, start, high, gap, start + matched.length);
+        const unit = entry.isWord
+          ? ` ${attributive ? target.singular : target.plural}`
+          : ` ${target.symbol}`;
         const body = `${lowText}${separator}${highText}${unit}`;
 
         pushMeasurement(ctx, changes, start, matched, body, entry.measure.id, 35);
@@ -1006,28 +1203,55 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         // The groups holding each side's number and the unit written straight after it.
         const groups: Array<[number, number]> =
           match[5] === undefined ? [[1, 2], [3, 6]] : [[1, 2], [3, 4], [5, 6]];
-        const sides = groups.map(([number, unit]) => {
+        const sides = groups.map(([number, unit], i) => {
           const alias = match[unit];
-          const upToUnit = alias === undefined ? '' : ctx.text.slice(start, match.indices![unit]![1]);
+          const sideEnd = match.indices![alias === undefined ? number : unit]![1];
+          const next = groups[i + 1];
           return {
             raw: match[number]!,
             value: parseNumber(match[number]!),
             alias,
-            entry: alias === undefined ? undefined : resolve(alias),
-            bareInch: alias !== undefined && isBareInch(alias, upToUnit),
+            entry: alias === undefined ? undefined : resolve(alias === FOOT_MARK ? PRIME : alias),
+            bareInch: alias !== undefined && isBareInch(alias, ctx.text.slice(start, sideEnd)),
+            beforeTimes:
+              next !== undefined &&
+              !/by/i.test(ctx.text.slice(sideEnd, match.indices![next[0]]![0])),
           };
         });
         if (sides.some((s) => s.value === null || (s.alias !== undefined && !s.entry))) continue;
         if (sides.some((s) => isUncounted(s.raw))) continue;
         const first = sides[0]!;
-        // A number in words with no unit of its own may be a noun, with `by` giving an amount.
-        const mayBeNoun = /\bby\b/i.test(match[0]) && isWritten(first.raw) && !first.alias;
-        const one = /^one$/i.test(first.raw);
-        const before = ctx.text.slice(Math.max(0, start - 24), start);
-        const noun = NUMBER_AS_NOUN.test(before) || (one && ONE_AS_NOUN.test(before));
-        if (mayBeNoun && noun) continue;
         const last = sides[sides.length - 1]!;
         const entry = last.entry!;
+        const before = ctx.text.slice(Math.max(0, start - 24), start);
+
+        if (sides.some((s) => s.alias === FOOT_MARK)) {
+          const lengths = sides.every((s) => !s.entry || hasSides(s.entry.measure));
+          if (OPENS_QUOTE.test(before) || !lengths) continue;
+          // A side with no mark of its own leaves the `'` unconfirmed, and converting the
+          // other sides alone would split the dimension.
+          if (sides.some((s) => !s.entry)) {
+            changes.push(hold(start, match[0], 'units.dimensions', 38));
+            continue;
+          }
+        }
+
+        // A number with no unit of its own may be a noun, with `by` giving an amount. A pair
+        // in digits before a noun describes it, as in `those 4 by 6 inch photos`.
+        const describes =
+          !(entry.isWord && !entry.isSingular) && MODIFIES_A_NOUN.test(ctx.text.slice(end));
+        const mayBeNoun =
+          /\bby\b/i.test(match[0]) && !first.alias && (isWritten(first.raw) || !describes);
+        const one = /^one$/i.test(first.raw);
+        const noun = NUMBER_AS_NOUN.test(before) || (one && ONE_AS_NOUN.test(before));
+        if (mayBeNoun && noun) {
+          // The single rule never reads a number in digits straight after `4 by`.
+          if (sides.length === 2) {
+            const from = match.indices![groups[1]![0]]![0];
+            pushSingle(ctx, changes, from, ctx.text.slice(from, end), last.raw, last.alias!);
+          }
+          continue;
+        }
 
         // A side with no unit of its own takes the next one written, as in `10 x 12 feet`.
         const units: Alias[] = [];
@@ -1051,8 +1275,16 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           }
           continue;
         }
-        // Beside an earlier side with a unit of its own, as in `10 ft x 12 in`, `in` is the unit.
-        if (last.bareInch && !sides.some((s) => s !== last && s.entry && !s.bareInch)) continue;
+        // A last `in` is the unit beside an earlier side with a unit of its own, as in
+        // `10 ft x 12 in`, and an `in` before `x` and another number is one, as in
+        // `4 in x 6 in`. Before `by` it may be the preposition: `6 in by 5 in the morning`. A
+        // `'` needs the other sides to confirm it, so it cannot confirm an `in`.
+        const confirms = (s: (typeof sides)[number]) =>
+          s !== last &&
+          s.entry !== undefined &&
+          s.alias !== FOOT_MARK &&
+          (!s.bareInch || s.beforeTimes);
+        if (last.bareInch && !sides.some(confirms)) continue;
         // `one by` may be a pronoun and an amount, as in `lower one by two feet`.
         if (sides.some((s) => !READABLE_NUMBER.test(s.raw)) || (mayBeNoun && one)) {
           changes.push(hold(start, match[0], entry.measure.id, 38));
@@ -1168,6 +1400,27 @@ const CHANGE_AFTER = new RegExp(
 /** `10°F below zero` is a negative temperature, not a distance from zero. */
 const FROM_ZERO = /^\s+(above|below)\s+zero\b/i;
 
+/** The Celsius value in brackets or joined by `/` or `or` at the start of `rest`. */
+function celsiusPartnerAfter(rest: string): RegExpExecArray | null {
+  const match = BRACKET_AFTER.exec(rest) ?? METRIC_PAIRED_AFTER.exec(rest);
+  return match && dimensionOf(METRIC_INNER.exec(match[1]!)) === 'temperature' ? match : null;
+}
+
+/**
+ * The text either side of a Fahrenheit value from `start` to `end`, past any Celsius value
+ * given beside it, where the words that mark a change in temperature stand, as they do in
+ * `20°F (11°C) warmer` and `rose 11°C or 20°F`.
+ */
+function wordsBeside(text: string, start: number, end: number): { before: string; after: string } {
+  const paired = metricPairedBefore(text, start, end);
+  const from = paired?.dimension === 'temperature' ? paired.start : start;
+  const to = end + (celsiusPartnerAfter(text.slice(end))?.[0].length ?? 0);
+  return {
+    before: text.slice(Math.max(0, from - CONTEXT_WINDOW), from),
+    after: text.slice(to, to + CONTEXT_WINDOW),
+  };
+}
+
 const ABSOLUTE_ID = 'units.temperature.fahrenheit';
 const DIFFERENCE_ID = 'units.temperature.difference';
 
@@ -1203,14 +1456,14 @@ function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
 
     const start = match.index;
     let end = start + match[0].length;
-    const before = ctx.text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
+    const beside = wordsBeside(ctx.text, start, end);
     const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
     const zero = FROM_ZERO.exec(after);
     if (zero) {
       end += zero[0].length;
       if (zero[1]!.toLowerCase() === 'below') values = values.map((v) => -Math.abs(v));
     }
-    const difference = !zero && (CHANGE_BEFORE.test(before) || CHANGE_AFTER.test(after));
+    const difference = !zero && (CHANGE_BEFORE.test(beside.before) || CHANGE_AFTER.test(beside.after));
 
     let numbers: string[];
     if (difference) {

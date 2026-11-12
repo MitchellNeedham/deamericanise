@@ -1,11 +1,10 @@
 import { readFileSync, statSync, writeFileSync, readdirSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { parseArgs } from 'node:util';
-import { CATEGORIES, CONFIDENCES, PRESETS, SYNTAXES, matchesRuleId } from './config.js';
+import { CATEGORIES, CONFIDENCES, PRESETS, SYNTAXES, UNIT_KEYS, matchesRuleId, unitKey } from './config.js';
 import { DIALECTS, isDialect } from './dialects/index.js';
 import { PROSE_EXTENSIONS, languageNames, lexerFor } from './lexers/index.js';
 import { ruleIds } from './rules/catalogue.js';
-import { MEASURES } from './rules/units/definitions.js';
 import { deamericaniseFile, isKnownLanguage } from './code.js';
 import type { Category, Change, Confidence, Dialect, Options, Preset, Precision, Syntax } from './types.js';
 
@@ -92,14 +91,6 @@ const RULE_SETTINGS = new Map([
 
 function list(value: string | undefined): string[] {
   return value ? value.split(',').map((s) => s.trim()).filter(Boolean) : [];
-}
-
-/** The `unitsKeep` key of the unit a name such as `inch`, `inches` or `in` stands for. */
-function unitKey(name: string): string | undefined {
-  const lower = name.toLowerCase();
-  return MEASURES.find((measure) =>
-    [measure.keep, ...measure.words, ...measure.abbrevs].some((form) => form.toLowerCase() === lower),
-  )?.keep;
 }
 
 /** Whether a file has a lexer or reads as prose, from its name alone. */
@@ -286,7 +277,7 @@ export async function main(argv: string[]): Promise<number> {
 
   const unitsKeep = list(values['units-keep']).map((name) => {
     const key = unitKey(name);
-    if (key === undefined) fail(`unknown unit "${name}". Known: ${MEASURES.map((m) => m.keep).join(', ')}`);
+    if (key === undefined) fail(`unknown unit "${name}". Known: ${UNIT_KEYS.join(', ')}`);
     return key;
   });
 

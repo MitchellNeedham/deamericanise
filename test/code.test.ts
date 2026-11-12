@@ -191,12 +191,33 @@ describe('an article at the end of a comment line', () => {
     expect(deamericaniseCode(source, { language, preset: 'localise' }).text).toBe(expected);
   });
 
+  it.each`
+    language    | source                                          | expected
+    ${'ts'}     | ${'// Use an\n//\n// eraser here.\n'}           | ${'// Use an\n//\n// rubber here.\n'}
+    ${'ts'}     | ${'/**\n * Use an\n *\n * eraser here.\n */'}   | ${'/**\n * Use an\n *\n * rubber here.\n */'}
+    ${'python'} | ${'# Use an\n#\n# eraser here.\n'}              | ${'# Use an\n#\n# rubber here.\n'}
+  `('leaves an article that ends a paragraph: $source', ({ language, source, expected }) => {
+    expect(deamericaniseCode(source, { language, preset: 'localise' }).text).toBe(expected);
+  });
+
   it('points the article fix at its replacement on the next line', () => {
     const source = 'const a = 1;\n/**\n * Use an\n * eraser here.\n */\n';
     const [article, word] = deamericaniseCode(source, { language: 'ts', preset: 'localise' }).changes;
     expect(source.slice(article!.start, article!.end)).toBe('an');
     expect(source.slice(word!.start, word!.end)).toBe('eraser');
     expect(article?.agreesWith).toEqual({ start: word!.start, end: word!.end });
+  });
+});
+
+describe('an article in a comment', () => {
+  it.each`
+    source                                       | options                                     | expected
+    ${'// He drove a pickup truck.\n'}           | ${{ preset: 'localise' }}                   | ${'// He drove a ute.\n'}
+    ${'// He drove a pickup truck.\n'}           | ${{ preset: 'localise', dialect: 'en-NZ' }} | ${'// He drove a ute.\n'}
+    ${'// Plan A popsicle.\n'}                   | ${{ preset: 'localise', dialect: 'en-GB' }} | ${'// Plan A ice lolly.\n'}
+    ${'// It melted.\n// A popsicle is cold.\n'} | ${{ preset: 'localise' }}                   | ${'// It melted.\n// An icy pole is cold.\n'}
+  `('is fixed only where it is one: $source', ({ source, options, expected }) => {
+    expect(deamericaniseCode(source, { language: 'ts', ...options }).text).toBe(expected);
   });
 });
 

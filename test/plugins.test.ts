@@ -28,9 +28,15 @@ const REJECTED = [
   { options: { dialect: 'en-XX' }, message: `Unknown dialect: en-XX. ${EXPECTED_DIALECTS}` },
   { options: { dialect: 'toString' }, message: `Unknown dialect: toString. ${EXPECTED_DIALECTS}` },
   { options: { preset: 'Localise' }, message: 'Unknown preset: Localise. Expected one of read, localise.' },
+  { options: { unitsKeep: ['furlong'] }, message: 'Unknown unit: furlong. Expected the key, name or abbreviation of one of inch,' },
 ];
 
-const VALID = [{ dialect: 'en-GB', preset: 'localise' }, { categories: { spelling: false } }, {}];
+const VALID = [
+  { dialect: 'en-GB', preset: 'localise' },
+  { categories: { spelling: false } },
+  { unitsKeep: ['inches', 'MPH'] },
+  {},
+];
 
 describe('the remark plugin', () => {
   it.each`
@@ -106,6 +112,11 @@ describe('the remark plugin', () => {
   it('leaves vocabulary alone without the localise preset', () => {
     const tree = root(paragraph(text('the sidewalk')));
     expect(flatten(run(tree))).toEqual(['the sidewalk']);
+  });
+
+  it('keeps a unit named the way a person writes it', () => {
+    const tree = root(paragraph(text('6 inches and 2 miles')));
+    expect(flatten(run(tree, { unitsKeep: ['inches', 'miles'] }))).toEqual(['6 inches and 2 miles']);
   });
 
   it('leaves a tree with no prose alone', () => {
@@ -264,10 +275,24 @@ describe('the ESLint plugin', () => {
       expect(reports[0]?.data).toEqual({ before: 'an eraser', after: 'a rubber' });
       expect(quickFix(code, reports[0]!)).toBe(fixed);
     });
+
+    it('reports the word alone when a blank line ends the paragraph after the article', () => {
+      const code = '// Use an\n//\n// eraser here.\n';
+      const reports = lint(code, [{ preset: 'localise' }]);
+      expect(reports).toHaveLength(1);
+      expect(reports[0]?.data).toEqual({ before: 'eraser', after: 'rubber' });
+      expect(quickFix(code, reports[0]!)).toBe('// Use an\n//\n// rubber here.\n');
+    });
   });
 
   it('takes rule options', () => {
     expect(lint(source, [{ categories: { spelling: false } }])).toHaveLength(0);
+  });
+
+  it('keeps a unit named the way a person writes it', () => {
+    const code = 'const a = 1; // 6 inches and 2 miles\n';
+    expect(lint(code)).toHaveLength(2);
+    expect(lint(code, [{ unitsKeep: ['inches', 'miles'] }])).toHaveLength(0);
   });
 
   it('names an unknown preset in its options rather than failing deep inside', () => {

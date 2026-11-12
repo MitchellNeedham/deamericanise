@@ -249,14 +249,6 @@ const american = { assumeAmerican: true } as const;
 
 const KNOWN_FAILURES: KnownFailure[] = [
   {
-    issue: 153,
-    property: 'idempotence',
-    input: 'Roll it half an inch thick.',
-    options: { units: { keepOriginal: true } },
-    // The second run converts the original that `keepOriginal` put in brackets.
-    matches: (v) => v.change !== undefined && v.origin?.after.endsWith(`(${v.change.before})`) === true,
-  },
-  {
     issue: 155,
     property: 'paragraphs',
     input: 'Room 13\n\n- 0°F overnight',
@@ -283,19 +275,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     input: 'On 03/04/2024 the storm hit.',
     options: { assumeAmerican: true, dates: { format: 'dmy' } },
     matches: (v) => v.change?.ruleId === 'dates.numeric' && v.origin?.ruleId === 'dates.numeric',
-  },
-  {
-    issue: 88,
-    property: 'idempotence',
-    input: 'half a mile May 3, 2024',
-    options: localise,
-    // A written-out quantity the first run left because a word followed it, which that run
-    // then rewrote into something starting with a number.
-    matches: (v) =>
-      v.change?.category === 'units' &&
-      /^[a-z]/i.test(v.change.before) &&
-      v.origin === undefined &&
-      follows(/^[\s-]+\d/)(v),
   },
   {
     issue: 165,

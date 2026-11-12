@@ -62,6 +62,7 @@ describe('the Prettier plugin against real Prettier', () => {
     ${'deamericanisePreset'}     | ${'read'}                                 | ${'The sidewalk.\n'}  | ${'The sidewalk.\n'}
     ${'deamericaniseConfidence'} | ${'safe,moderate'}                        | ${'A flat tire.\n'}   | ${'A flat tire.\n'}
     ${'deamericaniseOptions'}    | ${'{"dialect":"en-GB","preset":"localise"}'} | ${'The sidewalk.\n'} | ${'The pavement.\n'}
+    ${'deamericaniseOptions'}    | ${'{"unitsKeep":["inches"]}'}             | ${'It is 6 inches wide.\n'} | ${'It is 6 inches wide.\n'}
   `('honours $option = $value', async ({ option, value, source, expected }) => {
     expect(await format(source as string, { parser: 'markdown', [option as string]: value })).toBe(expected);
   });
@@ -92,6 +93,7 @@ describe('the Prettier plugin against real Prettier', () => {
   describe('an option the library rejects fails the file with the library\'s message', () => {
     const DIALECT = 'Unknown dialect: en-XX. Expected one of en-AU, en-GB, en-NZ, en-IE, en-ZA, en-CA.';
     const PRESET = 'Unknown preset: Localise. Expected one of read, localise.';
+    const UNIT = 'Unknown unit: furlong. Expected the key, name or abbreviation of one of inch,';
 
     it.each`
       parser          | source
@@ -110,6 +112,7 @@ describe('the Prettier plugin against real Prettier', () => {
       await expect(run('{"dialect":"en-XX"}')).rejects.toThrow(DIALECT);
       await expect(run('{"preset":"Localise"}')).rejects.toThrow(PRESET);
       await expect(run('{"dialect":"toString"}')).rejects.toThrow('Unknown dialect: toString.');
+      await expect(run('{"unitsKeep":["furlong"]}')).rejects.toThrow(UNIT);
     });
   });
 

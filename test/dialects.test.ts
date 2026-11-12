@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { DIALECTS, deamericaniseCode, deamericaniseText, dialectPack, ruleCatalogue } from '../src/index.js';
-import type { Dialect, LexEntry, RuleContext } from '../src/index.js';
+import {
+  DIALECTS,
+  deamericanise,
+  deamericaniseCode,
+  deamericaniseFile,
+  deamericaniseText,
+  dialectPack,
+  resolveOptions,
+  ruleCatalogue,
+} from '../src/index.js';
+import type { Confidence, Dialect, LexEntry, Options, RuleContext } from '../src/index.js';
 import { checkOptions } from '../src/config.js';
 import { isDialect } from '../src/dialects/index.js';
 import { compileLexicon, findLexiconMatches } from '../src/engine/lexicon.js';
@@ -80,6 +89,39 @@ describe('911 is the emergency number only where it is called', () => {
     const once = deamericaniseText('The ridge is 911 feet high.', options);
     expect(once).toBe('The ridge is 278 metres (911 feet) high.');
     expect(deamericaniseText(once, options)).toBe(once);
+  });
+});
+
+describe('the emergency number is risky', () => {
+  const emergency = 'In an emergency, call 911.';
+  const tiers = (dialect: Dialect, confidence: Confidence[], input = emergency) =>
+    deamericaniseText(input, { dialect, preset: 'localise', confidence });
+
+  it.each(EMERGENCY_NUMBERS)('leaves it out of safe and moderate under %s', (dialect) => {
+    expect(tiers(dialect, ['safe', 'moderate'])).toBe(emergency);
+    expect(tiers(dialect, ['moderate'])).toBe(emergency);
+  });
+
+  it.each(EMERGENCY_NUMBERS)('changes it under %s with risky, as a risky change', (dialect, number) => {
+    expect(tiers(dialect, ['risky'])).toBe(`In an emergency, call ${number}.`);
+    const { changes } = deamericanise(emergency, { dialect, preset: 'localise' });
+    expect(changes.map((change) => [change.after, change.confidence])).toEqual([[number, 'risky']]);
+  });
+
+  it.each(EMERGENCY_NUMBERS)('changes it under %s with the default confidence', (dialect, number) => {
+    expect(say(dialect)(emergency)).toBe(`In an emergency, call ${number}.`);
+  });
+
+  it('keeps the rest of the dialect in safe and moderate', () => {
+    expect(tiers('en-AU', ['safe', 'moderate'], 'the sidewalk')).toBe('the footpath');
+    expect(tiers('en-GB', ['safe', 'moderate'], 'the sidewalk')).toBe('the pavement');
+  });
+
+  it('still drops it with the dialect rules switched off, and brings it back by id', () => {
+    const options = { preset: 'localise', rules: { 'dialect.*': false } } as const;
+    expect(deamericaniseText(emergency, options)).toBe(emergency);
+    const byId: Options = { preset: 'localise', confidence: ['safe', 'moderate'], rules: { 'dialect.en-AU': true } };
+    expect(deamericaniseText(emergency, byId)).toBe('In an emergency, call 000.');
   });
 });
 
@@ -288,6 +330,22 @@ describe('the dialect registry', () => {
     expect(() => dialectPack(dialect)).toThrow(message(id));
     expect(() => ruleCatalogue(dialect)).toThrow(message(id));
     expect(() => checkOptions({ dialect })).toThrow(message(id));
+  });
+
+  it.each(UNKNOWN)('rejects "%s" by name with nothing to read', (id) => {
+    const dialect = id as Dialect;
+    expect(() => resolveOptions({ dialect })).toThrow(message(id));
+    expect(() => deamericaniseText('', { dialect })).toThrow(message(id));
+    expect(() => deamericaniseCode('const a = 1;\n', { language: 'ts', dialect })).toThrow(message(id));
+    expect(() => deamericaniseFile('a.ts', 'const a = 1;\n', { dialect })).toThrow(message(id));
+    expect(() => deamericaniseFile('a.md', '', { dialect })).toThrow(message(id));
+  });
+
+  it.each(Object.keys(DIALECTS))('leaves a file with nothing to read unchanged under %s', (id) => {
+    const dialect = id as Dialect;
+    expect(resolveOptions({ dialect }).dialect).toBe(id);
+    expect(deamericaniseCode('const a = 1;\n', { language: 'ts', dialect }).text).toBe('const a = 1;\n');
+    expect(deamericaniseFile('a.ts', 'const a = 1;\n', { dialect }).text).toBe('const a = 1;\n');
   });
 
   it.each([...UNKNOWN, undefined, null, 1, {}, { toString: () => 'en-AU' }])('isDialect(%o) is false', (id) => {

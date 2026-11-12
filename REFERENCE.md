@@ -80,6 +80,10 @@ the run before anything is read, with `unknown language "..."` on stderr and exi
 and a commented file such as `tsconfig.json` has just its comments rewritten. A `.json`
 file is still skipped unless it is forced this way.
 
+`--dialect` takes any id `--list-dialects` prints. Any other value stops the run before
+anything is read, `--list-rules` included, with `unknown dialect "..."` on stderr and exit
+status 2.
+
 `--rule` and `--units-keep` are checked up front, as `--language` is. A `--rule` pattern
 has to match a rule id of at least one dialect, so a command line shared across dialects
 still runs under `en-CA`, which has no `dialect.*` rules. `--units-keep` takes a unit's
@@ -636,6 +640,10 @@ rewritten. Keep a backtick span on one line there.
 
 ## Integrations
 
+The remark, ESLint and Prettier plugins check their options before they read a file, so
+an option the library rejects, such as an unknown `dialect` or `preset`, fails the run on
+its first file with the library's own message, whatever that file holds.
+
 ### remark
 
 Working on the syntax tree means code fences, inline code, link targets, HTML blocks and
@@ -848,7 +856,9 @@ there each root needs the rules in its own styles.
 `units`, `dates`, `times` and `currency` each accept `false` to switch the category off.
 
 A `dialect` or `preset` outside its list throws an `Error` that names the value and the
-ones it accepts, such as `Unknown preset: Localise. Expected one of read, localise.`
+ones it accepts, such as `Unknown preset: Localise. Expected one of read, localise.` Only
+the ids in `DIALECTS` are dialects, so a name every object has, such as `toString`, is
+rejected the same way.
 
 ## Known limits
 

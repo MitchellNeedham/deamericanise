@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { DIALECTS, deamericaniseText } from '../src/index.js';
+import { DIALECTS, deamericaniseCode, deamericaniseText, dialectPack, ruleCatalogue } from '../src/index.js';
 import type { Dialect, LexEntry, RuleContext } from '../src/index.js';
+import { checkOptions } from '../src/config.js';
+import { isDialect } from '../src/dialects/index.js';
 import { compileLexicon, findLexiconMatches } from '../src/engine/lexicon.js';
 import { spellingEntries } from '../src/rules/spelling/index.js';
 import { baseVocabulary } from '../src/rules/vocabulary.js';
@@ -273,6 +275,37 @@ describe('the dialect registry', () => {
 
   it('rejects a dialect it does not know', () => {
     expect(() => deamericaniseText('color', { dialect: 'en-XX' as Dialect })).toThrow(/Unknown dialect/);
+  });
+
+  const UNKNOWN = ['toString', 'constructor', '__proto__', 'hasOwnProperty', 'valueOf', 'en-XX', 'en-au', ''];
+  const message = (id: string) =>
+    `Unknown dialect: ${id}. Expected one of en-AU, en-GB, en-NZ, en-IE, en-ZA, en-CA.`;
+
+  it.each(UNKNOWN)('rejects "%s" by name everywhere a dialect is looked up', (id) => {
+    const dialect = id as Dialect;
+    expect(() => deamericaniseText('the color', { dialect })).toThrow(message(id));
+    expect(() => deamericaniseCode('// the color', { language: 'ts', dialect })).toThrow(message(id));
+    expect(() => dialectPack(dialect)).toThrow(message(id));
+    expect(() => ruleCatalogue(dialect)).toThrow(message(id));
+    expect(() => checkOptions({ dialect })).toThrow(message(id));
+  });
+
+  it.each([...UNKNOWN, undefined, null, 1, {}, { toString: () => 'en-AU' }])('isDialect(%o) is false', (id) => {
+    expect(isDialect(id)).toBe(false);
+  });
+
+  it.each(Object.keys(DIALECTS))('runs under %s in the library and its catalogue', (id) => {
+    const dialect = id as Dialect;
+    expect(isDialect(id)).toBe(true);
+    expect(dialectPack(dialect).id).toBe(id);
+    expect(ruleCatalogue(dialect).length).toBeGreaterThan(0);
+    expect(deamericaniseText('the color', { dialect })).toBe('the colour');
+    expect(() => checkOptions({ dialect })).not.toThrow();
+  });
+
+  it('means en-AU with no dialect at all', () => {
+    expect(deamericaniseText('call 911', { preset: 'localise' })).toBe('call 000');
+    expect(() => checkOptions()).not.toThrow();
   });
 });
 

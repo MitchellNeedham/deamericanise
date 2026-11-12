@@ -242,6 +242,7 @@ fuel economy. The volume measures are the US ones, which are not the imperial on
 10 miles        -> 16 kilometres     30 mpg     -> 7.8 L/100km
 1/2 gallon      -> 1.9 litres        5-10 feet  -> 1.5-3 metres
 180 lbs         -> 82 kg             10 acres   -> 4 hectares
+29.92 inHg      -> 1013 hPa          32 psi     -> 220 kPa
 ```
 
 A unit that describes the noun after it stays singular: `a 9 inch dish` becomes
@@ -258,8 +259,9 @@ the unit one of itself: `two foot-long subs` becomes `two 30 centimetre long sub
 determiner that takes one of a noun, or in a list of sizes, the count is the number of units,
 so `a two foot-long sub` becomes `a 61 centimetre long sub`, as `a two-foot-long sub` does.
 A unit that starts a noun leaves the number counting it, so `Bake 1 pound cake`,
-`6 foot soldiers`, `foot traffic`, `8 inch worms` and `5 yard sales` are left as written, while
-`a 2-pound cake` becomes `a 910 gram cake`.
+`6 foot soldiers`, `foot traffic`, `8 inch worms`, `5 yard sales`, `3 yard signs`,
+`the two pound signs` and `3 mile markers` are left as written, while `a 2-pound cake`
+becomes `a 910 gram cake`.
 A length that gives the size of a noun describes it whatever its number, so
 `a 6 foot long table` becomes `a 1.8 metre long table`, `cut into 1/2 inch thick slices`
 becomes `cut into 1.3 centimetre thick slices`, and `a 6-foot-tall fence` becomes
@@ -564,13 +566,29 @@ becomes `Cut 1.8 metres or 3 metres of rope`, and `Cut 3 metres or 6 feet of rop
 `Cut 3 metres or 1.8 metres of rope`. A slash with no figure after it is a rate, so
 `5 gallons/minute` becomes `19 litres/minute`.
 
-Measurements that are imperial worldwide are left alone: screens, wheels, pipes, vinyl.
-`a 15 inch laptop` stays a 15 inch laptop, and so do `monitors of 27 inches` and
+Measurements that are imperial worldwide are left alone: screens, wheels, pipes, vinyl,
+drive bays, audio jacks and telescopes. `a 15 inch laptop` stays a 15 inch laptop, and so do
+`a 2.5-inch SATA SSD`, `the 1/4-inch TRS jack`, `monitors of 27 inches` and
 `wheels between 15 and 17 inches`, which name the thing first. So does a unit that is part
-of a name, such as `the 40 yard line` or `the 147-pound division`. A range or dimension of
-them stays whole, so `bolts of ½-¾ inch` and `a 15" x 17" panel` are left exactly as
-written, with no piece of them converted on its own. `units: { respectConventions: false }`
-converts all of them.
+of a name, such as `the 40 yard line`, `the 26-mile marker` or `the 147-pound division`. A
+range or dimension of them stays whole, so `bolts of ½-¾ inch` and `a 15" x 17" panel` are
+left exactly as written, with no piece of them converted on its own.
+`units: { respectConventions: false }` converts all of them.
+
+A distance or a position from such a thing is a measurement. `away`, `apart`, `off`,
+`above`, `below`, `behind`, `beneath` or `from` straight after the size makes it one, so
+`Place the monitor 20 inches from your eyes` becomes
+`Place the monitor 51 centimetres from your eyes`. `from corner to corner` spans the thing
+itself, so `The screen is 27 inches from corner to corner.` is left as written. `jack` and
+`plug` name a thing only after its size, since before one they are verbs, so
+`Plug the 2 inch hole` converts.
+
+A shipping container of a standard length in feet, one of `10`, `20`, `40`, `45`, `48` and
+`53`, is named by it, so `a 40-foot high-cube container` and `the twenty-foot equivalent unit`
+are left as written, while `a 30-foot container` converts. An aviation altitude stays in feet beside `MSL`,
+`AMSL`, `AGL`, `QNH` or `QFE`, or in a sentence with `flight level`, `cruising altitude` or a
+service, absolute or cloud `ceiling`, so `35,000 feet MSL` is left as written. A room has a
+ceiling too, so `a 10-foot ceiling` converts, and so does `The plane is 200 feet long.`
 
 A unit word with a capital is part of a name when the next word has one too, or when the
 next word that title case would capitalise does. So `Track 7 Miles Davis`,
@@ -1220,7 +1238,7 @@ there each root needs the rules in its own styles.
 | `units.precision` | `'natural'` | `natural`, `exact`, or a number of decimal places |
 | `units.keepOriginal` | `false` | Write `1.8 metres (6 ft)` |
 | `units.fuelEconomy` | `'l-per-100km'` | Or `km-per-l` |
-| `units.respectConventions` | `true` | Leave screen sizes, yard lines and weight classes alone |
+| `units.respectConventions` | `true` | Leave screen sizes, yard lines, container lengths, altitudes and weight classes alone |
 | `dates.format` | `'iso'` | `iso`, `dmy`, `long` |
 | `dates.reorderLongDates` | `localise` only | `March 5, 2024` to `5 March 2024` |
 | `times.to24Hour` | `false` | On gives `15:00` rather than `3pm` |

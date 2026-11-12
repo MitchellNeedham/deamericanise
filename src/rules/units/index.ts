@@ -235,6 +235,9 @@ export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: num
  */
 const DETERMINER_BEFORE = /(?:\b(?:a|an|the|this|that|each|every|per|another)\s+|\d\s*[x×]\s*)$/i;
 
+/** The sizes a length gives, as in `6 feet long` and `a 6 foot long table`. */
+const SIZES = ['thick', 'wide', 'long', 'tall', 'deep', 'high'];
+
 /**
  * Words that cannot open a noun straight after a measurement: prepositions, sizes and
  * comparisons, adverbs of place, slope and time, pronouns, determiners, conjunctions and
@@ -245,16 +248,16 @@ const NOT_A_NOUN = [
   'of', 'in', 'on', 'at', 'by', 'for', 'and', 'or', 'to', 'from', 'with', 'per', 'into',
   'through', 'across', 'past', 'along', 'beyond', 'behind', 'about', 'against', 'among',
   'between', 'during', 'near', 'onto', 'toward', 'towards', 'under', 'underneath', 'beneath',
-  'upon', 'via', 'within', 'without',
-  'thick', 'wide', 'long', 'tall', 'deep', 'high', 'short', 'further', 'farther', 'more',
+  'upon', 'via', 'within', 'without', 'beside', 'like',
+  ...SIZES, 'short', 'further', 'farther', 'more',
   'less', 'longer', 'shorter', 'wider', 'taller', 'deeper', 'higher', 'closer', 'too',
   'enough', 'apiece', 'each', 'only',
   'away', 'apart', 'down', 'up', 'north', 'south', 'east', 'west', 'ahead', 'back', 'out',
   'off', 'around', 'over', 'overhead', 'above', 'below', 'inside', 'outside', 'inland',
-  'offshore',
+  'offshore', 'here', 'there', 'everywhere', 'overall', 'lengthwise', 'crosswise',
   'uphill', 'downhill', 'upstream', 'downstream',
-  'later', 'earlier', 'ago', 'before', 'after',
-  'i', 'me', 'he', 'him', 'she', 'it', 'we', 'us', 'they', 'them', 'you',
+  'later', 'earlier', 'ago', 'before', 'after', 'now', 'today', 'already', 'again',
+  'i', 'me', 'he', 'him', 'she', 'it', 'we', 'us', 'they', 'them', 'you', 'which', 'who',
   'a', 'an', 'the', 'this', 'that', 'these', 'those', 'his', 'her', 'its', 'their', 'my',
   'our', 'your', 'some', 'any', 'no', 'all', 'both', 'every',
   'but', 'so', 'if', 'when', 'while', 'as', 'than', 'because', 'since', 'until', 'unless',
@@ -267,16 +270,52 @@ const NOT_A_NOUN = [
 const UNIT_FORMS = alternate(MEASURES.flatMap((measure) => [...measure.words, ...measure.abbrevs]));
 
 /**
- * A word straight after a measurement that may be a noun it describes. A number in words,
- * alone or with its unit (`one-inch`, `onelbs`), or a date is not one. Another rule may
- * rewrite either to start with a digit, so reading it as a noun would leave the measurement
- * to a second run.
+ * The start of a word that may be a noun. A number in words, alone or with its unit
+ * (`one-inch`, `onelbs`), or a date is not one. Another rule may rewrite either to start
+ * with a digit, so reading it as a noun would leave the measurement to a second run.
  */
-const MODIFIES_A_NOUN = new RegExp(
-  String.raw`^(?:\s|${HYPHEN})+(?!(?:${NOT_A_NOUN.join('|')}|(?:${NUMBER_PATTERN})(?:${GAP}(?:${UNIT_FORMS}))?)` +
-    String.raw`(?!\w|${HYPHEN})|(?:${MONTH_PATTERN})\.?\s+\d)[a-z]`,
-  'i',
+const NOUN_START =
+  String.raw`(?!(?:${NOT_A_NOUN.join('|')}|(?:${NUMBER_PATTERN})(?:${GAP}(?:${UNIT_FORMS}))?)` +
+  String.raw`(?!\w|${HYPHEN})|(?:${MONTH_PATTERN})\.?\s+\d)[a-z]`;
+
+/** A word straight after a measurement that may be a noun it describes. */
+const MODIFIES_A_NOUN = new RegExp(String.raw`^(?:\s|${HYPHEN})+${NOUN_START}`, 'i');
+
+const SIZE = String.raw`(?:${SIZES.join('|')})(?!\w|${HYPHEN})`;
+
+/**
+ * Straight after a unit of length, the only kind that gives a size: `1 pound thick bacon` is
+ * a quantity of bacon.
+ */
+const AFTER_A_LENGTH = String.raw`(?<=(?<![A-Za-z])(?:${alternate(
+  MEASURES.filter((measure) => measure.id.startsWith('units.length.')).flatMap((measure) => [
+    ...measure.words,
+    ...measure.abbrevs,
+  ]),
+)}))`;
+
+/** Another size beside the first, as in the `by 3 foot wide` of `6 foot long by 3 foot wide`. */
+const ANOTHER_SIZE =
+  String.raw`(?:,?\s+(?:and|or|by|x|×)|,)\s+(?:${NUMBER_PATTERN})${GAP}(?:${UNIT_FORMS})` +
+  String.raw`(?:\s|${HYPHEN})+${SIZE}`;
+
+/**
+ * A size straight after a length, then the noun the length describes through it, as in
+ * `a 6 foot long table` and `a 6-foot-tall fence`. A thing has at most three sizes, and the
+ * bound keeps each measurement from reading every size in a long list.
+ */
+const SIZES_A_NOUN = new RegExp(
+  String.raw`${AFTER_A_LENGTH}(?:\s|${HYPHEN})+${SIZE}(?:${ANOTHER_SIZE}){0,2}\s+${NOUN_START}`,
+  'iy',
 );
+
+/** Whether the length ending at `end` gives the size of a noun after it. */
+function sizesNoun(text: string, end: number): boolean {
+  SIZES_A_NOUN.lastIndex = end;
+  return SIZES_A_NOUN.test(text);
+}
+
+const HYPHEN_BEFORE_SIZE = new RegExp(String.raw`${AFTER_A_LENGTH}${HYPHEN}(?=${SIZE})`, 'iy');
 
 /**
  * Whether the singular unit word ending at `end` describes the noun after it, so its metric
@@ -285,7 +324,9 @@ const MODIFIES_A_NOUN = new RegExp(
  * opening the phrase says so, as does a hyphen tying the number to the unit, or the singular
  * after a number above one, which would otherwise take the plural. One and a fraction take
  * the singular anyway, so `one quart small onions` and `1/2 pound ground beef` are
- * quantities with the `of` left out, read as `one quart of small onions` would be.
+ * quantities with the `of` left out, read as `one quart of small onions` would be. A length
+ * that gives the size of a noun describes it whatever its number, as `1/2 inch thick slices`
+ * does.
  */
 function describesNoun(
   text: string,
@@ -294,6 +335,7 @@ function describesNoun(
   gap: string,
   end: number,
 ): boolean {
+  if (sizesNoun(text, end)) return true;
   if (!MODIFIES_A_NOUN.test(text.slice(end))) return false;
   return (
     Math.abs(value) > 1 ||
@@ -893,6 +935,35 @@ function redundantMetric(
 const AFTER_UNIT = /(?:)/y;
 
 /**
+ * `pushMeasurement`, with the change it makes widened over a hyphen that joins a length to
+ * the size it gives. The metric unit stands apart from its number, so `6-foot-tall` reads
+ * `1.8 metre tall`.
+ */
+function pushBeforeSize(
+  ctx: RuleContext,
+  changes: Change[],
+  start: number,
+  matched: string,
+  body: string,
+  ruleId: string,
+  priority: number,
+): void {
+  const made = changes.length;
+  pushMeasurement(ctx, changes, start, matched, body, ruleId, priority);
+  const end = start + matched.length;
+  const last = changes.at(-1);
+  if (changes.length === made || !last || last.hold || last.end !== end) return;
+  HYPHEN_BEFORE_SIZE.lastIndex = end;
+  if (!HYPHEN_BEFORE_SIZE.test(ctx.text)) return;
+  changes[changes.length - 1] = {
+    ...last,
+    end: end + 1,
+    before: last.before + ctx.text[end],
+    after: `${last.after} `,
+  };
+}
+
+/**
  * Records one converted measurement, collapsing a redundant parenthetical or pair if there
  * is one. A measurement that is itself the parenthetical after its metric value is not
  * recorded, and one paired after the metric value it restates is held as written. The stop
@@ -1205,7 +1276,7 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
     const optional = rest.reduceRight((inner, unit) => `(?:${part(unit)}${inner})?`, '');
     const pattern = new RegExp(
       String.raw`${START}(${UNSIGNED_NUMBER})${GAP}${largest}${part(next!)}${optional}`,
-      'gi',
+      'dgi',
     );
     const sided = hasSides(compound.measures[0]!);
 
@@ -1253,11 +1324,15 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
             p.measure.words.some((w) => w === p.unit.toLowerCase());
           const last = parts[parts.length - 1]!;
           const end = start + match[0].length;
-          const attributive =
-            isWord(last) &&
-            SINGULAR_WORDS.has(last.unit.toLowerCase()) &&
-            DETERMINER_BEFORE.test(ctx.text.slice(Math.max(0, start - 24), start)) &&
-            MODIFIES_A_NOUN.test(ctx.text.slice(end));
+          const singular = (p: (typeof parts)[number]) =>
+            isWord(p) && SINGULAR_WORDS.has(p.unit.toLowerCase());
+          // A singular after a number above one says so in any part, as the pound does in
+          // `7 pound 1 ounce babies`.
+          const value = Math.max(...parts.flatMap((p, i) => (singular(p) ? [values[i]!] : [])));
+          const lastNumber = match.indices![2 * parts.length - 1]!;
+          const lastUnit = match.indices![2 * parts.length]!;
+          const gap = ctx.text.slice(lastNumber[1], lastUnit[0]);
+          const attributive = singular(last) && describesNoun(ctx.text, start, value, gap, end);
           const unit = !parts.some(isWord)
             ? target.symbol
             : attributive
@@ -1388,7 +1463,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     // The hyphen ties the fraction to the unit, so the count before them counts the noun,
     // as in `two quarter-pound burgers`.
     const count = entry.isSingular && matched[raw.length] === '-' ? COUNT_APART.exec(raw) : null;
-    if (count && MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) {
+    if (
+      count &&
+      (MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length)) ||
+        sizesNoun(ctx.text, start + matched.length))
+    ) {
       const cut = count[0].length;
       pushSingle(ctx, changes, start + cut, matched.slice(cut), raw.slice(cut), alias);
       return;
@@ -1421,7 +1500,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     const from = attributive ? numberStart : start;
     const quantity = matched.slice(from - start);
 
-    pushMeasurement(ctx, changes, from, quantity, `${number}${unit}`, entry.measure.id, 30);
+    pushBeforeSize(ctx, changes, from, quantity, `${number}${unit}`, entry.measure.id, 30);
   };
 
   const rangeRule: Rule = {
@@ -1485,7 +1564,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           : ` ${target.symbol}`;
         const body = `${lowText}${separator}${highText}${unit}`;
 
-        pushMeasurement(ctx, changes, start, matched, body, entry.measure.id, 35);
+        pushBeforeSize(ctx, changes, start, matched, body, entry.measure.id, 35);
       }
       return changes;
     },
@@ -1561,7 +1640,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         // A number with no unit of its own may be a noun, with `by` giving an amount. A pair
         // in digits before a noun describes it, as in `those 4 by 6 inch photos`.
         const describes =
-          !(entry.isWord && !entry.isSingular) && MODIFIES_A_NOUN.test(ctx.text.slice(end));
+          !(entry.isWord && !entry.isSingular) &&
+          (MODIFIES_A_NOUN.test(ctx.text.slice(end)) || sizesNoun(ctx.text, end));
         const mayBeNoun =
           /\bby\b/i.test(match[0]) && !first.alias && (isWritten(first.raw) || !describes);
         const one = /^one$/i.test(first.raw);

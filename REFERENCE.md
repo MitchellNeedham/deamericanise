@@ -256,6 +256,11 @@ measurement counts the noun, so `two quarter-pound burgers` becomes `two 110 gra
 A unit that starts a noun leaves the number counting it, so `Bake 1 pound cake`,
 `6 foot soldiers`, `foot traffic` and `8 inch worms` are left as written, while
 `a 2-pound cake` becomes `a 910 gram cake`.
+A length that gives the size of a noun describes it whatever its number, so
+`a 6 foot long table` becomes `a 1.8 metre long table`, `cut into 1/2 inch thick slices`
+becomes `cut into 1.3 centimetre thick slices`, and `a 6-foot-tall fence` becomes
+`a 1.8 metre tall fence`. A size with no noun after it leaves the unit plural, so
+`6 feet long` becomes `1.8 metres long`.
 
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
@@ -313,6 +318,8 @@ converts it. A weight or height at the end of a range, as in `7-8 lb 4 oz`,
 its first end could be in either unit. So is a height or weight that starts where no
 measurement can (see below), as in `At 7:30 feet 2 inches`.
 `st` is read only in such a weight, because `1st` on its own is an ordinal.
+A weight in two units describes a noun as one unit does, so `7 pound 8 ounce babies` becomes
+`3.4 kilogram babies`.
 
 Numbers written out in words are read too, fractions and all: `two and a half feet` becomes
 `76 centimetres` and `a quarter mile away` becomes `400 metres away`. So do `half a mile`,

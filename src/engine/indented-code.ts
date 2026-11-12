@@ -1,10 +1,10 @@
 import type { Range } from './apply.js';
 
 /**
- * The blocks CommonMark opens as it reads a document line by line. Only indented code and HTML
- * blocks of the first kind are collected. The rest decide where those may start: never
- * indented code inside a paragraph, and four columns past the content of the list item or
- * quote it sits in.
+ * The blocks CommonMark opens as it reads a document line by line. Only indented code, HTML
+ * blocks of the first kind and the raw elements inside the sixth and seventh kinds are
+ * collected. The rest decide where those may start: never indented code inside a paragraph,
+ * and four columns past the content of the list item or quote it sits in.
  */
 type Block =
   | { kind: 'document' | 'quote' | 'paragraph' | 'heading' | 'break' }
@@ -51,6 +51,30 @@ const HTML_CLOSE: Record<number, RegExp> = {
   5: /\]\]>/,
 };
 
+/**
+ * An element inside an HTML block that holds code or text shown as written: the tags of
+ * `HTML_OPEN[1]`. An HTML comment is matched too, so that a tag inside one opens nothing.
+ */
+const RAW_ELEMENT = /<!--(?:-?>|[\s\S]*?(?:-->|$))|<(script|pre|textarea|style)(?=\s|>|$)/gi;
+
+/**
+ * Each raw element in the HTML block from `start` to `end`, from its opening tag to the next
+ * closing tag of the same name, or to the end of the block if none closes it.
+ */
+function collectRawElements(text: string, start: number, end: number, into: Range[]): void {
+  const html = text.slice(start, end);
+  RAW_ELEMENT.lastIndex = 0;
+  for (let match = RAW_ELEMENT.exec(html); match; match = RAW_ELEMENT.exec(html)) {
+    const name = match[1];
+    if (name === undefined) continue;
+    const closing = new RegExp(String.raw`<\/${name}\s*>`, 'gi');
+    closing.lastIndex = RAW_ELEMENT.lastIndex;
+    const stop = closing.exec(html) ? closing.lastIndex : html.length;
+    into.push({ start: start + match.index, end: start + stop });
+    RAW_ELEMENT.lastIndex = stop;
+  }
+}
+
 const isSpaceOrTab = (c: string | undefined): boolean => c === ' ' || c === '\t';
 
 /**
@@ -75,7 +99,7 @@ class Scanner {
   private allClosed = true;
   private lastMatched = 0;
 
-  constructor(private readonly into: Range[]) {}
+  constructor(private readonly text: string, private readonly into: Range[]) {}
 
   private get tip(): Block {
     return this.open[this.open.length - 1]!;
@@ -136,6 +160,8 @@ class Scanner {
     const block = this.open.pop()!;
     if (block.kind === 'code' || (block.kind === 'html' && block.type === 1)) {
       this.into.push({ start: block.start, end: block.end });
+    } else if (block.kind === 'html' && block.type >= 6) {
+      collectRawElements(this.text, block.start, block.end, this.into);
     }
   }
 
@@ -368,14 +394,18 @@ class Scanner {
  *
  * HTML blocks of the first kind: a line that starts with `<pre`, `<script`, `<style` or
  * `<textarea`, through the line that holds a closing tag of any of the four, blank lines
- * included, or to the end of the list item or quote it sits in. Other HTML blocks, comments
- * among them, are not collected, so the text in them reads as prose.
+ * included, or to the end of the list item or quote it sits in.
  *
  * Each range runs from the block's first character to the end of its last line that is not
  * blank.
+ *
+ * Inside an HTML block of the sixth or seventh kind, such as one opened by `<div>` or
+ * `<details>`: each `pre`, `script`, `style` or `textarea` element, from its opening tag to
+ * the next closing tag of the same name, or to the end of the block. The rest of the block,
+ * and every other HTML block, comments among them, reads as prose.
  */
 export function collectVerbatimBlocks(text: string, into: Range[]): void {
-  const scanner = new Scanner(into);
+  const scanner = new Scanner(text, into);
   let start = 0;
   for (const line of text.split('\n')) {
     scanner.read(line.endsWith('\r') ? line.slice(0, -1) : line, start);

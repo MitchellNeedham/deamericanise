@@ -242,6 +242,13 @@ after it converts on its own: `2 x 4 oz cans` becomes `2 x 110 g cans`, and
 `2 x 4 lb 8 oz bags` becomes `2 x 2.04 kg bags`. A dimension is left as written when a side with no unit sits between two different units
 (`10 ft x 12 x 6 in`), or when the rule for one of its units is switched off.
 
+A side may be a whole number in words: `a ten by twelve foot room` becomes
+`a 3 by 3.7 metre room`, and `two x 4 oz cans` becomes `two x 110 g cans`. A fraction in
+words on any side, as in `two and a half by three feet`, leaves the dimension as written. So
+does `one by two feet`, since `one` may be a pronoun with `by` giving an amount. After a word
+such as `each`, `all` or `that one`, only the amount converts: `raise each one by two inches`
+becomes `raise each one by 5.1 centimetres`.
+
 A weight in two units is one weight, as a height in feet and inches is one height:
 `7 pounds 8 ounces` becomes `3.4 kilograms`, `11st 4lb` becomes `71.7 kg`, and
 `11 stone 4 pounds 8 ounces` becomes `71.9 kilograms`. Together the parts claim three
@@ -269,9 +276,23 @@ read whole is left as written. That covers `catch-twenty-two miles`, and
 two words), and a cardinal may follow, with or without `and`: `a hundred miles` becomes
 `160 kilometres`, `one hundred and twenty feet` becomes `37 metres`, and
 `two thousand five hundred feet` and `twenty-two hundred feet` convert too. A number never
-starts after `hundred` or `thousand` with at most a comma, `and` or `to` between, so
-`hundreds of miles`, `a few hundred feet`, `between one hundred and two hundred miles` and
-`a hundred thousand miles` are left as written. `It cost a hundred pounds.` is still money.
+starts after `hundred` or `thousand` with at most a comma, `and` or `to` between, except as
+the second end of a range, so `hundreds of miles`, `a few hundred feet` and
+`a hundred thousand miles` are left as written, while
+`between one hundred and two hundred miles` becomes `between 160 and 320 kilometres`.
+`It cost a hundred pounds.` is still money.
+
+A range may have a whole number in words at either end when `to` joins it, or `and` after
+`between`: `five to 10 miles` becomes `8 to 16 kilometres`, and `between one and two pounds`
+becomes `between 450 and 910 grams`. A dash joins a range only between digits, since
+`one-half` and `twenty-two` are single numbers, so `five-10 miles` is left as written. So is
+a range with a fraction in words at either end, as in `two and a half to three miles`, and
+`two to three hundred feet`, which may mean 200 to 300. `half to` is an idiom, so
+`reduce by half to 2 quarts` converts only the quarts.
+
+A whole number hyphenated to a fraction below one is a mixed number, as trade writing has
+it: `a 2-3/4 inch board` becomes `a 7 centimetre board`, the same as `a 2 3/4 inch board`.
+`1-3 inches` and `1/2-3/4 inch` are still ranges.
 
 A fraction with a zero denominator, as in `5/0 inches`, is not a quantity, so it is left as
 written, and so is a height or weight it is part of, as in `5 feet 1/0 inches`.

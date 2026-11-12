@@ -2219,8 +2219,7 @@ function fuelEconomyRule(): Rule {
 
       single.lastIndex = 0;
       for (const match of ctx.text.matchAll(single)) {
-        // Its range settles it. `resolveChanges` tests every change against every hold, so a
-        // second change or hold for each range is quadratic in a long run of ranges.
+        // Its range settles it.
         if (rangeEnds.has(match.index + match[0].length)) continue;
         const mpg = Number(match[1]);
         if (!mpg || endsRange(ctx.text, match.index, mpg)) {

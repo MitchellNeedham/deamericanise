@@ -15,7 +15,7 @@ Mix two cups of brown sugar, two cups of honey, six egg yolks and beat them thor
 
 ## Fruit Wheels
 
-Sift together two cups of flour, two teaspoons of baking-powder, one-half teaspoon of salt, one tablespoon of sugar. Rub in two large tablespoons of butter. Mix to soft dough with milk; roll out **1.3 centimetres** thick. Spread thickly with soft butter, dust with one teaspoon of flour, four tablespoons of granulated sugar, one teaspoon of cinnamon; sprinkle over one-half cup each of seeded and cut raisins, chopped citron, and cleaned currants. Roll up, cut in **2.5 centimetres** slices, put **2.5 centimetres** apart on greased, flat pans, and bake in hot oven. *PANCAKES, FRITTERS, Etc.*
+Sift together two cups of flour, two teaspoons of baking-powder, one-half teaspoon of salt, one tablespoon of sugar. Rub in two large tablespoons of butter. Mix to soft dough with milk; roll out **1.3 centimetres** thick. Spread thickly with soft butter, dust with one teaspoon of flour, four tablespoons of granulated sugar, one teaspoon of cinnamon; sprinkle over one-half cup each of seeded and cut raisins, chopped citron, and cleaned currants. Roll up, cut in **2.5 centimetre** slices, put **2.5 centimetres** apart on greased, flat pans, and bake in hot oven. *PANCAKES, FRITTERS, Etc.*
 
 ## Fruit Cake (Wedding Cake)
 
@@ -53,7 +53,7 @@ published before 1929, and distributed by Project Gutenberg.
 | 9 | `one-half pound` | `230 grams` | `units.mass.pound` | moderate |
 | 9 | `half an inch` | `1.3 centimetres` | `units.length.inch` | moderate |
 | 13 | `one-half inch` | `1.3 centimetres` | `units.length.inch` | moderate |
-| 13 | `one-inch` | `2.5 centimetres` | `units.length.inch` | moderate |
+| 13 | `one-inch` | `2.5 centimetre` | `units.length.inch` | moderate |
 | 13 | `one inch` | `2.5 centimetres` | `units.length.inch` | moderate |
 | 17 | `one pound` | `450 grams` | `units.mass.pound` | moderate |
 | 17 | `one pound` | `450 grams` | `units.mass.pound` | moderate |

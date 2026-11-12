@@ -1,5 +1,6 @@
 import { buildGate, type Gate } from '../../config.js';
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
+import { MONTH_PATTERN } from '../dates.js';
 import {
   COMPOUNDS,
   MEASURES,
@@ -202,19 +203,80 @@ export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: num
 }
 
 /**
- * A singular unit is modifying the noun after it only when a determiner opens the phrase:
- * `a 9 inch dish` describes the dish, so it takes the singular. `one quart small onions`
- * is an ingredient quantity with the `of` left out, and `one` is itself the determiner,
- * so it stays plural and reads the same as `one quart of small onions` would. A count
- * opens the phrase as a determiner does, so `2 x 4 ounce cans` keeps the singular.
+ * A determiner opening the phrase, as in `a 9 inch dish`. A count opens it as a determiner
+ * does, so `2 x 4 ounce cans` keeps the singular.
  */
 const DETERMINER_BEFORE = /(?:\b(?:a|an|the|this|that|each|every|per|another)\s+|\d\s*[x×]\s*)$/i;
 
+/**
+ * Words that cannot open a noun straight after a measurement: prepositions, sizes and
+ * comparisons, adverbs of place, slope and time, pronouns, determiners, conjunctions and
+ * auxiliary verbs. A unit before one is a quantity, as in `a quarter mile later` and
+ * `6 foot when he left`. A hyphen after one makes a modifier of it, as in `deep-dish`.
+ */
+const NOT_A_NOUN = [
+  'of', 'in', 'on', 'at', 'by', 'for', 'and', 'or', 'to', 'from', 'with', 'per', 'into',
+  'through', 'across', 'past', 'along', 'beyond', 'behind', 'about', 'against', 'among',
+  'between', 'during', 'near', 'onto', 'toward', 'towards', 'under', 'underneath', 'beneath',
+  'upon', 'via', 'within', 'without',
+  'thick', 'wide', 'long', 'tall', 'deep', 'high', 'short', 'further', 'farther', 'more',
+  'less', 'longer', 'shorter', 'wider', 'taller', 'deeper', 'higher', 'closer', 'too',
+  'enough', 'apiece', 'each', 'only',
+  'away', 'apart', 'down', 'up', 'north', 'south', 'east', 'west', 'ahead', 'back', 'out',
+  'off', 'around', 'over', 'overhead', 'above', 'below', 'inside', 'outside', 'inland',
+  'offshore',
+  'uphill', 'downhill', 'upstream', 'downstream',
+  'later', 'earlier', 'ago', 'before', 'after',
+  'i', 'me', 'he', 'him', 'she', 'it', 'we', 'us', 'they', 'them', 'you',
+  'a', 'an', 'the', 'this', 'that', 'these', 'those', 'his', 'her', 'its', 'their', 'my',
+  'our', 'your', 'some', 'any', 'no', 'all', 'both', 'every',
+  'but', 'so', 'if', 'when', 'while', 'as', 'than', 'because', 'since', 'until', 'unless',
+  'though', 'although', 'whereas', 'whether', 'where', 'then', 'yet', 'nor',
+  'is', 'are', 'was', 'were', 'be', 'been', 'am', 'has', 'have', 'had', 'does', 'did',
+  'will', 'would', 'should', 'could',
+];
+
+/** Every unit the rules read, as written straight after a number in `onelbs`. */
+const UNIT_FORMS = alternate(MEASURES.flatMap((measure) => [...measure.words, ...measure.abbrevs]));
+
+/**
+ * A word straight after a measurement that may be a noun it describes. A number in words,
+ * alone or run into its unit, or a date is not one. Another rule may rewrite either to start
+ * with a digit, so reading it as a noun would leave the measurement to a second run.
+ */
 const MODIFIES_A_NOUN = new RegExp(
-  String.raw`^[\s-]+(?!(?:of|in|on|at|by|for|and|or|to|from|with|per|thick|wide|long|tall|deep|high|` +
-    String.raw`across|away|apart|each|only|down|up|north|south|east|west|ahead|behind|past|along|` +
-    String.raw`beyond|into|through|short|further|farther|more|less|longer|shorter|wider|taller|` +
-    String.raw`deeper|higher|closer)\b)[a-z]`,
+  String.raw`^[\s-]+(?!(?:${NOT_A_NOUN.join('|')}|(?:${NUMBER_PATTERN})(?:${UNIT_FORMS})?)(?![\w-])|` +
+    String.raw`(?:${MONTH_PATTERN})\.?\s+\d)[a-z]`,
+  'i',
+);
+
+/**
+ * Whether the singular unit word ending at `end` describes the noun after it, so its metric
+ * unit stays singular too: `a 9 inch dish`, `9 inch pans`, `one-inch slices`. The unit
+ * follows a number worth `value` that starts at `numberStart`, across `gap`. A determiner
+ * opening the phrase says so, as does a hyphen tying the number to the unit, or the singular
+ * after a number above one, which would otherwise take the plural. One and a fraction take
+ * the singular anyway, so `one quart small onions` and `1/2 pound ground beef` are
+ * quantities with the `of` left out, read as `one quart of small onions` would be.
+ */
+function describesNoun(
+  text: string,
+  numberStart: number,
+  value: number,
+  gap: string,
+  end: number,
+): boolean {
+  if (!MODIFIES_A_NOUN.test(text.slice(end))) return false;
+  return (
+    Math.abs(value) > 1 ||
+    gap.includes('-') ||
+    DETERMINER_BEFORE.test(text.slice(Math.max(0, numberStart - 24), numberStart))
+  );
+}
+
+/** The count of `two quarter`: a cardinal, then a space and a singular fraction word. */
+const COUNT_APART = new RegExp(
+  String.raw`^(?!an?\s)[a-z]+${INLINE_SPACE}+(?=(?:half|quarter|third|fourth|eighth|sixteenth)$)`,
   'i',
 );
 
@@ -894,6 +956,14 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     const entry = resolve(alias);
     const value = parseNumber(raw);
     if (!entry || value === null) return;
+    // The hyphen ties the fraction to the unit, so the count before them counts the noun,
+    // as in `two quarter-pound burgers`.
+    const count = entry.isSingular && matched[raw.length] === '-' ? COUNT_APART.exec(raw) : null;
+    if (count && MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) {
+      const cut = count[0].length;
+      pushSingle(ctx, changes, start + cut, matched.slice(cut), raw.slice(cut), alias);
+      return;
+    }
     if (isOtherSense(ctx, entry, start, start + matched.length)) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
@@ -909,14 +979,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     const { precision, maxDecimals } = ctx.options.units;
     const number = formatNumber(target.value, precision, significantFigures(raw), maxDecimals);
     const numberStart = start + (/^an?\s+/i.exec(raw)?.[0].length ?? 0);
-    // A singular unit modifying a following noun is attributive: `a 9 inch dish`,
-    // `a 3/8 inch bolt`. What follows decides, not the value, because a fraction is
-    // just as attributive. `1/2 gallon of milk` and `1/16 inch thick` are not.
+    const gap = matched.slice(raw.length, matched.length - alias.length);
     const attributive =
       entry.isWord &&
       entry.isSingular &&
-      DETERMINER_BEFORE.test(ctx.text.slice(Math.max(0, numberStart - 24), numberStart)) &&
-      MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length));
+      describesNoun(ctx.text, numberStart, value, gap, start + matched.length);
     const unit = entry.isWord
       ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
       : ` ${target.symbol}`;
@@ -970,7 +1037,12 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const lowText = formatNumber(low * perSourceUnit, precision, figures, maxDecimals);
         const highText = formatNumber(target.value, precision, figures, maxDecimals);
         const separator = /to/i.test(join) ? ' to ' : /and/i.test(join) ? ' and ' : '-';
-        const unit = entry.isWord ? ` ${target.plural}` : ` ${target.symbol}`;
+        const gap = matched.slice(lowRaw.length + join.length + highRaw.length, -alias.length);
+        const attributive =
+          entry.isSingular && describesNoun(ctx.text, start, high, gap, start + matched.length);
+        const unit = entry.isWord
+          ? ` ${attributive ? target.singular : target.plural}`
+          : ` ${target.symbol}`;
         const body = `${lowText}${separator}${highText}${unit}`;
 
         pushMeasurement(ctx, changes, start, matched, body, entry.measure.id, 35);

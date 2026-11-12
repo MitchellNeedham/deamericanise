@@ -21,7 +21,8 @@ export function normaliseKey(s: string): string {
   return s.toLowerCase().replace(APOSTROPHES, "'").replace(WHITESPACE, ' ').trim();
 }
 
-function toPattern(from: string): string {
+/** The pattern an entry's `from` matches as: any run of space between words, any apostrophe. */
+export function toPattern(from: string): string {
   return from
     .split(WHITESPACE)
     .filter(Boolean)

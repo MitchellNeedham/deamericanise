@@ -33,6 +33,39 @@ export function endsSentence(text: string, start: number, end: number, opener: R
   return opener.test(text);
 }
 
+const SENTENCE_BOUND = new RegExp(String.raw`[.!?]|${BREAK}`, 'g');
+
+/**
+ * The sentence holding `start` to `end`, as the offsets where it begins and ends. It begins
+ * just past the last block break before `start`, or the last stop before it that
+ * `endsSentence` accepts with `opener`, and ends at the first of either from `end` on. Neither
+ * bound is looked for more than `reach` characters from the span.
+ */
+export function sentenceBounds(
+  text: string,
+  start: number,
+  end: number,
+  opener: RegExp,
+  reach = Infinity,
+): [from: number, to: number] {
+  const bounds = (match: RegExpMatchArray, at: number): boolean =>
+    match[0].startsWith('\n') || endsSentence(text, at, at + 1, opener);
+
+  const head = Math.max(0, start - reach);
+  let from = head;
+  for (const match of text.slice(head, start).matchAll(SENTENCE_BOUND)) {
+    const at = head + match.index;
+    if (bounds(match, at)) from = at + match[0].length;
+  }
+
+  const to = Math.min(text.length, end + reach);
+  for (const match of text.slice(end, to).matchAll(SENTENCE_BOUND)) {
+    const at = end + match.index;
+    if (bounds(match, at)) return [from, at];
+  }
+  return [from, to];
+}
+
 /** Whether the block holding `start` has a letter before it, so is more than a bare label. */
 function wordsBefore(text: string, start: number): boolean {
   for (let i = start - 1; i >= 0; i--) {

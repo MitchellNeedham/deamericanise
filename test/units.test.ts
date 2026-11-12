@@ -263,6 +263,66 @@ describe('a weight in two units is one weight', () => {
   });
 });
 
+describe('a number straight after a weight is its next unit, before another weight', () => {
+  const noRanges = { rules: { 'units.range': false } };
+
+  it.each`
+    input                                               | expected                                                | why
+    ${'11 stone 4 to 12 stone'}                         | ${'71.7 kilograms to 76 kilograms'}                     | ${'stone and pounds'}
+    ${'7 lb 8 to 9 lb'}                                 | ${'3.4 kg to 4.1 kg'}                                   | ${'pounds and ounces'}
+    ${'She went from 11 stone 4 to 12 stone in a year.'} | ${'She went from 71.7 kilograms to 76 kilograms in a year.'} | ${'in a sentence'}
+    ${'The baby weighed 7 pounds 8 to 9 pounds.'}       | ${'The baby weighed 3.4 kilograms to 4.1 kilograms.'}   | ${'pounds written out'}
+    ${'eleven stone four to twelve stone'}              | ${'71.7 kilograms to 76 kilograms'}                     | ${'in words'}
+    ${'between 7 lb 8 and 9 lb'}                        | ${'between 3.4 kg and 4.1 kg'}                          | ${'joined by "and"'}
+    ${'11 stone 4 - 12 stone'}                          | ${'71.7 kilograms - 76 kilograms'}                      | ${'joined by a spaced dash'}
+    ${'11 stone 13 to 12 stone'}                        | ${'75.7 kilograms to 76 kilograms'}                     | ${'thirteen pounds'}
+    ${'7 lb 8 to 9 lb 4 oz'}                            | ${'3.4 kg to 4.2 kg'}                                   | ${'before a weight in two units'}
+    ${'7 lb 8 to 9 lb 8 to 10 lb'}                      | ${'3.4 kg to 4.31 kg to 4.5 kg'}                        | ${'three weights in a row'}
+    ${'12 stone 11 stone 4 to 12 stone'}                | ${'76 kilograms 71.7 kilograms to 76 kilograms'}        | ${'after a weight in the same unit'}
+  `('reads $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                       | expected
+    ${'11 stone 4 to 12 stone'} | ${'71.7 kilograms to 76 kilograms'}
+    ${'7 lb 8 to 9 lb'}         | ${'3.4 kg to 4.1 kg'}
+  `('reads $input with the range rule off', ({ input, expected }) => {
+    expect(convert(input, noRanges)).toBe(expected);
+  });
+
+  it('keeps the original of each weight', () => {
+    expect(convert('11 stone 4 to 12 stone', { units: { keepOriginal: true } })).toBe(
+      '71.7 kilograms (11 stone 4) to 76 kilograms (12 stone)',
+    );
+  });
+
+  it.each`
+    unchanged                                         | options                     | why
+    ${'11 stone 14 to 12 stone'}                      | ${{}}                       | ${'fourteen is no number of pounds'}
+    ${'7 lb 16 to 9 lb'}                              | ${{}}                       | ${'sixteen is no number of ounces'}
+    ${'The price rose from 7 pounds 50 to 8 pounds.'} | ${{}}                       | ${'nor is fifty'}
+    ${'11 stone 4-12 stone'}                          | ${{}}                       | ${'a dash written tight, where no second weight can start'}
+    ${'5 to 11 stone 4 to 12 stone'}                  | ${{}}                       | ${'the first weight ends a range'}
+    ${'It cost 5 pounds 10 to 6 pounds'}              | ${{}}                       | ${'pounds of money'}
+    ${'11 stone 4 pounds 8 to 12 pounds'}             | ${{}}                       | ${'the tail of a weight in stone'}
+    ${'11 stone 4 to 12 stone'}                       | ${{ dialect: 'en-GB' }}     | ${'Britain keeps stone'}
+    ${'7 lb 8 to 9 lb'}                               | ${{ unitsKeep: ['ounce'] }} | ${'the smaller unit is kept'}
+  `('leaves "$unchanged" as written ($why)', ({ unchanged, options }) => {
+    expect(convert(unchanged, options)).toBe(unchanged);
+  });
+
+  it.each`
+    input                              | expected
+    ${'11 stone 4 pounds to 12 stone'} | ${'71.7 kilograms to 76 kilograms'}
+    ${'5 to 10 pounds'}                | ${'2.3 to 4.5 kilograms'}
+    ${'7 pounds 8 ounces'}             | ${'3.4 kilograms'}
+    ${'5 to 7 pounds 8 ounces'}        | ${'5 to 7 pounds 8 ounces'}
+  `('still converts $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
 describe('a weight in two units that describes a noun stays singular', () => {
   it.each`
     input                         | expected                    | why
@@ -951,6 +1011,46 @@ describe('fractions and ranges', () => {
   });
 });
 
+describe('a range whose first end has a hanging hyphen', () => {
+  const noRanges = { rules: { 'units.range': false } };
+
+  it.each`
+    input                              | expected                                     | why
+    ${'Cut into 2- to 3-inch pieces.'} | ${'Cut into 5.1 to 7.6 centimetre pieces.'}  | ${'joined by "to"'}
+    ${'a 10- to 12-pound turkey'}      | ${'a 4.5 to 5.4 kilogram turkey'}            | ${'a weight'}
+    ${'Use 8- or 9-inch pans.'}        | ${'Use 20 or 23 centimetre pans.'}           | ${'joined by "or"'}
+    ${'Cut 2- and 3-inch pieces'}      | ${'Cut 5.1 and 7.6 centimetre pieces'}       | ${'joined by "and"'}
+    ${'two- to three-inch pieces'}     | ${'5.1 to 7.6 centimetre pieces'}            | ${'ends in words'}
+    ${'2‑ to 3‑inch pieces'} | ${'5.1 to 7.6 centimetre pieces'}            | ${'a non-breaking hyphen'}
+    ${'a 20- to 30-mpg car'}           | ${'a 7.8 to 12 L/100km car'}                 | ${'fuel economy'}
+  `('converts both ends of $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged
+    ${'Cut into 2- to 3-inch pieces.'}
+    ${'a 10- to 12-pound turkey'}
+    ${'Use 8- or 9-inch pans.'}
+  `('leaves "$unchanged" as written with the range rule off', ({ unchanged }) => {
+    expect(convert(unchanged, noRanges)).toBe(unchanged);
+  });
+
+  it('opens no range on the second end', () => {
+    expect(convert('1- to 2-3 inch')).toBe('1- to 2-3 inch');
+  });
+
+  it.each`
+    input                              | expected
+    ${'Cut into 2 to 3-inch pieces.'}  | ${'Cut into 5.1 to 7.6 centimetre pieces.'}
+    ${'Cut into 2-3 inch pieces.'}     | ${'Cut into 5.1-7.6 centimetre pieces.'}
+    ${'a 10–12-pound turkey'}          | ${'a 4.5-5.4 kilogram turkey'}
+    ${'2-3/4 inch'}                    | ${'7 centimetres'}
+  `('still converts $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
 describe('a number that is not finite', () => {
   it.each`
     unchanged
@@ -1514,6 +1614,39 @@ describe('a pair is never half converted with its rule switched off', () => {
 
   it('still converts a dimension of fractions as one', () => {
     expect(convert('1/2 x 3/4 inch')).toMatch(/^1\.3 x 1\.9 centimetres?$/);
+  });
+
+  it.each`
+    unchanged                            | why
+    ${'five-10 miles'}                   | ${'a first end in words before a dash'}
+    ${'five to 10 miles'}                | ${'a first end in words before "to"'}
+    ${'two and a half to three miles'}   | ${'a fraction in words'}
+    ${'five to twenty-two miles'}        | ${'a second end of two words'}
+  `('leaves "$unchanged" alone without ranges ($why)', ({ unchanged }) => {
+    expect(convert(unchanged, noRanges)).toBe(unchanged);
+  });
+
+  it.each`
+    unchanged               | why
+    ${'ten by 12 feet'}     | ${'a first side in words before "by"'}
+    ${'ten x 12 feet'}      | ${'the same, before "x"'}
+    ${'ten by twelve feet'} | ${'both sides in words'}
+    ${'one by two feet'}    | ${'"one by", which the dimension rule holds'}
+  `('leaves "$unchanged" alone without dimensions ($why)', ({ unchanged }) => {
+    expect(convert(unchanged, noDimensions)).toBe(unchanged);
+  });
+
+  it.each`
+    input                             | expected                               | options
+    ${'raise each one by two inches'} | ${'raise each one by 5.1 centimetres'} | ${noRanges}
+    ${'raise each one by two inches'} | ${'raise each one by 5.1 centimetres'} | ${noDimensions}
+    ${'reduce by half to 2 quarts'}   | ${'reduce by half to 1.9 litres'}      | ${noRanges}
+    ${'reduce by half to 2 quarts'}   | ${'reduce by half to 1.9 litres'}      | ${noDimensions}
+    ${'two x 4 oz cans'}              | ${'two x 110 g cans'}                  | ${noDimensions}
+    ${'five to 10 miles'}             | ${'8 to 16 kilometres'}                | ${{}}
+    ${'ten by 12 feet'}               | ${'3 by 3.7 metres'}                   | ${{}}
+  `('still converts $input with $options', ({ input, expected, options }) => {
+    expect(convert(input, options)).toBe(expected);
   });
 });
 

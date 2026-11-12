@@ -11,24 +11,25 @@ const convert = (input: string) =>
 // range in `test/units.test.ts`. A local run still catches a slow path that count cannot see.
 const onCi = Boolean(process.env.CI);
 
+// Two lengths timed in one run, so the speed of the machine cancels out. Other test files run
+// in parallel. Alternating the lengths and keeping the fastest time of each stops a burst of
+// that load from slowing one length alone.
+const growth = (short: string, long: string) => {
+  const best = [Infinity, Infinity];
+  for (let round = 0; round < 5; round++) {
+    [short, long].forEach((text, i) => {
+      const started = performance.now();
+      convert(text);
+      best[i] = Math.min(best[i]!, performance.now() - started);
+    });
+  }
+  return best[1]! / best[0]!;
+};
+
 describe.skipIf(onCi)('a long run of fuel economy ranges takes time in line with its length', () => {
-  // Two lengths timed in one run, so the speed of the machine cancels out. Four times the
-  // ranges take about four times as long; testing every change against a hold for every range
-  // takes well over eight times as long.
+  // Four times the ranges take about four times as long; testing every change against a hold
+  // for every range takes well over eight times as long.
   const MAX_RATIO = 8;
-  // Other test files run in parallel. Alternating the lengths and keeping the fastest time of
-  // each stops a burst of that load from slowing one length alone.
-  const growth = (short: string, long: string) => {
-    const best = [Infinity, Infinity];
-    for (let round = 0; round < 5; round++) {
-      [short, long].forEach((text, i) => {
-        const started = performance.now();
-        convert(text);
-        best[i] = Math.min(best[i]!, performance.now() - started);
-      });
-    }
-    return best[1]! / best[0]!;
-  };
 
   it.each`
     range                    | length  | expected
@@ -39,6 +40,26 @@ describe.skipIf(onCi)('a long run of fuel economy ranges takes time in line with
     ({ range, length, expected }) => {
       expect(convert(range.repeat(length)).startsWith(expected)).toBe(true);
       expect(growth(range.repeat(length), range.repeat(length * 4))).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});
+
+describe.skipIf(onCi)('a long chain of weights takes time in line with its length', () => {
+  // Each weight's next unit is decided by walking back along the chain, once for the text.
+  // Walking back from every weight takes time in the square of the chain's length, which is
+  // sixteen times as long for four times the chain.
+  const MAX_RATIO = 10;
+
+  it.each`
+    link                  | length  | expected
+    ${'11 stone 4 to '}   | ${1000} | ${'71.7 kilograms to 71.7 kilograms to '}
+    ${'7 lb 8 to 9 lb, '} | ${1000} | ${'3.4 kg to 4.1 kg, 3.4 kg to 4.1 kg, '}
+  `(
+    '"$link", $length times and four times that',
+    ({ link, length, expected }) => {
+      expect(convert(link.repeat(length)).startsWith(expected)).toBe(true);
+      expect(growth(link.repeat(length), link.repeat(length * 4))).toBeLessThan(MAX_RATIO);
     },
     60_000,
   );

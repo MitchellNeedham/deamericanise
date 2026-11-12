@@ -11,6 +11,7 @@ import {
   type MetricValue,
 } from './definitions.js';
 import { BARE_CELSIUS_FIGURE, FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
+import { PREPOSITION_IN } from './money.js';
 import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
@@ -382,9 +383,39 @@ const COUNT_APART = new RegExp(
   'i',
 );
 
+const BARE_INCH = new RegExp(String.raw`${PREPOSITION_IN}$`, 'i');
+
 /** `6 in` is usually the preposition. `6in` never is. */
 function isBareInch(alias: string, whole: string): boolean {
-  return alias.toLowerCase() === 'in' && /\s$/.test(whole.slice(0, whole.length - alias.length));
+  return alias.toLowerCase() === 'in' && BARE_INCH.test(whole);
+}
+
+/** Verbs that take `in` as their particle, in every form: `let`, `brought`, `squeezing`. */
+const IN_PARTICLE_VERB =
+  String.raw`let(?:s|ting)?|put(?:s|ting)?|br(?:ing(?:s|ing)?|ought)|c(?:omes?|oming|ame)|` +
+  String.raw`fit(?:s|ted|ting)?|squeez(?:e|es|ed|ing)|pack(?:s|ed|ing)?|invit(?:e|es|ed|ing)|` +
+  String.raw`allow(?:s|ed|ing)?|sen(?:d|ds|t|ding)|call(?:s|ed|ing)?`;
+
+/** Such a verb governing the count after it, across at most a word such as `only` or `the`. */
+const IN_PARTICLE_VERB_BEFORE = new RegExp(
+  String.raw`\b(?:${IN_PARTICLE_VERB})\s+(?:(?:only|just|another|all|the|these|those|my|your|` +
+    String.raw`his|her|its|our|their|some|about|around|nearly|almost|roughly)\s+)?$`,
+  'i',
+);
+
+/**
+ * Whether the spaced `in.` ending the quantity `text.slice(start, end)` is the particle of
+ * a verb before it, as in `let only 3 in.` and `I put 2 in.`: the verb takes `in` and the
+ * stop ends the sentence. `It is 12 in. long` and `Put a 12 in. tile in the gap` read the
+ * inch.
+ */
+function isInParticle(text: string, start: number, end: number, alias: string): boolean {
+  return (
+    alias.toLowerCase() === 'in.' &&
+    /\s$/.test(text.slice(start, end - alias.length)) &&
+    IN_PARTICLE_VERB_BEFORE.test(text.slice(Math.max(0, start - CONTEXT_WINDOW), start)) &&
+    endsSentence(text, start, end, AFTER_UNIT)
+  );
 }
 
 /**
@@ -1516,7 +1547,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     }
     if (isAmbiguousHere(entry.measure, ctx.text)) return;
     if (isBareInch(alias, matched)) return;
-    if (isConventional(ctx, entry.measure, start, start + matched.length)) {
+    if (
+      isInParticle(ctx.text, start, start + matched.length, alias) ||
+      isConventional(ctx, entry.measure, start, start + matched.length)
+    ) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
@@ -1584,7 +1618,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(alias, matched)) continue;
         const conventional = isConventional(ctx, entry.measure, start, start + matched.length);
-        if (reading === 'hold' || conventional) {
+        const particle = isInParticle(ctx.text, start, start + matched.length, alias);
+        if (reading === 'hold' || conventional || particle) {
           changes.push(hold(start, matched, entry.measure.id, 35));
           continue;
         }

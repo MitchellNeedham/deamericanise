@@ -536,17 +536,24 @@ const BASE = times(1);
 // Unlike `\b`, this holds before the closing `_` of emphasis, as in `_175 degrees Celsius_`.
 const UNIT_END = String.raw`(?![A-Za-z\d])`;
 
+/** `word` in any case, as `celsius`, `Celsius` and `CELSIUS` all are. */
+const anyCase = (word: string) => word.replace(/[a-z]/g, (letter) => `[${letter}${letter.toUpperCase()}]`);
+const DEGREES_WORD = `${anyCase('degree')}[sS]?`;
+const CELSIUS_WORD = `${anyCase('celsius')}${UNIT_END}`;
+
 /**
  * Metric units by dimension, in every form the unit rules write them, in the American
  * spellings, and in the shorthand of a hand-written temperature such as `180C` or `180ºC`.
+ * The words of a temperature are read in any case, as the Fahrenheit value's are, but a lone
+ * `C` only in upper case, so `180c` is no Celsius value.
  * Each key names a capture group, which is how a match reports its dimension.
  */
 const METRIC_UNITS = {
   temperature: [
     [
-      String.raw`degrees?\s+(?:Celsius|C)${UNIT_END}|[°º˚]\s*C(?:elsius${UNIT_END})?|` +
-        String.raw`Celsius${UNIT_END}|℃|deg\.?\s*C${UNIT_END}|` +
-        String.raw`(?:degrees?\s+)?[Cc]entigrade${UNIT_END}`,
+      String.raw`${DEGREES_WORD}\s+(?:${CELSIUS_WORD}|C${UNIT_END})|[°º˚]\s*(?:${CELSIUS_WORD}|C)|` +
+        String.raw`${CELSIUS_WORD}|℃|${anyCase('deg')}\.?\s*C${UNIT_END}|` +
+        String.raw`(?:${DEGREES_WORD}\s+)?${anyCase('centigrade')}${UNIT_END}`,
       BASE,
     ],
     [String.raw`C${UNIT_END}`, BASE, BARE_CELSIUS_FIGURE],
@@ -588,11 +595,17 @@ type Dimension = keyof typeof METRIC_UNITS;
 // `METRIC_FORMS` reads a unit apart from its figure, so the figure a form needs is checked here.
 const afterFigure = ([forms, , figure]: MetricUnit) => (figure ? `(?<=${figure})(?:${forms})` : forms);
 
+/** A dimension's metric units as the source of one pattern, each form after the figure it needs. */
+export function metricUnitForms(dimension: Dimension): string {
+  const units: MetricUnit[] = METRIC_UNITS[dimension];
+  return units.map(afterFigure).join('|');
+}
+
 const METRIC_NUMBER = String.raw`[-−]?\d[\d,]*(?:\.\d+)?`;
 const METRIC_VALUE =
   String.raw`${METRIC_NUMBER}(?:\s*(?:-|–|—|to|and|x|×|by)\s*${METRIC_NUMBER})*\s*-?\s*` +
-  `(?:${Object.entries(METRIC_UNITS)
-    .map(([dimension, units]) => `(?<${dimension}>${units.map(afterFigure).join('|')})`)
+  `(?:${(Object.keys(METRIC_UNITS) as Dimension[])
+    .map((dimension) => `(?<${dimension}>${metricUnitForms(dimension)})`)
     .join('|')})`;
 
 /**
@@ -751,10 +764,10 @@ const MPG_FORMS = [
  */
 const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
   temperature: [
-    String.raw`[°º˚]\s*F(?:ahrenheit)?`,
-    '℉',
-    String.raw`degrees?\s+F(?:ahrenheit)?`,
-    String.raw`deg\.?\s*F`,
+    String.raw`[°º˚]\s*F(?:ahrenheit|\.)?`,
+    String.raw`℉\.?`,
+    String.raw`degrees?\s+F(?:ahrenheit|\.)?`,
+    String.raw`deg\.?\s*F\.?`,
     'Fahrenheit',
   ],
   economy: [...MPG_FORMS],
@@ -997,6 +1010,33 @@ function redundantMetric(
  */
 const AFTER_UNIT = /(?:)/y;
 
+/** Whether `matched`, a measurement at `start`, ends in a stop that also ends the sentence. */
+function keepsStop(text: string, start: number, matched: string): boolean {
+  return matched.endsWith('.') && endsSentence(text, start, start + matched.length, AFTER_UNIT);
+}
+
+/** `°F` or `℉` and a stop: a symbol, which has no stop of its own. */
+const SYMBOL_STOP = /(?:[°º˚]\s*F|℉)\.$/i;
+
+/** Space that stays in the paragraph, then a word in lower case, so the sentence plainly goes on. */
+const LOWER_CASE_NEXT = new RegExp(String.raw`(?=\s)${SOFT_SPACE}\p{Ll}`, 'uy');
+
+function continuesInLowerCase(text: string, at: number): boolean {
+  LOWER_CASE_NEXT.lastIndex = at;
+  return LOWER_CASE_NEXT.test(text);
+}
+
+/**
+ * Whether the stop that ends `matched`, a Fahrenheit value at `start`, stays in the text. A
+ * bare letter `F` abbreviates the scale, so its stop goes as an abbreviation's does, unless
+ * it also ends the sentence. A symbol's stop is usually the sentence's own, but authors also
+ * write `350°F. for 20 minutes`, so it goes only before a word in lower case.
+ */
+function fahrenheitKeepsStop(text: string, start: number, matched: string): boolean {
+  if (!SYMBOL_STOP.test(matched)) return keepsStop(text, start, matched);
+  return !continuesInLowerCase(text, start + matched.length);
+}
+
 /**
  * `pushMeasurement`, with the change it makes widened over a hyphen that joins a length to
  * the size it gives. The metric unit stands apart from its number, so `6-foot-tall` reads
@@ -1069,7 +1109,7 @@ function pushMeasurement(
     return;
   }
   let after = withOriginal(ctx, body, matched);
-  if (matched.endsWith('.') && endsSentence(ctx.text, start, start + matched.length, AFTER_UNIT)) after += '.';
+  if (keepsStop(ctx.text, start, matched)) after += '.';
   changes.push(change(start, matched, after, ruleId, priority));
 }
 
@@ -1942,7 +1982,9 @@ function fahrenheitReadings(
     let values = parsed as number[];
 
     const start = match.index;
-    let end = start + match[0].length;
+    // A stop that stays in the text stays outside the value and any kept original.
+    const valueEnd = start + match[0].length - (fahrenheitKeepsStop(ctx.text, start, match[0]) ? 1 : 0);
+    let end = valueEnd;
     const beside = wordsBeside(ctx.text, start, end);
     const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
     const zero = FROM_ZERO.exec(after);
@@ -1962,9 +2004,13 @@ function fahrenheitReadings(
       numbers = formatEnds(ctx, values.map((v) => ((v - 32) * 5) / 9), raw);
     }
 
-    const spelled = /degrees?/i.test(match[4] ?? '');
-    const single = numbers.length === 1 && Math.abs(Number(numbers[0])) === 1;
-    const suffix = spelled ? ` ${single ? 'degree' : 'degrees'} Celsius` : '°C';
+    const unit = match[4] ?? '';
+    const spelled = /degrees?/i.test(unit);
+    const gap = /\s*$/.exec(match[0].slice(0, match[0].length - unit.length))![0];
+    const singular =
+      (numbers.length === 1 && Math.abs(Number(numbers[0])) === 1) ||
+      (/^degree(?!s)/i.test(unit) && describesNoun(ctx.text, start, values.at(-1)!, gap, valueEnd));
+    const suffix = spelled ? ` ${singular ? 'degree' : 'degrees'} Celsius` : '°C';
     readings.push({
       start,
       matched: ctx.text.slice(start, end),
@@ -2045,7 +2091,9 @@ function temperatureDecadeRule(): Rule {
   const DECADE = String.raw`(low|mid|middle|high|upper|lower)?(?:\s|${HYPHEN})*(1[01]0|\d0)['\u2019]?s`;
   const pattern = new RegExp(
     String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
-      String.raw`(?:\s*(?:and|to|${HYPHEN}|\u2013)\s*${DECADE})?(?!\w)(\s*(?:${FAHRENHEIT}|Fahrenheit\b))?`,
+      String.raw`(?:\s*(?:and|to|${HYPHEN}|\u2013)\s*${DECADE})?(?!\w)` +
+      // A bare `degrees` after a decade can only be its unit, unless a Celsius unit begins there.
+      String.raw`(\s*(?:${FAHRENHEIT}|Fahrenheit\b|(?!${metricUnitForms('temperature')})degrees\b))?`,
     'gi',
   );
 
@@ -2102,7 +2150,7 @@ function temperatureDecadeRule(): Rule {
           start,
           end,
           before: match[0],
-          after: body,
+          after: fahrenheitKeepsStop(ctx.text, start, match[0]) ? `${body}.` : body,
           ruleId: 'units.temperature.decade',
           category: 'units',
           confidence: 'risky',

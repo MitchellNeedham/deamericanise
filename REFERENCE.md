@@ -421,6 +421,16 @@ converts as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule 
 
 Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F`, `degrees Fahrenheit` or
 `95 Fahrenheit`, with `º` or `˚` accepted for the degree sign, as phone keyboards type it.
+A bare letter `F`, as in `degrees F`, `deg F` or `350 F`, takes the stop after it as an
+abbreviation does, so `Bake at 350 degrees F. for 20 minutes` becomes
+`Bake at 175 degrees Celsius for 20 minutes`, while a stop that also ends the sentence
+stays, and so does one before a figure or a bracket. `°F` and `℉` are symbols, whose stop
+is usually the sentence's own, so it goes only where a word in lower case carries the
+sentence on: `Bake at 350°F. for 20 minutes` becomes `Bake at 175°C for 20 minutes`, while
+`- 350°F.`, `"Bake at 350°F." he said` and `It was 90°F. Then it rained.` keep their stop.
+The word `Fahrenheit` takes no stop. A spelled-out value keeps the author's singular
+where it describes the noun after it, so `a 350 degree F oven` becomes
+`a 175 degree Celsius oven`, while `Preheat to 350 degrees F` keeps the plural.
 The word alone does not count after a whole number of four figures, which reads as a year
 (`In 1724 Fahrenheit proposed his scale`), before `thermometers` or `scale`, where the
 number counts them, or before a number, where it is a title (`Fahrenheit 451`). A bare `F`,
@@ -441,7 +451,10 @@ A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `17
 `175 deg C`, `175 Celsius`), as `175 centigrade` or `175 degrees centigrade`, and as a bare
 upper case `C` after a number of two or three figures with at most one space.
 So `Bake at 350°F (180C)` becomes `Bake at 180C` and `180C/350°F/gas 4` stays as it is,
-while `Apartment 3C (65°F)` is a flat and its temperature converts.
+while `Apartment 3C (65°F)` is a flat and its temperature converts. The words are read in
+any case, as the Fahrenheit value's are, so `350 degrees fahrenheit (180 degrees celsius)`
+becomes `180 degrees celsius`, but a lone `C` only in upper case, after a degree sign or
+`degrees` too, so `Bake at 350°F (180c)` becomes `Bake at 175°C (180c)`.
 
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
@@ -650,7 +663,10 @@ the cooking: a word that names a thing (`bake sale`, `bake-off`, `baked goods`,
 `baked beans`, `baking tin`) is no cue, and a verb that takes an amount of its own
 (`came to`, `rose to`, `raised`, `cost`, `sold`) stops the search, so
 `The bake sale takings came to 320.` has no oven in it, while
-`Bake at 350 and sell them at the bake sale.` does. A setting has to be followed by its
+`Bake at 350 and sell them at the bake sale.` does. Another temperature, in any unit a
+setting takes or in any Celsius form the unit rules read, stops the search too, so the oven
+in `Heat the oven to 180℃ or to 400F` is set by its first value and counts for nothing. A
+setting has to be followed by its
 unit (any Fahrenheit unit the temperature rule reads, a bare `F`, or a degree with no
 scale, as in `350 deg F`, `a 350℉ oven` or `350 degrees`) or by the rest of the
 instruction: punctuation, a joining word such as `for`, `until`, `till` or `before`, a

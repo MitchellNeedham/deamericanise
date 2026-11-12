@@ -285,6 +285,30 @@ const KNOWN_FAILURES: KnownFailure[] = [
     // The first run lengthened the text between the word and the context that refused it.
     matches: (v) => v.origin === undefined && v.change?.category === 'vocabulary' && beyondGuardWindow(v),
   },
+  {
+    issue: 282,
+    property: 'idempotence',
+    input: 'It hit 10F. December 1, 2024 was a few degrees colder.',
+    options: localise,
+    // The first run wrote a day-first date after a stop, which opens no sentence.
+    matches: (v) =>
+      v.origin === undefined &&
+      v.change?.ruleId === 'units.temperature.fahrenheit' &&
+      /F$/.test(v.change.before) &&
+      /[.!?]\s+\d{1,2} [A-Z][a-z]+ \d{4}/.test(v.text),
+  },
+  {
+    issue: 283,
+    property: 'idempotence',
+    input: 'It weighs a quarterstone.',
+    options: { units: { keepOriginal: true } },
+    // The second run converts the original the first run wrote in brackets.
+    matches: (v) =>
+      v.origin !== undefined &&
+      v.change !== undefined &&
+      v.origin.after.endsWith(`(${v.change.before})`) &&
+      /[a-z]stone$/i.test(v.change.before),
+  },
 ];
 
 const isKnown = (v: Violation): boolean => KNOWN_FAILURES.some((k) => k.property === v.property && k.matches(v));

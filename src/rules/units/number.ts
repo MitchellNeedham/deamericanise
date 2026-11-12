@@ -21,7 +21,11 @@ const LINE_BREAK = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
 /** A line that starts a new block: blank, a list item, a heading, a quote or a table row. */
 const NEW_BLOCK = String.raw`${INLINE_SPACE}*(?:${LINE_BREAK}|$|[-*+](?=\s|$)|\d+[.)](?=\s|$)|[#>|])`;
 
-const SOFT_BREAK = String.raw`${INLINE_SPACE}*${LINE_BREAK}(?!${NEW_BLOCK})${INLINE_SPACE}*`;
+// The `(?<=...)` always holds. Read backwards in a lookbehind it is tested before the
+// lookahead, and turns down a run of spaces with no line break at once, where the lookahead
+// would walk the rest of the run from every space in it.
+const SOFT_BREAK =
+  String.raw`${INLINE_SPACE}*${LINE_BREAK}(?!${NEW_BLOCK})(?<=[\n\r\v\f\u2028\u2029])${INLINE_SPACE}*`;
 
 /**
  * Whitespace inside one quantity but outside its number: on one line, or across a single
@@ -29,9 +33,17 @@ const SOFT_BREAK = String.raw`${INLINE_SPACE}*${LINE_BREAK}(?!${NEW_BLOCK})${INL
  */
 export const SOFT_SPACE = String.raw`(?:${SOFT_BREAK}|${INLINE_SPACE}*)`;
 
-/** `SOFT_SPACE` on either side of `token`, with at most one line break between them. */
+/**
+ * `SOFT_SPACE` on either side of `token`, with at most one line break between them. `token`
+ * may match nothing, but never ends in a space.
+ */
 export function softGap(token: string): string {
-  return String.raw`(?:${SOFT_SPACE}${token}${INLINE_SPACE}*|${INLINE_SPACE}*${token}${SOFT_BREAK})`;
+  // Space after the token only follows something other than space. After an empty token two
+  // runs of space would meet, and a match failing after them would try every split of the run.
+  return (
+    String.raw`(?:${SOFT_SPACE}${token}(?:(?<!${INLINE_SPACE})${INLINE_SPACE}+)?|` +
+    String.raw`${INLINE_SPACE}*${token}(?<!${INLINE_SPACE})${SOFT_BREAK})`
+  );
 }
 
 /** Recipes and older prose write their numbers out: `one cup`, `three-quarters cup`. */

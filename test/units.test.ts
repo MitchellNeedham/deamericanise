@@ -167,7 +167,7 @@ describe('feet and inches together', () => {
   });
 
   it('reads no inches before "or" and a number', () => {
-    expect(convert('6 feet 2 or 3 inches')).not.toContain('1.88');
+    expect(convert('6 feet 2 or 3 inches')).toBe('1.8 metres 5.1 or 7.6 centimetres');
   });
 });
 

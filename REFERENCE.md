@@ -853,6 +853,22 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   any `=value` after it, so `--center`, `--color=gray` and `--label="dark gray"` are held in
   prose as well as in comments. Two hyphens straight after a word are a dash, so
   `the color--that is` is still rewritten.
+  An @mention or a #hashtag is held where a token starts, so `Thanks @gray` and `#color`
+  keep their spelling. A lone `@` or `#`, a Markdown heading and a hashtag with no letter,
+  such as `#3`, are left to the rules. A Liquid, Jinja or Nunjucks tag on one line, such as
+  `{% if favorite %}`, `{{ color }}` or `{# gray #}`, is held, and the text between two tags
+  is prose. An emoji shortcode such as `:colorful:` is held when no letter, digit or colon
+  touches it, so `1:2:3` and `std::color::gray` are not shortcodes.
+  A CSS declaration in a sentence is held from its property name to the end of its value,
+  which stops at a function word such as `and`, `to` or `the`, so
+  `Set text-align: center to center it` keeps the first `center` and rewrites the second.
+  A hyphenated name from a CSS property family, such as `text-align` or `background-color`,
+  a vendor prefix or a custom property marks a declaration by itself. A bare name such as
+  `color` or `border`, or any other hyphenated word, needs more: another declaration beside
+  it, a value only CSS writes (a hex colour, a call, a length such as `2px`, or
+  `!important`), a closing brace, or a semicolon that ends the line. So `Eye color: blue`
+  and `a follow-up: color it` are still rewritten. A held declaration is held from every
+  rule, so `max-width: 2in` keeps its inches.
   Inline code is paired the way CommonMark pairs it: a span closes on a run of as many
   backticks as opened it, so ``` ``a ` b`` ``` is one span, and it may wrap onto the next
   line of its paragraph. A backtick with no partner before the paragraph ends, or one
@@ -1337,6 +1353,9 @@ options it had and goes on following the page under them.
   words joined by slashes (`color/flavor/size`) and a run-on sentence with a lower-case
   word after the stop (`the color.it was`) are held. A file name straight after a number,
   as in `Copy 2 color.ts`, reads as a measurement and is rewritten.
+- A CSS declaration in a sentence is read from its shape. One with a bare property name and
+  nothing else only CSS writes, as in `Set color: gray on it`, reads as a key and its value
+  in prose, as `Eye color: gray` does, and is rewritten.
 - Outside the remark plugin, the paragraph an inline code span may wrap within is found
   from its lines: a blank line, or a line that opens a heading, quote, list item, fence,
   rule or table row, ends it. A span that wraps onto the next `>` line of a block quote is

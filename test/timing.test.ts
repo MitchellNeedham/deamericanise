@@ -118,6 +118,12 @@ const WHITESPACE_RUNS = [
   { before: 'Weigh five to', name: 'spaces', run: ' ', length: 3000, after: 'seven pounds 8 ounces', expected: 'Weigh five to' },
   { before: 'It weighs 7 pounds', name: 'spaces', run: ' ', length: 3000, after: 'The color.', expected: 'It weighs 3.2 kilograms' },
   { before: 'It is 5', name: 'spaces', run: ' ', length: 30000, after: 'The color.', expected: 'It is 5' },
+  { before: 'It is 5', name: 'spaces', run: ' ', length: 100000, after: 'The color.', expected: 'It is 5' },
+  { before: 'It is five', name: 'spaces', run: ' ', length: 100000, after: 'The color.', expected: 'It is five' },
+  { before: 'x', name: 'spaces', run: ' ', length: 100000, after: 'y', expected: 'x' },
+  { before: 'text-align:', name: 'spaces', run: ' ', length: 100000, after: 'center', expected: 'text-align:' },
+  { before: '{%', name: 'spaces', run: ' ', length: 100000, after: 'if color %}', expected: '{%' },
+  { before: 'Thanks @', name: 'spaces', run: ' ', length: 100000, after: 'gray', expected: 'Thanks @' },
 ];
 const whitespaceText = ({ before, run, length, after }: (typeof WHITESPACE_RUNS)[number]) =>
   `${before}${run.repeat(length)}${after}`;

@@ -195,9 +195,17 @@ function collectCode(text: string, syntax: Syntax | undefined, into: Range[]): v
   if (syntax === 'markdown') collectVerbatimBlocks(text, into);
 }
 
+/**
+ * A long command-line flag, with any `=value` after it: `--center`, `--color=gray`,
+ * `--label="dark gray"`. Two hyphens straight after a word are a dash, as in `color--that`, so
+ * a flag starts only where a token starts, and never in the `<!--` that opens an HTML comment.
+ */
+const LONG_FLAG = /(?<![\w!-])--[A-Za-z][\w-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|\S*))?/g;
+
 const STRUCTURAL: RegExp[] = [
   /\bhttps?:\/\/\S+/g,
   /\bwww\.\S+/g,
+  LONG_FLAG,
   // Starting only where the token starts, so a long dotted token is walked once, not once per word.
   /(?<![\w.+-])[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
   /<[a-zA-Z/][^>\n]*>/g,

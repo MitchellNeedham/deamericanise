@@ -80,3 +80,41 @@ describe.skipIf(onCi)('a long chain of weights takes time in line with its lengt
     60_000,
   );
 });
+
+/** A text broken by a long run of white space, and what the text before the run reads as. */
+const WHITESPACE_RUNS = [
+  { before: 'A 7 pound 8 ounce baby.', name: 'spaces', run: ' ', length: 3000, after: 'The color.', expected: 'A 3.4 kilogram baby.' },
+  { before: 'A 7 pound 8 ounce baby.', name: 'tabs', run: '\t', length: 3000, after: 'The color.', expected: 'A 3.4 kilogram baby.' },
+  { before: 'A 7 pound 8 ounce baby.', name: 'newlines', run: '\n', length: 12000, after: 'The color.', expected: 'A 3.4 kilogram baby.' },
+  { before: 'A 7 pound 8 ounce baby.', name: 'spaces', run: ' ', length: 3000, after: '5 feet', expected: 'A 3.4 kilogram baby.' },
+  { before: 'A 7 pound 8 ounce baby.', name: 'spaces', run: ' ', length: 3000, after: 'half a mile', expected: 'A 3.4 kilogram baby.' },
+  { before: 'A 7 pound 8 ounce baby.', name: 'spaces', run: ' ', length: 3000, after: 'seven pounds 8 ounces', expected: 'A 3.4 kilogram baby.' },
+  { before: 'He is six foot two', name: 'spaces', run: ' ', length: 3000, after: 'tall.', expected: 'He is 1.88 metres' },
+  { before: 'He is six foot two', name: 'spaces', run: ' ', length: 3000, after: 'boxes.', expected: 'He is 1.8 metres two' },
+  { before: 'He is six foot two', name: 'spaces', run: ' ', length: 3000, after: 'with boxes.', expected: 'He is 1.88 metres' },
+  { before: 'Weigh five to', name: 'spaces', run: ' ', length: 3000, after: 'seven pounds 8 ounces', expected: 'Weigh five to' },
+  { before: 'It weighs 7 pounds', name: 'spaces', run: ' ', length: 3000, after: 'The color.', expected: 'It weighs 3.2 kilograms' },
+  { before: 'It is 5', name: 'spaces', run: ' ', length: 30000, after: 'The color.', expected: 'It is 5' },
+];
+const whitespaceText = ({ before, run, length, after }: (typeof WHITESPACE_RUNS)[number]) =>
+  `${before}${run.repeat(length)}${after}`;
+
+describe('a long run of whitespace leaves the text before it read as before', () => {
+  it.each(WHITESPACE_RUNS)('"$before", $length $name, then "$after"', (row) => {
+    expect(convert(whitespaceText(row)).startsWith(row.expected)).toBe(true);
+  });
+});
+
+// No count sees a pattern's backtracking, so on CI only the output above is checked.
+describe.skipIf(onCi)('a long run of whitespace takes time in line with its length', () => {
+  // Generous, since each of these takes a few milliseconds. A pattern that walks the run from
+  // every place in it, or tries every split of it, takes several seconds.
+  const LIMIT_MS = 1000;
+
+  it.each(WHITESPACE_RUNS)('"$before", $length $name, then "$after"', (row) => {
+    convert(whitespaceText({ ...row, length: 1 }));
+    const started = performance.now();
+    convert(whitespaceText(row));
+    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+  });
+});

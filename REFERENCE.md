@@ -334,6 +334,12 @@ A whole number hyphenated to a fraction below one is a mixed number, as trade wr
 it: `a 2-3/4 inch board` becomes `a 7 centimetre board`, the same as `a 2 3/4 inch board`.
 `1-3 inches` and `1/2-3/4 inch` are still ranges.
 
+Wherever a hyphen may stand in or beside a measurement, the Unicode hyphen (U+2010) and the
+non-breaking hyphen (U+2011) that typesetting puts in `5-10` or `6-foot` read the same as
+`-`. So a range written with either still becomes `1.5-3 metres`, and `the 40-yard-line`
+written with either is still a conventional size. Neither is a minus sign, so a number
+straight after one is left as written.
+
 A fraction with a zero denominator, as in `5/0 inches`, is not a quantity, so it is left as
 written, and so is a height or weight it is part of, as in `5 feet 1/0 inches`.
 
@@ -344,19 +350,24 @@ does a range or dimension broken at its `to`, `-` or `x`. Nothing joins across a
 or into a line that opens a list item, heading, quote or table row, so `Serves 4` followed
 by `- 2 pounds beef` is a serving count and a bullet, not a range.
 
-A measurement never starts straight after `-`, `/`, `,` or `:` following a digit, where the
-number is the tail of a date, a fraction, a grouped number or a clock time. So
-`3/14/2024 1/2 gallon` converts the `1/2 gallon` alone, and `a 7:30 mile pace` is left as
-written, while `Distance:5 miles` still converts. Nor does one start on a price, so
+A measurement never starts straight after `-`, `/`, `,` or `:` following a digit or a vulgar
+fraction, where the number is the tail of a date, a fraction, a grouped number or a clock
+time. So `3/14/2024 1/2 gallon` converts the `1/2 gallon` alone, and `a 7:30 mile pace` is
+left as written, while `Distance:5 miles` still converts. Nor does one start on a price, so
 `a $5 gallon of milk` and `a $5 x 10 foot tarp` are left as written. Four figures straight
-after a written-out month and day are the year of a date, so `Oct 22, 2024 1/2 inch` and
-`22 October 2024 1/2 inch` convert the `1/2 inch` alone. A bare month says too little, so
+after a written-out month, with or without a day, are the year of a date, so
+`Oct 22, 2024 1/2 inch`, `October 22 2024 1/2 inch`, `22 October 2024 1/2 inch` and
+`In May 2024 1/2 inch` convert the `1/2 inch` alone, and `In May 2000 feet` is left as
+written. A comma after a bare month frees the number, so `In May, 2000 feet` converts, and a
+shorter number is no year, so
 `In May 5-10 feet` is still a range. A range's first number is never more than ten times the
 size of the second, which makes it a year or a count. Where the first number cannot open the
 range, the second converts on its own: `In 2024 - 5 feet` becomes
 `In 2024 - 1.5 metres`, and `Price $5 - 10 inches` keeps its price. `from` or `between`
 before the first number makes a range of any two, so `fell from 10 to 0.5 miles` converts
-whole.
+whole. With `units.range` or `units.dimensions` switched off, a range or dimension is left as
+written, never half converted, so `½-¾ inch`, `½ to ¾ inch` and `1½ x 2 inch` stay as they
+are.
 
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
 `Bake at 175-190°C`. A temperature range wraps and stops at a new block as the others do,

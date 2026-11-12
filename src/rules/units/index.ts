@@ -13,10 +13,13 @@ import { BARE_CELSIUS_FIGURE, FAHRENHEIT, fahrenheitTemperatures } from './fahre
 import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
+  HYPHEN,
   INLINE_SPACE,
   NOT_IN_COMPOUND,
   NUMBER_PATTERN,
   NUMBER_START,
+  NUMERIC_FIRST,
+  NUMERIC_LAST,
   NUMERIC_PATTERN,
   SECOND_END_WORDS,
   SOFT_SPACE,
@@ -26,25 +29,28 @@ import {
   formatTemperature,
   isOvenSetting,
   parseNumber,
+  plainHyphens,
   significantFigures,
   softGap,
 } from './number.js';
 
 const CONTEXT_WINDOW = 48;
 /** Between a number and its unit: a space, a hyphen (`6-foot`), or nothing (`6ft`). */
-const GAP = softGap('-?');
-const RANGE_JOIN = softGap(String.raw`(?:[-\u2013\u2014]|to|and)`);
+const GAP = softGap(`${HYPHEN}?`);
+const RANGE_JOIN = softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and)`);
 const DIMENSION_JOIN = softGap('(?:x|×|by)');
+const TIGHT_HYPHEN = new RegExp(`^${HYPHEN}$`);
 
 /**
  * The second number of a range or dimension is not a measurement of its own, even where the
  * pair does not match as a whole: `14 1/2 gallon` in `2024-03-14 1/2 gallon`.
  */
-const NOT_SECOND_OF_PAIR = String.raw`(?<!\d${softGap(String.raw`(?:[-\u2013\u2014]|to|and|x|×|by)`)})`;
+const NOT_SECOND_OF_PAIR =
+  String.raw`(?<!${NUMERIC_LAST}${softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and|x|×|by)`)})`;
 
 /** A range's first number and its join, ending where the range's second number starts. */
 const RANGE_BEFORE = new RegExp(
-  String.raw`(?<=${NUMBER_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=[\d\-−])`,
+  String.raw`(?<=${NUMBER_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=${NUMERIC_FIRST})`,
   'diy',
 );
 
@@ -159,16 +165,33 @@ function isAmbiguousHere(measure: Measure, text: string): boolean {
   return measure.ambiguousWhen !== undefined && measure.ambiguousWhen.test(text);
 }
 
+let lastText = '';
+let lastPlain = '';
+
+/**
+ * `text` as the checks on the words around a measurement read it, since their patterns name
+ * only the hyphen-minus. The rules ask about one text many times in a row, so the last one is
+ * kept.
+ */
+function contextText(text: string): string {
+  if (text !== lastText) {
+    lastText = text;
+    lastPlain = plainHyphens(text);
+  }
+  return lastPlain;
+}
+
 function isConventional(ctx: RuleContext, measure: Measure, start: number, end: number): boolean {
   const rules = measure.conventional;
   if (!rules || !ctx.options.units.respectConventions) return false;
-  const before = ctx.text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
-  const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
+  const text = contextText(ctx.text);
+  const before = text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
+  const after = text.slice(end, end + CONTEXT_WINDOW);
   return Boolean((rules.before?.test(before)) || (rules.after?.test(after)));
 }
 
 function isOtherSense(ctx: RuleContext, alias: Alias, start: number, end: number): boolean {
-  return alias.isWord && alias.measure.otherSense?.(ctx.text, start, end) === true;
+  return alias.isWord && alias.measure.otherSense?.(contextText(ctx.text), start, end) === true;
 }
 
 const OTHER_SENSES = new Map(
@@ -199,7 +222,7 @@ export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: num
   if (!otherSense) return false;
   const from = Math.max(0, unitStart - NUMBER_REACH);
   const number = NUMBER_BEFORE_UNIT.exec(text.slice(from, unitStart));
-  return number !== null && otherSense(text, from + number.index, unitEnd);
+  return number !== null && otherSense(contextText(text), from + number.index, unitEnd);
 }
 
 /**
@@ -246,8 +269,8 @@ const UNIT_FORMS = alternate(MEASURES.flatMap((measure) => [...measure.words, ..
  * to a second run.
  */
 const MODIFIES_A_NOUN = new RegExp(
-  String.raw`^[\s-]+(?!(?:${NOT_A_NOUN.join('|')}|(?:${NUMBER_PATTERN})(?:${GAP}(?:${UNIT_FORMS}))?)` +
-    String.raw`(?![\w-])|(?:${MONTH_PATTERN})\.?\s+\d)[a-z]`,
+  String.raw`^(?:\s|${HYPHEN})+(?!(?:${NOT_A_NOUN.join('|')}|(?:${NUMBER_PATTERN})(?:${GAP}(?:${UNIT_FORMS}))?)` +
+    String.raw`(?!\w|${HYPHEN})|(?:${MONTH_PATTERN})\.?\s+\d)[a-z]`,
   'i',
 );
 
@@ -270,7 +293,7 @@ function describesNoun(
   if (!MODIFIES_A_NOUN.test(text.slice(end))) return false;
   return (
     Math.abs(value) > 1 ||
-    gap.includes('-') ||
+    plainHyphens(gap).includes('-') ||
     DETERMINER_BEFORE.test(text.slice(Math.max(0, numberStart - 24), numberStart))
   );
 }
@@ -560,7 +583,7 @@ const FRACTION_OF =
  * The count before the unit in `a mile and a half` and `two inches and a quarter`. A count
  * straight after `/` or `-` is the tail of `1 1/2` or `twenty-two`, not a number.
  */
-const COUNT_BEFORE_FRACTION = String.raw`an?(?=\s)|(?<![-−/])${WHOLE_NUMBER}`;
+const COUNT_BEFORE_FRACTION = String.raw`an?(?=\s)|(?<!${HYPHEN}|[−/])${WHOLE_NUMBER}`;
 
 /** The fraction after the unit in `a mile and a half`, in its group. */
 const AND_FRACTION = String.raw`and${INLINE_SPACE}+(${COUNTED_FRACTION})`;
@@ -622,17 +645,18 @@ function measurementDimension(text: string): Dimension | undefined {
  * including a piece of the measurement such as the `2 inches` in `(6 feet 2 inches)`.
  */
 function restatesMetric(ctx: RuleContext, start: number, end: number): boolean {
-  const head = ctx.text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
-  const tail = ctx.text.slice(end, end + CONTEXT_WINDOW);
+  const text = contextText(ctx.text);
+  const head = text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
+  const tail = text.slice(end, end + CONTEXT_WINDOW);
   const open = head.lastIndexOf('(');
   const close = tail.indexOf(')');
   if (open < 0 || close < 0) return false;
-  const inside = head.slice(open + 1) + ctx.text.slice(start, end) + tail.slice(0, close);
+  const inside = head.slice(open + 1) + text.slice(start, end) + tail.slice(0, close);
   const dimension = measurementDimension(inside);
   if (dimension === undefined) return false;
   const bracket = start - head.length + open;
   // Through the `(`, so a line break before it can see that its next line opens no new block.
-  const before = ctx.text.slice(Math.max(0, bracket - CONTEXT_WINDOW), bracket + 1);
+  const before = text.slice(Math.max(0, bracket - CONTEXT_WINDOW), bracket + 1);
   return dimensionOf(METRIC_BEFORE.exec(before)) === dimension;
 }
 
@@ -700,7 +724,7 @@ function followsItsMetric(
   body: string,
   ruleId: string,
 ): boolean {
-  const paired = metricPairedBefore(ctx.text, start, end);
+  const paired = metricPairedBefore(contextText(ctx.text), start, end);
   return paired !== undefined && restatesBody(paired.metric, body, ruleId);
 }
 
@@ -717,7 +741,7 @@ function redundantMetric(
   body: string,
   ruleId: string,
 ): { end: number; after: string } | null {
-  const rest = ctx.text.slice(end);
+  const rest = contextText(ctx.text).slice(end);
   const match = BRACKET_AFTER.exec(rest) ?? METRIC_PAIRED_AFTER.exec(rest);
   if (!match || !restatesBody(match[1]!, body, ruleId)) return null;
   return { end: end + match[0].length, after: metricSpelling(match[1]!.trim()) };
@@ -992,12 +1016,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   if (!alternation) return [];
 
   const S = INLINE_SPACE;
-  // The pair guard can only apply before a digit, and is too costly to run at every word.
-  const START = String.raw`${NUMBER_START}(?:(?=[\d\-−])${NOT_SECOND_OF_PAIR}|(?![\d\-−]))`;
+  // The pair guard can only apply before a number in digits, and is too costly to run at every
+  // word.
+  const START = String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})${NOT_SECOND_OF_PAIR}|(?!${NUMERIC_FIRST}))`;
   // Only a dimension's second number is refused here. `endsRange` judges a range's, which
   // needs both numbers.
   const SINGLE_START =
-    String.raw`${NUMBER_START}(?:(?=[\d\-−])(?<!\d${DIMENSION_JOIN})|(?![\d\-−]))`;
+    String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})(?<!${NUMERIC_LAST}${DIMENSION_JOIN})|(?!${NUMERIC_FIRST}))`;
   const single = new RegExp(
     String.raw`${SINGLE_START}(${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
@@ -1140,7 +1165,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const reading = written ? writtenRange(ctx.text, start, lowRaw, join, highRaw) : 'read';
         if (reading === 'skip') continue;
         // `2-3/4` is one number, which the single measurement rule reads.
-        if (!written && join === '-' && parseNumber(`${lowRaw}-${highRaw}`) !== null) continue;
+        if (!written && TIGHT_HYPHEN.test(join) && parseNumber(`${lowRaw}-${highRaw}`) !== null) continue;
         if (!canBeRange(ctx.text, start, low, high)) continue;
         if (isOtherSense(ctx, entry, start, start + matched.length)) {
           changes.push(hold(start, matched, entry.measure.id, 35));
@@ -1524,10 +1549,10 @@ function temperatureRules(): Rule[] {
 function temperatureDecadeRule(): Rule {
   // A decade, optionally banded (`low`, `mid`, `upper`), optionally paired with a second
   // decade (`the 70s and 80s`). `70's` and `low-70s` are both written in the wild.
-  const DECADE = String.raw`(low|mid|middle|high|upper|lower)?[\s-]*(1[01]0|\d0)['\u2019]?s`;
+  const DECADE = String.raw`(low|mid|middle|high|upper|lower)?(?:\s|${HYPHEN})*(1[01]0|\d0)['\u2019]?s`;
   const pattern = new RegExp(
     String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
-      String.raw`(?:\s*(?:and|to|-|\u2013)\s*${DECADE})?(?!\w)(\s*(?:${FAHRENHEIT}|Fahrenheit\b))?`,
+      String.raw`(?:\s*(?:and|to|${HYPHEN}|\u2013)\s*${DECADE})?(?!\w)(\s*(?:${FAHRENHEIT}|Fahrenheit\b))?`,
     'gi',
   );
 

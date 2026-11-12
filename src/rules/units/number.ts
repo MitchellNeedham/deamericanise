@@ -10,12 +10,30 @@ const VULGAR: Record<string, number> = {
 const VULGAR_CLASS = `[${Object.keys(VULGAR).join('')}]`;
 const DIGITS = String.raw`\d{1,3}(?:,\d{3})+|\d+`;
 
+/** How a number in digits ends: a digit or a vulgar fraction, as in `15` and `15½`. */
+export const NUMERIC_LAST = String.raw`(?:\d|${VULGAR_CLASS})`;
+
+/** How a number in digits starts: a digit, a minus sign or a vulgar fraction. */
+export const NUMERIC_FIRST = String.raw`(?:[\d\-−]|${VULGAR_CLASS})`;
+
+/** U+2010 HYPHEN and U+2011 NON-BREAKING HYPHEN, which join words and are never minus signs. */
+const UNICODE_HYPHENS = String.raw`\u2010\u2011`;
+
+/** A hyphen as typesetting writes it: the hyphen-minus, U+2010 or U+2011. */
+export const HYPHEN = `[-${UNICODE_HYPHENS}]`;
+const UNICODE_HYPHEN = new RegExp(`[${UNICODE_HYPHENS}]`, 'g');
+
+/** `text` with U+2010 and U+2011 written as `-`, at the same offsets. */
+export function plainHyphens(text: string): string {
+  return text.replace(UNICODE_HYPHEN, '-');
+}
+
 /**
  * Whitespace that stays on one line. A number is never written across a line break, so
  * `Step 14` at the end of one line and `1/2 gallon` at the start of the next stay apart.
  */
 export const INLINE_SPACE = String.raw`[^\S\n\r\v\f\u2028\u2029]`;
-const SPACE_OR_HYPHEN = String.raw`(?:${INLINE_SPACE}+|-)`;
+const SPACE_OR_HYPHEN = String.raw`(?:${INLINE_SPACE}+|${HYPHEN})`;
 
 const LINE_BREAK = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
 
@@ -82,7 +100,7 @@ const ONES = Object.keys(CARDINALS).filter((word) => CARDINALS[word]! < 10);
  */
 const COMPOUND =
   String.raw`(?:${TENS.join('|')})` +
-  String.raw`(?:-(?:${ONES.join('|')})(?!\w)|${INLINE_SPACE}+(?:${ONES.join('|')})(?![\w-]))`;
+  String.raw`(?:${HYPHEN}(?:${ONES.join('|')})(?!\w)|${INLINE_SPACE}+(?:${ONES.join('|')})(?!\w|${HYPHEN}))`;
 
 /** A spelled-out fraction with its count: `a quarter`, `three-quarters`, `one half`. */
 export const COUNTED_FRACTION = String.raw`(?:an?${INLINE_SPACE}+|(?:${CARD})${SPACE_OR_HYPHEN})(?:${FRAC})`;
@@ -97,7 +115,7 @@ export const FRACTION_WORDS = String.raw`(?:${COUNTED_FRACTION}|(?:${FRAC}))`;
 // The tail of a longer number that a line break cut off, such as `half feet` after `two and
 // a`, is not a number of its own. A new block in between makes it one again.
 const NOT_AFTER_AND = String.raw`(?<!(?:\d|\b(?:${CARD}))${softGap('and')})`;
-const NOT_AFTER_COUNT = String.raw`(?<!\b(?:${CARD}|an?)-?${SOFT_SPACE})`;
+const NOT_AFTER_COUNT = String.raw`(?<!\b(?:${CARD}|an?)${HYPHEN}?${SOFT_SPACE})`;
 
 const SPACING = String.raw`(?:${SOFT_BREAK}|${INLINE_SPACE}+)`;
 
@@ -109,8 +127,8 @@ const SPACING = String.raw`(?:${SOFT_BREAK}|${INLINE_SPACE}+)`;
  * the line above counts as well.
  */
 export const NOT_IN_COMPOUND =
-  String.raw`(?<![A-Za-z]-)` +
-  String.raw`(?<!\b(?:(?:${TENS.join('|')})-?|(?:${SCALE}),?(?:${SPACING}(?:and|to))?)${SPACING})`;
+  String.raw`(?<![A-Za-z]${HYPHEN})` +
+  String.raw`(?<!\b(?:(?:${TENS.join('|')})${HYPHEN}?|(?:${SCALE}),?(?:${SPACING}(?:and|to))?)${SPACING})`;
 
 /**
  * `body`, unless `guard` finds it is the tail of a longer number. The lookahead keeps the
@@ -146,7 +164,7 @@ const MULTIPLIED =
 function wholeWords(guard: string): string {
   return (
     String.raw`(?=an?${INLINE_SPACE}+(?:${SCALE})\b|${CARD})${guard}` +
-    String.raw`(?:(?:${MULTIPLIED}${INLINE_SPACE}+(?:and${INLINE_SPACE}+|(?=${CARDINAL_WORDS}(?![\w-]))))?` +
+    String.raw`(?:(?:${MULTIPLIED}${INLINE_SPACE}+(?:and${INLINE_SPACE}+|(?=${CARDINAL_WORDS}(?!\w|${HYPHEN}))))?` +
     String.raw`${CARDINAL_WORDS}(?!${SPACE_OR_HYPHEN}(?:${SCALE})\b)|${MULTIPLIED})`
   );
 }
@@ -177,7 +195,7 @@ export const WHOLE_NUMBER = String.raw`(?:${DIGITS}|${WHOLE_WORDS})`;
  * is below one, which `parseNumber` decides.
  */
 export const NUMERIC_PATTERN = [
-  String.raw`[-−]?\d+-\d+/\d+`,
+  String.raw`[-−]?\d+${HYPHEN}\d+/\d+`,
   String.raw`[-−]?(?:${DIGITS})${INLINE_SPACE}+\d+/\d+`,
   String.raw`[-−]?(?:${DIGITS})${INLINE_SPACE}*${VULGAR_CLASS}`,
   String.raw`[-−]?\d+/\d+`,
@@ -245,7 +263,7 @@ export function parseNumber(raw: string): number | null {
 }
 
 function readNumber(raw: string): number | null {
-  const text = raw.trim().replace(/−/g, '-').replace(/,/g, '');
+  const text = plainHyphens(raw.trim()).replace(/−/g, '-').replace(/,/g, '');
   if (/[a-z]/i.test(text)) return parseWords(text);
   const sign = text.startsWith('-') ? -1 : 1;
   const body = text.replace(/^-/, '');
@@ -289,23 +307,27 @@ export function significantFigures(raw: string): number {
 }
 
 /**
- * The month and day of a date in words, as the date rules read and write it, up to where its
- * year starts: `Oct 22, ` and `22 October `.
+ * A date in words up to where its year starts: a month and day as the date rules read and
+ * write them, `Oct 22, ` and `22 October `, a month and day with no comma, `October 22 `, or
+ * a month alone, `May `.
  */
 const DATE_BEFORE_YEAR =
-  String.raw`\b(?:(?:${MONTH_PATTERN})\.?\s+\d{1,2}(?:st|nd|rd|th)?,\s*|` +
+  String.raw`\b(?:(?:${MONTH_PATTERN})\.?\s+(?:\d{1,2}(?:st|nd|rd|th)?(?:,\s*|\s+))?|` +
   String.raw`\d{1,2}(?:st|nd|rd|th)?\s+(?:${MONTH_PATTERN})\.?\s+)`;
 
 /**
- * Where a number of a measurement may start: not inside a word or a decimal. Straight after
- * `\d-`, `\d/`, `\d,` or `\d:` it is the tail of a date or of a range written tight, of a
- * fraction, of a grouped number such as `1,005`, or the minutes of a time such as `7:30`.
- * Straight after a currency sign it is a price, and four figures straight after `Oct 22,` or
- * `22 October` are the year of a date. The optional space after the sign matches the
- * currency rule, which reads `$ 5` as money.
+ * Where a number of a measurement may start: not inside a word, a decimal or a number such
+ * as `15½`, and not straight after U+2010 or U+2011, which only join words. Straight after a
+ * digit or vulgar fraction and then a hyphen, dash, `/`, `,` or `:` it is the tail of a date
+ * or of a range written tight, of a fraction, of a grouped number such as `1,005`, or the
+ * minutes of a time such as `7:30`. Straight after a currency sign it is a price, and four
+ * figures straight after `Oct 22,`, `22 October`, `October 22` or `May` are the year of a
+ * date. The optional space after the sign matches the currency rule, which reads `$ 5` as
+ * money.
  */
 export const NUMBER_START =
-  String.raw`(?<![\w.]|\d[-\u2013\u2014/,:]|[$£€]\s?)` +
+  String.raw`(?<![\w.${UNICODE_HYPHENS}]|${VULGAR_CLASS}|` +
+  String.raw`${NUMERIC_LAST}(?:${HYPHEN}|[\u2013\u2014/,:])|[$£€]\s?)` +
   String.raw`(?!(?=\d{4}(?!\d))(?<=${DATE_BEFORE_YEAR}))`;
 
 /** `from` or `between` before a first number, which opens a range whatever its ends. */

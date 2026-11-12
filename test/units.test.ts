@@ -763,8 +763,23 @@ describe('the year of a written-out date is not a measurement', () => {
     ${'Oct. 22nd, 2024 - 250 feet'}        | ${'22 October 2024 - 76 metres'}            | ${'an abbreviated month with a stop'}
     ${'13 march 2024 - 250 feet'}          | ${'13 march 2024 - 76 metres'}              | ${'a month in lower case'}
     ${'22 October 2024 - 350°F'}           | ${'22 October 2024 - 175°C'}                | ${'a temperature range'}
+    ${'In May 2024 1/2 inch of rain fell.'}  | ${'In May 2024 1.3 centimetres of rain fell.'} | ${'a fraction after a bare month and year'}
+    ${'By March 2024 1/2 gallon cost more.'} | ${'By March 2024 1.9 litres cost more.'}       | ${'the same, before a volume'}
+    ${'June 2024 - 250 feet of snow fell.'}  | ${'June 2024 - 76 metres of snow fell.'}       | ${'a range after a bare month and year'}
+    ${'Oct. 2024 - 250 feet'}                | ${'Oct. 2024 - 76 metres'}                     | ${'the same, with an abbreviated month'}
+    ${'October 22 2024 1/2 inch long'}       | ${'October 22 2024 1.3 centimetres long'}      | ${'a month and day with no comma'}
+    ${'October 22nd 2024 - 250 feet'}        | ${'22 October 2024 - 76 metres'}               | ${'the same, with an ordinal day it rewrites'}
   `('converts the quantity alone after $why', ({ input, expected }) => {
     expect(convert(input, localise)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                 | why
+    ${'In May 2000 feet of snow fell.'}       | ${'four figures straight after a bare month'}
+    ${'October 22 2000 feet of snow fell.'}   | ${'four figures straight after a month and day with no comma'}
+    ${'In May 2000 x 5 feet of snow fell.'}   | ${'the first side of a dimension'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged, localise)).toBe(unchanged);
   });
 
   it.each([
@@ -783,6 +798,9 @@ describe('the year of a written-out date is not a measurement', () => {
     ${'March 5, 2024'}                             | ${'5 March 2024'}                                 | ${'the date itself'}
     ${'On Oct 22, 5 feet of snow fell.'}           | ${'On Oct 22, 1.5 metres of snow fell.'}          | ${'a number too short to be a year'}
     ${'On 22 October 5 feet of snow fell.'}        | ${'On 22 October 1.5 metres of snow fell.'}       | ${'the same, after a date written day first'}
+    ${'In May 2024 - 5 feet of snow fell.'}        | ${'In May 2024 - 1.5 metres of snow fell.'}       | ${'a range refused after a bare month'}
+    ${'In May, 2000 feet of snow fell.'}           | ${'In May, 610 metres of snow fell.'}             | ${'four figures after a comma'}
+    ${'On March 13 25 feet of snow fell.'}         | ${'On March 13 7.6 metres of snow fell.'}         | ${'a number too short to be a year, after a day with no comma'}
   `('still converts $why', ({ input, expected }) => {
     expect(convert(input, localise)).toBe(expected);
   });
@@ -861,6 +879,75 @@ describe('a whole number hyphenated to a fraction is one mixed number', () => {
     ${'−2-3/4'} | ${-2.75}
     ${'1-3/2'}  | ${null}
     ${'2-3/0'}  | ${null}
+  `('reads "$raw" as $value', ({ raw, value }) => {
+    expect(parseNumber(raw)).toBe(value);
+  });
+});
+
+describe('a Unicode hyphen reads as a hyphen', () => {
+  it.each`
+    input                                    | expected                                | why
+    ${'5‑10 feet'}                      | ${'1.5-3 metres'}                       | ${'a range joined by U+2011'}
+    ${'5‐10 feet'}                      | ${'1.5-3 metres'}                       | ${'a range joined by U+2010'}
+    ${'5 ‑ 10 feet'}                    | ${'1.5-3 metres'}                       | ${'the same, spaced'}
+    ${'1‑3 inches'}                     | ${'2.5-7.6 centimetres'}                | ${'two whole numbers'}
+    ${'a 6‑foot fence'}                 | ${'a 1.8 metre fence'}                  | ${'between a number and its unit'}
+    ${'twenty‐two miles'}               | ${'35 kilometres'}                      | ${'inside a number of two words'}
+    ${'a forty‑five‑mile drive'}   | ${'a 72 kilometre drive'}               | ${'the same, hyphenated to its unit'}
+    ${'a 2‑3/4 inch board'}             | ${'a 7 centimetre board'}               | ${'inside a mixed number'}
+    ${'Highs in the 70s‑80s today.'}    | ${'Highs between 21 and 32°C today.'}   | ${'between two Fahrenheit decades'}
+    ${'5-10 feet'}                           | ${'1.5-3 metres'}                       | ${'a hyphen-minus'}
+    ${'a 6-foot fence'}                      | ${'a 1.8 metre fence'}                  | ${'the same, before a unit'}
+    ${'It was −5°F outside'}                 | ${'It was -20.6°C outside'}             | ${'a minus sign'}
+    ${'It was -5°F outside'}                 | ${'It was -20.6°C outside'}             | ${'a hyphen-minus before a number, which is a minus sign'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('joins a Fahrenheit range', () => {
+    expect(convert('Bake at 350‑375°F.')).toMatch(/^Bake at 175[-‑]190°C\.$/);
+  });
+
+  it.each`
+    input                               | expected
+    ${'one‑half cup of citron'}    | ${'120 millilitres of citron'}
+    ${'one-half cup of citron'}         | ${'120 millilitres of citron'}
+  `('$input -> $expected with cups switched on', ({ input, expected }) => {
+    expect(convert(input, { rules: { 'units.volume.cup': true } })).toBe(expected);
+  });
+
+  it.each`
+    unchanged                               | why
+    ${'It was ‑5°F outside.'}          | ${'a number straight after U+2011, which is not a minus sign'}
+    ${'catch‑twenty‑two miles'}   | ${'a hyphenated word the table cannot read'}
+    ${'twenty five‑pound bags'}        | ${'twenty bags or one weight'}
+    ${'a 5/16‑18 UNC bolt'}            | ${'a thread spec'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                    | why
+    ${'the 40‑yard‑line'}          | ${'a conventional size'}
+    ${'a 27‑inch‑screen'}          | ${'the same, for a screen'}
+    ${'a 20‑pound‑note'}           | ${'money'}
+    ${'a 9‑inch‑round pan'}        | ${'a singular unit describing the noun after it'}
+    ${'a 1.8 metre (6‑foot) fence'}     | ${'an original in brackets after its metric value'}
+    ${'1.5‑3 m (5‑10 feet)'}       | ${'the same, for a range'}
+  `('reads the words around "$input" as around a hyphen-minus ($why)', ({ input }) => {
+    const ascii = convert(input.replace(/‑/g, '-'));
+    expect(convert(input)).toBe(ascii.replace(/-/g, '‑'));
+  });
+
+  it('collapses a metric bracket that restates a range', () => {
+    expect(convert('5‑10 feet (1.5‑3 m)')).toMatch(/^1\.5[-‑]3 m$/);
+  });
+
+  it.each`
+    raw                  | value
+    ${'2‑3/4'}      | ${2.75}
+    ${'twenty‐two'} | ${22}
+    ${'one‑half'}   | ${0.5}
   `('reads "$raw" as $value', ({ raw, value }) => {
     expect(parseNumber(raw)).toBe(value);
   });
@@ -1072,6 +1159,55 @@ describe('a conventional size is never half converted', () => {
     expect(convert('15-17 inch wheels and 6 feet of pipe')).toBe(
       '15-17 inch wheels and 1.8 metres of pipe',
     );
+  });
+});
+
+describe('a pair is never half converted with its rule switched off', () => {
+  const noRanges = { rules: { 'units.range': false } };
+  const noDimensions = { rules: { 'units.dimensions': false } };
+
+  it.each`
+    unchanged             | why
+    ${'½-¾ inch'}         | ${'a vulgar fraction at each end'}
+    ${'15½-17 inches'}    | ${'a vulgar fraction ends the first number'}
+    ${'½ - ¾ inch'}       | ${'the same, spaced'}
+    ${'½ to ¾ inch'}      | ${'the same, joined by "to"'}
+    ${'3/8-1/2 inch'}     | ${'a fraction at each end'}
+    ${'5-10 feet'}        | ${'two whole numbers'}
+  `('leaves "$unchanged" alone without ranges ($why)', ({ unchanged }) => {
+    expect(convert(unchanged, noRanges)).toBe(unchanged);
+  });
+
+  it.each`
+    unchanged            | why
+    ${'½ x ¾ inch'}      | ${'a vulgar fraction on each side'}
+    ${'1½ x 2 inch'}     | ${'a vulgar fraction ends the first side'}
+    ${'1/2 x 3/4 inch'}  | ${'a fraction on each side'}
+  `('leaves "$unchanged" alone without dimensions ($why)', ({ unchanged }) => {
+    expect(convert(unchanged, noDimensions)).toBe(unchanged);
+  });
+
+  it.each`
+    unchanged            | why
+    ${'½ x 3-4 inch'}    | ${'a range after a side that ends in a vulgar fraction'}
+    ${'1½-2 x 3 feet'}   | ${'a dimension after a range that starts with one'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                      | expected                    | options
+    ${'2024-03-14 1/2 gallon'} | ${'2024-03-14 1.9 litres'}  | ${noRanges}
+    ${'a depth of -30 feet'}   | ${'a depth of -9.1 metres'} | ${noRanges}
+    ${'1/2 gallon'}            | ${'1.9 litres'}             | ${noRanges}
+    ${'3/4 inch'}              | ${'1.9 centimetres'}        | ${noDimensions}
+    ${'½-¾ inch'}              | ${'1.3-1.9 centimetres'}    | ${{}}
+  `('still converts $input', ({ input, expected, options }) => {
+    expect(convert(input, options)).toBe(expected);
+  });
+
+  it('still converts a dimension of fractions as one', () => {
+    expect(convert('1/2 x 3/4 inch')).toMatch(/^1\.3 x 1\.9 centimetres?$/);
   });
 });
 

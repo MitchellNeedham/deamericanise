@@ -6,6 +6,7 @@ import { spellingEntries } from '../spelling/index.js';
 import { DOTTED_TIME, OPENER as AFTER_TIME } from '../times.js';
 import { baseVocabulary } from '../vocabulary.js';
 import {
+  HYPHEN,
   INLINE_SPACE,
   NUMBER_PATTERN,
   NUMBER_START,
@@ -39,7 +40,7 @@ const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
 /** `165F` and `350 F`. `F-150` and `F-type` are names. */
 const BARE = String.raw`${INLINE_SPACE}?F(?![\w'’]|[-–][A-Za-z])`;
 
-const JOIN = softGap(String.raw`(?:-|\u2013|\u2014|to)`);
+const JOIN = softGap(String.raw`(?:${HYPHEN}|\u2013|\u2014|to)`);
 const BETWEEN_AND =
   String.raw`(?<=\bbetween(?=\s)${SOFT_SPACE}${DEGREES})` + softGap(String.raw`(?<=\s)and(?=\s)`);
 

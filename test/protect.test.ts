@@ -158,6 +158,102 @@ describe('long command-line flags', () => {
   });
 });
 
+describe('a CSS declaration in a sentence', () => {
+  it.each`
+    unchanged                                              | why
+    ${'Set text-align: center and color: red on the div.'} | ${'a bare name after a hyphenated one'}
+    ${'Add background-color: gray; to the body rule.'}     | ${'a hyphenated name, then a semicolon'}
+    ${'text-align: center;'}                               | ${'a declaration on its own'}
+    ${'Use color: gray and text-align: center on it.'}     | ${'a bare name before a hyphenated one'}
+    ${'Set color: gray, background: white on it.'}         | ${'two bare names together'}
+    ${'Use { color: gray } for it.'}                       | ${'a bare name in braces'}
+    ${'color: gray;'}                                      | ${'a semicolon that ends the line'}
+    ${'Use color: #ccc on it.'}                            | ${'a hex colour'}
+    ${'Use filter: grayscale(1) on it.'}                   | ${'a call'}
+    ${'Set accent-color: gray !important on it.'}          | ${'an important value'}
+    ${'Set -webkit-text-fill-color: gray on it.'}          | ${'a vendor prefix'}
+    ${'Set --brand-color: gray on it.'}                    | ${'a custom property'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                        | expected                                                     | why
+    ${'Set justify-content: center to center the color swatch.'} | ${'Set justify-content: center to centre the colour swatch.'} | ${'the value ends at a function word'}
+    ${'Set text-align: center for the favorite layout.'}         | ${'Set text-align: center for the favourite layout.'}        | ${'the same'}
+    ${'Use color: #ccc for the gray text.'}                      | ${'Use color: #ccc for the grey text.'}                      | ${'the same, after a hex colour'}
+    ${'the color of the sky'}                                    | ${'the colour of the sky'}                                   | ${'no colon'}
+    ${'configure center alignment in CSS'}                       | ${'configure centre alignment in CSS'}                       | ${'no colon'}
+    ${'Note: color matters.'}                                    | ${'Note: colour matters.'}                                   | ${'Note is no CSS property'}
+    ${'Favorite color: gray.'}                                   | ${'Favourite colour: grey.'}                                 | ${'a bare name alone is a key in prose'}
+    ${'Eye color: blue; hair color: gray.'}                      | ${'Eye colour: blue; hair colour: grey.'}                    | ${'a semicolon inside a sentence'}
+    ${'One follow-up: color the gray boxes.'}                    | ${'One follow-up: colour the grey boxes.'}                   | ${'a hyphenated word that names no CSS property'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
+describe('template tags and emoji shortcodes', () => {
+  it.each`
+    unchanged                                    | why
+    ${'{% include picker theme="gray" %}'}       | ${'a Liquid tag and its arguments'}
+    ${'{{ favorite | upcase }} and {{ color }}'} | ${'Liquid or Jinja output'}
+    ${'{# the color is gray #}'}                 | ${'a Jinja comment'}
+    ${':colorful: and :heart:'}                  | ${'emoji shortcodes'}
+    ${'It is (:+1::gray_heart:) now.'}           | ${'a run of shortcodes in brackets'}
+    ${'Ratio 1:2:3'}                             | ${'a ratio'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                         | expected                                       | why
+    ${'{% if favorite %}The color.{% endif %}'}   | ${'{% if favorite %}The colour.{% endif %}'}   | ${'the text between tags is prose'}
+    ${'{% if x %}The color.{% endif %}'}          | ${'{% if x %}The colour.{% endif %}'}          | ${'the same'}
+    ${'{%- if favorite -%}gray{%- endif -%}'}     | ${'{%- if favorite -%}grey{%- endif -%}'}      | ${'the same, with whitespace control'}
+    ${'{% if favorite and the color is gray'}     | ${'{% if favourite and the colour is grey'}    | ${'a tag that never closes is prose'}
+    ${'Note: the color is gray.'}                 | ${'Note: the colour is grey.'}                 | ${'a colon with a space after it'}
+    ${'std::color::gray'}                         | ${'std::colour::grey'}                         | ${'a colon either side is a scope'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it('holds them in a Markdown file', () => {
+    const input = '{% if favorite %}The color.{% endif %}\n\n{{ favorite | upcase }} and {{ color }}\n\n:colorful: and :heart:\n';
+    expect(deamericaniseFile('page.md', input).text).toBe(
+      '{% if favorite %}The colour.{% endif %}\n\n{{ favorite | upcase }} and {{ color }}\n\n:colorful: and :heart:\n',
+    );
+  });
+});
+
+describe('mentions and hashtags', () => {
+  it.each`
+    unchanged                                  | why
+    ${'cc @favorite-color'}                    | ${'a handle with a hyphen'}
+    ${'Tag it #color today.'}                  | ${'a hashtag'}
+    ${'Ask (@gray) or "#favorite" about it.'}  | ${'after a bracket or a quote'}
+    ${'Email jo@color.com today.'}             | ${'an email address, held as before'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                | expected                              | why
+    ${'Thanks @gray for the color fix.'} | ${'Thanks @gray for the colour fix.'} | ${'the words beside a mention'}
+    ${'Meet @ the color store.'}         | ${'Meet @ the colour store.'}         | ${'a lone @'}
+    ${'Drive @60mph there.'}             | ${'Drive @97 km/h there.'}            | ${'an @ before a number means at'}
+    ${'Item #3 is gray.'}                | ${'Item #3 is grey.'}                 | ${'a number'}
+    ${'# of items is gray'}              | ${'# of items is grey'}               | ${'a lone #'}
+    ${'Use C# for the color.'}           | ${'Use C# for the colour.'}           | ${'a # straight after a word'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it('still rewrites a Markdown heading', () => {
+    expect(au('# Color', { syntax: 'markdown' })).toBe('# Colour');
+  });
+});
+
 describe('fenced code, read the way CommonMark reads it', () => {
   it.each`
     input                                                                     | expected                                                                   | why

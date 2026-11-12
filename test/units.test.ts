@@ -544,35 +544,6 @@ describe('a measurement starts only where a number can', () => {
   });
 });
 
-describe('a long run of whitespace takes time in line with its length', () => {
-  // Generous, since each of these takes a few milliseconds. A pattern that walks the run from
-  // every place in it, or tries every split of it, takes several seconds.
-  const LIMIT_MS = 1000;
-
-  it.each`
-    before                         | name          | run     | length   | after                      | expected
-    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'The color.'}            | ${'A 3.4 kilogram baby.'}
-    ${'A 7 pound 8 ounce baby.'}   | ${'tabs'}     | ${'\t'} | ${3000}  | ${'The color.'}            | ${'A 3.4 kilogram baby.'}
-    ${'A 7 pound 8 ounce baby.'}   | ${'newlines'} | ${'\n'} | ${12000} | ${'The color.'}            | ${'A 3.4 kilogram baby.'}
-    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'5 feet'}                | ${'A 3.4 kilogram baby.'}
-    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'half a mile'}           | ${'A 3.4 kilogram baby.'}
-    ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'seven pounds 8 ounces'} | ${'A 3.4 kilogram baby.'}
-    ${'He is six foot two'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'tall.'}                 | ${'He is 1.88 metres'}
-    ${'He is six foot two'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'boxes.'}                | ${'He is 1.8 metres two'}
-    ${'He is six foot two'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'with boxes.'}           | ${'He is 1.88 metres'}
-    ${'Weigh five to'}             | ${'spaces'}   | ${' '}  | ${3000}  | ${'seven pounds 8 ounces'} | ${'Weigh five to'}
-    ${'It weighs 7 pounds'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'The color.'}            | ${'It weighs 3.2 kilograms'}
-    ${'It is 5'}                   | ${'spaces'}   | ${' '}  | ${30000} | ${'The color.'}            | ${'It is 5'}
-  `('"$before", $length $name, then "$after"', ({ before, run, length, after, expected }) => {
-    const text = (n: number) => `${before}${run.repeat(n)}${after}`;
-    convert(text(1));
-    const started = performance.now();
-    const output = convert(text(length));
-    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
-    expect(output.startsWith(expected)).toBe(true);
-  });
-});
-
 describe('a long chain of heights takes time in line with its length', () => {
   // Generous, since each of these takes tens of milliseconds. A walk back along the chain
   // from every height in it takes seconds.

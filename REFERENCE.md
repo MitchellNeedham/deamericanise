@@ -617,7 +617,11 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 - **Proper nouns.** Pearl Harbor, the World Trade Center, the Department of Defense, the
   Australian Labor Party, rigor mortis, Fahrenheit 451, the MIT License, Prolog, and
   trademarks such as Band-Aid and Realtor.
-- **Structure.** URLs, email addresses, inline code, fenced code blocks and HTML tags.
+- **Structure.** URLs, email addresses, long command-line flags, inline code, fenced code
+  blocks and HTML tags. A long flag is two hyphens and a letter at the start of a token, with
+  any `=value` after it, so `--center`, `--color=gray` and `--label="dark gray"` are held in
+  prose as well as in comments. Two hyphens straight after a word are a dash, so
+  `the color--that is` is still rewritten.
   Inline code is paired the way CommonMark pairs it: a span closes on a run of as many
   backticks as opened it, so ``` ``a ` b`` ``` is one span, and it may wrap onto the next
   line of its paragraph. A backtick with no partner before the paragraph ends, or one
@@ -628,7 +632,7 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 
   | `syntax` | |
   | --- | --- |
-  | `'markdown'` | Fences as above, and indented code blocks and `pre`, `script`, `style` and `textarea` blocks as CommonMark reads them |
+  | `'markdown'` | Fences as above, and indented code blocks and `pre`, `script`, `style` and `textarea` blocks and elements as CommonMark reads them |
   | `'text'` | No such fences, since a line of tildes underlines a heading in `.rst` or `.txt`: three backticks protect everything up to the next three |
   | none (default) | Fences as above, and an indented line is prose |
 
@@ -641,8 +645,12 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   and runs to the end of the line that holds a closing tag of any of the four, blank lines
   included, or to the end of the list item or quote it sits in. CommonMark passes it through
   as raw HTML, so all of it is held, including text after the closing tag on its last line.
-  Other HTML blocks, such as `<div align="center">` on a line of its own, and HTML comments
-  hold text that is still rewritten, as is a tag in the middle of a sentence.
+
+  Another HTML block, such as one opened by `<div align="center">` or `<details>` on a line
+  of its own, runs to the next blank line. Inside it, each `pre`, `script`, `style` or
+  `textarea` element is held from its opening tag to the next closing tag of the same name,
+  or to the end of the block. The rest of that block, and HTML comments, hold text that is
+  still rewritten, as is a tag in the middle of a sentence.
 - **File names and paths,** read from their shape rather than a list of extensions. A file
   name is a name holding a letter, then a dot and an extension in one case with no space
   either side, so `behavior.ts`, `Center.vue` and `GRAY.PNG` are held, and so is a domain or
@@ -656,9 +664,9 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   after a number, such as `300 lb.ft` or `32 ft/s/s`, is a measurement.
 - **Identifiers,** when `protectIdentifiers` is on (the default for source files):
   `normalizeInput`, `MAX_COLOR_VALUE`, `background-color`, `theme.colors.gray`,
-  `--color-scheme`, `getColor()`. An initialism, where every part is one or two letters
-  followed by a stop, is not a dotted name, so `U.S.`, `Ph.D.` and `p.m.` in a comment are
-  rewritten as they are in prose.
+  a one-hyphen flag such as `-color`, `getColor()`. An initialism, where every part is one or
+  two letters followed by a stop, is not a dotted name, so `U.S.`, `Ph.D.` and `p.m.` in a
+  comment are rewritten as they are in prose.
 - **Anything you name:**
 
   ```ts
@@ -760,6 +768,12 @@ value. A weighted score over those signals separates code from prose across C, P
 SQL, CSS and the rest with one rule set, and a line that already starts with the host
 language's comment marker is taken as commented-out on sight.
 
+An s-expression puts its name after the bracket, so a line also reads as code when it opens
+with a Lisp declaration or special form in lower case, such as `(defun`, `(setq`, `(let` or
+`(when`, or when it opens or closes two brackets at once, as `((color` and `color))` do.
+`; (setq color 1)` and `;; (let ((color 1)) color)` are left alone, while
+`; (See the color chart.)` is rewritten.
+
 A run of the marker that a language writes by convention is one marker, not two: `;;`,
 `;;;` and `;;;;` in Lisp, `'''` in Visual Basic, `%%` and `%%%` in Erlang, MATLAB and
 LaTeX, and `!!` in Fortran. So `;; Pick the color.` is rewritten, while `;;; ;; old note`,
@@ -769,9 +783,10 @@ alone. `LexerSpec.markerRuns` sets these per language.
 
 The costs are lopsided: a missed rewrite inside a commented-out block is invisible, while
 a rewrite there is a broken build. The threshold is set accordingly, so the occasional
-prose line that reads like code is left alone. It works line by line, so a block comment
-can hold prose and an `@example` at once, and doc tags keep their operands: the name in
-`@param {string} color` is protected while the description beside it is not.
+prose line that reads like code is left alone, such as `// (when ready, center it)` in any
+language. It works line by line, so a block comment can hold prose and an `@example` at
+once, and doc tags keep their operands: the name in `@param {string} color` is protected
+while the description beside it is not.
 
 Turn it off with `protectCommentedCode: false` or `--no-code-guard`.
 
@@ -1054,10 +1069,6 @@ with no prose. Only the ids in `DIALECTS` are dialects, so a name every object h
   known to be Markdown: a Markdown file, `syntax: 'markdown'`, or Prettier's Markdown parser.
   So `deamericaniseText` with no `syntax`, stdin without `--language md` or
   `--syntax markdown`, and comments rewrite them.
-- Outside the remark plugin, a `pre`, `script`, `style` or `textarea` element inside another
-  HTML block, such as a `<pre>` between `<div>` and `</div>` with no blank line between them,
-  is read as CommonMark reads it: part of the outer block, so its contents are rewritten. The
-  remark plugin leaves every HTML block alone.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`
   or `keepOriginal` where the numbers matter.
 - A number that a hard wrap splits, such as `1` at the end of one line and `1/2 gallons` at

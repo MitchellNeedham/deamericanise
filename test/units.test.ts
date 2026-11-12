@@ -3579,6 +3579,123 @@ describe('tons, when the document says which kind', () => {
   });
 });
 
+describe('a unit the words beside it read in another sense', () => {
+  it.each`
+    input                                                 | expected
+    ${'Install a 3-ton central AC unit.'}                 | ${'Install an 11 kilowatt central AC unit.'}
+    ${'A 3-ton air conditioner is enough for the house.'} | ${'An 11 kilowatt air conditioner is enough for the house.'}
+    ${'Buy a 3-ton mini-split.'}                          | ${'Buy an 11 kilowatt mini-split.'}
+    ${'A 40-ton cooling tower.'}                          | ${'A 140 kilowatt cooling tower.'}
+    ${'The plant has 500 tons of cooling.'}               | ${'The plant has 1800 kilowatts of cooling.'}
+    ${'AC units of 2 to 5 tons.'}                         | ${'AC units of 7 to 18 kilowatts.'}
+    ${'The heat pump is 3 tons.'}                         | ${'The heat pump is 11 kilowatts.'}
+    ${'Data in metric tons. A 3-ton AC unit.'}            | ${'Data in metric tons. An 11 kilowatt AC unit.'}
+    ${'It gives 7 tons of refrigeration.'}                | ${'It gives 25 kilowatts.'}
+    ${'He bought 16 oz of gold.'}                         | ${'He bought 500 g of gold.'}
+    ${'He bought 2 troy ounces of gold.'}                 | ${'He bought 62 grams of gold.'}
+    ${'He bought 2 ozt of gold.'}                         | ${'He bought 62 g of gold.'}
+    ${'He bought 2 oz t of gold.'}                        | ${'He bought 62 g of gold.'}
+    ${'He bought 2 troy oz of silver.'}                   | ${'He bought 62 g of silver.'}
+    ${'He bought half an ounce of gold.'}                 | ${'He bought 16 grams of gold.'}
+    ${'Buy a 1 oz gold coin.'}                            | ${'Buy a 31 g gold coin.'}
+    ${'Drink 16 oz of water.'}                            | ${'Drink 470 mL of water.'}
+    ${'Add 8 oz of milk.'}                                | ${'Add 240 mL of milk.'}
+    ${'Add 8 oz heavy cream.'}                            | ${'Add 240 mL heavy cream.'}
+    ${'Pour a 16-oz pint glass of beer.'}                 | ${'Pour a 470 mL pint glass of beer.'}
+    ${'Open a 12 oz can of soda.'}                        | ${'Open a 350 mL can of soda.'}
+    ${'Open a 12 oz soda can.'}                           | ${'Open a 350 mL soda can.'}
+    ${'Open a 12-ounce bottle of beer.'}                  | ${'Open a 350 millilitre bottle of beer.'}
+    ${'Pour 2 x 12 oz cans of soda.'}                     | ${'Pour 2 x 350 mL cans of soda.'}
+    ${'Add 2 to 3 oz of milk.'}                           | ${'Add 59 to 89 mL of milk.'}
+    ${'Mix 2 oz gin and 1 oz lime juice.'}                | ${'Mix 59 mL gin and 30 mL lime juice.'}
+    ${'Use 1 cup (8 oz) whole milk.'}                     | ${'Use 1 cup (240 mL) whole milk.'}
+    ${'Use 8 oz (about 1 cup) of milk.'}                  | ${'Use 240 mL (about 1 cup) of milk.'}
+    ${'Drink 16 oz (470 mL) of water.'}                   | ${'Drink 470 mL of water.'}
+    ${'Leave 240 mL (8 oz) of water.'}                    | ${'Leave 240 mL (8 oz) of water.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                  | why
+    ${'Order the board with 2 oz copper.'}     | ${'the copper of a circuit board'}
+    ${'Order 2 oz copper PCBs.'}               | ${'copper that describes a board'}
+    ${'Copper weight: 2 oz, on both sides.'}   | ${'copper before the number'}
+    ${'The PCB uses 1 oz on inner layers.'}    | ${'a circuit board in the sentence'}
+  `('holds the copper weight of a circuit board: $why', ({ unchanged }) => {
+    const { text, changes } = deamericanise(unchanged);
+    expect(text).toBe(unchanged);
+    expect(changes).toEqual([]);
+  });
+
+  it.each`
+    input                                             | expected
+    ${'A 3-ton truck.'}                               | ${'A 2.7 tonne truck.'}
+    ${'The bridge carries 40 tons.'}                  | ${'The bridge carries 36 tonnes.'}
+    ${'Data in metric tons. A 3-ton truck.'}          | ${'Data in metric tons. A 3-ton truck.'}
+    ${'The AC is in a 3-ton truck.'}                  | ${'The AC is in a 2.7 tonne truck.'}
+    ${'A 5-ton HVAC truck.'}                          | ${'A 4.5 tonne HVAC truck.'}
+    ${'The ship has a gross tonnage of 90,000 tons.'} | ${'The ship has a gross tonnage of 82,000 tonnes.'}
+    ${'Cooling 3 tons of steel takes a day.'}         | ${'Cooling 2.7 tonnes of steel takes a day.'}
+    ${'Add 8 oz cream cheese.'}                       | ${'Add 230 g cream cheese.'}
+    ${'Add 8 oz sour cream.'}                         | ${'Add 230 g sour cream.'}
+    ${'Add 8 oz ice cream.'}                          | ${'Add 230 g ice cream.'}
+    ${'Add 8 oz milk chocolate.'}                     | ${'Add 230 g milk chocolate.'}
+    ${'Add 2 oz baking soda.'}                        | ${'Add 57 g baking soda.'}
+    ${'Add 14 oz sweetened condensed milk.'}          | ${'Add 400 g sweetened condensed milk.'}
+    ${'Buy 12 oz whole bean coffee.'}                 | ${'Buy 340 g whole bean coffee.'}
+    ${'A 16-oz steak.'}                               | ${'A 450 g steak.'}
+    ${'A 16 oz T-bone steak.'}                        | ${'A 450 g T-bone steak.'}
+    ${'Dissolve 2 oz of sugar in water.'}             | ${'Dissolve 57 g of sugar in water.'}
+    ${'Open a 15 oz can of beans.'}                   | ${'Open a 430 g can of beans.'}
+    ${'Fill a 16 oz glass jar of honey.'}             | ${'Fill a 450 g glass jar of honey.'}
+    ${'Drink 8 oz (230 g) of milk.'}                  | ${'Drink 230 g of milk.'}
+    ${'Add 8 fl oz of milk.'}                         | ${'Add 240 mL of milk.'}
+    ${'Buy 2 oz silver polish.'}                      | ${'Buy 57 g silver polish.'}
+    ${'Add 2 oz of copper sulfate.'}                  | ${'Add 57 g of copper sulfate.'}
+    ${'The PCB ships in an 8 oz bag.'}                | ${'The PCB ships in a 230 g bag.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('reads nothing after a stop that ends the sentence', () => {
+    const { changes } = deamericanise('Use 16 oz. Water the plants.');
+    expect(changes.map((c) => c.ruleId)).toEqual(['units.mass.ounce']);
+  });
+
+  it.each`
+    input                                 | ruleId                             | note
+    ${'He bought 16 oz of gold.'}         | ${'units.mass.troy-ounce'}         | ${'read as troy ounces, in which precious metals are weighed'}
+    ${'Drink 16 oz of water.'}            | ${'units.volume.fluid-ounce'}      | ${'read as fluid ounces, since it measures a liquid'}
+    ${'Install a 3-ton central AC unit.'} | ${'units.power.refrigeration-ton'} | ${'read as tons of refrigeration, a rate of cooling'}
+  `('converts $input under $ruleId, with a note', ({ input, ruleId, note }) => {
+    const units = deamericanise(input).changes.filter((c) => c.category === 'units');
+    expect(units.map((c) => [c.ruleId, c.note])).toEqual([[ruleId, note]]);
+  });
+
+  it.each`
+    input                         | options                                                   | expected
+    ${'Drink 16 oz of water.'}    | ${{ rules: { 'units.volume.fluid-ounce': false } }}       | ${'Drink 16 oz of water.'}
+    ${'Drink 16 oz of water.'}    | ${{ unitsKeep: ['fluid ounces'] }}                        | ${'Drink 16 oz of water.'}
+    ${'Drink 16 oz of water.'}    | ${{ rules: { 'units.mass.ounce': false } }}               | ${'Drink 470 mL of water.'}
+    ${'He bought 16 oz of gold.'} | ${{ unitsKeep: ['troy-ounce'] }}                          | ${'He bought 16 oz of gold.'}
+    ${'He bought 2 ozt of gold.'} | ${{ unitsKeep: ['ozt'] }}                                 | ${'He bought 2 ozt of gold.'}
+    ${'A 3-ton AC unit.'}         | ${{ rules: { 'units.power.refrigeration-ton': false } }}  | ${'A 3-ton AC unit.'}
+  `('follows the options of the measure it reads as: $options', ({ input, options, expected }) => {
+    expect(convert(input, options)).toBe(expected);
+  });
+
+  it.each([
+    ['Drink 16 oz of water.', 'Drink 470 mL (16 oz) of water.'],
+    ['Install a 3-ton central AC unit.', 'Install an 11 kilowatt (3-ton) central AC unit.'],
+    ['He bought 16 oz of gold.', 'He bought 500 g (16 oz) of gold.'],
+  ])('keeps "%s" as written in its own bracket on a second run', (input, once) => {
+    const options = { units: { keepOriginal: true } };
+    expect(convert(input, options)).toBe(once);
+    expect(convert(once, options)).toBe(once);
+  });
+});
+
 describe('pounds of money are not weights', () => {
   it.each`
     unchanged                                                  | why

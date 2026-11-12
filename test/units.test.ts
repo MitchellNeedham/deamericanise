@@ -326,6 +326,24 @@ describe('a long run of whitespace takes time in line with its length', () => {
   });
 });
 
+describe('a long chain of heights takes time in line with its length', () => {
+  // Generous, since each of these takes tens of milliseconds. A walk back along the chain
+  // from every height in it takes seconds.
+  const LIMIT_MS = 1000;
+
+  it.each`
+    link                            | count   | expected
+    ${'6 foot 2 to 6 foot 4 and '}  | ${500}  | ${'1.88 metres to 1.93 metres and 1.88 metres to 1.93 metres and '}
+    ${'6 foot 2 to '}               | ${1000} | ${'1.88 metres to 1.88 metres to 1.88 metres to '}
+  `('"$link" $count times', ({ link, count, expected }) => {
+    convert(link);
+    const started = performance.now();
+    const output = convert(link.repeat(count));
+    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+    expect(output.startsWith(expected)).toBe(true);
+  });
+});
+
 describe('mass and volume', () => {
   it.each`
     input                | expected

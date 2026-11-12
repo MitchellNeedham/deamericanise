@@ -2511,6 +2511,13 @@ function temperatureDecadeRule(): Rule {
     'gi',
   );
 
+  // Case-sensitive, so a lone `c` is no unit here, as it is none after a figure. The bare `C`
+  // is read apart because `metricUnitForms` reads it only after a figure, as in `180C`.
+  const CELSIUS_AFTER = new RegExp(
+    String.raw`${SOFT_SPACE}(?:${metricUnitForms('temperature')})|${INLINE_SPACE}?C${UNIT_END}`,
+    'y',
+  );
+
   const TEMPERATURE_NEARBY =
     /\b(?:temperatures?|degrees?|weather|heat|humidity|forecasts?|highs?|lows?|warm|warmer|mild|cool|cooler|chilly|hot|hotter|cold|colder|freezing|thermometer|climate|Fahrenheit|outdoors?|outside)\b/i;
 
@@ -2544,8 +2551,17 @@ function temperatureDecadeRule(): Rule {
         const before = ctx.text.slice(Math.max(0, start - 90), start);
         const after = ctx.text.slice(end, end + 90);
 
-        if (A_DECADE.test(before)) continue;
         const marked = match[6] !== undefined;
+        if (!marked) {
+          CELSIUS_AFTER.lastIndex = end;
+          const celsius = CELSIUS_AFTER.exec(ctx.text);
+          if (celsius) {
+            changes.push(hold(start, match[0] + celsius[0], 'units.temperature.decade', 36));
+            continue;
+          }
+        }
+
+        if (A_DECADE.test(before)) continue;
         if (!marked && !TEMPERATURE_NEARBY.test(before) && !TEMPERATURE_NEARBY.test(after)) continue;
 
         const firstBand = SPREAD[(match[2] ?? '').toLowerCase()] ?? [0, 9];

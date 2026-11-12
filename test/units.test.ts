@@ -3763,8 +3763,50 @@ describe('Fahrenheit decades', () => {
     );
   });
 
-  it('leaves the degrees of a Celsius unit after a decade to that unit', () => {
-    expect(convert('temperatures in the 20s degrees Celsius')).toContain('degrees Celsius');
+  it.each`
+    input                                          | why
+    ${'temperatures in the 30s Celsius'}           | ${'Celsius'}
+    ${'temperatures in the 20s degrees Celsius'}   | ${'degrees Celsius, whose degrees is no bare unit'}
+    ${'highs in the 20s °C'}                       | ${'a degree sign and C'}
+    ${'highs in the 30s ºC'}                       | ${'a phone keyboard degree sign'}
+    ${'highs in the 30s ℃'}                        | ${'the Celsius sign'}
+    ${'highs in the 30s centigrade'}               | ${'centigrade'}
+    ${'highs in the 30s degrees centigrade'}       | ${'degrees centigrade'}
+    ${'highs in the 30s degrees C'}                | ${'degrees C'}
+    ${'highs in the 30s deg C'}                    | ${'deg C'}
+    ${'highs in the 30s C'}                        | ${'a bare upper case C'}
+    ${'highs in the 30s celsius'}                  | ${'the word in lower case'}
+    ${'highs in the low 30s Celsius'}              | ${'a banded decade'}
+    ${'highs in the 20s and 30s Celsius'}          | ${'two decades'}
+    ${'highs in the 20s or 30s °C'}                | ${'two decades joined by or'}
+    ${'highs in the 30s\nCelsius'}                 | ${'the unit on the next line'}
+  `('leaves a decade with a Celsius unit as written: $input ($why)', ({ input }) => {
+    expect(convert(input)).toBe(input);
+  });
+
+  it('leaves a decade with a Celsius unit as written under localise', () => {
+    const input = 'temperatures in the 30s Celsius';
+    expect(deamericaniseText(input, { preset: 'localise' })).toBe(input);
+  });
+
+  /** The spans the decade rule holds as written in `text`. */
+  const decadeHolds = (text: string): string[] => {
+    const resolved = resolveOptions({});
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold && c.ruleId === 'units.temperature.decade')
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                                         | span
+    ${'temperatures in the 30s Celsius today'}    | ${'in the 30s Celsius'}
+    ${'highs in the 20s degrees Celsius'}         | ${'in the 20s degrees Celsius'}
+    ${'highs in the 20s or 30s °C'}               | ${'in the 20s or 30s °C'}
+    ${'highs in the 30s C'}                       | ${'in the 30s C'}
+  `('holds "$span" whole', ({ input, span }) => {
+    expect(decadeHolds(input)).toEqual([span]);
   });
 
   // The decade of the calendar is the far commoner reading, so these must all survive.

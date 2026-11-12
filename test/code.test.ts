@@ -329,6 +329,32 @@ describe("a prose file's type decides whether indented code is protected", () =>
   });
 });
 
+describe("a prose file's type decides whether a pre, script or style block is protected", () => {
+  const pre = 'The color.\n\n<pre>\nconst color = "gray";\n</pre>\n';
+
+  it.each`
+    filename       | options                   | expected
+    ${'README.md'} | ${{}}                     | ${'The colour.\n\n<pre>\nconst color = "gray";\n</pre>\n'}
+    ${'stdin'}     | ${{ language: 'md' }}     | ${'The colour.\n\n<pre>\nconst color = "gray";\n</pre>\n'}
+    ${'stdin.txt'} | ${{ syntax: 'markdown' }} | ${'The colour.\n\n<pre>\nconst color = "gray";\n</pre>\n'}
+    ${'notes.txt'} | ${{}}                     | ${'The colour.\n\n<pre>\nconst colour = "grey";\n</pre>\n'}
+    ${'CHANGELOG'} | ${{}}                     | ${'The colour.\n\n<pre>\nconst colour = "grey";\n</pre>\n'}
+  `('$filename with $options', ({ filename, options, expected }) => {
+    expect(deamericaniseFile(filename, pre, options).text).toBe(expected);
+  });
+
+  it('leaves a script and a style block in a Markdown file alone', () => {
+    const source = '<script>\nconst color = "gray";\n</script>\n\n<style>\n.gray { color: gray; }\n</style>\n';
+    expect(deamericaniseFile('README.md', source).text).toBe(source);
+  });
+
+  it('rewrites the text of another HTML block in a Markdown file', () => {
+    expect(deamericaniseFile('README.md', '<div align="center">\nThe color\n</div>\n').text).toBe(
+      '<div align="center">\nThe colour\n</div>\n',
+    );
+  });
+});
+
 describe("a comment is read in its language's doc markup", () => {
   const rstDocstring =
     'def f():\n    """\n    Colors\n    ~~~~~~\n\n    The color of things.\n\n    Behavior\n    ~~~~~~~~\n\n    More color.\n    """\n';

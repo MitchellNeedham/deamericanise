@@ -174,10 +174,11 @@ export interface Options {
    */
   minAmericanConfidence?: number;
   /**
-   * The markup the text is written in. `markdown` also leaves indented code blocks alone.
-   * `text` reads no CommonMark fences, so a line of tildes under a heading is prose, and three
-   * backticks protect everything up to the next three. Left out, the syntax is unknown: fences
-   * are read as CommonMark reads them, and an indented line is prose.
+   * The markup the text is written in. `markdown` also leaves indented code blocks, and `pre`,
+   * `script`, `style` and `textarea` blocks, alone. `text` reads no CommonMark fences, so a
+   * line of tildes under a heading is prose, and three backticks protect everything up to the
+   * next three. Left out, the syntax is unknown: fences are read as CommonMark reads them, and
+   * an indented line is prose.
    */
   syntax?: Syntax;
 }

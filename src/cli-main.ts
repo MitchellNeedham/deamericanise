@@ -60,7 +60,8 @@ Files
                          --language json reads only its comments.
       --syntax <name>    ${SYNTAXES.join(' | ')}: the markup of stdin and prose files.
                          Defaults to the file's type, and to text for stdin.
-                         markdown also leaves indented code blocks alone.
+                         markdown also leaves indented code blocks, and pre,
+                         script, style and textarea blocks, alone.
       --docstrings       Also rewrite Python docstrings
       --no-code-guard    Rewrite comment lines that look like commented-out code too
       --list-languages   Print every language name --language accepts

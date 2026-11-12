@@ -1,3 +1,5 @@
+import { FIGURE_DATE } from './dates.js';
+
 /** A closing quote or bracket that can stand between a stop and the sentence after it. */
 export const CLOSING = String.raw`[)\]}"'’”»]`;
 
@@ -14,16 +16,18 @@ const BREAK = String.raw`\n[^\S\n]*(?:\n|${LIST_MARKER}|#{1,6}[^\S\n])`;
 const BLOCK_BREAK = new RegExp(BREAK, 'y');
 const BLOCK_END = new RegExp(String.raw`\s*$|[^\S\n]*${BREAK}`, 'y');
 
-const NEXT_WORD = new RegExp(String.raw`\s+${OPENING}*(?=\p{Lu}(?!\p{Lu}))`, 'uy');
+const NEXT_WORD = new RegExp(String.raw`\s+${OPENING}*(?=\p{Lu}(?!\p{Lu})|${FIGURE_DATE})`, 'uy');
 
 /**
  * Whether the stop just before `end` is also the sentence's full stop. It is when nothing
  * else ends the sentence: past any closing quotes or brackets, a new sentence starts, or
  * the text or block ends after words that could make one.
  *
- * A new sentence starts with a capitalised word that `opener`, a sticky (`y`) pattern, matches
- * where that word begins. A word in capitals never starts one: it is a time zone such as
- * `ET`, an acronym, or text set in capitals throughout.
+ * A new sentence starts with a capitalised word, or a date that starts with a figure, that
+ * `opener`, a sticky (`y`) pattern, matches where it begins. Such a date counts because the
+ * date rules write `December 1, 2024` as `1 December 2024` or `01/12/2024`, and a sentence
+ * has to end at the same stop before the rewrite and after it. A word in capitals never
+ * starts one: it is a time zone such as `ET`, an acronym, or text set in capitals throughout.
  */
 export function endsSentence(text: string, start: number, end: number, opener: RegExp): boolean {
   CLOSERS.lastIndex = end;
@@ -37,6 +41,20 @@ export function endsSentence(text: string, start: number, end: number, opener: R
   if (!NEXT_WORD.test(text)) return false;
   opener.lastIndex = NEXT_WORD.lastIndex;
   return opener.test(text);
+}
+
+/** The two dots after a stop that make it the first of an ellipsis, and no third. */
+const ELLIPSIS_REST = /\.\.(?!\.)/y;
+
+/**
+ * Whether the stop just before `end`, the last of an abbreviation, stays where the
+ * abbreviation is rewritten without it. It stays where it is also the sentence's full stop,
+ * by `endsSentence` with `opener`, or the first dot of an ellipsis, as in `5 p.m...`. Before
+ * a whole ellipsis, as in `12 in....`, it is the abbreviation's alone.
+ */
+export function stopStays(text: string, start: number, end: number, opener: RegExp): boolean {
+  ELLIPSIS_REST.lastIndex = end;
+  return ELLIPSIS_REST.test(text) || endsSentence(text, start, end, opener);
 }
 
 const SENTENCE_BOUND = new RegExp(String.raw`[.!?]|${BREAK}`, 'g');

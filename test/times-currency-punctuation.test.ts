@@ -68,9 +68,20 @@ describe('times', () => {
     ${'The vote is at 3 p.m. Tuesday.'}         | ${'The vote is at 3pm Tuesday.'}
     ${'The vote is at 3 p.m. Tues. in Ohio.'}   | ${'The vote is at 3pm Tues. in Ohio.'}
     ${'The vote is at 3 p.m. March 5.'}         | ${'The vote is at 3pm March 5.'}
+    ${'The vote is at 3 p.m. 5 March.'}         | ${'The vote is at 3pm 5 March.'}
+    ${'The vote is at 3 p.m. 25/12/2024.'}      | ${'The vote is at 3pm 25/12/2024.'}
     ${'DOORS OPEN AT 7 P.M. SHARP'}             | ${'DOORS OPEN AT 7pm SHARP'}
     ${'- 9 a.m.\n- 5 p.m.'}                     | ${'- 9am\n- 5pm'}
   `('needs no sentence stop: $input', ({ input, expected }) => {
+    expect(times(input)).toBe(expected);
+  });
+
+  it.each`
+    input                           | expected
+    ${'We left at 5 p.m...'}        | ${'We left at 5pm...'}
+    ${'We left at 5 P.M... or so.'} | ${'We left at 5pm... or so.'}
+    ${'We left at 5 p.m....'}       | ${'We left at 5pm...'}
+  `('keeps the stop that opens an ellipsis, and no other: $input', ({ input, expected }) => {
     expect(times(input)).toBe(expected);
   });
 
@@ -311,6 +322,15 @@ describe('punctuation', () => {
     ${'U.S.'}                                      | ${'US'}
     ${'- U.S.\n- U.K.'}                            | ${'- US\n- UK'}
   `('needs no sentence stop: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                               | expected
+    ${'She moved to the U.K...'}        | ${'She moved to the UK...'}
+    ${'He has a Ph.D... or so.'}        | ${'He has a PhD... or so.'}
+    ${'She moved to the U.K....'}       | ${'She moved to the UK...'}
+  `('keeps the stop that opens an ellipsis, and no other: $input', ({ input, expected }) => {
     expect(punctuation(input)).toBe(expected);
   });
 

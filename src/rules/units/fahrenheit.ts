@@ -1,5 +1,6 @@
 import { DIALECTS } from '../../dialects/index.js';
 import { toPattern } from '../../engine/lexicon.js';
+import { FIGURE_DATE } from '../dates.js';
 import { CONTRACTIONS, OPENER as AFTER_INITIALISM } from '../punctuation.js';
 import { sentenceBounds } from '../sentence.js';
 import { spellingEntries } from '../spelling/index.js';
@@ -25,12 +26,12 @@ export const NOT_A_TITLE = String.raw`(?![^\S\n]*(?:\n[^\S\n]*(?!\d+[.)](?:\s|$)
 
 /**
  * The stop after an `F` or `℉`, as in `350 degrees F.` or `350°F.`, which the unit rules
- * decide by the form it follows (`fahrenheitKeepsStop` in `index.ts`). A stop that opens an
- * ellipsis or runs into a word is left in the text. So is one before a bracket or a figure,
- * where it may end a sentence that the unit rules' test cannot see end: a bracket may trail
- * the sentence, and a figure never opens one there.
+ * decide by the form it follows (`fahrenheitKeepsStop` in `index.ts`), past the Celsius value
+ * in brackets where the pair collapses. A stop that opens an ellipsis or runs into a word is
+ * left in the text. So is one before a figure, where it may end a sentence that the unit
+ * rules' test cannot see end: only a date opens one there.
  */
-const STOP = String.raw`(?:\.(?![.\w]|\s*[(\d]))?`;
+const STOP = String.raw`(?:\.(?![.\w]|\s*\d))?`;
 
 /**
  * `°F`, `℉`, `degrees Fahrenheit` and the like: Fahrenheit written as a unit. `º` and `˚`
@@ -117,11 +118,12 @@ const TITLE_STOP = String.raw`\b(?:${CONTRACTIONS.join('|')})\.${TO_WORD}`;
  * stop, so no rewrite moves a sentence's end: after a time such as `6 p.m.`, the time rule's;
  * after an initialism such as `U.S.`, the abbreviation rule's; after a title such as `Mr.`,
  * none, since that rule drops the stop before a name. After any other word, any capitalised
- * word starts one. A number in words never does, as one in figures cannot, since the unit
- * rules write `Two feet` as `61 centimetres`.
+ * word starts one, and so does a date that starts with a figure, as `1 December 2024` does.
+ * No other number does, in words or in figures, since the unit rules write `Two feet` as
+ * `61 centimetres`.
  */
 const OPENER = new RegExp(
-  String.raw`(?!(?:${NUMBER_PATTERN})(?![\p{L}\p{N}]))(?:` +
+  String.raw`(?!(?!${FIGURE_DATE})(?:${NUMBER_PATTERN})(?![\p{L}\p{N}]))(?:` +
     String.raw`(?<=${TIME_STOP})${AFTER_TIME.source}` +
     String.raw`|(?<!${TIME_STOP})(?<=${INITIALISM_STOP})${AFTER_INITIALISM.source}` +
     String.raw`|(?<!${INITIALISM_STOP}|${TITLE_STOP}))`,

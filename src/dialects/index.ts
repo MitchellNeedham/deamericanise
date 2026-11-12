@@ -92,7 +92,7 @@ const COOKIE: Guard[] = [
 
 /** Trucks Britain calls trucks too. */
 const TRUCK: Guard[] = [
-  { forbidBefore: /\b(?:pick-?up|dump|fork-?lift|food|monster|tow|ice[\s-]cream)[\s-]+$/i },
+  { forbidBefore: /\b(?:pick-?up|dump|fork-?lift|food|monster|tow|ice[\s-]cream|rubbish)[\s-]+$/i },
 ];
 
 const PANTS_OWNER = String.raw`(?:the|your|my|his|her|its|our|their|one['’]s)`;
@@ -244,7 +244,28 @@ const HIGHWAY: Guard[] = [
   },
 ];
 
-const APARTMENT: Guard[] = [{ forbidBefore: /\bserviced\s+$/i, forbidAfter: /^\s+complex(?:es)?\b/i }];
+const APARTMENT: Guard[] = [{ forbidBefore: /\bserviced\s+$/i, forbidAfter: /^\s+(?:complex(?:es)?|blocks?)\b/i }];
+
+/** Making the call, straight before the number: `call 911`, `dialled 911`, `calls to 911`. */
+const CALLING = anyOf([
+  'call(?:s|ed|ing)?', 'dial(?:s|l?ed|l?ing)?', 'ring(?:s|ing)?', 'rang', 'rung',
+  'phon(?:e|es|ed|ing)', 'text(?:s|ed|ing)?', String.raw`(?:call|text)s?\s+to`,
+]);
+
+/** The service the number names, straight after it: `a 911 call`, `911 dispatchers`. */
+const EMERGENCY_SERVICE = anyOf([
+  'call(?:s|ers?)?', 'operators?', 'dispatch(?:ers?)?', 'services?', 'cent(?:re|er)s?',
+  'emergenc(?:y|ies)', '(?:hot)?lines?',
+]);
+
+/**
+ * `911` is the emergency number only where the text calls it or names the service by it.
+ * Anywhere else it is a figure (`$1,911`, `911 feet`) or a name (`Porsche 911`, `Room 911`).
+ */
+const EMERGENCY_NUMBER: Guard[] = [
+  { requireBefore: new RegExp(String.raw`\b(?:${CALLING})\s+$`, 'i') },
+  { requireAfter: new RegExp(String.raw`^[\s-]+(?:${EMERGENCY_SERVICE})\b`, 'i') },
+];
 
 /**
  * A postbox is only the kind for posting letters. A mailbox at home is a letterbox, which
@@ -275,6 +296,7 @@ const FIELD_TRIP: Guard[] = [
  * guards fires when any one of them lets it through.
  */
 const GATES: Record<string, Guard[]> = {
+  '911': EMERGENCY_NUMBER,
   candy: [{ forbidAfter: /^\s+floss\b/i }],
   candies: [{ forbidAfter: /^\s+floss\b/i }],
   cookie: COOKIE,
@@ -341,7 +363,6 @@ const AU: Row[] = [
   ['cooler', 'esky'],
   ['pickup truck', 'ute'],
   ['downtown', 'the CBD'],
-  ['trailer', 'caravan'],
   ['rain boots', 'gumboots'],
   ['galoshes', 'gumboots'],
   ['911', '000'],
@@ -370,6 +391,8 @@ const GB: Row[] = [
   ['fire trucks', 'fire engines'],
   ['firetruck', 'fire engine'],
   ['firetrucks', 'fire engines'],
+  ['garbage truck', 'bin lorry'],
+  ['garbage trucks', 'bin lorries'],
   ['freeway', 'motorway'],
   ['freeways', 'motorways'],
   ['highway', 'motorway'],
@@ -396,8 +419,10 @@ const GB: Row[] = [
   ['liquor stores', 'off-licences'],
   ['bell pepper', 'pepper'],
   ['bell peppers', 'peppers'],
-  ['postie', 'postman'],
-  ['posties', 'postmen'],
+  ['mailman', 'postman'],
+  ['mailmen', 'postmen'],
+  ['mail carrier', 'postman'],
+  ['mail carriers', 'postmen'],
   ['mailbox', 'postbox'],
   ['mailboxes', 'postboxes'],
   ['field trip', 'school trip'],
@@ -422,6 +447,8 @@ const NZ: Row[] = [
   ['potato chips', 'chips'],
   ['apartment', 'flat'],
   ['apartments', 'flats'],
+  ['apartment building', 'block of flats'],
+  ['apartment buildings', 'blocks of flats'],
   ['soccer', 'football'],
   ['freeway', 'motorway'],
   ['highway', 'motorway'],
@@ -446,8 +473,10 @@ const NZ: Row[] = [
 ];
 
 const IE: Row[] = [
-  ...GB.filter(([from]) => from !== '911'),
+  ...GB.filter(([from]) => from !== '911' && from !== 'field trip' && from !== 'field trips'),
   ['911', '112'],
+  ['field trip', 'school tour'],
+  ['field trips', 'school tours'],
 ];
 
 const ZA: Row[] = [

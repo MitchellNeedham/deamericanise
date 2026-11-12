@@ -86,6 +86,11 @@ describe('the remark plugin', () => {
     const tree = root({ type: 'thematicBreak' });
     expect(run(tree)).toBe(tree);
   });
+
+  it('names an unknown preset rather than failing deep inside', () => {
+    const tree = root(paragraph(text('the color')));
+    expect(() => run(tree, { preset: 'Localise' })).toThrow('Unknown preset: Localise. Expected one of read, localise.');
+  });
 });
 
 describe('the ESLint plugin', () => {
@@ -191,6 +196,12 @@ describe('the ESLint plugin', () => {
 
   it('takes rule options', () => {
     expect(lint(source, [{ categories: { spelling: false } }])).toHaveLength(0);
+  });
+
+  it('names an unknown preset in its options rather than failing deep inside', () => {
+    expect(() => lint(source, [{ preset: 'Localise' }])).toThrow(
+      'Unknown preset: Localise. Expected one of read, localise.',
+    );
   });
 
   it('ships a flat-config preset', () => {

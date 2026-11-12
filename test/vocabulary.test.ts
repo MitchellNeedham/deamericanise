@@ -68,6 +68,47 @@ describe('words gated on their context', () => {
   });
 });
 
+describe('trailers', () => {
+  it.each`
+    input                    | expected
+    ${'a trailer park'}      | ${'a caravan park'}
+    ${'two trailer parks'}   | ${'two caravan parks'}
+    ${'a travel trailer'}    | ${'a caravan'}
+    ${'two travel trailers'} | ${'two caravans'}
+    ${'a house trailer'}     | ${'a caravan'}
+    ${'house trailers'}      | ${'caravans'}
+    ${'a camping trailer'}   | ${'a caravan'}
+    ${'camping trailers'}    | ${'caravans'}
+    ${'a tractor trailer'}   | ${'a semi-trailer'}
+    ${'a semi truck'}        | ${'a semi-trailer'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it.each([
+    'Watch the movie trailer.',
+    'We hitched the boat trailer.',
+    'a semi-trailer',
+    'a box trailer',
+    'a horse trailer',
+    'the trailer hitch',
+  ])('leaves "%s" alone', (input) => {
+    expect(au(input)).toBe(input);
+  });
+});
+
+describe('tuition', () => {
+  it.each`
+    input                   | expected
+    ${'Paid tuition.'}      | ${'Paid tuition fees.'}
+    ${'Paid tuition fees.'} | ${'Paid tuition fees.'}
+    ${'Tuition Fees'}       | ${'Tuition Fees'}
+    ${'the tuition fee'}    | ${'the tuition fee'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
 describe('school years', () => {
   it.each`
     input              | expected
@@ -213,6 +254,88 @@ describe('a mailbox for post still becomes a letterbox', () => {
     ${'Put a sign on the mailbox.'}                              | ${'Put a sign on the letterbox.'}
     ${'Mailboxes for sale'}                                      | ${'Letterboxes for sale'}
     ${'Your mailbox is full. Check the mailbox for the parcel.'} | ${'Your mailbox is full. Check the letterbox for the parcel.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    for (const dialect of MAILBOX_DIALECTS) expect(au(input, { dialect }), dialect).toBe(expected);
+  });
+});
+
+// Gmail, Outlook, Google Drive and macOS name a folder `Trash`. Windows names its one the Recycle Bin.
+describe('the trash of an email client or file manager stays the trash', () => {
+  it.each([
+    'Move it to the Trash folder.',
+    'Empty the trash in Gmail.',
+    'Drag the file to the Trash.',
+    'Restore the email from the trash.',
+    'Messages in the trash are deleted forever after 30 days.',
+    'Outlook moves the email to the trash.',
+    "If you don't see the Deleted Items folder, but instead see the Trash folder, your account doesn't support it.",
+    'Files you move to the Trash are deleted forever after 30 days.',
+    'To put a file in the Trash:',
+    'Any files you put in the trash are put in the trash everywhere.',
+    'Empty the trash in Google Drive.',
+    'Restore it from the trash in Dropbox.',
+    "You start by dragging items to the Trash in the Dock, but the items aren't deleted until you empty the Trash.",
+    'Empty the Trash',
+    'On your Mac, click the Trash icon in the Dock.',
+    'Items that you move to the Trash from your Mac remain until you empty the Trash.',
+    'You can choose to automatically empty the Trash in Finder settings.',
+    'Remove items from the Trash after 30 days.',
+    'Drag it to the trash.',
+    'Windows calls the trash the Recycle Bin.',
+    'Click the Trash can icon.',
+    'Press the trash button.',
+    'Tap the trash can to delete the email.',
+    'Items in the Trash can be restored.',
+  ])('leaves "%s" alone', (input) => {
+    for (const dialect of MAILBOX_DIALECTS) expect(au(input, { dialect }), dialect).toBe(input);
+  });
+});
+
+describe('household trash still becomes rubbish', () => {
+  it.each`
+    input                                                   | expected
+    ${'take out the trash'}                                 | ${'take out the rubbish'}
+    ${'Put the trash out on Tuesday.'}                      | ${'Put the rubbish out on Tuesday.'}
+    ${'The trash goes out on Thursday night.'}              | ${'The rubbish goes out on Thursday night.'}
+    ${'Throw the wrapper in the trash.'}                    | ${'Throw the wrapper in the rubbish.'}
+    ${'Household trash is collected weekly.'}               | ${'Household rubbish is collected weekly.'}
+    ${'Put the trash cans out on Tuesday.'}                 | ${'Put the rubbish bins out on Tuesday.'}
+    ${'Trash cans go out on Tuesday.'}                      | ${'Rubbish bins go out on Tuesday.'}
+    ${'Drag the trash cans down the driveway.'}             | ${'Drag the rubbish bins down the driveway.'}
+    ${'The kids put the trash in the trash can.'}           | ${'The kids put the rubbish in the rubbish bin.'}
+    ${'TAKE OUT THE TRASH'}                                 | ${'TAKE OUT THE RUBBISH'}
+    ${'Empty the trash in Gmail. Then take out the trash.'} | ${'Empty the trash in Gmail. Then take out the rubbish.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    for (const dialect of MAILBOX_DIALECTS) expect(au(input, { dialect }), dialect).toBe(expected);
+  });
+
+  it('leaves "trash talk" alone', () => {
+    for (const dialect of MAILBOX_DIALECTS) expect(au('trash talk', { dialect }), dialect).toBe('trash talk');
+  });
+});
+
+describe("Gmail's Vacation responder keeps its name", () => {
+  it.each([
+    'Turn on the vacation responder in Gmail settings.',
+    'Vacation responder',
+    'Vacation responder on',
+    'Under the "General" tab, go to the "Vacation responder" section.',
+    'When your vacation responder is on, a banner shows across the top of your inbox.',
+    'Set up a vacation responder',
+    'Gmail Vacation Responder',
+    'Set up a vacation auto-responder.',
+  ])('leaves "%s" alone', (input) => {
+    for (const dialect of MAILBOX_DIALECTS) expect(au(input, { dialect }), dialect).toBe(input);
+  });
+});
+
+describe('a vacation is still a holiday', () => {
+  it.each`
+    input                           | expected
+    ${'my vacation'}                | ${'my holiday'}
+    ${'Plan your summer vacation.'} | ${'Plan your summer holiday.'}
+    ${'vacationing in Bali'}        | ${'holidaying in Bali'}
+    ${'Book a vacation before you turn on the vacation responder.'} | ${'Book a holiday before you turn on the vacation responder.'}
   `('$input -> $expected', ({ input, expected }) => {
     for (const dialect of MAILBOX_DIALECTS) expect(au(input, { dialect }), dialect).toBe(expected);
   });

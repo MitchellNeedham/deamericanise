@@ -26,7 +26,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { DIALECTS, MEASURES, commentSpans, deamericanise, deamericaniseCode, lexerFor } from '../src/index.js';
-import type { AmericanSignals, Change, CodeOptions, Result } from '../src/index.js';
+import type { AmericanSignals, Change, CodeOptions, LexEntry, Result } from '../src/index.js';
 import { applyChanges, type Range } from '../src/engine/apply.js';
 import { spellingEntries } from '../src/rules/spelling/index.js';
 import { baseVocabulary } from '../src/rules/vocabulary.js';
@@ -225,45 +225,37 @@ const startsOnWrittenOutYear = (v: Violation): boolean =>
   /^\d{4}\b/.test(v.change.before) &&
   v.origin.after.endsWith(v.change.before.slice(0, 4));
 
+const VOCABULARY = [...baseVocabulary(), ...Object.values(DIALECTS).flatMap((pack) => pack.vocabulary)];
+
+/** Must match `CONTEXT_WINDOW` in src/engine/lexicon.ts. */
+const GUARD_WINDOW = 80;
+
+/** Whether `entry`'s guards let the span through when they see `window` characters either side. */
+function passesGuards(entry: LexEntry, text: string, start: number, end: number, window: number): boolean {
+  const before = text.slice(Math.max(0, start - window), start);
+  const after = text.slice(end, end + window);
+  if (entry.requireBefore && !entry.requireBefore.test(before)) return false;
+  if (entry.requireAfter && !entry.requireAfter.test(after)) return false;
+  if (entry.forbidBefore && entry.forbidBefore.test(before)) return false;
+  if (entry.forbidAfter && entry.forbidAfter.test(after)) return false;
+  return true;
+}
+
+/** The word's guards refuse it with the whole text in view, but not within their window. */
+const beyondGuardWindow = (v: Violation): boolean => {
+  const change = v.change;
+  if (change === undefined) return false;
+  const entries = VOCABULARY.filter((e) => e.ruleId === change.ruleId && e.from === change.before.toLowerCase());
+  return (
+    entries.some((e) => passesGuards(e, v.text, change.start, change.end, GUARD_WINDOW)) &&
+    !entries.some((e) => passesGuards(e, v.text, change.start, change.end, Infinity))
+  );
+};
+
 const localise = { preset: 'localise' } as const;
 const american = { assumeAmerican: true } as const;
 
 const KNOWN_FAILURES: KnownFailure[] = [
-  {
-    issue: 152,
-    property: 'idempotence',
-    input: 'Paid tuition.',
-    options: localise,
-    matches: rewritesReplacement('tuition fees'),
-  },
-  {
-    issue: 152,
-    property: 'idempotence',
-    input: 'a garbage truck',
-    options: { ...localise, dialect: 'en-GB' },
-    matches: rewritesReplacement('rubbish truck', 'rubbish trucks'),
-  },
-  {
-    issue: 152,
-    property: 'idempotence',
-    input: 'the mailman',
-    options: { ...localise, dialect: 'en-GB' },
-    matches: rewritesReplacement('postie', 'posties'),
-  },
-  {
-    issue: 151,
-    property: 'idempotence',
-    input: 'a tractor trailer',
-    options: localise,
-    matches: rewritesReplacement('semi-trailer', 'semi-trailers'),
-  },
-  {
-    issue: 152,
-    property: 'idempotence',
-    input: 'an apartment building',
-    options: { ...localise, dialect: 'en-NZ' },
-    matches: rewritesReplacement('apartment block', 'apartment blocks'),
-  },
   {
     issue: 153,
     property: 'idempotence',
@@ -322,29 +314,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     input: 'On 03/04/2024 the storm hit.',
     options: { assumeAmerican: true, dates: { format: 'dmy' } },
     matches: (v) => v.change?.ruleId === 'dates.numeric' && v.origin?.ruleId === 'dates.numeric',
-  },
-  {
-    issue: 159,
-    property: 'idempotence',
-    input: 'Speeds of 2-622 miles an hour cost $1,317.',
-    options: {},
-    // The first run wrote something the second run's detection counts as a month-first date.
-    matches: (v) =>
-      v.verdicts !== undefined && v.verdicts[1].unambiguousMonthFirstDates > v.verdicts[0].unambiguousMonthFirstDates,
-  },
-  {
-    issue: 160,
-    property: 'idempotence',
-    input: 'The ridge is 911 feet high.',
-    options: { ...localise, units: { keepOriginal: true } },
-    matches: (v) => v.change?.before === '911' || v.origin?.before === '911',
-  },
-  {
-    issue: 160,
-    property: 'idempotence',
-    input: 'It cost $1,911 to fix.',
-    options: { ...localise, ...american },
-    matches: (v) => v.change?.before === '911' || v.origin?.before === '911',
   },
   {
     issue: 88,
@@ -440,6 +409,14 @@ const KNOWN_FAILURES: KnownFailure[] = [
         v.origin.after.startsWith(amount)
       );
     },
+  },
+  {
+    issue: 186,
+    property: 'idempotence',
+    input: 'https://example.com/10th-grade?q=10th-grade 1/2pounds per square inch 0 by 0 cookies the ',
+    options: { ...localise, units: { keepOriginal: true } },
+    // The first run lengthened the text between the word and the context that refused it.
+    matches: (v) => v.origin === undefined && v.change?.category === 'vocabulary' && beyondGuardWindow(v),
   },
 ];
 
@@ -581,7 +558,9 @@ const structure: fc.Arbitrary<Structure> = fc.oneof(
   slug.map((w) => ({ text: `${w}.${w}@example.com`, block: false })),
   words.map((ws) => ({ text: `\`${ws.join(' ')}\``, block: false })),
   slug.map((w) => ({ text: `<span class="${w}">`, block: false })),
-  words.map((ws) => ({ text: `\`\`\`\n${ws.join('\n')}\n\`\`\``, block: true })),
+  fc
+    .tuple(fc.constantFrom('```', '~~~', '````'), words)
+    .map(([fence, ws]) => ({ text: `${fence}\n${ws.join('\n')}\n${fence}`, block: true })),
 );
 
 type Piece = { prose: string } | { structure: Structure };

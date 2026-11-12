@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { deamericanise, deamericaniseText } from '../src/index.js';
-import type { Change } from '../src/index.js';
+import { analyse, deamericanise, deamericaniseText, resolveOptions } from '../src/index.js';
+import type { Change, Options, RuleContext } from '../src/index.js';
 import { resolveChanges } from '../src/engine/apply.js';
+import { patternRules } from '../src/rules/index.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
 import { NUMERIC_PATTERN, parseNumber } from '../src/rules/units/number.js';
 
@@ -338,6 +339,50 @@ describe('fractions and ranges', () => {
   });
 });
 
+describe('a number that is not finite', () => {
+  it.each`
+    unchanged
+    ${'It is 5/0 inches.'}
+    ${'a 1/0 mile walk'}
+    ${'0/0 feet'}
+    ${'1 1/0 miles'}
+    ${'1/0-2 inches'}
+    ${'1/0 x 2 feet'}
+    ${'5 feet 1/0 inches'}
+    ${'7 pounds 1/0 ounces'}
+  `('leaves "$unchanged" alone', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input              | expected
+    ${'1/2 inch'}      | ${'1.3 centimetres'}
+    ${'0 inches'}      | ${'0 millimetres'}
+    ${'1 1/2 miles'}   | ${'2.4 kilometres'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each(['5/0', '-5/0', '0/0', '1 1/0'])('reads "%s" as no number', (raw) => {
+    expect(parseNumber(raw)).toBeNull();
+  });
+
+  it('never writes NaN or Infinity in any unit', () => {
+    const rules = Object.fromEntries(MEASURES.map((m) => [m.id, true]));
+    const options = { assumeAmerican: true, rules, units: { respectConventions: false } };
+    const shapes = ['5/0', '0/0', '1 1/0', '1/0-2', '2 to 1/0', '1/0 x 2', '2 x 3 x 1/0'];
+    const written: string[] = [];
+    for (const unit of MEASURES.flatMap((m) => [...m.words, ...m.abbrevs])) {
+      for (const shape of shapes) {
+        for (const change of deamericanise(`It is ${shape} ${unit} long.`, options).changes) {
+          if (/NaN|Infinity/.test(change.after)) written.push(`${change.before} -> ${change.after}`);
+        }
+      }
+    }
+    expect(written).toEqual([]);
+  });
+});
+
 describe('a range opens only on a number that can be its first end', () => {
   it.each`
     input                                    | expected                                    | why
@@ -594,6 +639,21 @@ describe('a held span in change resolution', () => {
     const beside = at(0, 5);
     expect(resolveChanges([held, whole, beside], [])).toEqual([beside, whole]);
   });
+
+  it('keeps a change that writes its part of it back as it was', () => {
+    const quote = at(19, 22, { before: 'x."', after: 'x".' });
+    expect(resolveChanges([held, quote], [])).toEqual([quote]);
+    expect(resolveChanges([held, at(19, 22, { before: 'x."', after: 'y".' })], [])).toEqual([]);
+  });
+
+  it.each`
+    input                                                  | expected
+    ${'The sign said "It cost 500 pounds."'}               | ${'The sign said "It cost 500 pounds".'}
+    ${'They called it "a fine of 200 pounds," then left.'} | ${'They called it "a fine of 200 pounds", then left.'}
+    ${'She said "I need bolts of ½-¾ inch."'}              | ${'She said "I need bolts of ½-¾ inch".'}
+  `('moves the stop out of a quotation that ends in a held span: $input', ({ input, expected }) => {
+    expect(deamericaniseText(input, { preset: 'localise' })).toBe(expected);
+  });
 });
 
 describe('units can be switched off', () => {
@@ -664,6 +724,46 @@ describe('a dimension with a different unit on each side', () => {
     ${'units.length.inch'}
   `('leaves it whole when $rule is off', ({ rule }) => {
     expect(convert('2 feet x 6 inches', { rules: { [rule]: false } })).toBe('2 feet x 6 inches');
+  });
+});
+
+describe('a count before a weight or volume', () => {
+  it.each`
+    input                                      | expected                                       | why
+    ${'buy 2 x 4 oz cans'}                     | ${'buy 2 x 110 g cans'}                        | ${'two cans of 4 oz each'}
+    ${'a case of 6 x 12 fl oz bottles'}        | ${'a case of 6 x 350 mL bottles'}              | ${'a volume'}
+    ${'2 x 5 lb bags of flour'}                | ${'2 x 2.3 kg bags of flour'}                  | ${'a count at the start'}
+    ${'2 × 4 oz cans'}                         | ${'2 × 110 g cans'}                            | ${'the multiplication sign'}
+    ${'2 x 6 x 12 oz cans'}                    | ${'2 x 6 x 340 g cans'}                        | ${'two counts'}
+    ${'buy 2 x 4 ounce cans'}                  | ${'buy 2 x 110 gram cans'}                     | ${'the count opens the phrase, so it stays singular'}
+    ${'a case of 6 x 12 fluid ounce bottles'}  | ${'a case of 6 x 350 millilitre bottles'}      | ${'the same for a volume'}
+    ${'6 x 1 pound'}                           | ${'6 x 450 grams'}                             | ${'no noun after, so it is plural'}
+    ${'2 x 4 lb 8 oz bags'}                    | ${'2 x 2.04 kg bags'}                          | ${'a weight in two units'}
+    ${'3 x 100 sq ft rolls'}                   | ${'3 x 9.3 m² rolls'}                          | ${'an area'}
+    ${'2 lb x 3 lb'}                           | ${'910 g x 1.4 kg'}                            | ${'two weights are two measurements'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                    | expected
+    ${'10 x 12 feet'}        | ${'3 x 3.7 metres'}
+    ${'8.5" x 11"'}          | ${'22 x 28 cm'}
+    ${'2 feet x 6 inches'}   | ${'61 x 15 centimetres'}
+  `('still reads a length as a dimension: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                       | options                                     | why
+    ${'a 2 x 4 stud'}               | ${{}}                                       | ${'no unit at all'}
+    ${'a 15" x 17" panel'}          | ${{}}                                       | ${'a conventional size'}
+    ${'It cost 2 x 5 pounds.'}      | ${{}}                                       | ${'money, with the count in its amount'}
+    ${'Babies weigh 7-8 lb 4 oz.'}  | ${{}}                                       | ${'a weight at the end of a range'}
+    ${'buy 2 x 4 oz cans'}          | ${{ rules: { 'units.mass.ounce': false } }} | ${'the unit is switched off'}
+    ${'2 x 11 stone 4 pounds'}      | ${{ dialect: 'en-GB' }}                     | ${'a unit of the weight is kept'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged, options }) => {
+    expect(convert(unchanged, options)).toBe(unchanged);
   });
 });
 
@@ -1075,6 +1175,71 @@ describe('a written-out number of two words', () => {
   });
 });
 
+describe('a written-out number with hundred or thousand', () => {
+  it.each`
+    input                                         | expected                     | why
+    ${'one hundred and twenty feet'}              | ${'37 metres'}               | ${'with "and"'}
+    ${'one hundred twenty feet'}                  | ${'37 metres'}               | ${'without "and"'}
+    ${'two hundred and fifty pounds of flour'}    | ${'110 kilograms of flour'}  | ${'before "of"'}
+    ${'five thousand and twenty feet'}            | ${'1.5 kilometres'}          | ${'thousand'}
+    ${'one hundred and twenty-five miles'}        | ${'200 kilometres'}          | ${'a cardinal of two words after "and"'}
+    ${'one hundred twenty two feet'}              | ${'37 metres'}               | ${'the same, spaced, without "and"'}
+    ${'a hundred miles'}                          | ${'160 kilometres'}          | ${'counted by "a"'}
+    ${'a thousand feet'}                          | ${'300 metres'}              | ${'the same, for thousand'}
+    ${'two thousand five hundred feet'}           | ${'760 metres'}              | ${'hundreds after thousands'}
+    ${'two thousand five hundred and fifty feet'} | ${'780 metres'}              | ${'and a cardinal after both'}
+    ${'twenty-two hundred feet'}                  | ${'670 metres'}              | ${'a count of two words'}
+    ${'Two Hundred Miles'}                        | ${'320 kilometres'}          | ${'in capitals'}
+    ${'He weighs two hundred pounds.'}            | ${'He weighs 91 kilograms.'} | ${'a weight with no money in sight'}
+    ${'a hundred-foot tree'}                      | ${'a 30 metre tree'}         | ${'attributive'}
+    ${'a two-hundred-foot cliff'}                 | ${'a 61 metre cliff'}        | ${'attributive, hyphenated throughout'}
+    ${'a hundred and twenty-foot drop'}           | ${'a 37 metre drop'}         | ${'"and" makes the hyphenated cardinal part of the number'}
+    ${'a hundred\nmiles'}                         | ${'160 kilometres'}          | ${'the unit may wrap onto the next line'}
+    ${'a hundred miles and a half'}               | ${'160 kilometres'}          | ${'with the fraction after the unit'}
+    ${'two hundred pounds eight ounces'}          | ${'90.9 kilograms'}          | ${'a weight in two units'}
+    ${'twenty-two pounds of beef'}                | ${'10 kilograms of beef'}    | ${'a cardinal of two words on its own still reads'}
+    ${'two and a half feet'}                      | ${'76 centimetres'}          | ${'as does "and a half"'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                     | why
+    ${'hundreds of miles'}                        | ${'a plural is not a number'}
+    ${'a few hundred feet'}                       | ${'no count before the multiplier'}
+    ${'between one hundred and two hundred miles'} | ${'"and" joins a range here, which is never half converted'}
+    ${'one hundred to two hundred miles'}         | ${'the same, with "to"'}
+    ${'twenty-two hundred hours'}                 | ${'a time'}
+    ${'one hundred and a half feet'}              | ${'a fraction is never what follows the multiplier'}
+    ${'one hundred and twenty and a half feet'}   | ${'nor after the cardinal that follows it'}
+    ${'two thousand and five hundred feet'}       | ${'"and" before a second multiplier'}
+    ${'a hundred thousand miles'}                 | ${'a multiplier counted by a multiplier'}
+    ${'one thousand, two hundred feet'}           | ${'a comma between the parts'}
+    ${'two hundred two-foot boards'}              | ${'two hundred boards or one length'}
+    ${'one hundred twenty-foot drop'}             | ${'the same, for a tens word'}
+    ${'one hundred\ntwenty feet'}                 | ${'the cardinal is cut off from its multiplier'}
+    ${'one hundred and\ntwenty feet'}             | ${'the same, after "and"'}
+    ${'It cost two hundred and fifty pounds.'}    | ${'money, read whole'}
+    ${'She earns forty thousand pounds a year.'}  | ${'a rate of pay'}
+    ${'a hundred-pound note'}                     | ${'a thing priced in pounds'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    words                          | value
+    ${'a hundred'}                 | ${100}
+    ${'one hundred and twenty'}    | ${120}
+    ${'one hundred twenty-two'}    | ${122}
+    ${'two thousand five hundred'} | ${2500}
+    ${'five thousand and twenty'}  | ${5020}
+    ${'twenty-two hundred'}        | ${2200}
+    ${'hundred'}                   | ${null}
+  `('reads "$words" as $value', ({ words, value }) => {
+    expect(parseNumber(words)).toBe(value);
+  });
+});
+
 describe('a fraction word that is also an ordinal', () => {
   const cups = (input: string) => convert(input, { rules: { 'units.volume.cup': true } });
 
@@ -1222,7 +1387,7 @@ describe('pounds of money are not weights', () => {
     ${'Tickets are £10 for adults and 5 pounds for children.'} | ${'a £ in the sentence'}
     ${'The house sold for a million pounds.'}                  | ${'a scale word is not read as a number'}
     ${'She paid 2 million pounds.'}                            | ${'the same'}
-    ${'It cost a hundred pounds.'}                             | ${'the same'}
+    ${'It cost a hundred pounds.'}                             | ${'a hundred, read whole, is still money'}
     ${'It only costs a few pounds.'}                           | ${'no number at all'}
     ${'It costs $4 per pound.'}                                | ${'a price per weight has no number before the unit'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
@@ -1248,6 +1413,8 @@ describe('pounds of money are not weights', () => {
     ${'Beef is £4 a pound, so 3 pounds comes to £12.'}          | ${'Beef is £4 a pound, so 1.4 kilograms comes to £12.'}      | ${'a price by the pound'}
     ${'It cost £3. The bag held 5 pounds.'}                     | ${'It cost £3. The bag held 2.3 kilograms.'}                 | ${'the £ is in another sentence'}
     ${'Prices are £4 for 2 lb.'}                                | ${'Prices are £4 for 910 g.'}                                | ${'an abbreviation is never money'}
+    ${'It cost 500 lbs.'}                                       | ${'It cost 230 kg.'}                                         | ${'the same, after a money verb'}
+    ${'I want to lose 2 pounds a week.'}                        | ${'I want to lose 910 grams a week.'}                        | ${'a weight verb outranks a rate'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -1255,6 +1422,40 @@ describe('pounds of money are not weights', () => {
   it('leaves money alone when respectConventions is off', () => {
     const options = { units: { respectConventions: false } };
     expect(convert('It cost 500 pounds.', options)).toBe('It cost 500 pounds.');
+  });
+
+  /** The spans the unit rules hold as written in `text`. */
+  const held = (text: string, options: Options = {}): string[] => {
+    const resolved = resolveOptions(options);
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold)
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                               | amount             | why
+    ${'It cost 500 pounds.'}            | ${'500 pounds'}    | ${'a single amount'}
+    ${'It cost 911 pounds.'}            | ${'911 pounds'}    | ${'a number that is also an emergency number'}
+    ${'It cost 10-20 pounds.'}          | ${'10-20 pounds'}  | ${'a range'}
+    ${'The tickets are 2 x 10 pounds.'} | ${'2 x 10 pounds'} | ${'a dimension'}
+    ${'It cost half a pound.'}          | ${'half a pound'}  | ${'a written-out quantity'}
+  `('holds $amount whole, so no rule can rewrite part of it ($why)', ({ input, amount }) => {
+    expect(held(input)).toContain(amount);
+    expect(held(input, { units: { respectConventions: false } })).toContain(amount);
+  });
+
+  it.each`
+    input                                      | dialect
+    ${'It cost 911 pounds.'}                   | ${'en-AU'}
+    ${'It cost 911 pounds.'}                   | ${'en-GB'}
+    ${'The prize is 911 pounds and a trophy.'} | ${'en-AU'}
+  `('leaves "$input" whole in $dialect under localise', ({ input, dialect }) => {
+    expect(deamericaniseText(input, { preset: 'localise', dialect })).toBe(input);
+    expect(
+      deamericaniseText(input, { preset: 'localise', dialect, units: { respectConventions: false } }),
+    ).toBe(input);
   });
 });
 

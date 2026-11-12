@@ -85,6 +85,9 @@ has to match a rule id of at least one dialect, so a command line shared across 
 still runs under `en-CA`, which has no `dialect.*` rules. `--units-keep` takes a unit's
 key, such as `inch` or `square-foot`, or any name the unit is written as, such as `inches`
 or `in`. Any other value stops the run with `unknown rule "..."` or `unknown unit "..."`
+and exit status 2. The value after a rule's `=` is `true`, `on`, `1` or `yes` to switch it
+on, or `false`, `off`, `0` or `no` to switch it off, in any case. A pattern with no `=`
+switches the rule off, and any other value stops the run with `unknown rule value "..."`
 and exit status 2.
 
 `LICENSE`, `COPYING` and `AUTHORS` are not on the list. A licence has to stay verbatim, and
@@ -158,8 +161,9 @@ nearest mailbox`), and otherwise the letterbox the other dialects say. A mailbox
 email or voicemail is neither, so it stays a mailbox in every dialect.
 
 `en-IE` and `en-ZA` follow British usage with local emergency numbers and a few words of
-their own. `en-CA` is the hybrid: it keeps `colour`, `centre` and `defence` but also keeps
-`-ize`, `aluminum`, `math`, `tire` and `gas`.
+their own, such as the Irish `school tour` for a field trip. `en-CA` is the hybrid: it
+keeps `colour`, `centre` and `defence` but also keeps `-ize`, `aluminum`, `math`, `tire`
+and `gas`.
 
 `en-GB` leaves miles, mph, pints and stone alone, because Britain still uses them, and a
 weight in stone and pounds stays whole. Turn a unit back on by id if you disagree:
@@ -206,11 +210,15 @@ not; `in the fall of 2024` becomes autumn but `prices will fall` does not; `bake
 cookies` becomes biscuits but `Accept all cookies`, `This site uses cookies` and a lone
 `Cookies` link do not; `Check the mailbox for the parcel` becomes a letterbox but `Your
 mailbox is full`, `a shared mailbox in Outlook`, `a voicemail mailbox` and a lone `Mailbox`
-label do not. Phrases the rest of the world already says keep their words:
+label do not; `take out the trash` becomes rubbish but `Empty the trash in Gmail` and
+`Drag the file to the Trash` do not; `my vacation` becomes a holiday but Gmail's `Vacation
+responder` does not. Phrases the rest of the world already says keep their words:
 `fortune cookie`, `food truck`, `my way or the highway`, `Highway 101`, `seat of your
 pants`, `ants in his pants`, `yoga pants`. In British English a `fire truck` is a fire engine
-and a `pickup truck` stays one. The verb stays too: `the dog pants heavily` keeps its `pants`,
-while `his pants were wet` becomes `his trousers were wet`.
+and a `pickup truck` stays one. Only a trailer people live or holiday in becomes a caravan:
+a `travel trailer` does, while a `boat trailer` and a `movie trailer` stay trailers. The
+verb stays too: `the dog pants heavily` keeps its `pants`, while `his pants were wet`
+becomes `his trousers were wet`.
 
 **Units.** Length, area, mass, volume, temperature, speed, pressure, power, torque and
 fuel economy. The volume measures are the US ones, which are not the imperial ones.
@@ -228,8 +236,10 @@ alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
 `22 x 28 centimetres`, both ends sharing the unit chosen for the larger. Each side is read
 in its own unit, so `2 feet x 6 inches` becomes `61 x 15 centimetres` and `10 ft x 12 in`
 becomes `3 x 0.3 m`, where the `in` is the unit because the side before it has one. Sides
-that measure different things, as in `2 feet x 6 pounds`, convert as two measurements. A
-dimension is left as written when a side with no unit sits between two different units
+that measure different things, as in `2 feet x 6 pounds`, convert as two measurements.
+Only a length has sides. Before any other unit a bare number is a count, and the quantity
+after it converts on its own: `2 x 4 oz cans` becomes `2 x 110 g cans`, and
+`2 x 4 lb 8 oz bags` becomes `2 x 2.04 kg bags`. A dimension is left as written when a side with no unit sits between two different units
 (`10 ft x 12 x 6 in`), or when the rule for one of its units is switched off.
 
 A weight in two units is one weight, as a height in feet and inches is one height:
@@ -254,6 +264,17 @@ A tens word and a units word are one number, joined by a hyphen or a space:
 starts inside a hyphenated word or straight after a tens word, so a compound that cannot be
 read whole is left as written. That covers `catch-twenty-two miles`, and
 `twenty five-pound bags`, which may be twenty bags or one weight.
+
+`hundred` and `thousand` multiply the count before them (`a`, `an` or a cardinal of one or
+two words), and a cardinal may follow, with or without `and`: `a hundred miles` becomes
+`160 kilometres`, `one hundred and twenty feet` becomes `37 metres`, and
+`two thousand five hundred feet` and `twenty-two hundred feet` convert too. A number never
+starts after `hundred` or `thousand` with at most a comma, `and` or `to` between, so
+`hundreds of miles`, `a few hundred feet`, `between one hundred and two hundred miles` and
+`a hundred thousand miles` are left as written. `It cost a hundred pounds.` is still money.
+
+A fraction with a zero denominator, as in `5/0 inches`, is not a quantity, so it is left as
+written, and so is a height or weight it is part of, as in `5 feet 1/0 inches`.
 
 A number never continues onto the next line, so the `14` that ends `Step 14` is never taken
 as the whole part of a `1/2 gallon` that opens the next line. The rest of a measurement can
@@ -334,11 +355,18 @@ pounds (`a 10-pound note`). A money word reaches only its own amount, so
 `It cost $20 for 5 pounds of beef` still converts. A `£` reaches the whole sentence, but a
 weight word in the measurement's own phrase (`lost`, `weighs`, `of beef`, `a 5-pound bag`)
 outranks it. `lb` and `lbs` are never money, and `respectConventions: false` does not
-convert money.
+convert money. An amount of money is held whole, as a conventional size is, so no other
+rule rewrites any part of it.
 
 **Dates.** `3/14/2024` becomes `2024-03-14` without needing to be told anything, because
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
 surrounding text is American enough to trust; see below. Output is ISO by default, with `dmy` and `long` available.
+
+The same separator has to appear twice, so `3.22-1000` is a range, not a date. A dotted
+date needs a four-figure year, because `1.13.24` is far more often a version number, and
+nothing straight after a version word such as `version`, `v`, `release`, `Node` or
+`Python` is a date. So `On 3.14.2024 we left.` becomes `On 2024-03-14 we left.`, while
+`Upgrade to version 1.13.24` and `Node 1.13.24` stay as written.
 
 `March 5, 2024` names its month, so nobody can misread it. Reordering it to `5 March 2024`
 is local convention rather than translation, and waits for `localise` (or
@@ -413,7 +441,12 @@ analyse('Preheat the oven to 350 degrees. Mix 2 cups of flour with 1 stick of bu
 ```
 
 The oven is not counted in a sentence about a pizza oven, a wood-fired oven or a
-pyrolytic clean, all of which do run that hot in Celsius. A cup is no evidence at all,
+pyrolytic clean, all of which do run that hot in Celsius. The number has to belong to
+the cooking: a word that names a thing (`bake sale`, `bake-off`, `baked goods`,
+`baked beans`, `baking tin`) is no cue, and a verb that takes an amount of its own
+(`came to`, `rose to`, `raised`, `cost`, `sold`) stops the search, so
+`The bake sale takings came to 320.` has no oven in it, while
+`Bake at 350 and sell them at the bake sale.` does. A cup is no evidence at all,
 since Australia and New Zealand cook in metric cups. A measured ingredient under a name
 only Americans use, such as `1 cup all-purpose flour` or `2 tablespoons cornstarch`,
 counts like any other vocabulary, unless the local name sits beside it, as it does in
@@ -421,11 +454,17 @@ counts like any other vocabulary, unless the local name sits beside it, as it do
 
 A temperature counts as `Fahrenheit` in exactly the forms the unit rules convert, so
 `165 degrees F` counts, `Cook until the chicken reaches 165F` counts, and `Apartment 3F`
-does not. The word `Fahrenheit` on its own counts too.
+does not. The word `Fahrenheit` on its own counts too where it names the scale, as in
+`Set the thermostat in Fahrenheit`, but not straight before a number, where it is part
+of a title such as `Fahrenheit 451` or `Fahrenheit 9/11`.
 
 Pounds count as `imperial units` only where the unit rules read them as a weight, so
 `2 pounds of ground beef` counts, and the money in `It cost 1,500 pounds` or
 `400 pounds a week` does not.
+
+A numeric date counts as month-first or day-first in exactly the forms the date rule
+reads, so `3/14/2024` counts as month-first and `14/3/2024` as day-first, while the range
+`3.22-1000` and the version in `Node 14.2.10` count for neither.
 
 Ambiguous dates ask a narrower question first, because a document writes its dates one way
 round: a sibling date that states its own order, whether by a day above 12 or by a named
@@ -452,7 +491,12 @@ deamericaniseText(text, { minAmericanConfidence: 0.4 });
   Inline code is paired the way CommonMark pairs it: a span closes on a run of as many
   backticks as opened it, so ``` ``a ` b`` ``` is one span, and it may wrap onto the next
   line of its paragraph. A backtick with no partner before the paragraph ends, or one
-  escaped as `` \` ``, protects nothing.
+  escaped as `` \` ``, protects nothing. A fenced code block opens on a line that starts with
+  three or more backticks or tildes and closes on a line of the same character at least as
+  long, so a fence of four backticks can hold one of three. A fence that never closes runs to
+  the end of the text. A prose file that is not Markdown, such as `.rst` or `.txt`, has no
+  such fences, since a line of tildes there underlines a heading: three backticks protect
+  everything up to the next three.
 - **Identifiers,** when `protectIdentifiers` is on (the default for source files):
   `normalizeInput`, `MAX_COLOR_VALUE`, `background-color`, `theme.colors.gray`,
   `--color-scheme`, `getColor()`.
@@ -767,6 +811,9 @@ there each root needs the rules in its own styles.
 
 `units`, `dates`, `times` and `currency` each accept `false` to switch the category off.
 
+A `dialect` or `preset` outside its list throws an `Error` that names the value and the
+ones it accepts, such as `Unknown preset: Localise. Expected one of read, localise.`
+
 ## Known limits
 
 - The sense-dependent rules are heuristics over a window of surrounding text. They are
@@ -779,6 +826,13 @@ there each root needs the rules in its own styles.
   from its lines: a blank line, or a line that opens a heading, quote, list item, fence,
   rule or table row, ends it. A span that wraps onto the next `>` line of a block quote is
   therefore not protected. The remark plugin reads the real structure.
+- Outside the remark plugin, a fence is read from its own lines, without the list items and
+  quotes around it. A fence that a list item or quote ends without a closing line therefore
+  runs on to the next line that would close it, or to the end of the text. Comments and
+  docstrings are read as Markdown, so a tilde heading underline in a reStructuredText
+  docstring leaves the text up to the next one as written.
+- Outside the remark plugin, an indented code block is rewritten like the prose around it:
+  telling it from indented prose needs to know the text is Markdown.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`
   or `keepOriginal` where the numbers matter.
 - A number that a hard wrap splits, such as `1` at the end of one line and `1/2 gallons` at
@@ -805,8 +859,14 @@ there each root needs the rules in its own styles.
   sentence. `Set up your voicemail. Your mailbox has not been set up.` still gives a
   letterbox, because the second sentence says nothing about voicemail. A bare `The mailbox
   is full.` reads as a bounce notice and stays a mailbox, though it can be a letterbox.
+- The trash of an email client or file manager is told from household rubbish the same way,
+  and a capitalised `Trash` partway through a sentence is read as the folder's name. So a
+  heading in title case, such as `How to Take Out the Trash`, keeps its trash.
 - `localise` rewrites emergency numbers, which is right for a translated recipe and wrong
-  for a news story about America. It is `risky`-tagged; `--confidence safe,moderate` drops
+  for a news story about America. It changes `911` only where the text calls it or names
+  the service by it (`call 911`, `dial 911`, `a 911 call`, `911 dispatchers`), so `$1,911`,
+  `911 feet`, `Porsche 911` and `Room 911` stay as written, and so does a bare
+  `Emergency: 911`. It is `risky`-tagged; `--confidence safe,moderate` drops
   it, and so does `--rule 'dialect.*=false'`.
 
 ## The browser demo

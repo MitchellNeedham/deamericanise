@@ -42,6 +42,10 @@ const CARDINALS: Record<string, number> = {
   sixty: 60, seventy: 70, eighty: 80, ninety: 90,
 };
 
+/** Multipliers, read only after a count: `a hundred`, `twenty-two hundred`. */
+const SCALES: Record<string, number> = { hundred: 100, thousand: 1000 };
+const SCALE = Object.keys(SCALES).join('|');
+
 const DENOMINATORS: Record<string, number> = {
   half: 2, halves: 2, quarter: 4, quarters: 4, third: 3, thirds: 3, fourth: 4, fourths: 4,
   eighth: 8, eighths: 8, sixteenth: 16, sixteenths: 16,
@@ -82,13 +86,18 @@ export const FRACTION_WORDS = String.raw`(?:${COUNTED_FRACTION}|(?:${FRAC}))`;
 const NOT_AFTER_AND = String.raw`(?<!(?:\d|\b(?:${CARD}))${softGap('and')})`;
 const NOT_AFTER_COUNT = String.raw`(?<!\b(?:${CARD}|an?)-?${SOFT_SPACE})`;
 
+const SPACING = String.raw`(?:${SOFT_BREAK}|${INLINE_SPACE}+)`;
+
 /**
- * Where a written-out number may start: not inside a hyphenated word and not straight after
- * a tens word, so whatever of `catch-twenty-two`, `twenty-twenty` or `twenty five-pound` the
- * table cannot read is left whole. A tens word ending the line above counts as well.
+ * Where a written-out number may start: not inside a hyphenated word, not straight after a
+ * tens word, and not after `hundred` or `thousand` with at most a comma, `and` or `to`
+ * between. So whatever of `catch-twenty-two`, `twenty-twenty`, `twenty five-pound` or
+ * `between one hundred and two hundred` the table cannot read is left whole. A word ending
+ * the line above counts as well.
  */
 export const NOT_IN_COMPOUND =
-  String.raw`(?<![A-Za-z]-)(?<!\b(?:${TENS.join('|')})-?(?:${SOFT_BREAK}|${INLINE_SPACE}+))`;
+  String.raw`(?<![A-Za-z]-)` +
+  String.raw`(?<!\b(?:(?:${TENS.join('|')})-?|(?:${SCALE}),?(?:${SPACING}(?:and|to))?)${SPACING})`;
 
 /**
  * `body`, unless `guard` finds it is the tail of a longer number. The lookahead keeps the
@@ -99,18 +108,43 @@ function unlessTail(guard: string, body: string): string {
 }
 
 /** A cardinal of one word or two: `seven`, `twenty-two`, `twenty two`. */
-const CARDINAL = unlessTail(NOT_IN_COMPOUND, String.raw`(?:${COMPOUND}|${CARD})`);
+const CARDINAL_WORDS = String.raw`(?:${COMPOUND}|${CARD})`;
+const CARDINAL = unlessTail(NOT_IN_COMPOUND, CARDINAL_WORDS);
+
+/**
+ * A count times `hundred` or `thousand`: `a hundred`, `twenty-two hundred`,
+ * `two thousand five hundred`.
+ */
+const MULTIPLIED =
+  String.raw`(?:an?${INLINE_SPACE}+|${CARDINAL_WORDS}${SPACE_OR_HYPHEN})` +
+  String.raw`(?:thousand\b(?:${INLINE_SPACE}+(?:${ONES.join('|')})${SPACE_OR_HYPHEN}hundred\b)?|hundred\b)`;
+
+/**
+ * A whole number in words: a cardinal, a multiplied count, or a multiplied count and then a
+ * cardinal with or without `and`, as in `one hundred and twenty` and `one hundred twenty`.
+ * A cardinal never stops short of the multiplier after it, so `between one hundred and two
+ * hundred` is not `one hundred and two` and a stray `hundred`. Without `and`, a cardinal
+ * hyphenated to what follows is not part of the number, since `two hundred two-foot boards`
+ * can be two hundred boards.
+ *
+ * The first alternative ends every number that ends in a cardinal, so read backwards, as the
+ * compound rules read the number before theirs, the pattern scans the cardinals once.
+ */
+const WHOLE_WORDS =
+  String.raw`(?=an?${INLINE_SPACE}+(?:${SCALE})\b|${CARD})${NOT_IN_COMPOUND}` +
+  String.raw`(?:(?:${MULTIPLIED}${INLINE_SPACE}+(?:and${INLINE_SPACE}+|(?=${CARDINAL_WORDS}(?![\w-]))))?` +
+  String.raw`${CARDINAL_WORDS}(?!${SPACE_OR_HYPHEN}(?:${SCALE})\b)|${MULTIPLIED})`;
 
 const WORD_NUMBER = [
   String.raw`(?:${CARDINAL}|\d+)${INLINE_SPACE}+and${INLINE_SPACE}+(?:${CARD}|an?)${SPACE_OR_HYPHEN}(?:${FRAC})`,
   unlessTail(NOT_AFTER_AND + NOT_IN_COMPOUND, String.raw`(?:${CARD})${SPACE_OR_HYPHEN}(?:${FRAC})`),
-  CARDINAL,
+  WHOLE_WORDS,
   unlessTail(NOT_AFTER_AND + NOT_IN_COMPOUND, String.raw`an?${INLINE_SPACE}+(?:${FRAC})`),
   unlessTail(NOT_AFTER_COUNT + NOT_IN_COMPOUND, String.raw`(?:${BARE_FRAC})`),
 ].join('|');
 
-/** A whole number in digits or words: `2`, `1,200`, `two`, `twenty-two`. */
-export const WHOLE_NUMBER = String.raw`(?:${DIGITS}|${CARDINAL})`;
+/** A whole number in digits or words: `2`, `1,200`, `two`, `twenty-two`, `a hundred`. */
+export const WHOLE_NUMBER = String.raw`(?:${DIGITS}|${WHOLE_WORDS})`;
 
 /**
  * Digits only. Ranges and dimensions use this rather than the full pattern, because a
@@ -127,8 +161,8 @@ export const NUMERIC_PATTERN = [
 
 /**
  * Matches `3`, `3.5`, `1,200`, `1 1/2`, `1½`, `3/4`, `one`, `three-quarters`,
- * `two and a half`, `a quarter`. The article in `a quarter` is part of the match, so a
- * caller that keeps it for a following noun has to split it off.
+ * `two and a half`, `a quarter`, `one hundred and twenty`. The article in `a quarter` is
+ * part of the match, so a caller that keeps it for a following noun has to split it off.
  */
 export const NUMBER_PATTERN = `${NUMERIC_PATTERN}|${WORD_NUMBER}`;
 
@@ -138,19 +172,33 @@ function cardinal(word: string): number | undefined {
   return CARDINALS[word];
 }
 
-/** `three-quarters`, `twenty-two`, `one and one-half`, `two and a half`, `a quarter`, `half`. */
+/**
+ * `three-quarters`, `twenty-two`, `one and one-half`, `two and a half`, `a quarter`, `half`,
+ * `one hundred and twenty`, `two thousand five hundred`.
+ */
 function parseWords(text: string): number | null {
   const parts = text.toLowerCase().replace(/-/g, ' ').split(/\s+/).filter((w) => w !== 'and');
   if (parts.length === 0) return null;
 
   let total = 0;
+  let group = 0;
   for (let i = 0; i < parts.length; i++) {
     const word = parts[i]!;
+    const scale = SCALES[word];
+    if (scale !== undefined) {
+      if (group === 0) return null;
+      if (word === 'hundred') group *= scale;
+      else {
+        total += group * scale;
+        group = 0;
+      }
+      continue;
+    }
     const denominator = DENOMINATORS[word];
     if (denominator !== undefined) {
       // A cardinal directly before it is the numerator: `three quarters`.
       const numerator = i > 0 && cardinal(parts[i - 1]!) !== undefined ? 0 : 1;
-      total += numerator / denominator;
+      group += numerator / denominator;
       continue;
     }
     let count = cardinal(word);
@@ -158,13 +206,19 @@ function parseWords(text: string): number | null {
     // A denominator after the pair divides all of it: `twenty-three quarters`.
     if (TENS.includes(word) && ONES.includes(parts[i + 1] ?? '')) count += CARDINALS[parts[++i]!]!;
     const next = parts[i + 1];
-    if (next && DENOMINATORS[next] !== undefined) total += count / DENOMINATORS[next]!;
-    else total += count;
+    if (next && DENOMINATORS[next] !== undefined) group += count / DENOMINATORS[next]!;
+    else group += count;
   }
-  return total;
+  return total + group;
 }
 
+/** The value `raw` is written as, or null where it is not a finite number, as `5/0` is not. */
 export function parseNumber(raw: string): number | null {
+  const value = readNumber(raw);
+  return value !== null && Number.isFinite(value) ? value : null;
+}
+
+function readNumber(raw: string): number | null {
   const text = raw.trim().replace(/−/g, '-').replace(/,/g, '');
   if (/[a-z]/i.test(text)) return parseWords(text);
   const sign = text.startsWith('-') ? -1 : 1;
@@ -182,8 +236,7 @@ export function parseNumber(raw: string): number | null {
   const fraction = body.match(/^(\d+)\/(\d+)$/);
   if (fraction) return sign * (Number(fraction[1]) / Number(fraction[2]));
 
-  const value = Number(body);
-  return Number.isFinite(value) ? sign * value : null;
+  return sign * Number(body);
 }
 
 /**

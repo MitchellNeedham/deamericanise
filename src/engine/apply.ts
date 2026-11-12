@@ -9,9 +9,25 @@ function overlaps(a: Range, b: Range): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
+/**
+ * The part of the source a change rewrites, without the text it writes back unchanged at
+ * either end, such as the `s` that `s."` keeps when it becomes `s".`.
+ */
+function rewritten(change: Change): Range {
+  const { before, after } = change;
+  const most = Math.min(before.length, after.length);
+  let head = 0;
+  while (head < most && before[head] === after[head]) head++;
+  let tail = 0;
+  while (tail < most - head && before.at(-1 - tail) === after.at(-1 - tail)) tail++;
+  return { start: change.start + head, end: change.end - tail };
+}
+
 /** `change` would rewrite some of `held` and leave the rest as written. */
-function splits(change: Range, held: Range): boolean {
-  return overlaps(change, held) && (change.start > held.start || change.end < held.end);
+function splits(change: Change, held: Range): boolean {
+  return (
+    overlaps(rewritten(change), held) && (change.start > held.start || change.end < held.end)
+  );
 }
 
 /**

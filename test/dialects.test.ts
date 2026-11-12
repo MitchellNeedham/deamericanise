@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DIALECTS, deamericaniseText } from '../src/index.js';
 import type { Dialect, LexEntry, RuleContext } from '../src/index.js';
 import { compileLexicon, findLexiconMatches } from '../src/engine/lexicon.js';
+import { spellingEntries } from '../src/rules/spelling/index.js';
+import { baseVocabulary } from '../src/rules/vocabulary.js';
 
 // The dialect overlays are vocabulary, so they need the localise preset.
 const say = (dialect: Dialect) => (input: string) =>
@@ -23,6 +25,59 @@ describe('the same sentence in each dialect', () => {
     expect(say('en-AU')(input), 'en-AU').toBe(au);
     expect(say('en-GB')(input), 'en-GB').toBe(gb);
     expect(say('en-NZ')(input), 'en-NZ').toBe(nz);
+  });
+});
+
+const EMERGENCY_NUMBERS: Array<[Dialect, string]> = [
+  ['en-AU', '000'],
+  ['en-GB', '999'],
+  ['en-NZ', '111'],
+  ['en-IE', '112'],
+  ['en-ZA', '10111'],
+];
+
+describe('911 is the emergency number only where it is called', () => {
+  it.each`
+    input                                          | expected
+    ${'Call 911 now.'}                             | ${'Call 000 now.'}
+    ${'If cell service is available, dial 911.'}   | ${'If cell service is available, dial 000.'}
+    ${'She called 911 at once.'}                   | ${'She called 000 at once.'}
+    ${'He was calling 911 when the line dropped.'} | ${'He was calling 000 when the line dropped.'}
+    ${'They dialled 911.'}                         | ${'They dialled 000.'}
+    ${'They dialed 911.'}                          | ${'They dialled 000.'}
+    ${'Ring 911 if he falls.'}                     | ${'Ring 000 if he falls.'}
+    ${'Phone 911 first.'}                          | ${'Phone 000 first.'}
+    ${'Call or text 911.'}                         | ${'Call or text 000.'}
+    ${'Calls to 911 rose last year.'}              | ${'Calls to 000 rose last year.'}
+    ${'Text to 911 works here.'}                   | ${'Text to 000 works here.'}
+    ${'She made a 911 call.'}                      | ${'She made a 000 call.'}
+    ${'The 911 dispatcher answered.'}              | ${'The 000 dispatcher answered.'}
+    ${'911 operators are trained for this.'}       | ${'000 operators are trained for this.'}
+    ${'Contact 911 emergency services.'}           | ${'Contact 000 emergency services.'}
+  `('$input -> $expected, with the local number in each dialect', ({ input, expected }) => {
+    for (const [dialect, number] of EMERGENCY_NUMBERS) {
+      expect(say(dialect)(input), dialect).toBe(expected.replace('000', number));
+    }
+  });
+
+  it.each`
+    unchanged                                     | why
+    ${'It cost $1,911 to fix.'}                   | ${'part of an amount'}
+    ${'It cost 911 pounds.'}                      | ${'an amount of money'}
+    ${'He drives a Porsche 911.'}                 | ${'a car'}
+    ${'Room 911 is on the ninth floor.'}          | ${'a room'}
+    ${'Flight 911 landed late.'}                  | ${'a flight'}
+    ${'The ridge is 280 metres (911 feet) high.'} | ${'a measurement'}
+    ${'Call Room 911.'}                           | ${'a room, though it is called'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    for (const [dialect] of EMERGENCY_NUMBERS) expect(say(dialect)(unchanged), dialect).toBe(unchanged);
+  });
+
+  it('keeps the figure in a converted measurement on a second run', () => {
+    const options = { preset: 'localise', units: { keepOriginal: true } } as const;
+    const once = deamericaniseText('The ridge is 911 feet high.', options);
+    expect(once).toBe('The ridge is 278 metres (911 feet) high.');
+    expect(deamericaniseText(once, options)).toBe(once);
   });
 });
 
@@ -61,13 +116,40 @@ describe('a dialect row outranks the shared row for the same word', () => {
     ${'two apartment buildings'}         | ${'en-GB'} | ${'two blocks of flats'}
     ${'Drop it in the nearest mailbox.'} | ${'en-GB'} | ${'Drop it in the nearest postbox.'}
     ${'public mailboxes'}                | ${'en-GB'} | ${'public postboxes'}
-    ${'a field trip'}                    | ${'en-IE'} | ${'a school trip'}
+    ${'a field trip'}                    | ${'en-IE'} | ${'a school tour'}
     ${'an apartment building'}           | ${'en-IE'} | ${'a block of flats'}
     ${'a field trip'}                    | ${'en-ZA'} | ${'a school trip'}
     ${'an apartment building'}           | ${'en-ZA'} | ${'a block of flats'}
     ${'any mailbox'}                     | ${'en-ZA'} | ${'any postbox'}
     ${'a field trip'}                    | ${'en-AU'} | ${'an excursion'}
-    ${'an apartment building'}           | ${'en-NZ'} | ${'an apartment block'}
+    ${'an apartment building'}           | ${'en-NZ'} | ${'a block of flats'}
+    ${'two apartment buildings'}         | ${'en-NZ'} | ${'two blocks of flats'}
+    ${'the mailman'}                     | ${'en-GB'} | ${'the postman'}
+    ${'the mailmen'}                     | ${'en-GB'} | ${'the postmen'}
+    ${'a mail carrier'}                  | ${'en-GB'} | ${'a postman'}
+    ${'two mail carriers'}               | ${'en-GB'} | ${'two postmen'}
+    ${'the mailman'}                     | ${'en-IE'} | ${'the postman'}
+    ${'the mailman'}                     | ${'en-ZA'} | ${'the postman'}
+    ${'the mailman'}                     | ${'en-AU'} | ${'the postie'}
+    ${'the mailmen'}                     | ${'en-NZ'} | ${'the posties'}
+    ${'a garbage truck'}                 | ${'en-GB'} | ${'a bin lorry'}
+    ${'two garbage trucks'}              | ${'en-GB'} | ${'two bin lorries'}
+    ${'two garbage trucks'}              | ${'en-IE'} | ${'two bin lorries'}
+    ${'a fire truck'}                    | ${'en-GB'} | ${'a fire engine'}
+  `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
+    expect(say(dialect as Dialect)(input)).toBe(expected);
+  });
+});
+
+describe('an Irish field trip is a school tour', () => {
+  it.each`
+    input                               | dialect    | expected
+    ${'Our class went on a field trip.'} | ${'en-IE'} | ${'Our class went on a school tour.'}
+    ${'Two field trips were planned.'}   | ${'en-IE'} | ${'Two school tours were planned.'}
+    ${'A school field trip.'}            | ${'en-IE'} | ${'A school excursion.'}
+    ${'Our class went on a field trip.'} | ${'en-GB'} | ${'Our class went on a school trip.'}
+    ${'Two field trips were planned.'}   | ${'en-ZA'} | ${'Two school trips were planned.'}
+    ${'Call 911 now.'}                   | ${'en-IE'} | ${'Call 112 now.'}
   `('$dialect: $input -> $expected', ({ input, dialect, expected }) => {
     expect(say(dialect as Dialect)(input)).toBe(expected);
   });
@@ -200,6 +282,10 @@ describe('words that are already correct are left alone', () => {
     ${'candy floss'}    | ${'en-AU'}  | ${'not American, so candy must not fire inside it'}
     ${'candy floss'}    | ${'en-GB'}  | ${'the same'}
     ${'fairy floss'}    | ${'en-AU'}  | ${'the target of another rule'}
+    ${'the postie'}     | ${'en-AU'}  | ${'the target of the shared mailman row'}
+    ${'the postie'}     | ${'en-GB'}  | ${'not American'}
+    ${'the posties'}    | ${'en-IE'}  | ${'the same'}
+    ${'a semi-trailer'} | ${'en-AU'}  | ${'not American, so trailer must not fire inside it'}
   `('$dialect leaves "$unchanged" alone ($why)', ({ unchanged, dialect }) => {
     expect(say(dialect as Dialect)(unchanged)).toBe(unchanged);
   });
@@ -302,6 +388,8 @@ describe('trucks', () => {
     ${'a monster truck'}          | ${'a monster truck'}           | ${'a monster truck'}           | ${'a monster truck'}          | ${'a monster truck'}
     ${'a tow truck'}              | ${'a tow truck'}               | ${'a tow truck'}               | ${'a tow truck'}              | ${'a tow truck'}
     ${'an ice cream truck'}       | ${'an ice cream truck'}        | ${'an ice cream truck'}        | ${'an ice cream truck'}       | ${'an ice cream truck'}
+    ${'a garbage truck'}          | ${'a bin lorry'}               | ${'a bin lorry'}               | ${'a rubbish truck'}          | ${'a rubbish truck'}
+    ${'a rubbish truck'}          | ${'a rubbish truck'}           | ${'a rubbish truck'}           | ${'a rubbish truck'}          | ${'a rubbish truck'}
   `('$input -> GB $gb / IE $ie / ZA $za / AU $au', ({ input, gb, ie, za, au }) => {
     expect(say('en-GB')(input), 'en-GB').toBe(gb);
     expect(say('en-IE')(input), 'en-IE').toBe(ie);
@@ -334,7 +422,10 @@ describe('overlay words in phrases that already read right', () => {
     ${'the Pacific Coast Highway'}                          | ${'the Pacific Coast Highway'}                          | ${'en-NZ'}
     ${'an apartment complex'}                               | ${'an apartment complex'}                               | ${'en-GB'}
     ${'a serviced apartment'}                               | ${'a serviced apartment'}                               | ${'en-GB'}
-    ${'two apartment buildings'}                            | ${'two apartment blocks'}                               | ${'en-NZ'}
+    ${'two apartment buildings'}                            | ${'two blocks of flats'}                                | ${'en-NZ'}
+    ${'an apartment block'}                                 | ${'an apartment block'}                                 | ${'en-GB'}
+    ${'two apartment blocks'}                               | ${'two apartment blocks'}                               | ${'en-NZ'}
+    ${'an apartment'}                                       | ${'a flat'}                                             | ${'en-NZ'}
     ${'They rented an apartment.'}                          | ${'They rented a flat.'}                                | ${'en-GB'}
     ${'an apartment complex'}                               | ${'an apartment complex'}                               | ${'en-NZ'}
   `('$dialect: $input -> $expected', ({ input, expected, dialect }) => {
@@ -400,5 +491,21 @@ describe('pants the garment still become trousers', () => {
     ${'She wears the pants in the family.'}         | ${'She wears the trousers in the family.'}
   `('$input -> $expected', ({ input, expected }) => {
     for (const dialect of TROUSER_DIALECTS) expect(say(dialect)(input), dialect).toBe(expected);
+  });
+});
+
+describe('a replacement is left alone by a second run', () => {
+  it.each(Object.keys(DIALECTS) as Dialect[])('%s', (dialect) => {
+    // Every rule runs, including those that wait for the text to read as American.
+    const options = { dialect, preset: 'localise', assumeAmerican: true } as const;
+    // Shared rows a dialect row outranks count too, so gating that dialect row cannot expose one.
+    const written = new Set(
+      [...spellingEntries(), ...baseVocabulary(), ...DIALECTS[dialect].vocabulary].map((entry) => entry.to),
+    );
+    const rewritten = [...written]
+      .map((to) => [to, deamericaniseText(to, options)])
+      .filter(([to, again]) => again !== to)
+      .map(([to, again]) => `${to} -> ${again}`);
+    expect(rewritten).toEqual([]);
   });
 });

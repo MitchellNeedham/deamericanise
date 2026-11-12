@@ -31,6 +31,14 @@ export interface LexerSpec {
   /** Names people actually type: `ruby` rather than `rb`, `shell` rather than `sh`. */
   aliases?: string[];
   lineComments: string[];
+  /**
+   * Runs of a line comment marker that the language writes by convention to open one comment,
+   * as Lisp writes `;;` inside a function and `;;;` at the top level. The longest of these that
+   * a comment starts with is its marker, so the comment is read as commented out only when a
+   * second marker follows, as in `;;; ;; old note`. A repeat that is not listed, such as `////`
+   * in TypeScript, is a second marker.
+   */
+  markerRuns?: string[];
   blockComments: Array<[open: string, close: string]>;
   /** Rust and Haskell allow a block comment inside a block comment. */
   nestedBlocks?: boolean;

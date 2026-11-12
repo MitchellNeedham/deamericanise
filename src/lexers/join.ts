@@ -29,13 +29,18 @@ export interface CommentText {
 type Bounds = [start: number, end: number];
 
 /**
- * Where a comment's prose starts. The extra character of a doc comment belongs to its marker,
- * as in `///`, `//!`, `---` and `/**`, when whitespace or the end of the comment follows it.
- * A repeat as long as the marker, as in `////` or `##`, makes a second marker instead, and
- * stays in the text so the line still reads as a comment commented out.
+ * Where a comment's prose starts. The longest run of the marker that its language writes by
+ * convention, as in Lisp's `;;` and `;;;`, is the marker. Otherwise the extra character of a
+ * doc comment belongs to its marker, as in `///`, `//!`, `---` and `/**`, when whitespace or
+ * the end of the comment follows it. A repeat as long as the marker, as in `////` or `##`, or
+ * left after a run, as in `;;;;;`, makes a second marker instead, and stays in the text so the
+ * line still reads as a comment commented out.
  */
-function proseStart(source: string, comment: SourceComment): number {
+function proseStart(source: string, comment: SourceComment, markerRuns: readonly string[] = []): number {
   const { open, start, end } = comment;
+  const marker = start - open.length;
+  const run = Math.max(0, ...markerRuns.filter((r) => source.startsWith(r, marker)).map((r) => r.length));
+  if (run > open.length) return marker + run;
   let i = start;
   while (i < end && i - start < open.length && source[i] === open.at(-1)) i++;
   if (i - start === open.length) return start;
@@ -105,8 +110,13 @@ interface Run {
  * Reads each comment as prose, joining a run of line comments into one text. A run is line
  * comments on consecutive lines with the same marker at the same column, each after the first
  * alone on its line, so a comment trailing code joins only the comments lined up beneath it.
+ * `markerRuns` are the runs of a line comment marker that its language writes as one marker.
  */
-export function joinComments(source: string, comments: SourceComment[]): CommentText[] {
+export function joinComments(
+  source: string,
+  comments: SourceComment[],
+  markerRuns: readonly string[] = [],
+): CommentText[] {
   const texts: CommentText[] = [];
   let run: Run | undefined;
   const flush = (): void => {
@@ -123,7 +133,7 @@ export function joinComments(source: string, comments: SourceComment[]): Comment
     }
 
     const marker = comment.start - comment.open.length;
-    const start = proseStart(source, comment);
+    const start = proseStart(source, comment, markerRuns);
     const prefix = source.slice(marker, start);
     const column = columnOf(source, marker);
     if (run?.prefix === prefix && run.column === column && /^\n[ \t]*$/.test(source.slice(run.end, marker))) {
@@ -140,7 +150,7 @@ export function joinComments(source: string, comments: SourceComment[]): Comment
 
 /** The prose of every comment in a source file. */
 export function commentTexts(source: string, lexer: LexerSpec, includeDocs = false): CommentText[] {
-  return joinComments(source, scanSourceComments(source, lexer, includeDocs));
+  return joinComments(source, scanSourceComments(source, lexer, includeDocs), lexer.markerRuns);
 }
 
 /** The last segment that starts at or before `at`. */

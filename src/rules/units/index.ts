@@ -1,7 +1,7 @@
 import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, Precision, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
-import { CLOSING, LIST_MARKER, OPENING, endsSentence } from '../sentence.js';
+import { CLOSING, LIST_MARKER, OPENING, endsSentence, stopStays } from '../sentence.js';
 import {
   COMPOUNDS,
   MEASURES,
@@ -1212,11 +1212,10 @@ function redundantMetric(
   end: number,
   body: string,
   ruleId: string,
-): { end: number; after: string } | null {
+): { end: number; metric: string; close: string } | null {
   const partner = metricPartnerAfter(contextText(ctx.text).slice(end));
   if (!partner || !restatesBody(partner.metric, body, ruleId)) return null;
-  const after = metricSpelling(partner.metric.trim()) + partner.close;
-  return { end: end + partner.length, after };
+  return { end: end + partner.length, metric: metricSpelling(partner.metric.trim()), close: partner.close };
 }
 
 /**
@@ -1227,9 +1226,13 @@ function redundantMetric(
  */
 const AFTER_UNIT = /(?:)/y;
 
-/** Whether `matched`, a measurement at `start`, ends in a stop that also ends the sentence. */
-function keepsStop(text: string, start: number, matched: string): boolean {
-  return matched.endsWith('.') && endsSentence(text, start, start + matched.length, AFTER_UNIT);
+/**
+ * Whether `matched`, a measurement at `start`, ends in a stop that stays: one that also ends
+ * the sentence or opens an ellipsis. It is read at `end`, which is past the metric partner
+ * when a pair collapses over the stop.
+ */
+function keepsStop(text: string, start: number, matched: string, end = start + matched.length): boolean {
+  return matched.endsWith('.') && stopStays(text, start, end, AFTER_UNIT);
 }
 
 /** `°F` or `℉` and a stop: a symbol, which has no stop of its own. */
@@ -1243,16 +1246,25 @@ function continuesInLowerCase(text: string, at: number): boolean {
   return LOWER_CASE_NEXT.test(text);
 }
 
+const BRACKET_NEXT = /\s*\(/y;
+
 /**
- * Whether the stop that ends `matched`, a Fahrenheit value at `start`, stays in the text. A
- * bare letter `F` abbreviates the scale, so its stop goes as an abbreviation's does, unless
- * it also ends the sentence. A symbol's stop is usually the sentence's own, but authors also
- * write `350°F. for 20 minutes`, so it goes only before a word in lower case.
+ * Whether the stop that ends `matched`, a Fahrenheit value at `start`, stays in the text,
+ * read at `end` as `keepsStop` reads it. A bare letter `F` abbreviates the scale, so its stop
+ * goes as an abbreviation's does, unless it also ends the sentence. A symbol's stop is usually
+ * the sentence's own, but authors also write `350°F. for 20 minutes`, so it goes only before a
+ * word in lower case. Either stays before a bracket, which may trail the sentence it ends.
  */
-function fahrenheitKeepsStop(text: string, start: number, matched: string): boolean {
-  if (!SYMBOL_STOP.test(matched)) return keepsStop(text, start, matched);
-  return !continuesInLowerCase(text, start + matched.length);
+function fahrenheitKeepsStop(text: string, start: number, matched: string, end = start + matched.length): boolean {
+  if (!matched.endsWith('.')) return false;
+  BRACKET_NEXT.lastIndex = end;
+  if (BRACKET_NEXT.test(text)) return true;
+  if (!SYMBOL_STOP.test(matched)) return keepsStop(text, start, matched, end);
+  return !continuesInLowerCase(text, end);
 }
+
+/** Where a stop can stand: past any closing marks, before a space or the end of the text. */
+const STOP_STANDS = new RegExp(String.raw`${CLOSING}*(?:\s|$)`, 'y');
 
 /**
  * `pushMeasurement`, with the change it makes widened over a hyphen that joins a length to
@@ -1287,8 +1299,9 @@ function pushBeforeSize(
  * Records one converted measurement, collapsing a redundant parenthetical or pair if there
  * is one. A measurement that is itself the parenthetical after its metric value is not
  * recorded, and one paired after the metric value it restates is held as written. The stop
- * of an abbreviation such as `in.` goes with it, unless it also ends the sentence, when the
- * metric value takes it.
+ * of an abbreviation such as `in.` goes with it, unless it also ends the sentence or opens an
+ * ellipsis, when the metric value takes it. Where a pair collapses, the stop is read past the
+ * metric value that stays.
  */
 function pushMeasurement(
   ctx: RuleContext,
@@ -1312,11 +1325,16 @@ function pushMeasurement(
       changes.push(hold(start, matched, ruleId, priority));
       return;
     }
+    // Only past the partner can the stop end the sentence. A symbol's test would keep it before
+    // any mark but a lower-case word, so the stop also needs a space or the end there.
+    const keeps = ruleId === ABSOLUTE_ID || ruleId === DIFFERENCE_ID ? fahrenheitKeepsStop : keepsStop;
+    STOP_STANDS.lastIndex = redundant.end;
+    const stop = STOP_STANDS.test(ctx.text) && keeps(ctx.text, start, matched, redundant.end) ? '.' : '';
     changes.push({
       start,
       end: redundant.end,
       before,
-      after: redundant.after,
+      after: redundant.metric + stop + redundant.close,
       ruleId,
       category: 'units',
       confidence: MEASUREMENT_CONFIDENCE,
@@ -2444,8 +2462,9 @@ function fahrenheitReadings(
 
     const start = listed[0]?.start ?? match.index;
     const whole = ctx.text.slice(start, match.index + match[0].length);
+    const wholeEnd = start + whole.length;
     // A stop that stays in the text stays outside the value and any kept original.
-    const valueEnd = start + whole.length - (fahrenheitKeepsStop(ctx.text, start, whole) ? 1 : 0);
+    const valueEnd = wholeEnd - (fahrenheitKeepsStop(ctx.text, start, whole) ? 1 : 0);
     let end = valueEnd;
     const beside = wordsBeside(ctx.text, start, end);
     const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
@@ -2473,12 +2492,12 @@ function fahrenheitReadings(
       (numbers.length === 1 && Math.abs(Number(numbers[0])) === 1) ||
       (/^degree(?!s)/i.test(unit) && describesNoun(ctx.text, start, values.at(-1)!, gap, valueEnd));
     const suffix = spelled ? ` ${singular ? 'degree' : 'degrees'} Celsius` : '°C';
-    readings.push({
-      start,
-      matched: ctx.text.slice(start, end),
-      body: interleave(numbers, joins) + suffix,
-      ruleId: difference ? DIFFERENCE_ID : ABSOLUTE_ID,
-    });
+    const body = interleave(numbers, joins) + suffix;
+    const ruleId = difference ? DIFFERENCE_ID : ABSOLUTE_ID;
+    // A stop kept before the Celsius value the pair collapses into goes into the change, so
+    // that `pushMeasurement` finds the partner and decides the stop past it.
+    if (end < wholeEnd && redundantMetric(ctx, wholeEnd, body, ruleId) !== null) end = wholeEnd;
+    readings.push({ start, matched: ctx.text.slice(start, end), body, ruleId });
   }
   return readings;
 }
@@ -2550,13 +2569,22 @@ function temperatureRules(): Rule[] {
 function temperatureDecadeRule(): Rule {
   // A decade, optionally banded (`low`, `mid`, `upper`), optionally paired with a second
   // decade (`the 70s and 80s`). `70's` and `low-70s` are both written in the wild.
-  const DECADE = String.raw`(low|mid|middle|high|upper|lower)?(?:\s|${HYPHEN})*(1[01]0|\d0)['\u2019]?s`;
+  // Only a band takes the space before the figure, or a failing match after `the` would try
+  // every split of the run of spaces that follows it.
+  const DECADE = String.raw`(?:(low|mid|middle|high|upper|lower)(?:\s|${HYPHEN})*)?(1[01]0|\d0)['\u2019]?s`;
   const pattern = new RegExp(
     String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
-      String.raw`(?:\s*(?:and|to|${HYPHEN}|\u2013)\s*${DECADE})?(?!\w)` +
+      String.raw`(?:${RANGE_JOIN}${DECADE})?(?!\w)` +
       // A bare `degrees` after a decade can only be its unit, unless a Celsius unit begins there.
       String.raw`(\s*(?:${FAHRENHEIT}|Fahrenheit\b|(?!${metricUnitForms('temperature')})degrees\b))?`,
     'gi',
+  );
+
+  // Case-sensitive, so a lone `c` is no unit here, as it is none after a figure. The bare `C`
+  // is read apart because `metricUnitForms` reads it only after a figure, as in `180C`.
+  const CELSIUS_AFTER = new RegExp(
+    String.raw`${SOFT_SPACE}(?:${metricUnitForms('temperature')})|${INLINE_SPACE}?C${UNIT_END}`,
+    'y',
   );
 
   const TEMPERATURE_NEARBY =
@@ -2592,8 +2620,17 @@ function temperatureDecadeRule(): Rule {
         const before = ctx.text.slice(Math.max(0, start - 90), start);
         const after = ctx.text.slice(end, end + 90);
 
-        if (A_DECADE.test(before)) continue;
         const marked = match[6] !== undefined;
+        if (!marked) {
+          CELSIUS_AFTER.lastIndex = end;
+          const celsius = CELSIUS_AFTER.exec(ctx.text);
+          if (celsius) {
+            changes.push(hold(start, match[0] + celsius[0], 'units.temperature.decade', 36));
+            continue;
+          }
+        }
+
+        if (A_DECADE.test(before)) continue;
         if (!marked && !TEMPERATURE_NEARBY.test(before) && !TEMPERATURE_NEARBY.test(after)) continue;
 
         const firstBand = SPREAD[(match[2] ?? '').toLowerCase()] ?? [0, 9];

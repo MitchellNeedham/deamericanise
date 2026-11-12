@@ -280,18 +280,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     matches: (v) => v.origin === undefined && v.change?.category === 'vocabulary' && beyondGuardWindow(v),
   },
   {
-    issue: 282,
-    property: 'idempotence',
-    input: 'It hit 10F. December 1, 2024 was a few degrees colder.',
-    options: localise,
-    // The first run wrote a day-first date after a stop, which opens no sentence.
-    matches: (v) =>
-      v.origin === undefined &&
-      v.change?.ruleId === 'units.temperature.fahrenheit' &&
-      /F$/.test(v.change.before) &&
-      /[.!?]\s+\d{1,2} [A-Z][a-z]+ \d{4}/.test(v.text),
-  },
-  {
     issue: 283,
     property: 'idempotence',
     input: 'It weighs a quarterstone.',
@@ -302,17 +290,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
       v.change !== undefined &&
       v.origin.after.endsWith(`(${v.change.before})`) &&
       /[a-z]stone$/i.test(v.change.before),
-  },
-  {
-    issue: 282,
-    property: 'idempotence',
-    input: 'Gate 10F. December 1, 2024 the oven broke.',
-    options: localise,
-    // The first run wrote a date after a stop day first, which no longer ends the sentence.
-    matches: (v) =>
-      v.origin === undefined &&
-      v.change?.ruleId === 'units.temperature.fahrenheit' &&
-      /[.!?]\s+\d{1,2} [A-Z][a-z]+ \d{4}\b/.test(v.text.slice(v.change.end, v.change.end + 120)),
   },
   {
     issue: 405,

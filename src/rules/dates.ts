@@ -8,6 +8,15 @@ const MONTHS = [
 
 export const MONTH_PATTERN = MONTHS.map((m) => `${m}|${m.slice(0, 3)}`).join('|');
 
+/**
+ * A date that starts with a figure, in a shape the date rules read or write: day-first with a
+ * named month, as `1 December 2024` and `5 March` are, or in figures, as `12/01/2024`,
+ * `01/12/2024` and `2024-12-01` are. It holds no capturing group, so it can sit in any pattern.
+ */
+export const FIGURE_DATE =
+  String.raw`(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:${MONTH_PATTERN})(?![A-Za-z])|` +
+  String.raw`\d{1,2}(?:/\d{1,2}/|-\d{1,2}-|\.\d{1,2}\.)(?:\d{4}|\d{2})(?!\d)|\d{4}-\d{2}-\d{2}(?!\d))`;
+
 function pad(n: number): string {
   return String(n).padStart(2, '0');
 }

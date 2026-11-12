@@ -475,13 +475,13 @@ others).
 An article and its word share a paragraph. A single line break between them is a hard
 wrap, so `Use an` at the end of one line still agrees with `eraser` at the start of the
 next, but a blank line ends the paragraph and the article is left as it was. A capital
-`A` or `An` counts as the article only where a capital is expected: at the start of the
-text, a line, a list item, a heading or a table cell; after a sentence end or a colon,
-past any closing quotes or brackets; straight after an opening quote, bracket or emphasis
-marker; or between two capitalised words, as in a title or text in capitals. Anywhere
-else it is a label, so `a Grade A eggplant` becomes `a Grade A aubergine` in `en-GB` and
-`Hall A 60 foot ceiling` becomes `Hall A 18 metre ceiling`. `AN` is in capitals by itself,
-so it is always the article, as a lower case `a` or `an` is.
+`A` counts as the article only where a capital is expected: at the start of the text, a
+line, a list item, a heading or a table cell; after a sentence end or a colon, past any
+closing quotes or brackets; straight after an opening quote, bracket or emphasis marker;
+or between two capitalised words, as in a title or text in capitals. Anywhere else it is
+a label, so `a Grade A eggplant` becomes `a Grade A aubergine` in `en-GB` and
+`Hall A 60 foot ceiling` becomes `Hall A 18 metre ceiling`. A label is a single letter,
+so `An` and `AN` are always the article, as a lower case `a` or `an` is.
 
 ## Deciding whether the text is American
 

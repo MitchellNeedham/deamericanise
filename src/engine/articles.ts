@@ -98,7 +98,7 @@ const LAST_WORD = /(\p{L}+)\P{L}*$/u;
 const FIRST_WORD = /^\P{L}*(\p{L}+)/u;
 
 /**
- * Whether a capitalised `A` or `An` at `start` is the article rather than a label, as in
+ * Whether a capital `A` at `start` is the article rather than a label, as in
  * `Grade A` or `Hall A`. It is where a capital is expected, or between two capitalised words,
  * as in a title or text in capitals. `word` is where the word it qualifies starts.
  */
@@ -140,8 +140,8 @@ export function articleAgreements(text: string, changes: Change[]): Change[] {
     const start = change.start - match[0].length;
     const end = start + match[1]!.length;
     if (taken.some((c) => c.start < end && start < c.end)) continue;
-    // `AN` is text in capitals by itself, so only `A` and `An` can be a label.
-    if (/^An?$/.test(match[1]!) && !capitalIsArticle(text, start, change.start)) continue;
+    // A label is a single letter, so `An` and `AN` are always the article.
+    if (match[1] === 'A' && !capitalIsArticle(text, start, change.start)) continue;
 
     extra.push({
       start,

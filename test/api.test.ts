@@ -93,12 +93,20 @@ describe('a capital A that is a label', () => {
     ${'| A popsicle |'}                             | ${'| An icy pole |'}                             | ${'a table cell'}
     ${'**A popsicle** melts.'}                      | ${'**An icy pole** melts.'}                      | ${'in emphasis at the start'}
     ${'Fix A Blinker'}                              | ${'Fix An Indicator'}                            | ${'title case'}
-    ${'Use An Eraser'}                              | ${'Use A Rubber'}                                | ${'title case with An'}
     ${'FIX A BLINKER'}                              | ${'FIX AN INDICATOR'}                            | ${'text in capitals'}
     ${'AN ERASER'}                                  | ${'A RUBBER'}                                    | ${'text in capitals with AN'}
-    ${'Use AN eraser.'}                             | ${'Use A rubber.'}                               | ${'AN is in capitals by itself'}
     ${'Use an eraser.'}                             | ${'Use a rubber.'}                               | ${'a lower case article'}
   `('is the article where a capital is expected: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(deamericaniseText(input, localise)).toBe(expected);
+  });
+
+  it.each`
+    input                      | expected                  | why
+    ${'Use An eraser.'}        | ${'Use A rubber.'}        | ${'mid-sentence'}
+    ${'Give An eraser to Bo.'} | ${'Give A rubber to Bo.'} | ${'mid-sentence before a name'}
+    ${'Use An Eraser'}         | ${'Use A Rubber'}         | ${'title case'}
+    ${'Use AN eraser.'}        | ${'Use A rubber.'}        | ${'in capitals'}
+  `('is the article whenever it is An: $input -> $expected ($why)', ({ input, expected }) => {
     expect(deamericaniseText(input, localise)).toBe(expected);
   });
 

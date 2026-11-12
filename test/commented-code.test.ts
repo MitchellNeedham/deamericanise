@@ -91,8 +91,50 @@ describe('a line commented on top of a comment', () => {
     ${'ts'}      | ${'//// the color of the theater'}
     ${'python'}  | ${'# # the color of the theater'}
     ${'sql'}     | ${'-- -- the color of the theater'}
+    ${'lisp'}    | ${'; ; the color of the theater'}
+    ${'lisp'}    | ${';;; ;; the color of the theater'}
+    ${'lisp'}    | ${';;;;; the color of the theater'}
+    ${'vb'}      | ${"' ''' the color of the theater"}
+    ${'vb'}      | ${"'''' the color of the theater"}
+    ${'erlang'}  | ${'%%%% the color of the theater'}
+    ${'fortran'} | ${'! !! the color of the theater'}
   `('$language leaves "$source" alone', ({ language, source }) => {
     expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(source);
+  });
+});
+
+describe('a comment opened with the marker run its language writes by convention', () => {
+  it.each`
+    language     | source                                       | expected
+    ${'lisp'}    | ${';; Pick the color.'}                      | ${';; Pick the colour.'}
+    ${'lisp'}    | ${';;; Pick the color.'}                     | ${';;; Pick the colour.'}
+    ${'lisp'}    | ${';;;; Pick the color.'}                    | ${';;;; Pick the colour.'}
+    ${'lisp'}    | ${';;Pick the color.'}                       | ${';;Pick the colour.'}
+    ${'lisp'}    | ${'(f\n  ;; Pick the\n  ;;\n  ;; color.\n  x)'} | ${'(f\n  ;; Pick the\n  ;;\n  ;; colour.\n  x)'}
+    ${'vb'}      | ${"''' <summary>Pick the color.</summary>"}  | ${"''' <summary>Pick the colour.</summary>"}
+    ${'vb'}      | ${"'''<summary>Pick the color.</summary>"}   | ${"'''<summary>Pick the colour.</summary>"}
+    ${'matlab'}  | ${'%% Pick the color.'}                      | ${'%% Pick the colour.'}
+    ${'erlang'}  | ${'%% Pick the color.'}                      | ${'%% Pick the colour.'}
+    ${'erlang'}  | ${'%%% Pick the color.'}                     | ${'%%% Pick the colour.'}
+    ${'fortran'} | ${'!! Pick the color.'}                      | ${'!! Pick the colour.'}
+  `('$language rewrites "$source"', ({ language, source, expected }) => {
+    expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(expected);
+  });
+
+  it.each`
+    language    | source                     | expected
+    ${'lisp'}   | ${'; Pick the color.'}     | ${'; Pick the colour.'}
+    ${'vb'}     | ${"' Pick the color."}     | ${"' Pick the colour."}
+    ${'matlab'} | ${'% Pick the color.'}     | ${'% Pick the colour.'}
+    ${'rust'}   | ${'/// the color'}         | ${'/// the colour'}
+  `('$language still rewrites "$source"', ({ language, source, expected }) => {
+    expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(expected);
+  });
+
+  it('reads a run as one text only with lines opened by the same run', () => {
+    expect(deamericaniseCode(';;; Use `the\n;; color` here.', { language: 'lisp' }).text).toBe(
+      ';;; Use `the\n;; colour` here.',
+    );
   });
 });
 

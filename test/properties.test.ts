@@ -207,16 +207,6 @@ const rewritesReplacement =
   (v: Violation): boolean =>
     v.origin !== undefined && afters.includes(v.origin.after.toLowerCase());
 
-const precedes =
-  (pattern: RegExp) =>
-  (v: Violation): boolean =>
-    v.change !== undefined && pattern.test(v.text.slice(0, v.change.start));
-
-const follows =
-  (pattern: RegExp) =>
-  (v: Violation): boolean =>
-    v.change !== undefined && pattern.test(v.text.slice(v.change.end));
-
 const VOCABULARY = [...baseVocabulary(), ...Object.values(DIALECTS).flatMap((pack) => pack.vocabulary)];
 
 /** Must match `CONTEXT_WINDOW` in src/engine/lexicon.ts. */
@@ -249,21 +239,6 @@ const american = { assumeAmerican: true } as const;
 
 const KNOWN_FAILURES: KnownFailure[] = [
   {
-    issue: 153,
-    property: 'idempotence',
-    input: 'Roll it half an inch thick.',
-    options: { units: { keepOriginal: true } },
-    // The second run converts the original that `keepOriginal` put in brackets.
-    matches: (v) => v.change !== undefined && v.origin?.after.endsWith(`(${v.change.before})`) === true,
-  },
-  {
-    issue: 155,
-    property: 'paragraphs',
-    input: 'Room 13\n\n- 0°F overnight',
-    options: {},
-    matches: (v) => v.change?.ruleId === 'units.temperature.fahrenheit',
-  },
-  {
     issue: 157,
     property: 'idempotence',
     input: 'grade 10 feet',
@@ -283,38 +258,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     input: 'On 03/04/2024 the storm hit.',
     options: { assumeAmerican: true, dates: { format: 'dmy' } },
     matches: (v) => v.change?.ruleId === 'dates.numeric' && v.origin?.ruleId === 'dates.numeric',
-  },
-  {
-    issue: 88,
-    property: 'idempotence',
-    input: 'half a mile May 3, 2024',
-    options: localise,
-    // A written-out quantity the first run left because a word followed it, which that run
-    // then rewrote into something starting with a number.
-    matches: (v) =>
-      v.change?.category === 'units' &&
-      /^[a-z]/i.test(v.change.before) &&
-      v.origin === undefined &&
-      follows(/^[\s-]+\d/)(v),
-  },
-  {
-    issue: 165,
-    property: 'idempotence',
-    input: 'Temperatures at 6 p.m. were 10F.',
-    options: {},
-    // A bare F the first run left: something it rewrote had a stop that cut the sentence short.
-    matches: (v) =>
-      v.change?.ruleId === 'units.temperature.fahrenheit' &&
-      /\d\s?F$/.test(v.change.before) &&
-      v.origin === undefined &&
-      !precedes(/\bbaking\b[^.!?]*$/i)(v),
-  },
-  {
-    issue: 166,
-    property: 'idempotence',
-    input: 'Put the cookie sheet in at 350F.',
-    options: localise,
-    matches: (v) => v.change?.ruleId === 'units.temperature.fahrenheit' && precedes(/\bbaking\b[^.!?]*$/i)(v),
   },
   {
     issue: 168,

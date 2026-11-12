@@ -68,9 +68,20 @@ describe('times', () => {
     ${'The vote is at 3 p.m. Tuesday.'}         | ${'The vote is at 3pm Tuesday.'}
     ${'The vote is at 3 p.m. Tues. in Ohio.'}   | ${'The vote is at 3pm Tues. in Ohio.'}
     ${'The vote is at 3 p.m. March 5.'}         | ${'The vote is at 3pm March 5.'}
+    ${'The vote is at 3 p.m. 5 March.'}         | ${'The vote is at 3pm 5 March.'}
+    ${'The vote is at 3 p.m. 25/12/2024.'}      | ${'The vote is at 3pm 25/12/2024.'}
     ${'DOORS OPEN AT 7 P.M. SHARP'}             | ${'DOORS OPEN AT 7pm SHARP'}
     ${'- 9 a.m.\n- 5 p.m.'}                     | ${'- 9am\n- 5pm'}
   `('needs no sentence stop: $input', ({ input, expected }) => {
+    expect(times(input)).toBe(expected);
+  });
+
+  it.each`
+    input                           | expected
+    ${'We left at 5 p.m...'}        | ${'We left at 5pm...'}
+    ${'We left at 5 P.M... or so.'} | ${'We left at 5pm... or so.'}
+    ${'We left at 5 p.m....'}       | ${'We left at 5pm...'}
+  `('keeps the stop that opens an ellipsis, and no other: $input', ({ input, expected }) => {
     expect(times(input)).toBe(expected);
   });
 
@@ -165,6 +176,34 @@ describe('currency', () => {
     ${'We sold $5 bell peppers.'}           | ${{ ...american, preset: 'localise' }} | ${'We sold US$5 capsicums.'}
   `('leaves the word after $input to its own rule', ({ input, options, expected }) => {
     expect(deamericaniseText(input, options)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                                        | why
+    ${'In the replacement string, $1 is the first capture group.'}   | ${'a capture group'}
+    ${'Use $0 for the script name.'}                                 | ${'a script name'}
+    ${'Swap $1 and $2 in sed.'}                                      | ${'sed'}
+    ${'The regex puts the year in $1.'}                              | ${'a regex'}
+    ${'Set $HOME and $1 first.'}                                     | ${'a variable with a name'}
+    ${'Then $@ holds all of them and $1 the first.'}                 | ${'a variable that is a sign'}
+  `('leaves the variable in "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(money(unchanged, american)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                    | expected
+    ${'It costs $1.'}                        | ${'It costs US$1.'}
+    ${'Use $1 off coupons.'}                 | ${'Use US$1 off coupons.'}
+    ${'It cost $5, then $6.'}                | ${'It cost US$5, then US$6.'}
+    ${'Group tickets cost $5.'}              | ${'Group tickets cost US$5.'}
+    ${'Entry to the match is $5.'}           | ${'Entry to the match is US$5.'}
+    ${'Kids pay $1 and adults pay $2.'}      | ${'Kids pay US$1 and adults pay US$2.'}
+    ${'It costs $1. The regex is free.'}     | ${'It costs US$1. The regex is free.'}
+    ${'A regex course costs $1.50 a month.'} | ${'A regex course costs US$1.50 a month.'}
+    ${'A regex course raised $1 million.'}   | ${'A regex course raised US$1 million.'}
+    ${'A regex course costs $ 1 a month.'}   | ${'A regex course costs US$ 1 a month.'}
+  `('reads $input as an amount', ({ input, expected }) => {
+    expect(money(input, american)).toBe(expected);
   });
 
   it('says nothing when the text does not look American', () => {
@@ -283,6 +322,15 @@ describe('punctuation', () => {
     ${'U.S.'}                                      | ${'US'}
     ${'- U.S.\n- U.K.'}                            | ${'- US\n- UK'}
   `('needs no sentence stop: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                               | expected
+    ${'She moved to the U.K...'}        | ${'She moved to the UK...'}
+    ${'He has a Ph.D... or so.'}        | ${'He has a PhD... or so.'}
+    ${'She moved to the U.K....'}       | ${'She moved to the UK...'}
+  `('keeps the stop that opens an ellipsis, and no other: $input', ({ input, expected }) => {
     expect(punctuation(input)).toBe(expected);
   });
 

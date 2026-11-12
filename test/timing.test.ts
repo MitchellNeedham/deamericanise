@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deamericaniseText } from '../src/index.js';
+import { analyse, deamericaniseText, resolveOptions } from '../src/index.js';
+import { patternRules } from '../src/rules/index.js';
 
 // A file of its own: a worker that has already run many tests slows the longer input more
 // than the shorter one, which breaks the comparison.
@@ -97,6 +98,28 @@ describe.skipIf(onCi)('a long chain of weights takes time in line with its lengt
   );
 });
 
+describe.skipIf(onCi)('TeX, maths, front matter and dollar variables take time in line with their length', () => {
+  const markdown = { syntax: 'markdown' } as const;
+  const american = { assumeAmerican: true };
+
+  it.each`
+    piece                                | options                         | wrap                                   | expected
+    ${'\\textcolor{gray}{gray word} '}   | ${{}}                           | ${(s: string) => s}                    | ${'\\textcolor{gray}{grey word} \\textcolor{gray}{grey word} '}
+    ${'$x$ gray '}                       | ${markdown}                     | ${(s: string) => s}                    | ${'$x$ grey $x$ grey '}
+    ${'$5 gray '}                        | ${{ ...markdown, ...american }} | ${(s: string) => s}                    | ${'US$5 grey US$5 grey '}
+    ${'$1 in sed '}                      | ${american}                     | ${(s: string) => s}                    | ${'$1 in sed $1 in sed '}
+    ${'title: The gray cat\n'}           | ${markdown}                     | ${(s: string) => `---\n${s}---\n`}     | ${'---\ntitle: The grey cat\ntitle: The grey cat\n'}
+  `(
+    '"$piece", 2000 times and four times that',
+    ({ piece, options, wrap, expected }) => {
+      const run = (text: string) => deamericaniseText(text, options);
+      expect(run(wrap(piece.repeat(2000))).startsWith(expected)).toBe(true);
+      expect(growth(wrap(piece.repeat(2000)), wrap(piece.repeat(8000)), run)).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});
+
 /** A text broken by a long run of white space, and what the text before the run reads as. */
 const WHITESPACE_RUNS = [
   { before: 'A 7 pound 8 ounce baby.', name: 'spaces', run: ' ', length: 3000, after: 'The color.', expected: 'A 3.4 kilogram baby.' },
@@ -111,6 +134,12 @@ const WHITESPACE_RUNS = [
   { before: 'Weigh five to', name: 'spaces', run: ' ', length: 3000, after: 'seven pounds 8 ounces', expected: 'Weigh five to' },
   { before: 'It weighs 7 pounds', name: 'spaces', run: ' ', length: 3000, after: 'The color.', expected: 'It weighs 3.2 kilograms' },
   { before: 'It is 5', name: 'spaces', run: ' ', length: 30000, after: 'The color.', expected: 'It is 5' },
+  { before: 'It is 5', name: 'spaces', run: ' ', length: 100000, after: 'The color.', expected: 'It is 5' },
+  { before: 'It is five', name: 'spaces', run: ' ', length: 100000, after: 'The color.', expected: 'It is five' },
+  { before: 'x', name: 'spaces', run: ' ', length: 100000, after: 'y', expected: 'x' },
+  { before: 'text-align:', name: 'spaces', run: ' ', length: 100000, after: 'center', expected: 'text-align:' },
+  { before: '{%', name: 'spaces', run: ' ', length: 100000, after: 'if color %}', expected: '{%' },
+  { before: 'Thanks @', name: 'spaces', run: ' ', length: 100000, after: 'gray', expected: 'Thanks @' },
   { before: 'It is 1', name: 'spaces', run: ' ', length: 30000, after: '000 miles', expected: 'It is 1' },
   { before: 'Walk a hundred', name: 'spaces', run: ' ', length: 3000, after: 'feet', expected: 'Walk 30 metres' },
 ];
@@ -134,5 +163,29 @@ describe.skipIf(onCi)('a long run of whitespace takes time in line with its leng
     const started = performance.now();
     convert(whitespaceText(row));
     expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+  });
+});
+
+describe.skipIf(onCi)('the decade rule takes time in line with a long run of spaces', () => {
+  // The rule alone, so the time the rest of the pipeline takes on the run cannot hide its own.
+  const options = resolveOptions({});
+  const decade = patternRules(options).find((rule) => rule.id === 'units.temperature.decade')!;
+  // Generous, since the rule takes a few milliseconds here. A pattern that tries every split
+  // of the run takes most of a second.
+  const LIMIT_MS = 100;
+
+  it.each`
+    before                   | expected
+    ${'the'}                 | ${[]}
+    ${'Highs in the'}        | ${[]}
+    ${'Highs in the mid'}    | ${[]}
+    ${'Highs in the 70s or'} | ${['between 21 and 26°C']}
+  `('"$before", 30000 spaces, then "x"', ({ before, expected }) => {
+    const text = `${before}${' '.repeat(30000)}x`;
+    const signals = analyse(text);
+    const started = performance.now();
+    const changes = decade.find({ text, options, signals, american: true });
+    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+    expect(changes.map((change) => change.after)).toEqual(expected);
   });
 });

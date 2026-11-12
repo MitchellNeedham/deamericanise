@@ -107,6 +107,9 @@ export function softGap(token: string): string {
   );
 }
 
+// Unlike `\b`, this holds before the closing `_` of emphasis, as in `_175 degrees Celsius_`.
+export const UNIT_END = String.raw`(?![A-Za-z\d])`;
+
 /** Recipes and older prose write their numbers out: `one cup`, `three-quarters cup`. */
 const CARDINALS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -162,14 +165,35 @@ const NOT_AFTER_COUNT = String.raw`(?<!\b(?:${CARD}|an?)${HYPHEN}?${SOFT_SPACE})
 const SPACING = String.raw`(?:${SOFT_BREAK}|${INLINE_SPACE}+)`;
 
 /**
- * Where a written-out number may start: not inside a hyphenated word, not straight after a
- * tens word, and not after `hundred` or `thousand` with at most a comma, `and` or `to`
- * between. So whatever of `catch-twenty-two`, `twenty-twenty`, `twenty five-pound` or
+ * A prefix that takes a number after its hyphen, as `sub-` does in `a sub-2 pound tent`. Four
+ * figures from 1000 to 2999 after `mid-` are a year, as in `In mid-2024 miles were driven`.
+ */
+export const NUMBER_PREFIX =
+  String.raw`\b(?:sub|under|over|near|mid(?!${HYPHEN}[12]\d{3}(?!\.?\d)))${HYPHEN}`;
+
+/**
+ * A hyphen that joins a number to the letters before it: one straight after the unit of a
+ * quantity, as in `5ft-6ft`, `350 °F-375 °F`, `two feet-three feet` and
+ * `60 miles per hour-70 miles per hour`, where it joins a range, or one after a prefix that
+ * takes a number, as in `a sub-2 pound tent`. No unit has more than three words before its
+ * last, as `pounds per square inch` has, and none is a number in words, so the `twenty` of
+ * `five twenty-two` and the `hundred` of `two hundred-three` are no unit.
+ */
+const JOINING_HYPHEN =
+  String.raw`(?:(?:${NUMERIC_LAST}|\b(?:${CARD})\b)${INLINE_SPACE}?(?:[°º˚]${INLINE_SPACE}?)?` +
+  String.raw`(?:[A-Za-z]+${INLINE_SPACE}){0,3}[A-Za-z]+(?<!\b(?:${CARD}|${SCALE}|${FRAC}))${HYPHEN}|` +
+  String.raw`${NUMBER_PREFIX})`;
+
+/**
+ * Where a written-out number may start: not inside a hyphenated word, unless the hyphen joins
+ * it to a unit or a prefix (`JOINING_HYPHEN`), not straight after a tens word, and not after
+ * `hundred` or `thousand` with at most a comma, `and` or `to` between. So whatever of
+ * `catch-twenty-two`, `twenty-twenty`, `twenty five-pound` or
  * `between one hundred and two hundred` the table cannot read is left whole. A word ending
  * the line above counts as well.
  */
 export const NOT_IN_COMPOUND =
-  String.raw`(?<![A-Za-z]${HYPHEN})` +
+  String.raw`(?<![A-Za-z]${HYPHEN}(?<!${JOINING_HYPHEN}))` +
   String.raw`(?<!\b(?:(?:${TENS.join('|')})${HYPHEN}?|(?:${SCALE}),?(?:${SPACING}(?:and|to))?)${SPACING})`;
 
 /**
@@ -379,29 +403,35 @@ const DATE_BEFORE_YEAR =
   String.raw`\d{1,2}(?:st|nd|rd|th)?\s+(?:${MONTH_PATTERN})\.?\s+)`;
 
 /**
- * Letters and then `-`, which join a name such as `catch-22` to its number, unless the letters
- * end the unit of a quantity before them, as in `5ft-6ft`, `350 °F-375 °F`, `two feet-6 feet`
- * and `60 miles per hour-70 miles per hour`, where the hyphen joins a range. No unit has more
- * than three words before its last, as `pounds per square inch` has.
+ * Letters and then `-`, which join a name such as `catch-22` to its number, or U+2010 or
+ * U+2011, which only join words, unless `JOINING_HYPHEN` joins a quantity's unit or a prefix
+ * to the number, as in `5ft‐6ft` and `a sub-2 pound tent`.
  */
-const NAME_HYPHEN =
-  String.raw`(?<!(?:${NUMERIC_LAST}|\b(?:${CARD}))${INLINE_SPACE}?(?:[°º˚]${INLINE_SPACE}?)?` +
-  String.raw`(?:[A-Za-z]+${INLINE_SPACE}){0,3})\b[A-Za-z]+-`;
+const NAME_HYPHEN = String.raw`(?:\b[A-Za-z]+-|[${UNICODE_HYPHENS}])(?<!${JOINING_HYPHEN})`;
+
+/**
+ * Not inside a word or a decimal. A run of `_` before a number opens emphasis, as in
+ * `_6 feet_`, unless a letter, digit or stop stands before the run, as in `MAX_6`.
+ */
+export const OUTSIDE_WORD =
+  // The lookahead comes first so the lookbehind walks a run of `_` only from its end.
+  String.raw`(?!_)(?<![A-Za-z\d.]_*)`;
 
 /**
  * Where a number of a measurement may start: not inside a word, a decimal or a number such
- * as `15½`, and not straight after U+2010 or U+2011, which only join words, or after the
- * letters and hyphen of a name such as `catch-22`. Straight after a
+ * as `15½`, and not after a hyphen that joins a name or a word to it (`NAME_HYPHEN`), as in
+ * `catch-22`. Straight after a
  * digit or vulgar fraction and then a hyphen, dash, `/`, `,` or `:` it is the tail of a date
  * or of a range written tight, of a fraction, of a grouped number such as `1,005`, or the
  * minutes of a time such as `7:30`. Straight after a currency sign it is a price, and four
  * figures straight after `Oct 22,`, `22 October`, `October 22` or `May` are the year of a
  * date. The optional space after the sign matches the currency rule, which reads `$ 5` as
- * money. Three figures straight after one to three and a space are a group of a number such
- * as `1 000`, while one or two are a number of their own, as the `4` of `Rooms 3 4 feet` is.
+ * money. Emphasis may open on it, as `OUTSIDE_WORD` reads it. Three figures straight after
+ * one to three and a space are a group of a number such as `1 000`, while one or two are a
+ * number of their own, as the `4` of `Rooms 3 4 feet` is.
  */
 export const NUMBER_START =
-  String.raw`(?<![\w.${UNICODE_HYPHENS}]|${VULGAR_CLASS}|${NAME_HYPHEN}|` +
+  String.raw`${OUTSIDE_WORD}(?<!${VULGAR_CLASS}|${NAME_HYPHEN}|` +
   String.raw`${NUMERIC_LAST}(?:${HYPHEN}|[\u2013\u2014/,:])|[$£€]\s?)` +
   String.raw`(?!(?=\d{4}(?!\d))(?<=${DATE_BEFORE_YEAR}))` +
   String.raw`(?!(?=\d{3}(?!\d))(?<=${GROUP_LEAD}))`;

@@ -402,6 +402,8 @@ describe('the Fahrenheit marker', () => {
     'Heat to 180°C or 350°F.',
     'It was 11°C (20°F) warmer.',
     'It rose 11°C or 20°F.',
+    'Preheat the oven to 180°C (350°F/gas mark 4).',
+    'It was a 43-degree-Celsius (110-degree-Fahrenheit) day.',
   ];
 
   const READ = [
@@ -420,6 +422,10 @@ describe('the Fahrenheit marker', () => {
     'It was 95 Fahrenheit.',
     'Bake at 350°F (175°C).',
     'Heat to 180°C or 400°F.',
+    'It was 110-degree-Fahrenheit heat.',
+    'Bake at __350°F__ today.',
+    'Preheat to gas mark 4 - 350°F first.',
+    'Preheat the oven to 350°F (180°C/gas mark 4).',
   ];
 
   const NOT_READ = [
@@ -441,6 +447,8 @@ describe('the Fahrenheit marker', () => {
     'I read Fahrenheit 451 at school.',
     'The film Fahrenheit 9/11 opened in 2004.',
     'They filmed the 1966 Fahrenheit 451 in England.',
+    'The wall has a thermal resistance of 0.45 °F·ft²·h/BTU.',
+    'It warms at 2 °F/min.',
     ...RESTATED,
   ];
 
@@ -517,11 +525,22 @@ describe('the imperial units marker', () => {
     'Walk 5 miles.',
     'Add 3 gallons of water.',
     'Bake a 2-pound cake.',
+    'It weighs _5 pounds_.',
+    'Walk __5 miles__ today.',
   ];
 
   const NOUNS = ['Bake 1 pound cake.', 'Send in 6 foot soldiers.', 'Count 8 inch worms.'];
 
-  const NAMES = ['Track 7 Miles Davis', 'From 1955 to 1959 Miles Davis led a quintet.'];
+  const NAMES = [
+    'Track 7 Miles Davis',
+    'From 1955 to 1959 Miles Davis led a quintet.',
+    'I watched 8 Mile last night.',
+    'A Boeing 747 mph record.',
+    'A Boeing 5, 6 and 7 mph run.',
+    'Route 66 miles from here.',
+  ];
+
+  const IN_A_WORD = ['Set MAX_5 pounds as the limit.', 'Set max_5 miles as the limit.'];
 
   const MONEY = [
     'The apartment cost 400 pounds a week.',
@@ -556,10 +575,17 @@ describe('the imperial units marker', () => {
     expect(analyse(input).markers).not.toContain(IMPERIAL);
   });
 
-  it.each([...MEASURED, ...MONEY, ...NOUNS, ...NAMES])('agrees with the unit rules on "%s"', (input) => {
-    const converted = deamericanise(input).changes.some((c) => c.category === 'units');
-    expect(analyse(input).markers.includes(IMPERIAL)).toBe(converted);
+  it.each(IN_A_WORD)('does not count the number inside a word in "%s"', (input) => {
+    expect(analyse(input).markers).not.toContain(IMPERIAL);
   });
+
+  it.each([...MEASURED, ...MONEY, ...NOUNS, ...NAMES, ...IN_A_WORD])(
+    'agrees with the unit rules on "%s"',
+    (input) => {
+      const converted = deamericanise(input).changes.some((c) => c.category === 'units');
+      expect(analyse(input).markers.includes(IMPERIAL)).toBe(converted);
+    },
+  );
 
   it('keeps a British date British beside pounds of money', () => {
     const text = 'The apartment cost 400 pounds a week. We organized it through Mr. Jones and moved in on 03/04/2024.';

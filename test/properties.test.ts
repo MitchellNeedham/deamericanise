@@ -6,8 +6,8 @@
  * 2. Offsets: each change's `start` and `end` slice its `before` out of the input, the
  *    changes are sorted and do not overlap, and an `agreesWith` names a change in the list.
  * 3. Reconstruction: applying the changes to the input gives the output text.
- * 4. Structure: no change touches a URL, an email address, inline code, a fenced block or
- *    an HTML tag.
+ * 4. Structure: no change touches a URL, an email address, inline code, a fenced block,
+ *    an HTML tag, or an indented code block in Markdown.
  * 5. Comments only: in a source file every change lies inside a comment, and every byte
  *    outside the comments, string literals included, comes through unchanged.
  * 6. Paragraphs: no change's `before` contains a blank line.
@@ -600,6 +600,33 @@ function assemble(parts: Array<[Piece, string]>): Generated {
 
 const generatedProse: fc.Arbitrary<Generated> = pieces.map(assemble);
 
+const MARKDOWN_OPTION_SETS: Record<string, CodeOptions> = {
+  read: { syntax: 'markdown' },
+  localise: { syntax: 'markdown', preset: 'localise' },
+};
+
+/** Generated prose with an indented code block after each run of it. */
+const generatedMarkdown: fc.Arbitrary<Generated> = fc
+  .array(fc.tuple(pieces, fc.array(words, { minLength: 1, maxLength: 3 }), fc.constantFrom('    ', '\t', '      ')), {
+    minLength: 1,
+    maxLength: 3,
+  })
+  .map((chunks) => {
+    let text = '';
+    const untouchable: Range[] = [];
+    for (const [parts, lines, indent] of chunks) {
+      const prose = assemble(parts);
+      for (const span of prose.untouchable) untouchable.push({ start: text.length + span.start, end: text.length + span.end });
+      // A line at the margin between blank lines closes any list the prose left open, so the
+      // indented lines after it are code rather than more of a list item.
+      text += `${prose.text}\n\nNext.\n\n`;
+      const code = lines.map((ws) => indent + ws.join(' ')).join('\n');
+      untouchable.push({ start: text.length + indent.length, end: text.length + code.length });
+      text += `${code}\n\n`;
+    }
+    return { text, untouchable };
+  });
+
 // ----- generated source files -----
 
 interface Language {
@@ -680,6 +707,19 @@ describe('generated text keeps every promise', () => {
     it(`with ${name}`, () => {
       fc.assert(
         fc.property(generatedProse, ({ text, untouchable }) => {
+          expect(unknownViolations(text, options, untouchable)).toEqual([]);
+        }),
+        { seed: SEED, numRuns: RUNS },
+      );
+    });
+  }
+});
+
+describe('generated Markdown keeps every promise', () => {
+  for (const [name, options] of Object.entries(MARKDOWN_OPTION_SETS)) {
+    it(`with ${name}`, () => {
+      fc.assert(
+        fc.property(generatedMarkdown, ({ text, untouchable }) => {
           expect(unknownViolations(text, options, untouchable)).toEqual([]);
         }),
         { seed: SEED, numRuns: RUNS },

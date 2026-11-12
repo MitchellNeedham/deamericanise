@@ -572,7 +572,10 @@ function feetInchesRule(): Rule {
       pattern.lastIndex = 0;
       for (const match of ctx.text.matchAll(pattern)) {
         const inches = parseNumber(match[2]!);
-        if (inches === null) continue;
+        if (inches === null) {
+          changes.push(hold(match.index, match[0], 'units.length.feet-inches', 40));
+          continue;
+        }
         const target = metricLength(Number(match[1]) * 0.3048 + inches * 0.0254);
         // Two components together claim three figures of precision, not one.
         const number = formatNumber(
@@ -632,7 +635,10 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
             .map((measure, i) => ({ measure, raw: match[2 * i + 1], unit: match[2 * i + 2] ?? '' }))
             .filter((p) => p.raw !== undefined);
           const values = parts.map((p) => parseNumber(p.raw!));
-          if (values.some((v) => v === null)) continue;
+          if (values.some((v) => v === null)) {
+            changes.push(hold(match.index, match[0], compound.id, 40));
+            continue;
+          }
 
           const start = match.index;
           notSecond.lastIndex = start;

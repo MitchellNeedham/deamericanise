@@ -369,7 +369,11 @@ the conversion: the same dimension, and each figure within a quarter of the conv
 `6 feet (5 m)` convert as normal and keep their bracket. The bracket may start on the next
 line, but not after a blank line. `1.8 metres (6 feet)` is left as
 it is, because the bracket only restates the metric value in front of it. That is the
-form `keepOriginal` writes, so running it again changes nothing. The bracket can open
+form `keepOriginal` writes, so running it again changes nothing. The same holds for any
+quantity in words the unit rules convert, as in `1.3 centimetres (half an inch)` and
+`2.4 kilometres (a mile and a half)`, and after emphasis or code that closes on the metric
+value, as in `**1.8 metres** (6 feet)`. Here too the bracket may start on the next line,
+but not after a blank line. The bracket can open
 with a word such as `about`, but it has to hold nothing else, and the dimension has to
 match: `2 metres (6 pounds)` still converts.
 

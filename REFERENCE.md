@@ -558,7 +558,7 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 
   | `syntax` | |
   | --- | --- |
-  | `'markdown'` | Fences as above, and indented code blocks as CommonMark reads them |
+  | `'markdown'` | Fences as above, and indented code blocks and `pre`, `script`, `style` and `textarea` blocks as CommonMark reads them |
   | `'text'` | No such fences, since a line of tildes underlines a heading in `.rst` or `.txt`: three backticks protect everything up to the next three |
   | none (default) | Fences as above, and an indented line is prose |
 
@@ -566,6 +566,13 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   item or quote it sits in, after a blank line or a block that is not a paragraph. A line
   indented that far inside a paragraph continues it, so a list item's wrapped line or second
   paragraph is still rewritten.
+
+  A `pre`, `script`, `style` or `textarea` block starts on a line that opens with that tag,
+  and runs to the end of the line that holds a closing tag of any of the four, blank lines
+  included, or to the end of the list item or quote it sits in. CommonMark passes it through
+  as raw HTML, so all of it is held, including text after the closing tag on its last line.
+  Other HTML blocks, such as `<div align="center">` on a line of its own, and HTML comments
+  hold text that is still rewritten, as is a tag in the middle of a sentence.
 - **File names and paths,** read from their shape rather than a list of extensions. A file
   name is a name holding a letter, then a dot and an extension in one case with no space
   either side, so `behavior.ts`, `Center.vue` and `GRAY.PNG` are held, and so is a domain or
@@ -682,6 +689,13 @@ value. A weighted score over those signals separates code from prose across C, P
 SQL, CSS and the rest with one rule set, and a line that already starts with the host
 language's comment marker is taken as commented-out on sight.
 
+A run of the marker that a language writes by convention is one marker, not two: `;;`,
+`;;;` and `;;;;` in Lisp, `'''` in Visual Basic, `%%` and `%%%` in Erlang, MATLAB and
+LaTeX, and `!!` in Fortran. So `;; Pick the color.` is rewritten, while `;;; ;; old note`,
+`; ; old note` and `;;;;; old note` are still commented on top of a comment. Other repeats
+are a second marker, so `//// the color` in TypeScript and `## the color` in Python are left
+alone. `LexerSpec.markerRuns` sets these per language.
+
 The costs are lopsided: a missed rewrite inside a commented-out block is invisible, while
 a rewrite there is a broken build. The threshold is set accordingly, so the occasional
 prose line that reads like code is left alone. It works line by line, so a block comment
@@ -695,7 +709,7 @@ Turn it off with `protectCommentedCode: false` or `--no-code-guard`.
 A comment is read the way its author wrote it. A block comment is one text, and so is a run
 of line comments on consecutive lines with the same marker at the same column. A comment
 after code joins only the comments lined up beneath it. Each line's marker (`//`, `#`, `///`,
-`//!`) and the `*` that starts each line of a `/*` comment are taken out first, so the text
+`//!`, `;;`) and the `*` that starts each line of a `/*` comment are taken out first, so the text
 is Markdown: a line left holding only `//` or `*` is a blank line that ends a paragraph, a
 backtick span or a fence may wrap from one line to the next, and an article that ends one
 line agrees with the word that starts the next.
@@ -782,8 +796,8 @@ export default {
 Prettier owns the parsers, so the plugin wraps the built-in ones and rewrites the source
 in `preprocess`, before Prettier records the text its printers work from. Markdown, MDX,
 JavaScript, TypeScript, CSS, SCSS, Less, YAML, HTML and Vue are covered: Markdown and MDX
-are handled as prose with `syntax: 'markdown'`, so indented code is left alone, and the
-rest have only their comments touched.
+are handled as prose with `syntax: 'markdown'`, so indented code and `pre`, `script`,
+`style` and `textarea` blocks are left alone, and the rest have only their comments touched.
 
 Prettier validates option types and has no object type, so the two settings people
 actually change are flat and anything else goes through `deamericaniseOptions` as JSON.
@@ -921,7 +935,7 @@ there each root needs the rules in its own styles.
 | `protect` | `[]` | Strings or patterns never to rewrite |
 | `protectProperNouns` | `true` | The built-in name list |
 | `protectIdentifiers` | `false` (`true` for code) | camelCase, snake_case, kebab API names, dotted names |
-| `syntax` | unknown | `markdown` or `text`: how code fences and indented code are read |
+| `syntax` | unknown | `markdown` or `text`: how code fences, indented code and HTML blocks are read |
 | `unitsKeep` | `[]` | Units to leave alone, by key |
 | `units.precision` | `'natural'` | `natural`, `exact`, or a number of decimal places |
 | `units.keepOriginal` | `false` | Write `1.8 metres (6 ft)` |
@@ -962,10 +976,15 @@ rejected the same way.
   runs on to the next line that would close it, or to the end of the text. A comment in a
   language that documents in Markdown is read that way, so a tilde heading underline in a
   reStructuredText block comment there leaves the text up to the next one as written.
-- Outside the remark plugin, an indented code block is rewritten like the prose around it
-  unless the text is known to be Markdown: a Markdown file, `syntax: 'markdown'`, or
-  Prettier's Markdown parser. So `deamericaniseText` with no `syntax`, stdin without
-  `--language md` or `--syntax markdown`, and comments rewrite it.
+- Outside the remark plugin, an indented code block, and the contents of a `pre`, `script`,
+  `style` or `textarea` block, are rewritten like the prose around them unless the text is
+  known to be Markdown: a Markdown file, `syntax: 'markdown'`, or Prettier's Markdown parser.
+  So `deamericaniseText` with no `syntax`, stdin without `--language md` or
+  `--syntax markdown`, and comments rewrite them.
+- Outside the remark plugin, a `pre`, `script`, `style` or `textarea` element inside another
+  HTML block, such as a `<pre>` between `<div>` and `</div>` with no blank line between them,
+  is read as CommonMark reads it: part of the outer block, so its contents are rewritten. The
+  remark plugin leaves every HTML block alone.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`
   or `keepOriginal` where the numbers matter.
 - A number that a hard wrap splits, such as `1` at the end of one line and `1/2 gallons` at

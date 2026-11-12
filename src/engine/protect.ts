@@ -252,7 +252,7 @@ export interface ProtectOptions {
   commentedCode: boolean;
   /** The host language's line-comment markers, for spotting a double-commented line. */
   commentMarkers: string[];
-  /** The text's markup, which decides how code fences and indented code are read. */
+  /** The text's markup, which decides how code fences, indented code and HTML blocks are read. */
   syntax: Syntax | undefined;
   /** The text comes from a parsed document, so a backtick in it is literal and opens no code. */
   parsed: boolean;

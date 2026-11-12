@@ -264,6 +264,14 @@ describe('the ESLint plugin', () => {
       expect(reports[0]?.data).toEqual({ before: 'an eraser', after: 'a rubber' });
       expect(quickFix(code, reports[0]!)).toBe(fixed);
     });
+
+    it('reports the word alone when a blank line ends the paragraph after the article', () => {
+      const code = '// Use an\n//\n// eraser here.\n';
+      const reports = lint(code, [{ preset: 'localise' }]);
+      expect(reports).toHaveLength(1);
+      expect(reports[0]?.data).toEqual({ before: 'eraser', after: 'rubber' });
+      expect(quickFix(code, reports[0]!)).toBe('// Use an\n//\n// rubber here.\n');
+    });
   });
 
   it('takes rule options', () => {

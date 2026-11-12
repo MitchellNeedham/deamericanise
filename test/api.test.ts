@@ -63,6 +63,87 @@ describe('articles follow the replacement', () => {
   });
 });
 
+describe('a capital A that is a label', () => {
+  const localise = { preset: 'localise' } as const;
+  const gb = { preset: 'localise', dialect: 'en-GB' } as const;
+
+  it.each`
+    input                       | options     | expected                     | why
+    ${'a Grade A eggplant'}     | ${gb}       | ${'a Grade A aubergine'}     | ${'a grade'}
+    ${'Plan A popsicle'}        | ${gb}       | ${'Plan A ice lolly'}        | ${'a plan at the start of the text'}
+    ${'the type A eggplant'}    | ${gb}       | ${'the type A aubergine'}    | ${'after a lowercase word'}
+    ${'Bring A cooler'}         | ${localise} | ${'Bring A esky'}            | ${'a capital where none is expected'}
+    ${'Hall A 60 foot ceiling'} | ${{}}       | ${'Hall A 18 metre ceiling'} | ${'before a converted measurement'}
+  `('is left alone: $input -> $expected ($why)', ({ input, options, expected }) => {
+    expect(deamericaniseText(input, options)).toBe(expected);
+  });
+
+  it.each`
+    input                                           | expected                                         | why
+    ${'A popsicle melted.'}                         | ${'An icy pole melted.'}                         | ${'the start of the text'}
+    ${'It melted. A popsicle is cold.'}             | ${'It melted. An icy pole is cold.'}             | ${'after a sentence end'}
+    ${'(It melted.) A popsicle is cold.'}           | ${'(It melted.) An icy pole is cold.'}           | ${'after a stop and a closing bracket'}
+    ${'Wait… A popsicle'}                           | ${'Wait… An icy pole'}                           | ${'after an ellipsis'}
+    ${'Note: A popsicle melts.'}                    | ${'Note: An icy pole melts.'}                    | ${'after a colon'}
+    ${'She wrote "A popsicle melts" on the board.'} | ${'She wrote "An icy pole melts" on the board.'} | ${'after an opening quote'}
+    ${'Dessert\nA popsicle'}                        | ${'Dessert\nAn icy pole'}                        | ${'the start of a line'}
+    ${'- A popsicle'}                               | ${'- An icy pole'}                               | ${'after a list marker'}
+    ${'# A popsicle'}                               | ${'# An icy pole'}                               | ${'after a heading marker'}
+    ${'> A popsicle'}                               | ${'> An icy pole'}                               | ${'after a quote marker'}
+    ${'| A popsicle |'}                             | ${'| An icy pole |'}                             | ${'a table cell'}
+    ${'**A popsicle** melts.'}                      | ${'**An icy pole** melts.'}                      | ${'in emphasis at the start'}
+    ${'Fix A Blinker'}                              | ${'Fix An Indicator'}                            | ${'title case'}
+    ${'Use An Eraser'}                              | ${'Use A Rubber'}                                | ${'title case with An'}
+    ${'FIX A BLINKER'}                              | ${'FIX AN INDICATOR'}                            | ${'text in capitals'}
+    ${'AN ERASER'}                                  | ${'A RUBBER'}                                    | ${'text in capitals with AN'}
+    ${'Use AN eraser.'}                             | ${'Use A rubber.'}                               | ${'AN is in capitals by itself'}
+    ${'Use an eraser.'}                             | ${'Use a rubber.'}                               | ${'a lower case article'}
+  `('is the article where a capital is expected: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(deamericaniseText(input, localise)).toBe(expected);
+  });
+
+  it('is the article before a converted measurement at the start', () => {
+    expect(deamericaniseText('an 8 foot fence')).toBe('a 2.4 metre fence');
+    expect(deamericaniseText('A 60 foot tree fell.', { assumeAmerican: true })).toBe('An 18 metre tree fell.');
+  });
+});
+
+describe('a blank line between an article and its word', () => {
+  const localise = { preset: 'localise' } as const;
+
+  it.each`
+    input                             | options     | expected                             | why
+    ${'Use an\n\neraser here.'}       | ${localise} | ${'Use an\n\nrubber here.'}          | ${'a blank line'}
+    ${'It needs an\n\n8 foot fence.'} | ${{}}       | ${'It needs an\n\n2.4 metre fence.'} | ${'before a converted measurement'}
+    ${'Use an\r\n\r\neraser here.'}   | ${localise} | ${'Use an\r\n\r\nrubber here.'}      | ${'Windows line endings'}
+    ${'Use an\n  \neraser here.'}     | ${localise} | ${'Use an\n  \nrubber here.'}        | ${'a blank line of spaces'}
+    ${'Use an \n\t\n eraser here.'}   | ${localise} | ${'Use an \n\t\n rubber here.'}      | ${'spaces either side of the lines'}
+  `('ends the agreement: $why', ({ input, options, expected }) => {
+    expect(deamericaniseText(input, options)).toBe(expected);
+  });
+
+  it.each`
+    input                        | options     | expected
+    ${'Use an\neraser here.'}    | ${localise} | ${'Use a\nrubber here.'}
+    ${'Use an\r\neraser here.'}  | ${localise} | ${'Use a\r\nrubber here.'}
+    ${'Use an \n  eraser here.'} | ${localise} | ${'Use a \n  rubber here.'}
+    ${'Use an eraser.'}          | ${localise} | ${'Use a rubber.'}
+    ${'Build an 8 foot fence.'}  | ${{}}       | ${'Build a 2.4 metre fence.'}
+  `('leaves a single line break in the paragraph: $input', ({ input, options, expected }) => {
+    expect(deamericaniseText(input, options)).toBe(expected);
+  });
+});
+
+describe('a ute', () => {
+  it.each`
+    dialect    | expected
+    ${'en-AU'} | ${'He drove a ute.'}
+    ${'en-NZ'} | ${'He drove a ute.'}
+  `('takes a in $dialect', ({ dialect, expected }) => {
+    expect(deamericaniseText('He drove a pickup truck.', { preset: 'localise', dialect })).toBe(expected);
+  });
+});
+
 describe('articles follow a replacement that starts with a number', () => {
   const american = { assumeAmerican: true };
   const clock = { assumeAmerican: true, times: { to24Hour: true } };
@@ -174,6 +255,18 @@ describe('articles follow a replacement that starts with a number', () => {
     ${'A4'}              | ${'misc'}     | ${'an'}
   `('$after ($category) takes $article', ({ after, category, article }) => {
     expect(articleFor(after, category)).toBe(article);
+  });
+
+  it.each`
+    after        | article
+    ${'ute'}     | ${'a'}
+    ${'utes'}    | ${'a'}
+    ${'Ute'}     | ${'a'}
+    ${'utensil'} | ${'an'}
+    ${'uterine'} | ${'an'}
+    ${'utter'}   | ${'an'}
+  `('$after (vocabulary) takes $article', ({ after, article }) => {
+    expect(articleFor(after, 'vocabulary')).toBe(article);
   });
 });
 

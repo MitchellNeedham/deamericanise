@@ -608,6 +608,8 @@ describe('the stop of a unit abbreviation', () => {
     ${'It weighs 5 lbs. The bag is full.'}         | ${'It weighs 2.3 kg. The bag is full.'}        | ${'pounds, plural'}
     ${'Add 8 oz.'}                                 | ${'Add 230 g.'}                                | ${'ounces'}
     ${'The baby weighed 7 lb. 8 oz.'}              | ${'The baby weighed 3.4 kg.'}                  | ${'a weight in two units'}
+    ${'It weighs 5 lb. 1 December 2024 was cold.'} | ${'It weighs 2.3 kg. 1 December 2024 was cold.'} | ${'before a sentence that opens with a day-first date'}
+    ${'It weighs 5 lb. 25/12/2024 was cold.'}      | ${'It weighs 2.3 kg. 25/12/2024 was cold.'}    | ${'before a sentence that opens with a date in figures'}
   `('keeps the stop that also ends the sentence: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -638,6 +640,29 @@ describe('the stop of a unit abbreviation', () => {
     ${'The bag weighs 2.2 lb. (1 kg).'}       | ${'The bag weighs 1 kg.'}
     ${'The bag weighs 1 kg (2.2 lb.) today.'} | ${'The bag weighs 1 kg (2.2 lb.) today.'}
   `('reads a dotted weight whole beside its metric value: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                          | expected                              | why
+    ${'The bag weighs 2.2 lb. (1 kg) Then stir.'}  | ${'The bag weighs 1 kg. Then stir.'}  | ${'before a new sentence'}
+    ${'The fence is 6 ft. (1.8 m) It is new.'}     | ${'The fence is 1.8 m. It is new.'}   | ${'the same, feet'}
+    ${'The bag weighs 2.2 lb. (1 kg)'}             | ${'The bag weighs 1 kg.'}             | ${'the end of the text'}
+    ${'The bag weighs 2.2 lb./1 kg Then stir.'}    | ${'The bag weighs 1 kg. Then stir.'}  | ${'a pair joined by a slash'}
+    ${'The bag weighs 2.2 lb. (1 kg) of flour.'}   | ${'The bag weighs 1 kg of flour.'}    | ${'before a word in lower case'}
+    ${'The bag weighs 2.2 lb. (1 kg), then stir.'} | ${'The bag weighs 1 kg, then stir.'}  | ${'before a comma'}
+    ${'The bag weighs 2.2 lb. (1 kg).'}            | ${'The bag weighs 1 kg.'}             | ${'before the sentence stop after the bracket'}
+  `('decides the stop past the metric value a pair collapses into: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                              | expected                          | why
+    ${'The board is 12 in...'}         | ${'The board is 30 cm...'}        | ${'inches'}
+    ${'It weighs 5 lb...'}             | ${'It weighs 2.3 kg...'}          | ${'pounds'}
+    ${'The fence is 6 ft... or so.'}   | ${'The fence is 1.8 m... or so.'} | ${'inside the sentence'}
+    ${'It is 12 in.... long'}          | ${'It is 30 cm... long'}          | ${'a whole ellipsis after the stop'}
+  `('keeps the stop that opens an ellipsis: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 });
@@ -719,9 +744,37 @@ describe('a spelled-out temperature that describes a noun stays singular', () =>
     ${'Preheat to 350 degrees F.'}          | ${'Preheat to 175 degrees Celsius.'}       | ${'the plural with no noun'}
     ${'It was 72 degrees Fahrenheit.'}      | ${'It was 22.2 degrees Celsius.'}          | ${'the same, spelled out'}
     ${'a 350°F oven'}                       | ${'a 175°C oven'}                          | ${'a symbol has no number'}
-    ${'a 350-degree F oven'}                | ${'a 350-degree F oven'}                   | ${'a hyphen is not read'}
+    ${'a 350-degree F oven'}                | ${'a 175 degree Celsius oven'}             | ${'a hyphen ties the number to "degree"'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a hyphenated degree-Fahrenheit modifier', () => {
+  it.each`
+    input                                                       | expected                                  | why
+    ${'It was 110-degree-Fahrenheit heat.'}                     | ${'It was 43.3 degree Celsius heat.'}     | ${'both hyphens'}
+    ${'It was a 110 degree-Fahrenheit day.'}                    | ${'It was a 43.3 degree Celsius day.'}    | ${'the second hyphen alone'}
+    ${'Use a 350‐degree‐F oven today.'}                         | ${'Use a 175 degree Celsius oven today.'} | ${'U+2010 hyphens and an F'}
+    ${'It was a 100-110-degree-Fahrenheit day.'}                | ${'It was a 38-43 degree Celsius day.'}   | ${'a range'}
+    ${'The heat hit 110-degree-Fahrenheit today.'}              | ${'The heat hit 43.3 degrees Celsius today.'} | ${'no noun after it takes the plural'}
+    ${'It was 110-degrees-Fahrenheit today.'}                   | ${'It was 43.3 degrees Celsius today.'}   | ${'the plural stays plural'}
+    ${'It was a 110-degree-Fahrenheit (43-degree-Celsius) day.'} | ${'It was a 43-degree-Celsius day.'}     | ${'a hyphenated Celsius partner'}
+    ${'It was 110 degrees Fahrenheit.'}                         | ${'It was 43.3 degrees Celsius.'}         | ${'spaced'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('converts a hyphenated degree-F modifier', () => {
+    expect(convert('A 110-degree-F day.', { assumeAmerican: true })).toBe('A 43.3 degree Celsius day.');
+  });
+
+  it.each`
+    unchanged                                                    | why
+    ${'A 110-degree day.'}                                       | ${'bare degrees'}
+    ${'It was a 43-degree-Celsius (110-degree-Fahrenheit) day.'} | ${'the Fahrenheit value restates the Celsius one'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
   });
 });
 
@@ -757,7 +810,7 @@ describe('the stop of a Fahrenheit F', () => {
     input                                                 | expected                                                  | why
     ${'Bake at 350 degrees F...'}                         | ${'Bake at 175 degrees Celsius...'}                       | ${'an ellipsis'}
     ${'Bake at 350 degrees F. 2 trays fit.'}              | ${'Bake at 175 degrees Celsius. 2 trays fit.'}            | ${'before a figure'}
-    ${'Bake at 350 degrees F. (180 degrees C) Then stir.'} | ${'Bake at 175 degrees Celsius. (180 degrees C) Then stir.'} | ${'before a bracket the sentence may trail'}
+    ${'Bake at 350 degrees F. (see below) Then stir.'}    | ${'Bake at 175 degrees Celsius. (see below) Then stir.'}    | ${'before a bracket the sentence may trail'}
     ${'Set it to 350 F. for an hour.'}                    | ${'Set it to 350 F. for an hour.'}                        | ${'a bare F with no word about heat'}
     ${'Bake it at 350 f. for an hour.'}                   | ${'Bake it at 350 f. for an hour.'}                       | ${'a lower case bare f'}
   `('leaves the stop in the text: $input -> $expected ($why)', ({ input, expected }) => {
@@ -788,10 +841,25 @@ describe('the stop of a Fahrenheit F', () => {
     ${'It was 90°F. Then it rained.'}        | ${'It was 32.2°C. Then it rained.'}       | ${'the same'}
     ${'Highs in the 80s°F. Then rain.'}      | ${'Highs between 27 and 32°C. Then rain.'} | ${'a decade before a new sentence'}
     ${'Bake at 350°F. 2 trays fit.'}         | ${'Bake at 175°C. 2 trays fit.'}          | ${'before a figure'}
-    ${'Bake at 350°F. (180°C) Then stir.'}   | ${'Bake at 175°C. (180°C) Then stir.'}    | ${'before a bracket'}
+    ${'Bake at 350°F. (see below) Then stir.'} | ${'Bake at 175°C. (see below) Then stir.'} | ${'before a bracket'}
     ${'Bake at 350°F (175°C).'}              | ${'Bake at 175°C.'}                       | ${'after its Celsius value'}
     ${'- 350 degrees Fahrenheit.'}           | ${'- 175 degrees Celsius.'}               | ${'the word takes no stop'}
   `('leaves the stop after a symbol or the word everywhere else: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                            | expected                       | why
+    ${'Bake at 350°F. (175°C) Then stir.'}           | ${'Bake at 175°C. Then stir.'} | ${'a symbol before a new sentence'}
+    ${'Bake at 350°F. (175°C)'}                      | ${'Bake at 175°C.'}            | ${'the end of the text'}
+    ${'Bake at 350°F. (175°C) for an hour.'}         | ${'Bake at 175°C for an hour.'} | ${'a symbol before a word in lower case'}
+    ${'Bake at 350°F. (175°C).'}                     | ${'Bake at 175°C.'}            | ${'before the sentence stop after the bracket'}
+    ${'Bake at 350°F. (175°C), then stir.'}          | ${'Bake at 175°C, then stir.'} | ${'before a comma'}
+    ${'Bake at 350 degrees F. (175°C) for an hour.'} | ${'Bake at 175°C for an hour.'} | ${'a bare letter F'}
+    ${'Bake at 350 degrees F. (175°C) Then stir.'}   | ${'Bake at 175°C. Then stir.'} | ${'a bare letter F before a new sentence'}
+    ${'Bake at 350°F (175°C). Then stir.'}           | ${'Bake at 175°C. Then stir.'} | ${'no stop before the bracket'}
+    ${'Bake at 350°F. Then stir.'}                   | ${'Bake at 175°C. Then stir.'} | ${'no bracket'}
+  `('decides the stop past the Celsius value a pair collapses into: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 
@@ -1054,10 +1122,22 @@ describe('Fahrenheit written as a bare F', () => {
     ${'At 20C by 6 p.m. Temperatures hit 50F.'}           | ${'At 20C by 6pm. Temperatures hit 10°C.'}
     ${'Put the cookie sheet in at 350F.'}                 | ${'Put the baking tray in at 175°C.'}
     ${'Put the baking tray in at 350F.'}                  | ${'Put the baking tray in at 175°C.'}
+    ${'It hit 10F. December 1, 2024 was a few degrees colder.'} | ${'It hit 10F. 1 December 2024 was a few degrees colder.'}
+    ${'It hit 10F. Dec 1st was a few degrees colder.'}    | ${'It hit 10F. 1 December was a few degrees colder.'}
+    ${'It hit 10F. 1 December 2024 was a few degrees colder.'} | ${'It hit 10F. 1 December 2024 was a few degrees colder.'}
+    ${'It hit 10F. In December it was a few degrees colder.'} | ${'It hit 10F. In December it was a few degrees colder.'}
+    ${'The heat was bad. Two feet of snow fell at 35F.'}  | ${'The heat was bad. 61 centimetres of snow fell at 1.7°C.'}
   `('decides $input on the first run as the second would', ({ input, expected }) => {
     const once = deamericaniseText(input, { preset: 'localise' });
     expect(once).toBe(expected);
     expect(deamericaniseText(once, { preset: 'localise' })).toBe(once);
+  });
+
+  it('decides a bare F before a month-first date on the first run as the second would, with dates in figures', () => {
+    const dayFirst = { preset: 'localise', dates: { format: 'dmy' } } as const;
+    const once = deamericaniseText('It hit 10F. December 1, 2024 was a few degrees colder.', dayFirst);
+    expect(once).toBe('It hit 10F. 01/12/2024 was a few degrees colder.');
+    expect(deamericaniseText(once, dayFirst)).toBe(once);
   });
 
   it('keeps a sentence that opens with a number in words, which a unit rule writes in figures', () => {
@@ -1391,6 +1471,32 @@ describe('a range joined by "or"', () => {
     const once = convert('It is 5 or 6 feet long.', options);
     expect(once).toBe('It is 1.5 or 1.8 metres (5 or 6 feet) long.');
     expect(convert(once, options)).toBe(once);
+  });
+});
+
+describe('a gas mark before a Fahrenheit value', () => {
+  it.each`
+    input                                             | expected                                           | why
+    ${'Preheat to gas mark 4 - 350°F first.'}         | ${'Preheat to gas mark 4 - 175°C first.'}          | ${'a dash'}
+    ${'Preheat to Gas Mark 4 to 350°F first.'}        | ${'Preheat to Gas Mark 4 to 175°C first.'}         | ${'"to"'}
+    ${'Preheat to gas 4 – 350°F first.'}              | ${'Preheat to gas 4 – 175°C first.'}               | ${'an en dash after "gas" alone'}
+    ${'Preheat to gas mark 4 - 350 degrees F first.'} | ${'Preheat to gas mark 4 - 175 degrees Celsius first.'} | ${'spelled out'}
+    ${'Preheat to gas mark 4 - 350F first.'}          | ${'Preheat to gas mark 4 - 175°C first.'}          | ${'a bare F'}
+    ${'Preheat to gas mark 4 - 350 Fahrenheit first.'} | ${'Preheat to gas mark 4 - 175°C first.'}         | ${'the word alone'}
+    ${'Preheat from gas mark 1 to 350°F first.'}      | ${'Preheat from gas mark 1 to 175°C first.'}       | ${'after "from"'}
+    ${'Preheat to gas mark 4 - 350-375°F first.'}     | ${'Preheat to gas mark 4 - 175-190°C first.'}      | ${'a range after it'}
+  `('is no first end of a range: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                               | expected
+    ${'Bake at 350-375°F.'}             | ${'Bake at 175-190°C.'}
+    ${'Preheat to 350°F - gas mark 4.'} | ${'Preheat to 175°C - gas mark 4.'}
+    ${'Preheat to gas mark 4 (350°F).'} | ${'Preheat to gas mark 4 (175°C).'}
+    ${'from -10 to 5°F'}                | ${'from -23 to -15°C'}
+  `('still gives $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
   });
 });
 
@@ -1769,6 +1875,59 @@ describe('a year after a preposition is not a measurement', () => {
   it('holds the year and its unit word whole', () => {
     expect(held('In 2024 miles were driven.')).toContain('2024 miles');
   });
+
+  it.each`
+    unchanged                                            | why
+    ${'In 2020-2024 miles were driven.'}                 | ${'joined by a hyphen'}
+    ${'In 2020–2024 miles were driven.'}                 | ${'joined by an en dash'}
+    ${'In 2020 - 2024 miles were driven.'}               | ${'joined by a spaced hyphen'}
+    ${'In 2020 to 2024 miles were driven.'}              | ${'joined by "to"'}
+    ${'In 2020 and 2024 miles were driven.'}             | ${'joined by "and"'}
+    ${'In 2020 or 2024 miles were driven.'}              | ${'joined by "or"'}
+    ${'In 2020, 2022 or 2024 miles were driven.'}        | ${'a list ending in "or"'}
+    ${'In 2020, 2022, and 2024 miles were driven.'}      | ${'a list ending in a comma and "and"'}
+    ${'In 2020, 2022, 2024 miles were driven.'}          | ${'a list with commas alone'}
+    ${'In 2020-2024 acre prices doubled.'}               | ${'a singular unit before a noun'}
+    ${'From 2019 to 2024 miles driven rose.'}            | ${'after "from"'}
+    ${'Between 2020 and 2024 acres were farmed.'}        | ${'after "between"'}
+    ${'Last year, from 2019 to 2024 miles driven rose.'} | ${'after a comma'}
+    ${'- Between 2020 and 2024 acres were farmed.'}      | ${'opening a list item'}
+    ${'Until 1999 to 2001 square miles were mapped.'}    | ${'a unit of two words'}
+  `('leaves the years of "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    unchanged
+    ${'In 2020-2024 miles were driven.'}
+    ${'In 2020, 2022 or 2024 miles were driven.'}
+  `('leaves the years of "$unchanged" alone with the range rule off', ({ unchanged }) => {
+    expect(convert(unchanged, { rules: { 'units.range': false } })).toBe(unchanged);
+  });
+
+  it.each`
+    input                                    | expected                                       | why
+    ${'It climbed from 1000 to 2000 feet.'}  | ${'It climbed from 300 to 610 metres.'}        | ${'a preposition inside the clause'}
+    ${'We drove 1500-2000 miles that year.'} | ${'We drove 2400-3200 kilometres that year.'}  | ${'no preposition before the range'}
+    ${'5-10 feet'}                           | ${'1.5-3 metres'}                              | ${'numbers too short to be years'}
+    ${'In 2024 - 5 feet of snow fell.'}      | ${'In 2024 - 1.5 metres of snow fell.'}        | ${'a year that cannot open the range'}
+    ${'In 1000-2000 feet, turn right.'}      | ${'In 300-610 metres, turn right.'}            | ${'a unit before a comma'}
+    ${'In 2024-2020 miles were driven.'}     | ${'In 3257-3251 kilometres were driven.'}      | ${'a second end before the first'}
+    ${'In 2020-3024 miles were driven.'}     | ${'In 3251-4867 kilometres were driven.'}      | ${'four figures too large for a year'}
+    ${'In 2020-2024-mile races they tired.'} | ${'In 3251-3257 kilometre races they tired.'}  | ${'a hyphen ties the number to the unit'}
+    ${'From 2019 miles driven rose.'}        | ${'From 3249 kilometres driven rose.'}         | ${'"from" before one number'}
+    ${'From 1500 feet to 2000 feet the trail climbs.'} | ${'From 460 to 610 metres the trail climbs.'} | ${'a unit after the first number'}
+    ${'From 1000 to 2000 feet the air thins.'} | ${'From 300 to 610 metres the air thins.'} | ${'a range of heights in feet'}
+    ${'Between 2000 and 2500 feet the trail steepens.'} | ${'Between 610 and 760 metres the trail steepens.'} | ${'the same, after "between"'}
+    ${'In 1500-2000 foot climbs we rested.'} | ${'In 460-610 metre climbs we rested.'} | ${'the same, in the singular before a noun'}
+    ${'From 2019 to 2024 feet the air thins.'} | ${'From 615.4 to 616.9 metres the air thins.'} | ${'the same, though its figures may be years'}
+  `('still converts $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('holds a range of years and its unit word whole', () => {
+    expect(held('In 2020-2024 miles were driven.')).toEqual(['2020-2024 miles']);
+  });
 });
 
 describe('a price is not a measurement', () => {
@@ -2135,6 +2294,68 @@ describe('a conventional size is never half converted', () => {
       '15-17 inch wheels and 1.8 metres of pipe',
     );
   });
+
+  it.each`
+    unchanged                                  | why
+    ${'rims from 15 inches to 17 inches'}      | ${'the noun before the range'}
+    ${'a 3/8" to 1/2" socket'}                 | ${'the noun after the range, with inch marks'}
+    ${'a 3/8″ to 1/2″ socket'}                 | ${'the same, with double primes'}
+    ${'a 2 inch to 3 inch pipe'}               | ${'a singular unit on both ends'}
+    ${'rims of 15 inches - 17 inches'}         | ${'joined by a spaced hyphen'}
+    ${'rims of 15 inches – 17 inches'}         | ${'joined by an en dash'}
+    ${'rims of 15 inches or 17 inches'}        | ${'joined by "or"'}
+    ${'rims between 15 inches and 17 inches'}  | ${'joined by "and"'}
+    ${'fits 15″-17″ wheels'}                   | ${'joined by a hyphen written tight'}
+  `('leaves "$unchanged" alone, with the unit on both ends of the range ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                 | expected
+    ${'rims from 15 inches to 17 inches'} | ${'rims from 38 to 43 centimetres'}
+    ${'a 3/8" to 1/2" socket'}            | ${'a 0.95 to 1.3 cm socket'}
+  `('converts all of $input when respectConventions is off', ({ input, expected }) => {
+    expect(convert(input, { units: { respectConventions: false } })).toBe(expected);
+  });
+});
+
+describe('a range with its unit on both ends', () => {
+  it.each`
+    input                                       | expected                              | why
+    ${'from 15 inches to 17 inches'}            | ${'from 38 to 43 centimetres'}        | ${'joined by "to"'}
+    ${'It rose from 6 feet to 8 feet.'}         | ${'It rose from 1.8 to 2.4 metres.'}  | ${'in a sentence'}
+    ${'from 5 ft to 6 ft'}                      | ${'from 1.5 to 1.8 m'}                | ${'abbreviations'}
+    ${'from 2 feet to 6 ft'}                    | ${'from 0.61 to 1.8 m'}               | ${'a word and an abbreviation of one unit'}
+    ${'a 2 inch to 3 inch board'}               | ${'a 5.1 to 7.6 centimetre board'}    | ${'describing a noun'}
+    ${'from two feet to three feet'}            | ${'from 61 to 91 centimetres'}        | ${'ends in words'}
+    ${'from two and a half feet to three feet'} | ${'from 76 to 91 centimetres'}        | ${'a fraction in words, which its unit ends'}
+    ${'from 1 1/2 inches to 2 inches'}          | ${'from 3.8 to 5.1 centimetres'}      | ${'a mixed number'}
+  `('converts both ends as one range: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                                  | why
+    ${'from 6 feet to 10 inches'}          | ${'from 1.8 metres to 25 centimetres'}    | ${'two units'}
+    ${'6 feet to 10 inches to 12 inches'}  | ${'1.8 metres to 25 to 30 centimetres'}   | ${'a range after a measurement in another unit'}
+    ${'6 feet 2 inches'}                   | ${'1.88 metres'}                          | ${'a height'}
+    ${'5 feet to 6 feet 2 inches'}         | ${'1.5 metres to 1.88 metres'}            | ${'a height at the second end'}
+    ${'5 feet or 6 feet'}                  | ${'1.5 metres or 1.8 metres'}             | ${'joined by "or"'}
+    ${'between 5 feet and 6 feet'}         | ${'between 1.5 metres and 1.8 metres'}    | ${'joined by "and"'}
+    ${'5 feet - 6 feet'}                   | ${'1.5 metres - 1.8 metres'}              | ${'joined by a spaced hyphen'}
+    ${'5ft-6ft'}                           | ${'1.5 m-1.8 m'}                          | ${'joined by a hyphen written tight'}
+    ${'It is 5 feet, 10 feet and 15 feet.'} | ${'It is 1.5 metres, 3 metres and 4.6 metres.'} | ${'a list'}
+    ${'Put 5 in to 6 inches of water.'}    | ${'Put 5 in to 15 centimetres of water.'} | ${'a spaced "in" that may be the preposition'}
+  `('converts each measurement on its own: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('keeps the original of the range, and runs twice without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('from 15 inches to 17 inches', options);
+    expect(once).toBe('from 38 to 43 centimetres (15 inches to 17 inches)');
+    expect(convert(once, options)).toBe(once);
+  });
 });
 
 describe('a pair is never half converted with its rule switched off', () => {
@@ -2203,6 +2424,31 @@ describe('a pair is never half converted with its rule switched off', () => {
     ${'one by two feet'}    | ${'"one by", which the dimension rule holds'}
   `('leaves "$unchanged" alone without dimensions ($why)', ({ unchanged }) => {
     expect(convert(unchanged, noDimensions)).toBe(unchanged);
+  });
+
+  it.each`
+    unchanged                      | why
+    ${'5 ft 6 to 6 ft'}            | ${'a number after a length in the range unit'}
+    ${'3 yards 2 to 4 yards'}      | ${'after yards'}
+    ${'10 feet 12 to 15 feet'}     | ${'twelve is no number of inches'}
+    ${'11 stone 20 to 12 stone'}   | ${'twenty is no number of pounds'}
+    ${'5 ft 6 or 6 ft'}            | ${'joined by "or"'}
+    ${'5 ft 6, 7 or 8 ft'}         | ${'a list'}
+    ${'5 ft 6, 7, 8 ft'}           | ${'a list with commas alone'}
+  `('leaves "$unchanged" whole without ranges, where the range rule holds it ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+    expect(convert(unchanged, noRanges)).toBe(unchanged);
+  });
+
+  it.each`
+    input                       | expected                                 | options
+    ${'2 feet 6 to 3 feet'}     | ${'76.2 centimetres to 91 centimetres'}  | ${{}}
+    ${'2 feet 6 to 3 feet'}     | ${'76.2 centimetres to 91 centimetres'}  | ${noRanges}
+    ${'6 feet 2 to 3 inches'}   | ${'1.8 metres 5.1 to 7.6 centimetres'}   | ${{}}
+    ${'6 feet 2 to 3 inches'}   | ${'1.8 metres 2 to 3 inches'}            | ${noRanges}
+    ${'11 stone 4 to 12 stone'} | ${'71.7 kilograms to 76 kilograms'}      | ${noRanges}
+  `('still reads $input with $options, where a height, a weight or another unit takes the number', ({ input, expected, options }) => {
+    expect(convert(input, options)).toBe(expected);
   });
 
   it.each`
@@ -3154,6 +3400,117 @@ describe('a temperature with a degree sign before two slashes is no path', () =>
   });
 });
 
+describe('a Fahrenheit degree inside a compound unit', () => {
+  it.each`
+    unchanged                                                    | why
+    ${'The wall has a thermal resistance of 0.45 °F·ft²·h/BTU.'} | ${'an R-value'}
+    ${'The R-value is 0.45 °F·ft²·h/BTU per inch.'}              | ${'the same, per inch'}
+    ${'The R-value is 0.45 °F⋅ft²⋅h/BTU.'}                       | ${'the same, with the dot operator'}
+    ${'It warms at 2 °F/min.'}                                   | ${'a rate'}
+    ${'It warms at 2°F/hour.'}                                   | ${'a rate in a word'}
+    ${'It warmed 0.5°F/decade.'}                                 | ${'a rate over years'}
+    ${'The sink is rated 0.5 °F/W.'}                             | ${'a thermal resistance per watt'}
+    ${'It warms at 2 degrees F/min.'}                            | ${'spelled out'}
+    ${'It warms at 2 degrees Fahrenheit/min.'}                   | ${'the same, with the scale named'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                               | expected                          | why
+    ${'It is 75°F/sunny today.'}        | ${'It is 23.9°C/sunny today.'}    | ${'a word after the slash that is no unit'}
+    ${'Grill it at 450°F/high heat.'}   | ${'Grill it at 230°C/high heat.'} | ${'a word that starts like a unit'}
+    ${'It fell 20°F overnight.'}        | ${'It fell 11°C overnight.'}      | ${'a change in temperature'}
+    ${'Bake at 350°F.'}                 | ${'Bake at 175°C.'}               | ${'a temperature'}
+    ${'The rate is 5 BTU per °F.'}      | ${'The rate is 5.3 kJ per °F.'}   | ${'a degree with no number'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a Celsius value in brackets that also gives the gas mark', () => {
+  it.each`
+    input                                                     | expected                                     | why
+    ${'Preheat the oven to 350°F (180°C/gas mark 4).'}        | ${'Preheat the oven to 180°C (gas mark 4).'} | ${'a slash'}
+    ${'Preheat the oven to 350°F (180°C, gas mark 4).'}       | ${'Preheat the oven to 180°C (gas mark 4).'} | ${'a comma'}
+    ${'Preheat the oven to 350°F (180°C or gas mark 4).'}     | ${'Preheat the oven to 180°C (gas mark 4).'} | ${'"or"'}
+    ${'Preheat the oven to 350°F (180°C; Gas Mark 4).'}       | ${'Preheat the oven to 180°C (Gas Mark 4).'} | ${'a semicolon and capitals'}
+    ${'Preheat the oven to 350°F (180°C / gas 4).'}           | ${'Preheat the oven to 180°C (gas 4).'}      | ${'a spaced slash and "gas" alone'}
+    ${'Preheat the oven to 250°F (120°C/gas mark ½).'}        | ${'Preheat the oven to 120°C (gas mark ½).'} | ${'a half gas mark'}
+    ${'Bake at 350-375°F (180-190°C/gas mark 4-5).'}          | ${'Bake at 180-190°C (gas mark 4-5).'}       | ${'a range'}
+    ${'Preheat the oven to 350°F\n(180°C/gas mark 4).'}       | ${'Preheat the oven to 180°C\n(gas mark 4).'} | ${'a wrapped line'}
+    ${'Preheat the oven to **350°F** (180°C/gas mark 4).'}    | ${'Preheat the oven to **180°C** (gas mark 4).'} | ${'bold closes on the metric value'}
+    ${'Preheat the oven to 350°F *(180°C/gas mark 4)*.'}      | ${'Preheat the oven to 180°C *(gas mark 4)*.'} | ${'emphasis on the bracket stays with it'}
+    ${'Preheat the oven to 350°F (*180°C/gas mark 4*).'}      | ${'Preheat the oven to 180°C (*gas mark 4*).'} | ${'emphasis around both stays on the gas mark'}
+    ${'Preheat the oven to 350 degrees F (180 degrees C/gas mark 4).'} | ${'Preheat the oven to 180 degrees C (gas mark 4).'} | ${'spelled out'}
+    ${'Preheat the oven to 350°F (200°C/gas mark 4).'}        | ${'Preheat the oven to 175°C (200°C/gas mark 4).'} | ${'a Celsius value that does not restate it'}
+    ${'It is 6 feet (1.8 m/gas mark 4) tall.'}                | ${'It is 1.8 metres (1.8 m/gas mark 4) tall.'} | ${'a gas mark follows only a temperature'}
+    ${'Preheat the oven to 350°F (180°C).'}                   | ${'Preheat the oven to 180°C.'}              | ${'no gas mark'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('collapses the pair with keepOriginal on, and runs twice without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('Preheat the oven to 350°F (180°C/gas mark 4).', options);
+    expect(once).toBe('Preheat the oven to 180°C (gas mark 4).');
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each`
+    unchanged                                            | why
+    ${'Preheat the oven to 180°C (350°F/gas mark 4).'}   | ${'the Fahrenheit value restates the Celsius one'}
+    ${'Preheat the oven to 180°C (350°F, gas mark 4).'}  | ${'the same, after a comma'}
+    ${'Preheat the oven to 180°C (*350°F*/gas mark 4).'} | ${'the same, with emphasis'}
+    ${'Preheat the oven to 180°C (350°F).'}              | ${'no gas mark'}
+    ${'Bake at gas mark 4 (180°C).'}                     | ${'a gas mark alone'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a measurement in underscore emphasis', () => {
+  it.each`
+    input                                   | expected                                   | why
+    ${'It is _6 feet_ tall.'}               | ${'It is _1.8 metres_ tall.'}              | ${'italic'}
+    ${'It is __6 feet__ tall.'}             | ${'It is __1.8 metres__ tall.'}            | ${'bold'}
+    ${'Bake at __350°F__.'}                 | ${'Bake at __175°C__.'}                    | ${'a temperature'}
+    ${'Bake at 350°F__ today.'}             | ${'Bake at 175°C__ today.'}                | ${'a run of underscores after the unit'}
+    ${'Bake at __350 degrees Fahrenheit__.'} | ${'Bake at __175 degrees Celsius__.'}     | ${'a temperature spelled out'}
+    ${'Bake the cake at _350F_ today.'}     | ${'Bake the cake at _175°C_ today.'}       | ${'a bare F'}
+    ${'It weighs _5 pounds_.'}              | ${'It weighs _2.3 kilograms_.'}            | ${'a weight'}
+    ${'It is _two feet_ long.'}             | ${'It is _61 centimetres_ long.'}          | ${'a number in words'}
+    ${'It is _half an inch_ thick.'}        | ${'It is _1.3 centimetres_ thick.'}        | ${'half an inch'}
+    ${'It is _a mile and a half_ away.'}    | ${'It is _2.4 kilometres_ away.'}          | ${'a mile and a half'}
+    ${'It is _2-3 feet_ long.'}             | ${'It is _61-91 centimetres_ long.'}       | ${'a range'}
+    ${'It is _6 x 4 feet_ wide.'}           | ${'It is _1.8 x 1.2 metres_ wide.'}        | ${'a dimension'}
+    ${'Drive at _60 mph_ there.'}           | ${'Drive at _97 km/h_ there.'}             | ${'a speed'}
+    ${'It does _30 mpg_ there.'}            | ${'It does _7.8 L/100km_ there.'}          | ${'fuel economy'}
+    ${'It is _6 feet 2 inches_ tall.'}      | ${'It is _1.88 metres_ tall.'}             | ${'a height in two units'}
+    ${'He is _six foot two_ now.'}          | ${'He is _1.88 metres_ now.'}              | ${'a height with no inch word'}
+    ${'He is _six-foot-two_ now.'}          | ${'He is _1.88 metres_ now.'}              | ${'the same, hyphenated'}
+    ${'It weighs _7 pounds 8 ounces_.'}     | ${'It weighs _3.4 kilograms_.'}            | ${'a weight in two units'}
+    ${'A _6-foot-tall_ fence.'}             | ${'A _1.8 metre tall_ fence.'}             | ${'a length and its size'}
+    ${'It is _6 feet_ (1.8 metres) tall.'}  | ${'It is _1.8 metres_ tall.'}              | ${'with its metric value'}
+    ${'It is *6 feet* tall.'}               | ${'It is *1.8 metres* tall.'}              | ${'asterisks, as before'}
+    ${'He is *six foot two* now.'}          | ${'He is *1.88 metres* now.'}              | ${'asterisks after a height with no inch word'}
+    ${'Leave __init__ 6 feet away.'}        | ${'Leave __init__ 1.8 metres away.'}       | ${'a run that closes on a word'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+    expect(convert(input, { syntax: 'markdown' })).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                | why
+    ${'Use MAX_6 feet.'}                     | ${'a letter before the underscore'}
+    ${'Use max_6 feet.'}                     | ${'the same, in lower case'}
+    ${'Use v5_6 feet.'}                      | ${'a digit before the underscore'}
+    ${'It is _1.8 metres_ (6 feet) tall.'}   | ${'the metric value it restates'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
 /** The alternatives at the top level of a pattern's source. */
 function topLevelAlternatives(source: string): string[] {
   const alternatives = [''];
@@ -3532,7 +3889,7 @@ describe('a fraction word that is also an ordinal', () => {
     ${'a third mile'}                  | ${'540 metres'}            | ${'the same, without "of"'}
     ${'one-third mile'}                | ${'540 metres'}            | ${'"one" counts it'}
     ${'one third mile'}                | ${'540 metres'}            | ${'the same, with a space'}
-    ${'the one-third mile marker'}     | ${'the 540 metre marker'}  | ${'a count after "the" is still a fraction'}
+    ${'the one-third mile track'}      | ${'the 540 metre track'}   | ${'a count after "the" is still a fraction'}
     ${'a third-mile loop'}             | ${'a 540 metre loop'}      | ${'attributive'}
     ${'the last third of a mile'}      | ${'the last 540 metres'}   | ${'"of a" makes even a bare one a fraction'}
     ${'one-fourth pound of butter'}    | ${'110 grams of butter'}   | ${'"fourth" is a fraction word'}
@@ -3594,6 +3951,150 @@ describe('tons, when the document says which kind', () => {
     ${'Figures in tonnes. It moved 900 tons.'}                   | ${'Figures in tonnes. It moved 900 tons.'}                    | ${'same'}
   `('$why', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a unit the words beside it read in another sense', () => {
+  it.each`
+    input                                                 | expected
+    ${'Install a 3-ton central AC unit.'}                 | ${'Install an 11 kilowatt central AC unit.'}
+    ${'A 3-ton air conditioner is enough for the house.'} | ${'An 11 kilowatt air conditioner is enough for the house.'}
+    ${'Buy a 3-ton mini-split.'}                          | ${'Buy an 11 kilowatt mini-split.'}
+    ${'A 40-ton cooling tower.'}                          | ${'A 140 kilowatt cooling tower.'}
+    ${'The plant has 500 tons of cooling.'}               | ${'The plant has 1800 kilowatts of cooling.'}
+    ${'AC units of 2 to 5 tons.'}                         | ${'AC units of 7 to 18 kilowatts.'}
+    ${'The heat pump is 3 tons.'}                         | ${'The heat pump is 11 kilowatts.'}
+    ${'Data in metric tons. A 3-ton AC unit.'}            | ${'Data in metric tons. An 11 kilowatt AC unit.'}
+    ${'It gives 7 tons of refrigeration.'}                | ${'It gives 25 kilowatts.'}
+    ${'He bought 16 oz of gold.'}                         | ${'He bought 500 g of gold.'}
+    ${'He bought 2 troy ounces of gold.'}                 | ${'He bought 62 grams of gold.'}
+    ${'He bought 2 ozt of gold.'}                         | ${'He bought 62 g of gold.'}
+    ${'He bought 2 oz t of gold.'}                        | ${'He bought 62 g of gold.'}
+    ${'He bought 2 troy oz of silver.'}                   | ${'He bought 62 g of silver.'}
+    ${'He bought half an ounce of gold.'}                 | ${'He bought 16 grams of gold.'}
+    ${'Buy a 1 oz gold coin.'}                            | ${'Buy a 31 g gold coin.'}
+    ${'Drink 16 oz of water.'}                            | ${'Drink 470 mL of water.'}
+    ${'Add 8 oz of milk.'}                                | ${'Add 240 mL of milk.'}
+    ${'Add 8 oz heavy cream.'}                            | ${'Add 240 mL heavy cream.'}
+    ${'Pour a 16-oz pint glass of beer.'}                 | ${'Pour a 470 mL pint glass of beer.'}
+    ${'Open a 12 oz can of soda.'}                        | ${'Open a 350 mL can of soda.'}
+    ${'Open a 12 oz soda can.'}                           | ${'Open a 350 mL soda can.'}
+    ${'Open a 12-ounce bottle of beer.'}                  | ${'Open a 350 millilitre bottle of beer.'}
+    ${'Pour 2 x 12 oz cans of soda.'}                     | ${'Pour 2 x 350 mL cans of soda.'}
+    ${'Add 2 to 3 oz of milk.'}                           | ${'Add 59 to 89 mL of milk.'}
+    ${'Mix 2 oz gin and 1 oz lime juice.'}                | ${'Mix 59 mL gin and 30 mL lime juice.'}
+    ${'Use 1 cup (8 oz) whole milk.'}                     | ${'Use 1 cup (240 mL) whole milk.'}
+    ${'Use 8 oz (about 1 cup) of milk.'}                  | ${'Use 240 mL (about 1 cup) of milk.'}
+    ${'Drink 16 oz (470 mL) of water.'}                   | ${'Drink 470 mL of water.'}
+    ${'Leave 240 mL (8 oz) of water.'}                    | ${'Leave 240 mL (8 oz) of water.'}
+    ${'Drink 16 oz sports drink.'}                        | ${'Drink 470 mL sports drink.'}
+    ${'A 3-ton AC unit costs more.'}                      | ${'An 11 kilowatt AC unit costs more.'}
+    ${'Pour 8 oz of milk into the pan.'}                  | ${'Pour 240 mL of milk into the pan.'}
+    ${'She bought 16 oz of gold coins.'}                  | ${'She bought 500 g of gold coins.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                         | expected
+    ${'A 5-ton air conditioner cools the hall.'}   | ${'An 18 kilowatt air conditioner cools the hall.'}
+    ${'A 5-ton heat pump heats the hall.'}         | ${'An 18 kilowatt heat pump heats the hall.'}
+    ${'The 5-ton air conditioner cools the hall.'} | ${'The 18 kilowatt air conditioner cools the hall.'}
+    ${'Drink 16 oz of water daily.'}               | ${'Drink 470 mL of water daily.'}
+    ${'16 oz of water keeps you going.'}           | ${'470 mL of water keeps you going.'}
+    ${'Add 8 oz of milk slowly.'}                  | ${'Add 240 mL of milk slowly.'}
+    ${'16 oz of gold costs a lot.'}                | ${'500 g of gold costs a lot.'}
+    ${'AC units of 3 tons cool the hall.'}         | ${'AC units of 11 kilowatts cool the hall.'}
+    ${'AC units of 2 to 5 tons cool the hall.'}    | ${'AC units of 7 to 18 kilowatts cool the hall.'}
+  `('reads the sense whatever word follows its thing: $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                  | why
+    ${'Order the board with 2 oz copper.'}     | ${'the copper of a circuit board'}
+    ${'The 2 oz copper board costs more.'}     | ${'copper before a verb'}
+    ${'Order 2 oz copper PCBs.'}               | ${'copper that describes a board'}
+    ${'Copper weight: 2 oz, on both sides.'}   | ${'copper before the number'}
+    ${'The PCB uses 1 oz on inner layers.'}    | ${'a circuit board in the sentence'}
+    ${'Copper weight: 2 ounces suits a board.'} | ${'copper before the number, and a verb after'}
+  `('holds the copper weight of a circuit board: $why', ({ unchanged }) => {
+    const { text, changes } = deamericanise(unchanged);
+    expect(text).toBe(unchanged);
+    expect(changes).toEqual([]);
+  });
+
+  it.each`
+    input                                             | expected
+    ${'A 3-ton truck.'}                               | ${'A 2.7 tonne truck.'}
+    ${'A 3-ton truck needs AC.'}                      | ${'A 2.7 tonne truck needs AC.'}
+    ${'The 3-ton trucks need AC.'}                    | ${'The 2.7 tonne trucks need AC.'}
+    ${'The truck carries 3 tons of gravel.'}          | ${'The truck carries 2.7 tonnes of gravel.'}
+    ${'The bridge carries 40 tons.'}                  | ${'The bridge carries 36 tonnes.'}
+    ${'Data in metric tons. A 3-ton truck.'}          | ${'Data in metric tons. A 3-ton truck.'}
+    ${'The AC is in a 3-ton truck.'}                  | ${'The AC is in a 2.7 tonne truck.'}
+    ${'The AC is in a 3 ton truck.'}                  | ${'The AC is in a 2.7 tonne truck.'}
+    ${'A 5-ton HVAC truck.'}                          | ${'A 4.5 tonne HVAC truck.'}
+    ${'The ship has a gross tonnage of 90,000 tons.'} | ${'The ship has a gross tonnage of 82,000 tonnes.'}
+    ${'Cooling 3 tons of steel takes a day.'}         | ${'Cooling 2.7 tonnes of steel takes a day.'}
+    ${'Add 8 oz cream cheese.'}                       | ${'Add 230 g cream cheese.'}
+    ${'Add 8 oz sour cream.'}                         | ${'Add 230 g sour cream.'}
+    ${'Add 8 oz ice cream.'}                          | ${'Add 230 g ice cream.'}
+    ${'Add 8 oz milk chocolate.'}                     | ${'Add 230 g milk chocolate.'}
+    ${'Buy 12 oz coffee beans.'}                      | ${'Buy 340 g coffee beans.'}
+    ${'Add 2 oz baking soda.'}                        | ${'Add 57 g baking soda.'}
+    ${'Add 14 oz sweetened condensed milk.'}          | ${'Add 400 g sweetened condensed milk.'}
+    ${'Buy 12 oz whole bean coffee.'}                 | ${'Buy 340 g whole bean coffee.'}
+    ${'A 16-oz steak.'}                               | ${'A 450 g steak.'}
+    ${'A 16 oz T-bone steak.'}                        | ${'A 450 g T-bone steak.'}
+    ${'Dissolve 2 oz of sugar in water.'}             | ${'Dissolve 57 g of sugar in water.'}
+    ${'Open a 15 oz can of beans.'}                   | ${'Open a 430 g can of beans.'}
+    ${'Open a 15 oz can of tomatoes.'}                | ${'Open a 430 g can of tomatoes.'}
+    ${'Fill a 16 oz glass jar of honey.'}             | ${'Fill a 450 g glass jar of honey.'}
+    ${'Drink 8 oz (230 g) of milk.'}                  | ${'Drink 230 g of milk.'}
+    ${'Add 8 fl oz of milk.'}                         | ${'Add 240 mL of milk.'}
+    ${'Buy 2 oz silver polish.'}                      | ${'Buy 57 g silver polish.'}
+    ${'Add 2 oz of copper sulfate.'}                  | ${'Add 57 g of copper sulfate.'}
+    ${'The PCB ships in an 8 oz bag.'}                | ${'The PCB ships in a 230 g bag.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('reads nothing after a stop that ends the sentence', () => {
+    const { changes } = deamericanise('Use 16 oz. Water the plants.');
+    expect(changes.map((c) => c.ruleId)).toEqual(['units.mass.ounce']);
+  });
+
+  it.each`
+    input                                 | ruleId                             | note
+    ${'He bought 16 oz of gold.'}         | ${'units.mass.troy-ounce'}         | ${'read as troy ounces, in which precious metals are weighed'}
+    ${'Drink 16 oz of water.'}            | ${'units.volume.fluid-ounce'}      | ${'read as fluid ounces, since it measures a liquid'}
+    ${'Install a 3-ton central AC unit.'} | ${'units.power.refrigeration-ton'} | ${'read as tons of refrigeration, a rate of cooling'}
+  `('converts $input under $ruleId, with a note', ({ input, ruleId, note }) => {
+    const units = deamericanise(input).changes.filter((c) => c.category === 'units');
+    expect(units.map((c) => [c.ruleId, c.note])).toEqual([[ruleId, note]]);
+  });
+
+  it.each`
+    input                         | options                                                   | expected
+    ${'Drink 16 oz of water.'}    | ${{ rules: { 'units.volume.fluid-ounce': false } }}       | ${'Drink 16 oz of water.'}
+    ${'Drink 16 oz of water.'}    | ${{ unitsKeep: ['fluid ounces'] }}                        | ${'Drink 16 oz of water.'}
+    ${'Drink 16 oz of water.'}    | ${{ rules: { 'units.mass.ounce': false } }}               | ${'Drink 470 mL of water.'}
+    ${'He bought 16 oz of gold.'} | ${{ unitsKeep: ['troy-ounce'] }}                          | ${'He bought 16 oz of gold.'}
+    ${'He bought 2 ozt of gold.'} | ${{ unitsKeep: ['ozt'] }}                                 | ${'He bought 2 ozt of gold.'}
+    ${'A 3-ton AC unit.'}         | ${{ rules: { 'units.power.refrigeration-ton': false } }}  | ${'A 3-ton AC unit.'}
+  `('follows the options of the measure it reads as: $options', ({ input, options, expected }) => {
+    expect(convert(input, options)).toBe(expected);
+  });
+
+  it.each([
+    ['Drink 16 oz of water.', 'Drink 470 mL (16 oz) of water.'],
+    ['Install a 3-ton central AC unit.', 'Install an 11 kilowatt (3-ton) central AC unit.'],
+    ['He bought 16 oz of gold.', 'He bought 500 g (16 oz) of gold.'],
+  ])('keeps "%s" as written in its own bracket on a second run', (input, once) => {
+    const options = { units: { keepOriginal: true } };
+    expect(convert(input, options)).toBe(once);
+    expect(convert(once, options)).toBe(once);
   });
 });
 
@@ -3752,7 +4253,26 @@ describe('Fahrenheit decades', () => {
     ${'highs in the upper 80s degrees today'}      | ${'highs between 31 and 32°C today'}
     ${'temperatures in the 80s and 90s degrees'}   | ${'temperatures between 27 and 37°C'}
     ${'highs in the 80s degrees F today'}          | ${'highs between 27 and 32°C today'}
+    ${'Highs in the mid-80s.'}                     | ${'Highs between 29 and 30°C.'}
+    ${'Highs in the mid 80s.'}                     | ${'Highs between 29 and 30°C.'}
+    ${'highs in the\n   80s'}                      | ${'highs between 27 and 32°C'}
   `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                               | why
+    ${'Highs in the 70s or 80s.'}          | ${'Highs between 21 and 32°C.'}        | ${'or'}
+    ${'Highs in the 70s and 80s.'}         | ${'Highs between 21 and 32°C.'}        | ${'and'}
+    ${'Highs in the 70s to 80s.'}          | ${'Highs between 21 and 32°C.'}        | ${'to'}
+    ${'highs in the 70s\u201480s'}         | ${'highs between 21 and 32°C'}         | ${'an em dash'}
+    ${'highs in the low 70s or upper 80s'} | ${'highs between 21 and 32°C'}         | ${'two banded decades'}
+    ${'highs in the 70s or 80s °F'}        | ${'highs between 21 and 32°C'}         | ${'a Fahrenheit unit after the pair'}
+    ${'highs in the 70s or 80s degrees'}   | ${'highs between 21 and 32°C'}         | ${'a bare degrees after the pair'}
+    ${'highs in the 70s or\n80s'}          | ${'highs between 21 and 32°C'}         | ${'the pair wrapped across lines'}
+    ${'highs in the 100s or 110s'}         | ${'highs between 38 and 48°C'}         | ${'decades of three figures'}
+    ${'Highs in the 70s or so.'}           | ${'Highs between 21 and 26°C or so.'}  | ${'no second decade after or'}
+  `('reads two decades joined as a range does: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 
@@ -3762,8 +4282,50 @@ describe('Fahrenheit decades', () => {
     );
   });
 
-  it('leaves the degrees of a Celsius unit after a decade to that unit', () => {
-    expect(convert('temperatures in the 20s degrees Celsius')).toContain('degrees Celsius');
+  it.each`
+    input                                          | why
+    ${'temperatures in the 30s Celsius'}           | ${'Celsius'}
+    ${'temperatures in the 20s degrees Celsius'}   | ${'degrees Celsius, whose degrees is no bare unit'}
+    ${'highs in the 20s °C'}                       | ${'a degree sign and C'}
+    ${'highs in the 30s ºC'}                       | ${'a phone keyboard degree sign'}
+    ${'highs in the 30s ℃'}                        | ${'the Celsius sign'}
+    ${'highs in the 30s centigrade'}               | ${'centigrade'}
+    ${'highs in the 30s degrees centigrade'}       | ${'degrees centigrade'}
+    ${'highs in the 30s degrees C'}                | ${'degrees C'}
+    ${'highs in the 30s deg C'}                    | ${'deg C'}
+    ${'highs in the 30s C'}                        | ${'a bare upper case C'}
+    ${'highs in the 30s celsius'}                  | ${'the word in lower case'}
+    ${'highs in the low 30s Celsius'}              | ${'a banded decade'}
+    ${'highs in the 20s and 30s Celsius'}          | ${'two decades'}
+    ${'highs in the 20s or 30s °C'}                | ${'two decades joined by or'}
+    ${'highs in the 30s\nCelsius'}                 | ${'the unit on the next line'}
+  `('leaves a decade with a Celsius unit as written: $input ($why)', ({ input }) => {
+    expect(convert(input)).toBe(input);
+  });
+
+  it('leaves a decade with a Celsius unit as written under localise', () => {
+    const input = 'temperatures in the 30s Celsius';
+    expect(deamericaniseText(input, { preset: 'localise' })).toBe(input);
+  });
+
+  /** The spans the decade rule holds as written in `text`. */
+  const decadeHolds = (text: string): string[] => {
+    const resolved = resolveOptions({});
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold && c.ruleId === 'units.temperature.decade')
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                                         | span
+    ${'temperatures in the 30s Celsius today'}    | ${'in the 30s Celsius'}
+    ${'highs in the 20s degrees Celsius'}         | ${'in the 20s degrees Celsius'}
+    ${'highs in the 20s or 30s °C'}               | ${'in the 20s or 30s °C'}
+    ${'highs in the 30s C'}                       | ${'in the 30s C'}
+  `('holds "$span" whole', ({ input, span }) => {
+    expect(decadeHolds(input)).toEqual([span]);
   });
 
   // The decade of the calendar is the far commoner reading, so these must all survive.
@@ -3781,6 +4343,7 @@ describe('Fahrenheit decades', () => {
     ${'Interest rates in the 80s hit records.'}      | ${'no temperature context'}
     ${'a 1.70s delay in the forecast'}               | ${'part of a decimal'}
     ${'Ford trucks from the 70s F series'}           | ${'a bare F is a letter, not a marker'}
+    ${'Lows in the -20s overnight.'}                 | ${'a minus sign, which no band explains'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });
@@ -3882,6 +4445,161 @@ describe('a conventional size names its noun in either number, on either side', 
     ${'Lose 2 inches off your waist.'}       | ${'Lose 5.1 centimetres off your waist.'}        | ${'a body measured, not sized'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a distance from a thing sized in inches', () => {
+  it.each`
+    input                                                  | expected                                                    | why
+    ${'Place the monitor about 20 inches from your eyes.'} | ${'Place the monitor about 51 centimetres from your eyes.'} | ${'a distance from the thing'}
+    ${'Space the bolts 6 inches apart.'}                   | ${'Space the bolts 15 centimetres apart.'}                  | ${'a distance between them'}
+    ${'Keep the phone 12 inches away from your face.'}     | ${'Keep the phone 30 centimetres away from your face.'}     | ${'away'}
+    ${'Mount the screen 30 inches above the desk.'}        | ${'Mount the screen 76 centimetres above the desk.'}        | ${'a position'}
+    ${'Place the speaker about 6 inches from the wall.'}   | ${'Place the speaker about 15 centimetres from the wall.'}  | ${'a noun read either side of a size'}
+    ${'The jack is 4 inches from the edge.'}               | ${'The jack is 10 centimetres from the edge.'}              | ${'after a verb'}
+    ${'Keep it 6 inches from the monitor.'}                | ${'Keep it 15 centimetres from the monitor.'}               | ${'the thing after the distance word'}
+    ${'Space the bolts 4 to 6 inches apart.'}              | ${'Space the bolts 10 to 15 centimetres apart.'}            | ${'a range'}
+    ${'Hang the screen 20 x 30 inches above the desk.'}    | ${'Hang the screen 51 x 76 centimetres above the desk.'}    | ${'a dimension'}
+    ${'hail 2 inches in diameter'}                         | ${'hail 5.1 centimetres in diameter'}                       | ${'no conventional noun'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                          | why
+    ${'a 27 inch monitor'}                             | ${'the noun straight after the size'}
+    ${'a 6 inch speaker'}                              | ${'the same'}
+    ${'The screen is 27 inches.'}                      | ${'nothing after the size'}
+    ${'The screen is 27 inches from corner to corner.'} | ${'from one part of the thing to another'}
+    ${'monitors of 27 inches'}                         | ${'the noun before the size'}
+    ${'a 6 inch off-white speaker'}                    | ${'a distance word inside another word'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('drive bays, audio jacks and telescope parts are sized in inches', () => {
+  it.each`
+    unchanged                                                    | converted
+    ${'Fit a 2.5-inch SATA SSD next to the 3.5-inch HDD.'}       | ${'Fit a 6.4 centimetre SATA SSD next to the 8.9 centimetre HDD.'}
+    ${'Plug the guitar into the 1/4-inch TRS jack.'}             | ${'Plug the guitar into the 6.4 millimetre TRS jack.'}
+    ${'Use a 2-inch eyepiece on the 8-inch Dobsonian telescope.'} | ${'Use a 5.1 centimetre eyepiece on the 20 centimetre Dobsonian telescope.'}
+  `('leaves "$unchanged" alone, and converts it with respectConventions off', ({ unchanged, converted }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+    expect(convert(unchanged, { units: { respectConventions: false } })).toBe(converted);
+  });
+
+  it.each`
+    input                                    | expected                                       | why
+    ${'The jack is 4 inches from the edge.'} | ${'The jack is 10 centimetres from the edge.'} | ${'a distance from the jack'}
+    ${'Plug the 2 inch hole with filler.'}   | ${'Plug the 5.1 centimetre hole with filler.'} | ${'a verb before the size names no plug'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged               | why
+    ${'A 3.5mm jack.'}      | ${'already metric'}
+    ${'A 27 inch monitor.'} | ${'a screen'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a shipping container is named by its length in feet', () => {
+  it.each`
+    unchanged                                                            | why
+    ${'We shipped it in a 20-foot container and two 40-foot containers.'} | ${'the standard lengths'}
+    ${'The 40-foot shipping container holds a lot.'}                     | ${'a word between'}
+    ${'a 40-foot high-cube container'}                                   | ${'a hyphenated word between'}
+    ${'a 20-foot reefer box'}                                            | ${'a box of a kind'}
+    ${'the twenty-foot equivalent unit'}                                 | ${'what a TEU stands for'}
+    ${'20- and 40-foot containers'}                                      | ${'two standard lengths'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                       | expected                                       | why
+    ${'A 20-foot boat.'}                        | ${'A 6.1 metre boat.'}                         | ${'no container'}
+    ${'A 6-foot fence.'}                        | ${'A 1.8 metre fence.'}                        | ${'the same'}
+    ${'the container is 20 feet from the wall'} | ${'the container is 6.1 metres from the wall'} | ${'a distance from a container'}
+    ${'Move it 20 feet towards the container.'} | ${'Move it 6.1 metres towards the container.'} | ${'a preposition and a determiner between'}
+    ${'a 30-foot container'}                    | ${'a 9.1 metre container'}                     | ${'no standard length'}
+    ${'a 20 to 30 foot container'}              | ${'a 6.1 to 9.1 metre container'}              | ${'a range with one end no standard length'}
+    ${'a 20-foot box'}                          | ${'a 6.1 metre box'}                           | ${'any box'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('converts a container with respectConventions off', () => {
+    expect(convert('a 20-foot container', { units: { respectConventions: false } })).toBe(
+      'a 6.1 metre container',
+    );
+  });
+});
+
+describe('an aviation altitude is given in feet', () => {
+  it.each`
+    unchanged                                                           | why
+    ${'We cruised at 35,000 feet MSL and descended to 1,500 feet AGL.'} | ${'a reference level after the altitude'}
+    ${'The plane climbed to flight level 350, about 35,000 feet.'}      | ${'a flight level earlier in the sentence'}
+    ${'We reached our cruising altitude of 35,000 feet.'}               | ${'a cruising altitude'}
+    ${'The service ceiling is 41,000 feet.'}                            | ${'an aircraft ceiling'}
+    ${'35,000 feet is a usual cruising altitude'}                       | ${'later in the sentence'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                  | expected                                                 | why
+    ${'The plane is 200 feet long.'}                       | ${'The plane is 61 metres long.'}                        | ${'a plane alone is not enough'}
+    ${'The hill rises 1,500 feet.'}                        | ${'The hill rises 460 metres.'}                          | ${'a height that is no altitude'}
+    ${'a 10-foot ceiling'}                                 | ${'a 3 metre ceiling'}                                   | ${'a room has a ceiling'}
+    ${'We climbed 35,000 feet. The flight level was 350.'} | ${'We climbed 11 kilometres. The flight level was 350.'} | ${'in another sentence'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('converts an altitude with respectConventions off', () => {
+    expect(convert('We cruised at 35,000 feet MSL.', { units: { respectConventions: false } })).toBe(
+      'We cruised at 11 kilometres MSL.',
+    );
+  });
+});
+
+describe('inches of mercury', () => {
+  it.each`
+    input                                       | expected
+    ${'Set the altimeter to 29.92 inHg.'}       | ${'Set the altimeter to 1013 hPa.'}
+    ${'29.92 inches of mercury'}                | ${'1013 hectopascals'}
+    ${'29.92 in Hg'}                            | ${'1013 hPa'}
+    ${'The pressure fell 2 inches of mercury.'} | ${'The pressure fell 68 hectopascals.'}
+    ${'29.92 inHg (1013 hPa)'}                  | ${'1013 hPa'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                   | expected                                | why
+    ${'Set the altimeter to 30 inHg.'}      | ${'Set the altimeter to 1016 hPa.'}     | ${'more figures than the source gives'}
+    ${'Set it between 29.9 and 30.1 inHg.'} | ${'Set it between 1013 and 1019 hPa.'}  | ${'each end of a range'}
+    ${'Try 29.92, 30.00 or 30.12 inHg.'}    | ${'Try 1013, 1016 or 1020 hPa.'}        | ${'each figure of a list'}
+    ${'It reads to within 0.01 inHg.'}      | ${'It reads to within 0.34 hPa.'}       | ${'no value under one is written as zero'}
+  `('writes whole hectopascals: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('honours a precision the options set', () => {
+    expect(convert('Set the altimeter to 29.92 inHg.', { units: { precision: 2 } })).toBe(
+      'Set the altimeter to 1013.21 hPa.',
+    );
+  });
+
+  it('honours unitsKeep', () => {
+    expect(convert('Set the altimeter to 29.92 inHg.', { unitsKeep: ['inHg'] })).toBe(
+      'Set the altimeter to 29.92 inHg.',
+    );
   });
 });
 
@@ -4160,6 +4878,56 @@ describe('a unit that is part of a noun', () => {
   });
 });
 
+describe('a count before a compound noun that starts with a unit', () => {
+  it.each`
+    unchanged                       | why
+    ${'We passed 3 mile markers.'}  | ${'a mile marker is a post'}
+    ${'the 26 mile marker'}         | ${'the post at mile 26'}
+    ${'the 26-mile marker'}         | ${'the same, hyphenated'}
+    ${'We put up 3 yard signs.'}    | ${'a yard sign is a sign'}
+    ${'Press the two pound signs.'} | ${'a pound sign is a mark'}
+    ${'Bake 1 pound cake'}          | ${'a pound cake is a cake'}
+    ${'the 40 yard line'}           | ${'a yard line is a name'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                | expected
+    ${'a 3 mile hike'}   | ${'a 4.8 kilometre hike'}
+    ${'3 miles of road'} | ${'4.8 kilometres of road'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  /** The spans the unit rules hold as written in `text`. */
+  const held = (text: string, options: Options = {}): string[] => {
+    const resolved = resolveOptions(options);
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold)
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                           | span
+    ${'We passed 3 mile markers.'}  | ${'3 mile'}
+    ${'the 26 mile marker'}         | ${'26 mile'}
+    ${'We put up 3 yard signs.'}    | ${'3 yard'}
+    ${'Press the two pound signs.'} | ${'two pound'}
+  `('holds $span whole, even with respectConventions off', ({ input, span }) => {
+    expect(held(input)).toEqual([span]);
+    expect(held(input, { units: { respectConventions: false } })).toEqual([span]);
+  });
+
+  it('converts a hyphenated mile marker with respectConventions off', () => {
+    expect(convert('the 26-mile marker', { units: { respectConventions: false } })).toBe(
+      'the 42 kilometre marker',
+    );
+  });
+});
+
 describe('a capitalised unit word that is part of a name', () => {
   it.each`
     unchanged                                         | why
@@ -4302,6 +5070,34 @@ describe('a count before an attributive measurement stays out of it', () => {
 
   it('leaves "a foot-long sub" alone, with no number to read', () => {
     expect(convert('a foot-long sub')).toBe('a foot-long sub');
+  });
+
+  it.each`
+    input                                          | expected                                              | why
+    ${'Buy two to three foot-long subs.'}          | ${'Buy two to three 30 centimetre long subs.'}        | ${'joined by "to"'}
+    ${'Buy two or three foot-long subs.'}          | ${'Buy two or three 30 centimetre long subs.'}        | ${'joined by "or"'}
+    ${'Cut five to six inch-thick steaks.'}        | ${'Cut five to six 2.5 centimetre thick steaks.'}     | ${'another unit and size'}
+    ${'Buy two, three or four foot-long subs.'}    | ${'Buy two, three or four 30 centimetre long subs.'}  | ${'a list'}
+    ${'Buy two to three hundred foot-long subs.'}  | ${'Buy two to three hundred 30 centimetre long subs.'} | ${'a count that may mean 200, which stays as written'}
+    ${'the two to three foot-long subs'}           | ${'the two to three 30 centimetre long subs'}         | ${'after a determiner that takes a count'}
+  `('reads a range of counts spaced before a unit tied to its size as counting the noun: $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('leaves a range of counts before a unit tied to its size as written with the range rule off', () => {
+    const unchanged = 'Buy two to three foot-long subs.';
+    expect(convert(unchanged, { rules: { 'units.range': false } })).toBe(unchanged);
+  });
+
+  it.each`
+    input                                       | expected                                       | why
+    ${'a two to three foot-long gap'}           | ${'a 61 to 91 centimetre long gap'}            | ${'a determiner that takes one of the noun'}
+    ${'a foot-long, three to four foot-wide board'} | ${'a foot-long, 0.91 to 1.2 metre wide board'} | ${'a list of sizes'}
+    ${'Buy 2 to 3 foot-long subs.'}             | ${'Buy 61 to 91 centimetre long subs.'}        | ${'counts in digits'}
+    ${'5-6 inch pans'}                          | ${'13-15 centimetre pans'}                     | ${'no hyphen after the unit'}
+    ${'two to three feet long'}                 | ${'61 to 91 centimetres long'}                 | ${'no hyphen ties the unit to its size'}
+  `('reads a range before a unit as the number of units: $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
   });
 });
 

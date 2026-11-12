@@ -1,9 +1,9 @@
 import type { Change, Rule, RuleContext } from '../types.js';
-import { MONTH_PATTERN } from './dates.js';
-import { endsSentence } from './sentence.js';
+import { FIGURE_DATE, MONTH_PATTERN } from './dates.js';
+import { stopStays } from './sentence.js';
 
-// The last stop of `P.M.` is matched and goes back only if it ends the sentence. A bare
-// `PM.` leaves the sentence's stop outside the match.
+// The last stop of `P.M.` is matched and goes back only if it ends the sentence or opens an
+// ellipsis. A bare `PM.` leaves the sentence's stop outside the match.
 const MERIDIEM = String.raw`(?:[ap]\.\s?m\.?|[ap]m)`;
 
 /** A day of the week or a month, in full or abbreviated. */
@@ -13,11 +13,12 @@ export const CALENDAR_WORD =
 
 /**
  * Any capitalised word after a time starts a new sentence, except one that carries the time
- * on, as in `8 p.m. Eastern` or `3 p.m. Tuesday`.
+ * on, as in `8 p.m. Eastern` or `3 p.m. Tuesday`. A date carries it on whichever way round it
+ * is written, as in `3 p.m. December 1` and `3 p.m. 1 December`.
  */
 export const OPENER = new RegExp(
   String.raw`(?!(?:Eastern|Central|Mountain|Pacific|Atlantic|Alaska|Hawaii|` +
-    String.raw`${CALENDAR_WORD})(?!\p{L}))`,
+    String.raw`${CALENDAR_WORD})(?!\p{L})|${FIGURE_DATE})`,
   'uy',
 );
 
@@ -64,7 +65,7 @@ export function timeRules(): Rule[] {
           const clock = `${hour12}:${minutes}${seconds ? `:${seconds}` : ''}`;
           after = `${match[2] ? clock : hour12}${isPm ? 'pm' : 'am'}`;
         }
-        if (match[0].endsWith('.') && endsSentence(ctx.text, start, end, OPENER)) after += '.';
+        if (match[0].endsWith('.') && stopStays(ctx.text, start, end, OPENER)) after += '.';
 
         if (after === match[0]) continue;
         changes.push({

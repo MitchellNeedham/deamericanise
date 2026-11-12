@@ -64,6 +64,7 @@ export function resolveOptions(options: Options = {}, defaults: Partial<Options>
     protectIdentifiers: merged.protectIdentifiers ?? false,
     protectCommentedCode: merged.protectCommentedCode ?? merged.protectIdentifiers ?? false,
     commentMarkers: [],
+    markdownFences: true,
     unitsKeep: merged.unitsKeep ?? [],
     assumeAmerican: merged.assumeAmerican,
     minAmericanConfidence: merged.minAmericanConfidence ?? 0.5,

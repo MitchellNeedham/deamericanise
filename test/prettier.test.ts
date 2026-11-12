@@ -20,6 +20,13 @@ describe('the Prettier plugin against real Prettier', () => {
     expect(await format(source, { parser: 'typescript' })).toBe(source);
   });
 
+  it('leaves a tilde fence and a four-backtick fence alone in Markdown', async () => {
+    const source = 'The color.\n\n~~~\nconst color = 1;\n~~~\n\n````md\n```\nconst color = 2;\n```\n````\n';
+    expect(await format(source, { parser: 'markdown' })).toBe(
+      'The colour.\n\n```\nconst color = 1;\n```\n\n````md\n```\nconst color = 2;\n```\n````\n',
+    );
+  });
+
   it.each`
     option                       | value                          | source                | expected
     ${'deamericanisePreset'}     | ${'localise'}                             | ${'The sidewalk.\n'}  | ${'The footpath.\n'}

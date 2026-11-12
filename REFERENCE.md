@@ -270,8 +270,8 @@ A unit of more than one word is read in the singular as well as the plural, so
 `half a pound per square inch` becomes `3.4 kilopascals` and `1 mile per hour` becomes
 `1.6 kilometres per hour`. In the singular it describes a noun as a one-word unit does, so
 `a 2 square mile park` becomes `a 5.2 square kilometre park` and `a 100 foot-pound wrench`
-becomes `a 140 newton metre wrench`. `an hour` before `ago`, `later`, `earlier`, `before` or `after`
-is a time, so `2 miles an hour ago` becomes `3.2 kilometres an hour ago`.
+becomes `a 140 newton metre wrench`. `an hour` before `ago`, `later`, `earlier`, `before` or
+`after` is a time, so `2 miles an hour ago` becomes `3.2 kilometres an hour ago`.
 
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
@@ -400,8 +400,8 @@ shorter number is no year, so
 and `In 2024 miles were driven.` are left as written. A comma in the number, a hyphen before
 the unit or an abbreviation for it makes a quantity, as in `In 2024-mile races` and
 `In 1500 ft of water`, and so does a unit word that ends the clause:
-`It rose by 1200 feet.` becomes `It rose by 370 metres.` A range's first number is never more than ten times the
-size of the second, which makes it a year or a count. Where the first number cannot open the
+`It rose by 1200 feet.` becomes `It rose by 370 metres.` A range's first number is never
+more than ten times the size of the second, which makes it a year or a count. Where the first number cannot open the
 range, the second converts on its own: `In 2024 - 5 feet` becomes
 `In 2024 - 1.5 metres`, and `Price $5 - 10 inches` keeps its price. `from` or `between`
 before the first number makes a range of any two, so `fell from 10 to 0.5 miles` converts
@@ -1176,7 +1176,7 @@ with no prose. Only the ids in `DIALECTS` are dialects, so a name every object h
   `a quarter mile round the bend` becomes `a 400 metre round the bend`. `a 2 pound cake` is
   left as written, because it may be a pound cake.
 - Four figures after a preposition that takes a year are left as written before a unit word
-  that goes on to a noun or verb, even where they are a quantity, as in
+  that does not end the clause, even where they are a quantity, as in
   `The wreck lies in 1500 feet of water.`
 - A line that ends in a number and a line that opens with a unit word are read as one
   measurement, so `Track 7` above `Feet first` becomes `Track 2.1 metres first`. A

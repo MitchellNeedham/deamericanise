@@ -572,7 +572,13 @@ the cooking: a word that names a thing (`bake sale`, `bake-off`, `baked goods`,
 `baked beans`, `baking tin`) is no cue, and a verb that takes an amount of its own
 (`came to`, `rose to`, `raised`, `cost`, `sold`) stops the search, so
 `The bake sale takings came to 320.` has no oven in it, while
-`Bake at 350 and sell them at the bake sale.` does. A cup is no evidence at all,
+`Bake at 350 and sell them at the bake sale.` does. A setting has to be followed by its
+unit (any Fahrenheit unit the temperature rule reads, a bare `F`, or a degree with no
+scale, as in `350 deg F`, `a 350℉ oven` or `350 degrees`) or by the rest of the
+instruction: punctuation, a joining word such as `for`, `until`, `till` or `before`, a
+manner such as `uncovered`, a dash between clauses, or a cooking time such as
+`20 minutes`. A quantity never follows it, so `in the oven for up to 300 minutes` has no
+oven setting, and nor does `300 - 400 minutes`. A cup is no evidence at all,
 since Australia and New Zealand cook in metric cups. A measured ingredient under a name
 only Americans use, such as `1 cup all-purpose flour` or `2 tablespoons cornstarch`,
 counts like any other vocabulary, unless the local name sits beside it, as it does in
@@ -582,7 +588,11 @@ A temperature counts as `Fahrenheit` in exactly the forms the unit rules convert
 `165 degrees F` counts, `Cook until the chicken reaches 165F` counts, and `Apartment 3F`
 does not. The word `Fahrenheit` on its own counts too where it names the scale, as in
 `Set the thermostat in Fahrenheit`, but not straight before a number, where it is part
-of a title such as `Fahrenheit 451` or `Fahrenheit 9/11`.
+of a title such as `Fahrenheit 451` or `Fahrenheit 9/11`. A Fahrenheit value that restates
+the Celsius value before it, as in `Bake at 175°C (350°F)` or `180°C or 350°F`, is the
+courtesy figure the unit rules leave as written, so neither it nor the word `Fahrenheit`
+inside it counts. `Bake at 350°F (175°C)` converts and counts, and so does
+`Heat to 180°C or 400°F`, where the two values disagree.
 
 Pounds count as `imperial units` only where the unit rules read them as a weight, so
 `2 pounds of ground beef` counts, and the money in `It cost 1,500 pounds` or

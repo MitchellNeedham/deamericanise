@@ -424,6 +424,7 @@ describe('Fahrenheit written with another degree sign, or none', () => {
     ${'I read Fahrenheit 451 last year.'}                    | ${'a title'}
     ${'They filmed the 1966 Fahrenheit 451 in England.'}     | ${'a title after a year'}
     ${'In 1724 Fahrenheit proposed his scale.'}              | ${'the man, after a year'}
+    ${'Set the 2 Fahrenheit thermometers aside.'}            | ${'a count of thermometers'}
     ${'It was 95\nFahrenheit is the scale they use.'}        | ${'the word on the next line'}
     ${'Quedó en 1º lugar.'}                                  | ${'an ordinal with no F'}
     ${'Es el nº 5.'}                                         | ${'the same'}

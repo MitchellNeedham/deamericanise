@@ -10,13 +10,15 @@ export const NOT_A_TITLE = String.raw`(?![^\S\n]*(?:\n[^\S\n]*(?!\d+[.)](?:\s|$)
 /**
  * `°F`, `℉`, `degrees Fahrenheit` and the like: Fahrenheit written as a unit. `º` and `˚`
  * stand in for the degree sign on phone keyboards and Spanish and Portuguese layouts. The
- * word alone counts after a number on its own line, but not after a whole number of four
- * figures, which reads as a year (`In 1724 Fahrenheit proposed his scale`), nor as a title.
+ * word alone counts after a number on the same line, but not after a whole number of four
+ * figures, which reads as a year (`In 1724 Fahrenheit proposed his scale`), nor before
+ * `thermometers` or `scale`, where the number counts them, nor as a title.
  */
 export const FAHRENHEIT =
   String.raw`[°º˚]\s*F\b|℉|[°º˚]\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|degrees?\s+F\b|deg\.?\s*F\b|` +
   // The lookahead comes first so the lookbehinds never walk a run of spaces from every place in it.
-  String.raw`(?=Fahrenheit\b)(?<=\d${INLINE_SPACE}*)(?<!(?<![\d.])\d{4}${INLINE_SPACE}*)Fahrenheit\b${NOT_A_TITLE}`;
+  String.raw`(?=Fahrenheit\b)(?<=\d${INLINE_SPACE}*)(?<!(?<![\d.])\d{4}${INLINE_SPACE}*)` +
+  String.raw`Fahrenheit\b(?!${INLINE_SPACE}+(?:thermometers?|scales?)\b)${NOT_A_TITLE}`;
 const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
 
 /** `165F` and `350 F`. `F-150` and `F-type` are names. */

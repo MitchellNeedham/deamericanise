@@ -348,8 +348,8 @@ converts as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule 
 Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F`, `degrees Fahrenheit` or
 `95 Fahrenheit`, with `º` or `˚` accepted for the degree sign, as phone keyboards type it.
 The word alone does not count after a whole number of four figures, which reads as a year
-(`In 1724 Fahrenheit proposed his scale`), nor before a number, where it is a title
-(`Fahrenheit 451`). A bare `F`,
+(`In 1724 Fahrenheit proposed his scale`), before `thermometers` or `scale`, where the
+number counts them, or before a number, where it is a title (`Fahrenheit 451`). A bare `F`,
 as in `165F` or `350 F`, is more often a letter, so it counts only as an upper case `F`
 after a number of two or three figures, in a sentence about heat (an oven, cooking, the
 weather, a fever or a temperature) that gives no Celsius value. `Cook until the chicken

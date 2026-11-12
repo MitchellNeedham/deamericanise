@@ -288,8 +288,15 @@ mixed number or a decimal, so `1 1/2 pounds 3 ounces` becomes `765 grams` and
 `2.5 feet 3 inches` becomes `83.8 centimetres`. Any part can be a whole number in words, so
 `six feet two inches` becomes `1.88 metres`. After `foot` or `feet` the inch word can be
 left out where nothing that could be a noun follows, so `He is six foot two.` becomes
-`He is 1.88 metres.`, while `6 feet 2 cars` is two things. Together the parts claim three
-significant figures. Where a unit of the weight is kept, by the dialect or by `unitsKeep`,
+`He is 1.88 metres.`, while `6 feet 2 cars` is two things. It can also be left out before a
+join and another measurement in feet, so `6 foot 2 to 6 foot 4` becomes
+`1.88 metres to 1.93 metres` and `2 feet 6 to 3 feet` becomes
+`76.2 centimetres to 91 centimetres`. A number straight after a length is a smaller unit of
+it, never the first end of a range in the same unit, so `5 ft 6 to 6 ft` and
+`3 yards 2 to 4 yards` are left as written. Together the parts claim three significant
+figures. A height that describes the noun after it keeps the singular where its inch unit is
+the singular word or a determiner opens it: `a 6 foot 2 inch man` and `a 6 ft 2 in man` both
+become `a 1.88 metre man`. Where a unit of the weight is kept, by the dialect or by `unitsKeep`,
 the whole weight is left as written, so an `en-GB` `11 stone 4 pounds` never becomes
 `11 stone 1.8 kilograms`. Turning on `units.mass.stone` or `units.mass.stone-pounds`
 converts it. A weight or height at the end of a range, as in `7-8 lb 4 oz`,
@@ -336,9 +343,10 @@ it: `a 2-3/4 inch board` becomes `a 7 centimetre board`, the same as `a 2 3/4 in
 
 Wherever a hyphen may stand in or beside a measurement, the Unicode hyphen (U+2010) and the
 non-breaking hyphen (U+2011) that typesetting puts in `5-10` or `6-foot` read the same as
-`-`. So a range written with either still becomes `1.5-3 metres`, and `the 40-yard-line`
-written with either is still a conventional size. Neither is a minus sign, so a number
-straight after one is left as written.
+`-`. So a range written with either still becomes `1.5-3 metres`, `6 feet 2-1/2 inches`
+written with either is still one height, and `the 40-yard-line` written with either is still
+a conventional size. Neither is a minus sign, so a number straight after one is left as
+written.
 
 A fraction with a zero denominator, as in `5/0 inches`, is not a quantity, so it is left as
 written, and so is a height or weight it is part of, as in `5 feet 1/0 inches`.

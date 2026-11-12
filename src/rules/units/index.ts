@@ -58,14 +58,17 @@ const RANGE_BEFORE = new RegExp(
 /**
  * The number at `start` is the second end of a range, as the `10` of `5 - 10 feet` is, and
  * not a measurement of its own, even where the range does not match as a whole. A first
- * number that cannot open the range leaves it free: `Price $5 - 10 inches`, `In 2024 - 5 feet`.
+ * number that cannot open the range leaves it free: `Price $5 - 10 inches`, `In 2024 - 5 feet`,
+ * and the inches of `2 feet 6 to 3 feet`.
  */
 function endsRange(text: string, start: number, value: number): boolean {
   RANGE_BEFORE.lastIndex = start;
   const before = RANGE_BEFORE.exec(text);
   if (before === null) return false;
+  const lowStart = before.indices![1]![0];
+  if (isHeightInches(text, lowStart)) return false;
   const low = parseNumber(before[1]!);
-  return low === null || canBeRange(text, before.indices![1]![0], low, value);
+  return low === null || canBeRange(text, lowStart, low, value);
 }
 
 /** A number the range and dimension rules read: any in digits, and a whole number in words. */
@@ -934,35 +937,111 @@ const RANGE_OPENING = new RegExp(
  * the range rule reads or holds, as in `7-8 lb 4 oz` and `five to six feet two inches`.
  * Whether the range's first end is `7` or `7 lb` cannot be told, so the measurement is held,
  * the range rule's change splits the hold and is dropped, and the whole range stays as written.
+ * The inches of a height open no range, so `6 foot 2 to 6 foot 4 inches` is two heights.
  */
 function endsRangeWhole(text: string, start: number, first: string): boolean {
+  const lowStart = rangeOpening(text, start, first);
+  return lowStart !== null && !isHeightInches(text, lowStart);
+}
+
+/**
+ * Where the first end starts of the range that `endsRangeWhole` asks about, before it asks
+ * whether that end is the inches of a height, or `null` where no such range opens.
+ */
+function rangeOpening(text: string, start: number, first: string): number | null {
   RANGE_OPENING.lastIndex = start;
   const opening = RANGE_OPENING.exec(text);
-  if (opening === null) return false;
+  if (opening === null) return null;
   const [lowRaw, join] = [opening[1]!, opening[2]!];
   const lowStart = opening.indices![1]![0];
   const written = isWritten(lowRaw) || isWritten(first);
-  if (written && writtenRange(text, lowStart, lowRaw, join, first) === 'skip') return false;
+  if (written && writtenRange(text, lowStart, lowRaw, join, first) === 'skip') return null;
   const low = parseNumber(lowRaw);
   const high = parseNumber(first);
-  return low === null || high === null || canBeRange(text, lowStart, low, high);
+  return low === null || high === null || canBeRange(text, lowStart, low, high) ? lowStart : null;
 }
 
 const LINE_END = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
 
+/** A join and a measurement in feet, as the ` to 6 foot` of `6 foot 2 to 6 foot 4`. */
+const ANOTHER_HEIGHT =
+  String.raw`${RANGE_JOIN}${NUMBER_START}(?:${UNSIGNED_NUMBER})${GAP}(?:feet|foot|ft)(?![A-Za-z])`;
+
 /**
  * Where inches may go without their word after `foot` or `feet`, as in `six foot two`: before
- * nothing that could be a noun. That is punctuation, `tall`, the end of the text, or the end
- * of a line where the next line is blank or starts with something other than a word, such as
- * a list marker.
+ * nothing that could be a noun, or before another height. That is punctuation, `tall`, the end
+ * of the text, the end of a line where the next line is blank or starts with something other
+ * than a word, such as a list marker, or a join and a measurement in feet, as in
+ * `6 foot 2 to 6 foot 4`.
  */
 const NO_NOUN_AFTER =
-  String.raw`(?=[.,;:!?)\]"'”’]+(?!\w)|${SOFT_SPACE}tall\b|` +
+  String.raw`(?=[.,;:!?)\]"'”’]+(?!\w)|${SOFT_SPACE}tall\b|${ANOTHER_HEIGHT}|` +
   String.raw`${INLINE_SPACE}*(?:$|${LINE_END}${INLINE_SPACE}*(?:$|${LINE_END}|[^\sA-Za-z])))`;
 
 /** Inches written without their word: a whole number from 1 to 11. */
 const isInchCount = (value: number | null) =>
   value !== null && Number.isInteger(value) && value >= 1 && value <= 11;
+
+/**
+ * The feet of a height with no inch word before another height, and its inches starting where
+ * the pattern is tried. The same shape as the last alternative of `feetInchesRule`.
+ */
+const INCHES_OF_HEIGHT = new RegExp(
+  String.raw`(?<=(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:feet|foot)${SOFT_SPACE})(?<=\s)` +
+    String.raw`(${WHOLE_NUMBER})(?=${ANOTHER_HEIGHT})`,
+  'diy',
+);
+
+/**
+ * The height whose inches start at `start`, with no inch word before another height, where it
+ * starts where a measurement can: its feet and where they start.
+ */
+function heightAt(text: string, start: number): { feet: string; feetStart: number } | null {
+  INCHES_OF_HEIGHT.lastIndex = start;
+  const match = INCHES_OF_HEIGHT.exec(text);
+  if (match === null || parseNumber(match[1]!) === null) return null;
+  if (!isInchCount(parseNumber(match[2]!))) return null;
+  const feetStart = match.indices![1]![0];
+  STARTS_HERE.lastIndex = feetStart;
+  return STARTS_HERE.test(text) ? { feet: match[1]!, feetStart } : null;
+}
+
+let inchesText = '';
+const inchesAt = new Map<number, boolean>();
+
+/**
+ * The number at `start` is the inches of a height that `feetInchesRule` converts before
+ * another height, as the `2` of `6 foot 2 to 6 foot 4` is, and not the first end of a range.
+ * Where that height itself ends a range, the answer is the one for the range's first end, so
+ * the walk follows a chain such as `5 to 6 foot 1 to 6 foot 2 to 6 foot 3` back to its start.
+ * Every answer is kept for the text, so a long chain takes time in line with its length, and
+ * the walk is a loop, so no chain is too long for the stack.
+ */
+function isHeightInches(text: string, start: number): boolean {
+  if (text !== inchesText) {
+    inchesText = text;
+    inchesAt.clear();
+  }
+  const walked: number[] = [];
+  let at: number | null = start;
+  let answer = true;
+  while (at !== null) {
+    const known = inchesAt.get(at);
+    if (known !== undefined) {
+      answer = known;
+      break;
+    }
+    walked.push(at);
+    const height = heightAt(text, at);
+    if (height === null) {
+      answer = false;
+      break;
+    }
+    at = rangeOpening(text, height.feetStart, height.feet);
+  }
+  for (const position of walked) inchesAt.set(position, answer);
+  return answer;
+}
 
 /**
  * `6 feet 2 inches`, `6'2"`, `5 ft 11 in`, `six feet two inches` and `six foot two` collapse
@@ -972,11 +1051,11 @@ function feetInchesRule(): Rule {
   const pattern = new RegExp(
     String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:(?:feet|foot|ft\.?|′|')` +
       softGap(String.raw`(?:and(?=\s))?`) +
-      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+-\d+/\d+|\d+/\d+|` +
+      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+${HYPHEN}\d+/\d+|\d+/\d+|` +
       String.raw`${WHOLE_NUMBER}(?:${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION})?)` +
       String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|")(?![A-Za-z])|` +
       String.raw`(?:feet|foot)${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER})`,
-    'gi',
+    'dgi',
   );
 
   return {
@@ -1005,7 +1084,18 @@ function feetInchesRule(): Rule {
           3,
           ctx.options.units.maxDecimals,
         );
-        const body = `${number} ${unitWord(target, Number(number))}`;
+        const end = match.index + match[0].length;
+        let attributive = false;
+        if (match[2] !== undefined) {
+          const unitText = ctx.text.slice(match.indices![2]![1], end);
+          const [, gap, inchUnit] = /^(\s*)(.*)$/s.exec(unitText)!;
+          // An abbreviation or mark is neither singular nor plural, so it counts as the singular
+          // after one, which describes a noun only after a determiner: `a 6 ft 2 in man`.
+          const value = /^inch$/i.test(inchUnit!) ? inches : 1;
+          attributive = describesNoun(ctx.text, match.index, value, gap!, end);
+        }
+        const unit = attributive ? target.singular : unitWord(target, Number(number));
+        const body = `${number} ${unit}`;
         pushMeasurement(ctx, changes, match.index, match[0], body, 'units.length.feet-inches', 40);
       }
       return changes;
@@ -1159,6 +1249,25 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
   const resolve = (alias: string) => byAlias.get(alias.toLowerCase().replace(/\s+/g, ' '));
 
+  const measurementBefore = new RegExp(
+    String.raw`(?<![\w.])(?:${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])${SOFT_SPACE}(?<=\s)$`,
+    'di',
+  );
+
+  /**
+   * Where a length measurement in `measure` starts that ends straight before `start`, with
+   * only space between, as `5 ft` does before the `6` of `5 ft 6 to 6 ft`. A number there is
+   * a smaller unit of that measurement, never more of the same unit.
+   */
+  const sameLengthBefore = (text: string, start: number, measure: Measure): number | null => {
+    if (!hasSides(measure)) return null;
+    const from = Math.max(0, start - NUMBER_REACH);
+    const before = measurementBefore.exec(text.slice(from, start));
+    if (before === null || resolve(before[1]!)?.measure !== measure) return null;
+    const quantity = before[0].slice(0, before.indices![1]![1] - before.index);
+    return isBareInch(before[1]!, quantity) ? null : from + before.index;
+  };
+
   /** A written-out quantity with its unit inside it, as in `half a mile`. */
   const pushWrapped = (
     ctx: RuleContext,
@@ -1263,6 +1372,16 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         // `2-3/4` is one number, which the single measurement rule reads.
         if (!written && TIGHT_HYPHEN.test(join) && parseNumber(`${lowRaw}-${highRaw}`) !== null) continue;
         if (!canBeRange(ctx.text, start, low, high)) continue;
+        const measurementStart = sameLengthBefore(ctx.text, start, entry.measure);
+        if (measurementStart !== null) {
+          // The inches of a height are for `feetInchesRule`. Any other smaller unit cannot be
+          // read, so the measurement and range stay as written.
+          if (!isHeightInches(ctx.text, start)) {
+            const held = ctx.text.slice(measurementStart, start + matched.length);
+            changes.push(hold(measurementStart, held, entry.measure.id, 35));
+          }
+          continue;
+        }
         if (isOtherSense(ctx, entry, start, start + matched.length)) {
           changes.push(hold(start, matched, entry.measure.id, 35));
           continue;

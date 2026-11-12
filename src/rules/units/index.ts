@@ -1,6 +1,7 @@
-import { buildGate, type Gate } from '../../config.js';
+import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
+import { endsSentence } from '../sentence.js';
 import {
   COMPOUNDS,
   MEASURES,
@@ -57,14 +58,17 @@ const RANGE_BEFORE = new RegExp(
 /**
  * The number at `start` is the second end of a range, as the `10` of `5 - 10 feet` is, and
  * not a measurement of its own, even where the range does not match as a whole. A first
- * number that cannot open the range leaves it free: `Price $5 - 10 inches`, `In 2024 - 5 feet`.
+ * number that cannot open the range leaves it free: `Price $5 - 10 inches`, `In 2024 - 5 feet`,
+ * and the inches of `2 feet 6 to 3 feet`.
  */
 function endsRange(text: string, start: number, value: number): boolean {
   RANGE_BEFORE.lastIndex = start;
   const before = RANGE_BEFORE.exec(text);
   if (before === null) return false;
+  const lowStart = before.indices![1]![0];
+  if (isHeightInches(text, lowStart)) return false;
   const low = parseNumber(before[1]!);
-  return low === null || canBeRange(text, before.indices![1]![0], low, value);
+  return low === null || canBeRange(text, lowStart, low, value);
 }
 
 /** A number the range and dimension rules read: any in digits, and a whole number in words. */
@@ -424,6 +428,9 @@ type MetricUnit = [forms: string, toBase: (value: number) => number, figure?: st
 const times = (factor: number) => (value: number) => value * factor;
 const BASE = times(1);
 
+// Unlike `\b`, this holds before the closing `_` of emphasis, as in `_175 degrees Celsius_`.
+const UNIT_END = String.raw`(?![A-Za-z\d])`;
+
 /**
  * Metric units by dimension, in every form the unit rules write them, in the American
  * spellings, and in the shorthand of a hand-written temperature such as `180C` or `180ºC`.
@@ -431,8 +438,13 @@ const BASE = times(1);
  */
 const METRIC_UNITS = {
   temperature: [
-    [String.raw`degrees?\s+(?:Celsius|C)\b|[°º˚]\s*C(?:elsius\b)?|Celsius\b`, BASE],
-    [String.raw`C\b`, BASE, BARE_CELSIUS_FIGURE],
+    [
+      String.raw`degrees?\s+(?:Celsius|C)${UNIT_END}|[°º˚]\s*C(?:elsius${UNIT_END})?|` +
+        String.raw`Celsius${UNIT_END}|℃|deg\.?\s*C${UNIT_END}|` +
+        String.raw`(?:degrees?\s+)?[Cc]entigrade${UNIT_END}`,
+      BASE,
+    ],
+    [String.raw`C${UNIT_END}`, BASE, BARE_CELSIUS_FIGURE],
   ],
   speed: [[String.raw`(?:kilometres?|kilometers?)\s+per\s+hour|km/h`, BASE]],
   torque: [[String.raw`newton[\s-]+(?:metres?|meters?)|N·m|Nm`, BASE]],
@@ -484,14 +496,37 @@ const METRIC_VALUE =
  */
 const METRIC_INNER = new RegExp(String.raw`^\s*${METRIC_VALUE}\s*$`);
 
+/** An opening or closing tag of an element that sits inside a line of text. */
+const INLINE_TAG =
+  String.raw`<\/?(?:a|abbr|b|bdi|bdo|cite|code|data|dfn|em|i|kbd|mark|q|s|samp|small|span|` +
+  String.raw`strong|sub|sup|time|u|var)(?:\s[^<>\n]*)?>`;
+const HAS_TAG = new RegExp(INLINE_TAG);
+
+/**
+ * Inline markup that can stand between the two values of a measurement given in both
+ * systems, or around either of them: Markdown emphasis, a code backtick, or an inline HTML
+ * tag. Every check that reads the two values together allows it in the same places.
+ */
+const MARKUP = String.raw`(?:[*_\`]|${INLINE_TAG})*`;
+const MARKUP_MARK = new RegExp(String.raw`[*_\`]|${INLINE_TAG}`, 'g');
+
+/** The markup that closes `opening`: its marks in reverse order, with each tag closed. */
+function closingOf(opening: string): string {
+  return (opening.match(MARKUP_MARK) ?? [])
+    .reverse()
+    .map((mark) => mark.replace(/^<(\w+)[^>]*>$/, '</$1>'))
+    .join('');
+}
+
 /**
  * A metric measurement just before a parenthetical, in text that runs to the opening
- * bracket. Markdown emphasis or code may close between them, as in `**1.8 metres** (6 feet)`,
- * and so may a line break that only wraps the paragraph. An opening `_` is emphasis, not
- * part of a word the measurement starts inside.
+ * bracket. Markup may close between them and open on the bracket, as in
+ * `**1.8 metres** (6 feet)` and `1.8 metres *(6 feet)*`, and a line break that only wraps
+ * the paragraph may stand between them too. An opening `_` is emphasis, not part of a word
+ * the measurement starts inside.
  */
 const METRIC_BEFORE = new RegExp(
-  String.raw`(?<![A-Za-z\d.]_*)${METRIC_VALUE}[*_\`]*${SOFT_SPACE}\($`,
+  String.raw`(?<![A-Za-z\d.]_*)${METRIC_VALUE}${MARKUP}${SOFT_SPACE}${MARKUP}\($`,
 );
 
 function dimensionOf(match: RegExpMatchArray | null): Dimension | undefined {
@@ -598,6 +633,13 @@ function restatesConversion(
   });
 }
 
+/** Miles per US gallon, in every form the fuel economy rule reads. */
+const MPG_FORMS = [
+  'mpg',
+  String.raw`miles(?:\s+per\s+|${HYPHEN}per${HYPHEN})gallon`,
+  String.raw`(?:miles|mi)\s*/\s*(?:gallon|gal)`,
+];
+
 /**
  * Imperial units by the dimension of what they convert to: every unit in MEASURES, and
  * the forms that only the feet-and-inches, temperature and fuel economy rules read.
@@ -610,7 +652,7 @@ const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
     String.raw`deg\.?\s*F`,
     'Fahrenheit',
   ],
-  economy: ['mpg', String.raw`miles\s+per\s+gallon`],
+  economy: [...MPG_FORMS],
   length: ["'", '’'],
 };
 for (const measure of MEASURES) {
@@ -675,13 +717,16 @@ const MEASUREMENT_PIECE = new RegExp(
 const APPROXIMATELY =
   /^(?:about|around|approximately|approx\.|roughly|nearly|almost|some|circa|c\.|ca\.|~|≈)\s*/i;
 
+/** Space and markup at either end of a text, as in `*about 6 feet*`. */
+const MARKUP_ENDS = new RegExp(String.raw`^\s*${MARKUP}|${MARKUP}\s*$`, 'g');
+
 /**
- * The dimension of the imperial measurement the text holds and nothing else, after an
- * optional word of approximation. `about 6 feet 2 inches` is a length, while
- * `10 feet for the old one` and `6 feet 3 pounds` are neither, and give undefined.
+ * The dimension of the imperial measurement the text holds and nothing else, inside any
+ * markup and after an optional word of approximation. `about 6 feet 2 inches` is a length,
+ * while `10 feet for the old one` and `6 feet 3 pounds` are neither, and give undefined.
  */
 function measurementDimension(text: string): Dimension | undefined {
-  const rest = text.trim().replace(APPROXIMATELY, '');
+  const rest = text.replace(MARKUP_ENDS, '').replace(APPROXIMATELY, '').replace(MARKUP_ENDS, '');
   let read = 0;
   let dimension: Dimension | undefined;
   for (const piece of rest.matchAll(MEASUREMENT_PIECE)) {
@@ -724,7 +769,15 @@ function metricSpelling(text: string): string {
   );
 }
 
-const BRACKET_AFTER = new RegExp(String.raw`^${SOFT_SPACE}\(([^()]{1,40})\)`);
+/**
+ * A bracket after a measurement. `close` is the markup that closes on the measurement
+ * before it, `open` the markup that opens on the bracket, and `inner` the markup that opens
+ * on the text inside it, which `innerClose` closes.
+ */
+const BRACKET_AFTER = new RegExp(
+  String.raw`^(?<close>${MARKUP})${SOFT_SPACE}(?<open>${MARKUP})\(` +
+    String.raw`(?<inner>${MARKUP})(?<metric>[^()]{1,40}?)(?<innerClose>${MARKUP})\)`,
+);
 
 /**
  * A `/` or `or` between one measurement in both systems, as in `180°C/350°F/gas 4`. A
@@ -733,12 +786,39 @@ const BRACKET_AFTER = new RegExp(String.raw`^${SOFT_SPACE}\(([^()]{1,40})\)`);
 const PAIR_JOIN = softGap(String.raw`(?:/|(?<=\s)or(?=\s))`);
 // `(?=\S)` makes a join that wraps take its line break, so the match ends at the next value.
 const METRIC_PAIRED_BEFORE = new RegExp(
-  String.raw`(?<![\w.])(${METRIC_VALUE})${PAIR_JOIN}(?=\S)`,
+  String.raw`(?<![A-Za-z\d.]_*)(${METRIC_VALUE})${MARKUP}${PAIR_JOIN}${MARKUP}(?=\S)`,
   'g',
 );
-const METRIC_PAIRED_AFTER = new RegExp(String.raw`^${PAIR_JOIN}(${METRIC_VALUE})(?!\w)`);
+/** A metric value joined after a measurement, with its markup named as in `BRACKET_AFTER`. */
+const METRIC_PAIRED_AFTER = new RegExp(
+  String.raw`^(?<close>${MARKUP})${PAIR_JOIN}(?<open>${MARKUP})` +
+    String.raw`(?<metric>${METRIC_VALUE})(?![A-Za-z\d])`,
+);
 /** A cheap test passed by every text that `METRIC_PAIRED_BEFORE` can end, and few others. */
-const ENDS_IN_JOIN = /(?:\/|\sor)\s*$/;
+const ENDS_IN_JOIN = new RegExp(String.raw`(?:\/|\sor)\s*${MARKUP}$`);
+
+interface MetricPartner {
+  /** The length of the text from the end of the imperial value to the end of the partner. */
+  length: number;
+  metric: string;
+  /** The markup that closes on the imperial value. */
+  close: string;
+}
+
+/**
+ * The metric value in brackets, or joined by `/` or `or`, at the start of `rest`, the text
+ * after an imperial value. Markup that opens on the bracket or the metric value has to
+ * close on it too.
+ */
+function metricPartnerAfter(rest: string): MetricPartner | undefined {
+  const match = BRACKET_AFTER.exec(rest) ?? METRIC_PAIRED_AFTER.exec(rest);
+  if (!match) return undefined;
+  const { close = '', open = '', inner = '', innerClose = '', metric = '' } = match.groups!;
+  const closing = closingOf(open);
+  if (innerClose !== closingOf(inner)) return undefined;
+  if (!rest.startsWith(closing, match[0].length)) return undefined;
+  return { length: match[0].length + closing.length, metric, close };
+}
 
 /**
  * The metric text gives the same measurement as `body`, a rule's conversion. Brackets and
@@ -789,7 +869,8 @@ function followsItsMetric(
  * half produces `9.1-18 metres (9-18 m)`. Swallow the parenthetical instead and keep the
  * author's own figure, which is the one they rounded on purpose. A bracket that says
  * anything else, as `6 feet (2 kg)` and `6 feet (5 m)` do, stays and nothing is lost.
- * `350°F/180°C` and `350°F or 180°C` collapse the same way.
+ * `350°F/180°C` and `350°F or 180°C` collapse the same way. Markup that closes on the
+ * imperial value closes on the metric one, so `**6 feet** (1.8 m)` becomes `**1.8 m**`.
  */
 function redundantMetric(
   ctx: RuleContext,
@@ -797,16 +878,26 @@ function redundantMetric(
   body: string,
   ruleId: string,
 ): { end: number; after: string } | null {
-  const rest = contextText(ctx.text).slice(end);
-  const match = BRACKET_AFTER.exec(rest) ?? METRIC_PAIRED_AFTER.exec(rest);
-  if (!match || !restatesBody(match[1]!, body, ruleId)) return null;
-  return { end: end + match[0].length, after: metricSpelling(match[1]!.trim()) };
+  const partner = metricPartnerAfter(contextText(ctx.text).slice(end));
+  if (!partner || !restatesBody(partner.metric, body, ruleId)) return null;
+  const after = metricSpelling(partner.metric.trim()) + partner.close;
+  return { end: end + partner.length, after };
 }
+
+/**
+ * Any capitalised word after a unit's stop starts a new sentence, a number in words included,
+ * as in `It weighs 5 lb. One bag is enough.` It has to accept every word the bare F's
+ * `OPENER` accepts there, or a stop that ends a bare F's sentence would go, and the second run
+ * would read a longer sentence.
+ */
+const AFTER_UNIT = /(?:)/y;
 
 /**
  * Records one converted measurement, collapsing a redundant parenthetical or pair if there
  * is one. A measurement that is itself the parenthetical after its metric value is not
- * recorded, and one paired after the metric value it restates is held as written.
+ * recorded, and one paired after the metric value it restates is held as written. The stop
+ * of an abbreviation such as `in.` goes with it, unless it also ends the sentence, when the
+ * metric value takes it.
  */
 function pushMeasurement(
   ctx: RuleContext,
@@ -824,10 +915,16 @@ function pushMeasurement(
   }
   const redundant = redundantMetric(ctx, start + matched.length, body, ruleId);
   if (redundant) {
+    const before = ctx.text.slice(start, redundant.end);
+    // A tag is protected, so no change can rewrite across one to collapse the pair.
+    if (HAS_TAG.test(before)) {
+      changes.push(hold(start, matched, ruleId, priority));
+      return;
+    }
     changes.push({
       start,
       end: redundant.end,
-      before: ctx.text.slice(start, redundant.end),
+      before,
       after: redundant.after,
       ruleId,
       category: 'units',
@@ -837,7 +934,9 @@ function pushMeasurement(
     });
     return;
   }
-  changes.push(change(start, matched, withOriginal(ctx, body, matched), ruleId, priority));
+  let after = withOriginal(ctx, body, matched);
+  if (matched.endsWith('.') && endsSentence(ctx.text, start, start + matched.length, AFTER_UNIT)) after += '.';
+  changes.push(change(start, matched, after, ruleId, priority));
 }
 
 /**
@@ -894,35 +993,111 @@ const RANGE_OPENING = new RegExp(
  * the range rule reads or holds, as in `7-8 lb 4 oz` and `five to six feet two inches`.
  * Whether the range's first end is `7` or `7 lb` cannot be told, so the measurement is held,
  * the range rule's change splits the hold and is dropped, and the whole range stays as written.
+ * The inches of a height open no range, so `6 foot 2 to 6 foot 4 inches` is two heights.
  */
 function endsRangeWhole(text: string, start: number, first: string): boolean {
+  const lowStart = rangeOpening(text, start, first);
+  return lowStart !== null && !isHeightInches(text, lowStart);
+}
+
+/**
+ * Where the first end starts of the range that `endsRangeWhole` asks about, before it asks
+ * whether that end is the inches of a height, or `null` where no such range opens.
+ */
+function rangeOpening(text: string, start: number, first: string): number | null {
   RANGE_OPENING.lastIndex = start;
   const opening = RANGE_OPENING.exec(text);
-  if (opening === null) return false;
+  if (opening === null) return null;
   const [lowRaw, join] = [opening[1]!, opening[2]!];
   const lowStart = opening.indices![1]![0];
   const written = isWritten(lowRaw) || isWritten(first);
-  if (written && writtenRange(text, lowStart, lowRaw, join, first) === 'skip') return false;
+  if (written && writtenRange(text, lowStart, lowRaw, join, first) === 'skip') return null;
   const low = parseNumber(lowRaw);
   const high = parseNumber(first);
-  return low === null || high === null || canBeRange(text, lowStart, low, high);
+  return low === null || high === null || canBeRange(text, lowStart, low, high) ? lowStart : null;
 }
 
 const LINE_END = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
 
+/** A join and a measurement in feet, as the ` to 6 foot` of `6 foot 2 to 6 foot 4`. */
+const ANOTHER_HEIGHT =
+  String.raw`${RANGE_JOIN}${NUMBER_START}(?:${UNSIGNED_NUMBER})${GAP}(?:feet|foot|ft)(?![A-Za-z])`;
+
 /**
  * Where inches may go without their word after `foot` or `feet`, as in `six foot two`: before
- * nothing that could be a noun. That is punctuation, `tall`, the end of the text, or the end
- * of a line where the next line is blank or starts with something other than a word, such as
- * a list marker.
+ * nothing that could be a noun, or before another height. That is punctuation, `tall`, the end
+ * of the text, the end of a line where the next line is blank or starts with something other
+ * than a word, such as a list marker, or a join and a measurement in feet, as in
+ * `6 foot 2 to 6 foot 4`.
  */
 const NO_NOUN_AFTER =
-  String.raw`(?=[.,;:!?)\]"'”’]+(?!\w)|${SOFT_SPACE}tall\b|` +
+  String.raw`(?=[.,;:!?)\]"'”’]+(?!\w)|${SOFT_SPACE}tall\b|${ANOTHER_HEIGHT}|` +
   String.raw`${INLINE_SPACE}*(?:$|${LINE_END}${INLINE_SPACE}*(?:$|${LINE_END}|[^\sA-Za-z])))`;
 
 /** Inches written without their word: a whole number from 1 to 11. */
 const isInchCount = (value: number | null) =>
   value !== null && Number.isInteger(value) && value >= 1 && value <= 11;
+
+/**
+ * The feet of a height with no inch word before another height, and its inches starting where
+ * the pattern is tried. The same shape as the last alternative of `feetInchesRule`.
+ */
+const INCHES_OF_HEIGHT = new RegExp(
+  String.raw`(?<=(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:feet|foot)${SOFT_SPACE})(?<=\s)` +
+    String.raw`(${WHOLE_NUMBER})(?=${ANOTHER_HEIGHT})`,
+  'diy',
+);
+
+/**
+ * The height whose inches start at `start`, with no inch word before another height, where it
+ * starts where a measurement can: its feet and where they start.
+ */
+function heightAt(text: string, start: number): { feet: string; feetStart: number } | null {
+  INCHES_OF_HEIGHT.lastIndex = start;
+  const match = INCHES_OF_HEIGHT.exec(text);
+  if (match === null || parseNumber(match[1]!) === null) return null;
+  if (!isInchCount(parseNumber(match[2]!))) return null;
+  const feetStart = match.indices![1]![0];
+  STARTS_HERE.lastIndex = feetStart;
+  return STARTS_HERE.test(text) ? { feet: match[1]!, feetStart } : null;
+}
+
+let inchesText = '';
+const inchesAt = new Map<number, boolean>();
+
+/**
+ * The number at `start` is the inches of a height that `feetInchesRule` converts before
+ * another height, as the `2` of `6 foot 2 to 6 foot 4` is, and not the first end of a range.
+ * Where that height itself ends a range, the answer is the one for the range's first end, so
+ * the walk follows a chain such as `5 to 6 foot 1 to 6 foot 2 to 6 foot 3` back to its start.
+ * Every answer is kept for the text, so a long chain takes time in line with its length, and
+ * the walk is a loop, so no chain is too long for the stack.
+ */
+function isHeightInches(text: string, start: number): boolean {
+  if (text !== inchesText) {
+    inchesText = text;
+    inchesAt.clear();
+  }
+  const walked: number[] = [];
+  let at: number | null = start;
+  let answer = true;
+  while (at !== null) {
+    const known = inchesAt.get(at);
+    if (known !== undefined) {
+      answer = known;
+      break;
+    }
+    walked.push(at);
+    const height = heightAt(text, at);
+    if (height === null) {
+      answer = false;
+      break;
+    }
+    at = rangeOpening(text, height.feetStart, height.feet);
+  }
+  for (const position of walked) inchesAt.set(position, answer);
+  return answer;
+}
 
 /**
  * `6 feet 2 inches`, `6'2"`, `5 ft 11 in`, `six feet two inches` and `six foot two` collapse
@@ -932,11 +1107,11 @@ function feetInchesRule(): Rule {
   const pattern = new RegExp(
     String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:(?:feet|foot|ft\.?|′|${FOOT_MARK})` +
       softGap(String.raw`(?:and(?=\s))?`) +
-      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+-\d+/\d+|\d+/\d+|` +
+      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+${HYPHEN}\d+/\d+|\d+/\d+|` +
       String.raw`${WHOLE_NUMBER}(?:${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION})?)` +
       String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|["”])(?![A-Za-z])|` +
       String.raw`(?:feet|foot)${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER})`,
-    'gi',
+    'dgi',
   );
   const sticky = new RegExp(pattern.source, 'iy');
 
@@ -983,7 +1158,18 @@ function feetInchesRule(): Rule {
           3,
           ctx.options.units.maxDecimals,
         );
-        const body = `${number} ${unitWord(target, Number(number))}`;
+        const end = match.index + match[0].length;
+        let attributive = false;
+        if (match[2] !== undefined) {
+          const unitText = ctx.text.slice(match.indices![2]![1], end);
+          const [, gap, inchUnit] = /^(\s*)(.*)$/s.exec(unitText)!;
+          // An abbreviation or mark is neither singular nor plural, so it counts as the singular
+          // after one, which describes a noun only after a determiner: `a 6 ft 2 in man`.
+          const value = /^inch$/i.test(inchUnit!) ? inches : 1;
+          attributive = describesNoun(ctx.text, match.index, value, gap!, end);
+        }
+        const unit = attributive ? target.singular : unitWord(target, Number(number));
+        const body = `${number} ${unit}`;
         pushMeasurement(ctx, changes, match.index, match[0], body, 'units.length.feet-inches', 40);
       }
       return changes;
@@ -1137,6 +1323,25 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
   const resolve = (alias: string) => byAlias.get(alias.toLowerCase().replace(/\s+/g, ' '));
 
+  const measurementBefore = new RegExp(
+    String.raw`(?<![\w.])(?:${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])${SOFT_SPACE}(?<=\s)$`,
+    'di',
+  );
+
+  /**
+   * Where a length measurement in `measure` starts that ends straight before `start`, with
+   * only space between, as `5 ft` does before the `6` of `5 ft 6 to 6 ft`. A number there is
+   * a smaller unit of that measurement, never more of the same unit.
+   */
+  const sameLengthBefore = (text: string, start: number, measure: Measure): number | null => {
+    if (!hasSides(measure)) return null;
+    const from = Math.max(0, start - NUMBER_REACH);
+    const before = measurementBefore.exec(text.slice(from, start));
+    if (before === null || resolve(before[1]!)?.measure !== measure) return null;
+    const quantity = before[0].slice(0, before.indices![1]![1] - before.index);
+    return isBareInch(before[1]!, quantity) ? null : from + before.index;
+  };
+
   /** A written-out quantity with its unit inside it, as in `half a mile`. */
   const pushWrapped = (
     ctx: RuleContext,
@@ -1242,6 +1447,16 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         // `2-3/4` is one number, which the single measurement rule reads.
         if (!written && TIGHT_HYPHEN.test(join) && parseNumber(`${lowRaw}-${highRaw}`) !== null) continue;
         if (!canBeRange(ctx.text, start, low, high)) continue;
+        const measurementStart = sameLengthBefore(ctx.text, start, entry.measure);
+        if (measurementStart !== null) {
+          // The inches of a height are for `feetInchesRule`. Any other smaller unit cannot be
+          // read, so the measurement and range stay as written.
+          if (!isHeightInches(ctx.text, start)) {
+            const held = ctx.text.slice(measurementStart, start + matched.length);
+            changes.push(hold(measurementStart, held, entry.measure.id, 35));
+          }
+          continue;
+        }
         if (isOtherSense(ctx, entry, start, start + matched.length)) {
           changes.push(hold(start, matched, entry.measure.id, 35));
           continue;
@@ -1509,9 +1724,10 @@ const CHANGE_AFTER = new RegExp(
 const FROM_ZERO = /^\s+(above|below)\s+zero\b/i;
 
 /** The Celsius value in brackets or joined by `/` or `or` at the start of `rest`. */
-function celsiusPartnerAfter(rest: string): RegExpExecArray | null {
-  const match = BRACKET_AFTER.exec(rest) ?? METRIC_PAIRED_AFTER.exec(rest);
-  return match && dimensionOf(METRIC_INNER.exec(match[1]!)) === 'temperature' ? match : null;
+function celsiusPartnerAfter(rest: string): MetricPartner | undefined {
+  const partner = metricPartnerAfter(rest);
+  if (dimensionOf(METRIC_INNER.exec(partner?.metric ?? '')) !== 'temperature') return undefined;
+  return partner;
 }
 
 /**
@@ -1522,7 +1738,7 @@ function celsiusPartnerAfter(rest: string): RegExpExecArray | null {
 function wordsBeside(text: string, start: number, end: number): { before: string; after: string } {
   const paired = metricPairedBefore(text, start, end);
   const from = paired?.dimension === 'temperature' ? paired.start : start;
-  const to = end + (celsiusPartnerAfter(text.slice(end))?.[0].length ?? 0);
+  const to = end + (celsiusPartnerAfter(text.slice(end))?.length ?? 0);
   return {
     before: text.slice(Math.max(0, from - CONTEXT_WINDOW), from),
     after: text.slice(to, to + CONTEXT_WINDOW),
@@ -1554,9 +1770,12 @@ function formatEnds(ctx: RuleContext, values: number[], raw: string[]): string[]
   return texts;
 }
 
-function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
+function fahrenheitReadings(
+  ctx: RuleContext,
+  matches: Iterable<RegExpExecArray> = fahrenheitTemperatures(ctx.text),
+): FahrenheitReading[] {
   const readings: FahrenheitReading[] = [];
-  for (const match of fahrenheitTemperatures(ctx.text)) {
+  for (const match of matches) {
     const raw = match[1] === undefined ? [match[3]!] : [match[1], match[3]!];
     const parsed = raw.map(parseNumber);
     if (parsed.some((v) => v === null)) continue;
@@ -1594,6 +1813,37 @@ function fahrenheitReadings(ctx: RuleContext): FahrenheitReading[] {
     });
   }
   return readings;
+}
+
+/** A rule run with the default options and no verdict, for a caller outside one. */
+const DEFAULT_RUN: Omit<RuleContext, 'text'> = {
+  options: resolveOptions(),
+  signals: {
+    confidence: 0,
+    markers: [],
+    unambiguousMonthFirstDates: 0,
+    unambiguousDayFirstDates: 0,
+    namedMonthFirstDates: 0,
+    namedDayFirstDates: 0,
+  },
+  american: false,
+};
+
+/**
+ * Whether the Fahrenheit temperature `match`, as `fahrenheitTemperatures` gives it, only
+ * restates the Celsius value before it, as in `175°C (350°F)` and `180°C/350°F`. The
+ * temperature rules leave such a value as written. A value before its Celsius partner, as
+ * in `350°F (175°C)`, is not a restatement: the rules convert it by dropping the partner.
+ */
+export function restatesCelsiusBefore(text: string, match: RegExpExecArray): boolean {
+  const ctx = { ...DEFAULT_RUN, text };
+  const [reading] = fahrenheitReadings(ctx, [match]);
+  if (reading === undefined) return false;
+  const end = reading.start + reading.matched.length;
+  return (
+    restatesMetric(ctx, reading.start, end) ||
+    followsItsMetric(ctx, reading.start, end, reading.body, reading.ruleId)
+  );
 }
 
 /**
@@ -1777,29 +2027,83 @@ function coinSizeRule(): Rule {
   };
 }
 
+/**
+ * `30 mpg`, `30 miles per gallon` and `30 mi/gal` become litres per 100 km, or km per litre.
+ * A range converts both ends and gives the smaller first, though litres per 100 km fall as
+ * miles per gallon rise: `20 to 30 mpg` becomes `7.8 to 12 L/100km`. After `from` the order
+ * shows a direction, so it stays: `from 20 to 30 mpg` becomes `from 12 to 7.8 L/100km`. A
+ * range or figure the rule cannot convert whole is held, so the length rule never reads its
+ * `miles`.
+ */
 function fuelEconomyRule(): Rule {
-  const pattern = new RegExp(
-    String.raw`${NUMBER_START}(\d+(?:\.\d+)?)\s*(mpg|miles per gallon)(?![A-Za-z])`,
-    'gi',
-  );
+  const id = 'units.economy.mpg';
+  const MPG = String.raw`\d+(?:\.\d+)?`;
+  const PLAIN_MPG = new RegExp(`^(?:${MPG})$`);
+  const UNIT = String.raw`${GAP}(?:${MPG_FORMS.join('|')})(?![A-Za-z])`;
+  const single = new RegExp(String.raw`${NUMBER_START}(${MPG})${UNIT}`, 'gi');
+  // Must start where the range rule starts, so the two read the same ranges.
+  const START = String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})${NOT_SECOND_OF_PAIR}|(?!${NUMERIC_FIRST}))`;
+  const range = new RegExp(String.raw`${START}(${NUMBER_PATTERN})(${RANGE_JOIN})(${MPG})${UNIT}`, 'gi');
+  const FROM_BEFORE = /\bfrom\s+$/i;
 
   return {
-    id: 'units.economy.mpg',
+    id,
     category: 'units',
     confidence: 'moderate',
     priority: 35,
     find(ctx) {
       const changes: Change[] = [];
-      pattern.lastIndex = 0;
-      for (const match of ctx.text.matchAll(pattern)) {
+      const perLitre = ctx.options.units.fuelEconomy === 'km-per-l';
+      const { precision, maxDecimals } = ctx.options.units;
+      const rate = (mpg: number) => (perLitre ? mpg * 0.425143707 : 235.214583 / mpg);
+      const economy = (mpg: number, figures: number) =>
+        formatNumber(rate(mpg), precision, figures, maxDecimals);
+      const unit = perLitre ? 'km/L' : 'L/100km';
+      // Where each range read here ends, which is where its second end's own match ends.
+      const rangeEnds = new Set<number>();
+
+      range.lastIndex = 0;
+      for (const match of ctx.text.matchAll(range)) {
+        const [matched, lowRaw, join, highRaw] = [match[0], match[1]!, match[2]!, match[3]!];
+        const start = match.index;
+        const low = parseNumber(lowRaw);
+        const high = Number(highRaw);
+        if (low === null) continue;
+        const reading = isWritten(lowRaw) ? writtenRange(ctx.text, start, lowRaw, join, highRaw) : 'read';
+        if (reading === 'skip' || !canBeRange(ctx.text, start, low, high)) continue;
+        rangeEnds.add(start + matched.length);
+        if (reading === 'hold' || !PLAIN_MPG.test(lowRaw) || low === 0 || high === 0) {
+          changes.push(hold(start, matched, id, 35));
+          continue;
+        }
+        const figures = Math.max(2, significantFigures(lowRaw), significantFigures(highRaw));
+        const separator = /to/i.test(join) ? ' to ' : /and/i.test(join) ? ' and ' : '-';
+        const write = (first: number, second: number) =>
+          `${economy(first, figures)}${separator}${economy(second, figures)} ${unit}`;
+        const end = start + matched.length;
+        const asWritten = write(low, high);
+        const keepOrder =
+          rate(low) <= rate(high) ||
+          FROM_BEFORE.test(ctx.text.slice(Math.max(0, start - 16), start)) ||
+          // An author's own metric value may give the ends in the source's order, and
+          // `pushMeasurement` keeps it in place of the conversion.
+          redundantMetric(ctx, end, asWritten, id) !== null ||
+          followsItsMetric(ctx, start, end, asWritten, id);
+        pushMeasurement(ctx, changes, start, matched, keepOrder ? asWritten : write(high, low), id, 35);
+      }
+
+      single.lastIndex = 0;
+      for (const match of ctx.text.matchAll(single)) {
+        // Its range settles it. `resolveChanges` tests every change against every hold, so a
+        // second change or hold for each range is quadratic in a long run of ranges.
+        if (rangeEnds.has(match.index + match[0].length)) continue;
         const mpg = Number(match[1]);
-        if (!mpg) continue;
-        const perLitre = ctx.options.units.fuelEconomy === 'km-per-l';
-        const value = perLitre ? mpg * 0.425143707 : 235.214583 / mpg;
-        const { precision, maxDecimals } = ctx.options.units;
-        const number = formatNumber(value, precision, Math.max(2, significantFigures(match[1]!)), maxDecimals);
-        const body = `${number} ${perLitre ? 'km/L' : 'L/100km'}`;
-        pushMeasurement(ctx, changes, match.index, match[0], body, 'units.economy.mpg', 35);
+        if (!mpg || endsRange(ctx.text, match.index, mpg)) {
+          changes.push(hold(match.index, match[0], id, 35));
+          continue;
+        }
+        const body = `${economy(mpg, Math.max(2, significantFigures(match[1]!)))} ${unit}`;
+        pushMeasurement(ctx, changes, match.index, match[0], body, id, 35);
       }
       return changes;
     },

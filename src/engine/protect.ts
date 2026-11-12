@@ -147,13 +147,16 @@ const BACKTICK_PAIRS = /`{3}[\s\S]*?`{3}/g;
 const INITIALISM = String.raw`(?:(?:[A-Za-z]{1,2}\.){2,}s|(?:[A-Za-z]{1,2}\.)+)(?!\w)`;
 
 /**
- * A unit straight after a number, as in `300 lb.ft` and `32 ft/s/s`, or joined to one, as in
- * `5ft.tall`, `1/2lb.ft` and `3p.m.`. The measurement and time rules read these, so a token
- * here is never a file name or an unrooted path. After a hyphen, a word of up to three letters
- * is a unit, as in `25-lb.ft`, and a longer one is a name, as in `01-colors.md`. The number
- * holds no comma, or a list such as `1,2,3` would be walked to its end from every item.
+ * A unit straight after a number, as in `300 lb.ft` and `32 ft/s/s`, or after a number and a
+ * degree sign, as in `225°F/low/slow`, or joined to one, as in `5ft.tall`, `1/2lb.ft` and
+ * `3p.m.`. The measurement and time rules read these, so a token here is never a file name or
+ * an unrooted path. After a hyphen, a word of up to three letters is a unit, as in `25-lb.ft`,
+ * and a longer one is a name, as in `01-colors.md`. The number holds no comma, or a list such
+ * as `1,2,3` would be walked to its end from every item.
  */
-const UNIT_AFTER_NUMBER = String.raw`(?<=(?<![A-Za-z_])\d[^\S\r\n]*)|[\d./-]*\d(?:[A-Za-z]|-[A-Za-z]{1,3}\.)`;
+const UNIT_AFTER_NUMBER =
+  String.raw`(?<=(?<![A-Za-z_])\d(?:[^\S\r\n]*[°º˚])?[^\S\r\n]*)|` +
+  String.raw`[\d./-]*\d(?:[A-Za-z]|-[A-Za-z]{1,3}\.)`;
 
 /** An extension in one case, so `color.It` is the next sentence run on rather than a file. */
 const EXTENSION = String.raw`\.(?:[a-z][a-z\d]*|[A-Z][A-Z\d]*)(?![\w-])`;
@@ -195,9 +198,17 @@ function collectCode(text: string, syntax: Syntax | undefined, into: Range[]): v
   if (syntax === 'markdown') collectVerbatimBlocks(text, into);
 }
 
+/**
+ * A long command-line flag, with any `=value` after it: `--center`, `--color=gray`,
+ * `--label="dark gray"`. Two hyphens straight after a word are a dash, as in `color--that`, so
+ * a flag starts only where a token starts, and never in the `<!--` that opens an HTML comment.
+ */
+const LONG_FLAG = /(?<![\w!-])--[A-Za-z][\w-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|\S*))?/g;
+
 const STRUCTURAL: RegExp[] = [
   /\bhttps?:\/\/\S+/g,
   /\bwww\.\S+/g,
+  LONG_FLAG,
   // Starting only where the token starts, so a long dotted token is walked once, not once per word.
   /(?<![\w.+-])[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
   /<[a-zA-Z/][^>\n]*>/g,

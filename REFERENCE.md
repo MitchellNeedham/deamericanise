@@ -349,16 +349,27 @@ Temperatures convert at both ends of a range too, so `Bake at 350-375°F` become
 `Bake at 175-190°C`. A change in temperature has no 32° offset to take off, so
 `dropped 20°F` becomes `dropped 11°C` and `10°F warmer` becomes `5.6°C warmer`. The words
 beside the number tell the two apart: a verb of change or `by` before it, a comparative
-or a noun such as `drop` after it. `fell to 20°F` names the new temperature and converts
-as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule of their own,
+or a noun such as `drop` after it. They are read past a Celsius value given beside the
+number, so `It was 20°F (11°C) warmer` becomes `It was 11°C warmer`, and
+`It rose 11°C or 20°F` stays as it is. `fell to 20°F` names the new temperature and
+converts as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule of their own,
 `units.temperature.difference`, so they can be switched off apart from temperatures.
 
-Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F` or `degrees Fahrenheit`. A bare `F`,
+Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F`, `degrees Fahrenheit` or
+`95 Fahrenheit`, with `º` or `˚` accepted for the degree sign, as phone keyboards type it.
+The word alone does not count after a whole number of four figures, which reads as a year
+(`In 1724 Fahrenheit proposed his scale`), before `thermometers` or `scale`, where the
+number counts them, or before a number, where it is a title (`Fahrenheit 451`). A bare `F`,
 as in `165F` or `350 F`, is more often a letter, so it counts only as an upper case `F`
 after a number of two or three figures, in a sentence about heat (an oven, cooking, the
 weather, a fever or a temperature) that gives no Celsius value. `Cook until the chicken
 reaches 165F` becomes `73.9°C`, while `Apartment 3F`, `seat 23F`, `the Boeing 777F`,
 `#33F`, `F-150` and the courtesy figure in `180C/350F/gas 4` stay as they are.
+
+A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `175 Celsius`),
+and as a bare upper case `C` after a number of two or three figures with at most one space.
+So `Bake at 350°F (180C)` becomes `Bake at 180C` and `180C/350°F/gas 4` stays as it is,
+while `Apartment 3C (65°F)` is a flat and its temperature converts.
 
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the

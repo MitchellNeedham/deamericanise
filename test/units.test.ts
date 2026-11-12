@@ -366,6 +366,38 @@ describe('temperature differences', () => {
   });
 });
 
+describe('a change in temperature beside its Celsius value', () => {
+  it.each`
+    input                                     | expected                         | why
+    ${'It was 20°F (11°C) warmer.'}           | ${'It was 11°C warmer.'}         | ${'the comparative past a bracket'}
+    ${'It was 20°F/11°C warmer.'}             | ${'It was 11°C warmer.'}         | ${'past a slash'}
+    ${'It was 20°F or 11°C warmer.'}          | ${'It was 11°C warmer.'}         | ${'past or'}
+    ${'a 30°F (17°C) swing in a day'}         | ${'a 17°C swing in a day'}       | ${'a noun of change past a bracket'}
+    ${'a 10-15°F (5.6-8.3°C) drop'}           | ${'a 5.6-8.3°C drop'}            | ${'a range'}
+    ${'Highs will run 5°F (3°C) above normal.'} | ${'Highs will run 3°C above normal.'} | ${'a distance from a norm'}
+    ${'It dropped 20°F (11°C).'}              | ${'It dropped 11°C.'}            | ${'the verb beside the Fahrenheit value'}
+    ${'It was 20°F warmer.'}                  | ${'It was 11°C warmer.'}         | ${'no Celsius value'}
+    ${'The pond fell to 20°F overnight.'}     | ${'The pond fell to -6.7°C overnight.'} | ${'to names a temperature'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                           | why
+    ${'It rose 11°C or 20°F.'}          | ${'the verb before a Celsius value joined by or'}
+    ${'It rose by 11°C/20°F.'}          | ${'by before a Celsius value joined by a slash'}
+    ${'a drop of 11°C or 20°F'}         | ${'a noun of change before the pair'}
+    ${'It was 11°C (20°F) warmer.'}     | ${'the Fahrenheit value restates the Celsius one'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('tags a change past its Celsius value with the difference rule', () => {
+    const { changes } = deamericanise('It was 20°F (11°C) warmer.');
+    expect(changes.map((c) => c.ruleId)).toEqual(['units.temperature.difference']);
+  });
+});
+
 describe('Fahrenheit ranges', () => {
   it.each`
     input                                             | expected                                          | why
@@ -455,6 +487,61 @@ describe('Fahrenheit written as a bare F', () => {
     expect(once).toBe('Cook until the chicken reaches 73.9°C (165F).');
     expect(convert(once, options)).toBe(once);
   });
+});
+
+describe('Fahrenheit written with another degree sign, or none', () => {
+  it.each`
+    input                                   | expected                          | why
+    ${'Bake at 350ºF.'}                     | ${'Bake at 175°C.'}               | ${'the masculine ordinal for the degree sign'}
+    ${'Bake at 350˚F.'}                     | ${'Bake at 175°C.'}               | ${'the ring above'}
+    ${'Bake at 350 º F.'}                   | ${'Bake at 175°C.'}               | ${'spaced'}
+    ${'It was 95º Fahrenheit.'}             | ${'It was 35°C.'}                 | ${'before the word'}
+    ${'It was 95 Fahrenheit.'}              | ${'It was 35°C.'}                 | ${'the word with no sign'}
+    ${'It was 95 fahrenheit.'}              | ${'It was 35°C.'}                 | ${'in lower case'}
+    ${'Bake at 350-375 Fahrenheit.'}        | ${'Bake at 175-190°C.'}           | ${'a range'}
+    ${'It rose 20 Fahrenheit.'}             | ${'It rose 11°C.'}                | ${'a change'}
+    ${'It was 95 Fahrenheit\n\n2. Rest.'}   | ${'It was 35°C\n\n2. Rest.'}      | ${'a list item past a blank line is no title'}
+    ${'It was 72 degrees Fahrenheit.'}      | ${'It was 22.2 degrees Celsius.'} | ${'spelled out stays spelled out'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                                | why
+    ${'I read Fahrenheit 451 last year.'}                    | ${'a title'}
+    ${'They filmed the 1966 Fahrenheit 451 in England.'}     | ${'a title after a year'}
+    ${'In 1724 Fahrenheit proposed his scale.'}              | ${'the man, after a year'}
+    ${'Set the 2 Fahrenheit thermometers aside.'}            | ${'a count of thermometers'}
+    ${'It was 95\nFahrenheit is the scale they use.'}        | ${'the word on the next line'}
+    ${'Quedó en 1º lugar.'}                                  | ${'an ordinal with no F'}
+    ${'Es el nº 5.'}                                         | ${'the same'}
+    ${'Ford trucks from the 70s F series'}                   | ${'no temperature'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                       | expected
+    ${'Bake at 350ºF (175ºC).'}                 | ${'Bake at 175ºC.'}
+    ${'Bake at 350˚F/175˚C.'}                   | ${'Bake at 175˚C.'}
+    ${'Bake at 350 Fahrenheit (175 Celsius).'}  | ${'Bake at 175 Celsius.'}
+    ${'Bake at 350°F (180°Celsius).'}           | ${'Bake at 180°Celsius.'}
+    ${'Bake at 175ºC (350ºF).'}                 | ${'Bake at 175ºC (350ºF).'}
+    ${'Heat to 180˚C or 350˚F.'}                | ${'Heat to 180˚C or 350˚F.'}
+    ${'Bake at 175 Celsius (350 Fahrenheit).'}  | ${'Bake at 175 Celsius (350 Fahrenheit).'}
+  `('reads the Celsius value beside it in the same forms: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each(['Bake at 350ºF.', 'It was 95 Fahrenheit.', 'It was 95º Fahrenheit.'])(
+    'runs twice on a kept original of %j without converting it again',
+    (input) => {
+      const options = { units: { keepOriginal: true } };
+      const once = convert(input, options);
+      expect(once).not.toBe(input);
+      expect(convert(once, options)).toBe(once);
+    },
+  );
 });
 
 describe('speed, power and economy', () => {
@@ -1511,6 +1598,41 @@ describe('a value paired with its metric value by a slash or "or"', () => {
     const once = convert(input, options);
     expect(once).toBe(expected);
     expect(convert(once, options)).toBe(once);
+  });
+});
+
+describe('a Celsius value written with a bare C', () => {
+  it.each`
+    input                               | expected                  | why
+    ${'Bake at 350°F (180C).'}          | ${'Bake at 180C.'}        | ${'in brackets after the Fahrenheit value'}
+    ${'Bake at 350°F (180 C).'}         | ${'Bake at 180 C.'}       | ${'after one space'}
+    ${'Bake at 350°F/180C.'}            | ${'Bake at 180C.'}        | ${'after a slash'}
+    ${'Bake at 350°F or 180C.'}         | ${'Bake at 180C.'}        | ${'after or'}
+    ${'Bake at 350-375°F (175-190C).'}  | ${'Bake at 175-190C.'}    | ${'a range'}
+    ${'Bake at 350°F (2 kg).'}          | ${'Bake at 175°C (2 kg).'} | ${'a weight is no Celsius value'}
+    ${'It was 20°F (11C) warmer.'}      | ${'It was 11C warmer.'}   | ${'a change in temperature'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                     | why
+    ${'Bake at 180C (350°F).'}                    | ${'the Fahrenheit value restates it in brackets'}
+    ${'Preheat the oven to 180C/350°F/gas 4.'}    | ${'the British trio with a marked Fahrenheit value'}
+    ${'Heat to 180C or 350°F.'}                   | ${'joined by or'}
+    ${'Preheat the oven to 180C/350F/gas 4.'}     | ${'the trio in bare forms'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                  | expected                                    | why
+    ${'Apartment 3C (65°F) is warm.'}      | ${'Apartment 3C (18.3°C) is warm.'}         | ${'one figure before C is a flat'}
+    ${'The A330-200C (65°F) is parked.'}   | ${'The A330-200C (18.3°C) is parked.'}      | ${'a designation'}
+    ${'Bake at 350°F (180c).'}             | ${'Bake at 175°C (180c).'}                  | ${'a lower case c'}
+    ${'Bake at 350°F (180  C).'}           | ${'Bake at 175°C (180  C).'}                | ${'more than one space'}
+  `('does not read a bare C in $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
   });
 });
 

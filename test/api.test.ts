@@ -404,6 +404,9 @@ describe('the Fahrenheit marker', () => {
     'A fever of 102.5F needs a doctor.',
     'Bake at 350-375F.',
     'It was 72 degrees Fahrenheit.',
+    'Bake at 350ºF.',
+    'Bake at 350˚F.',
+    'It was 95 Fahrenheit.',
   ];
 
   const NOT_READ = [
@@ -424,6 +427,7 @@ describe('the Fahrenheit marker', () => {
     'Heat the oven to 180C fan or to 400F.',
     'I read Fahrenheit 451 at school.',
     'The film Fahrenheit 9/11 opened in 2004.',
+    'They filmed the 1966 Fahrenheit 451 in England.',
   ];
 
   it.each(READ)('finds Fahrenheit in "%s"', (input) => {

@@ -1,6 +1,6 @@
 import type { AmericanSignals } from '../types.js';
 import { longDates, numericDates } from '../rules/dates.js';
-import { fahrenheitTemperatures } from '../rules/units/fahrenheit.js';
+import { NOT_A_TITLE, fahrenheitTemperatures } from '../rules/units/fahrenheit.js';
 import { isUnitInOtherSense } from '../rules/units/index.js';
 
 /** What a marker adds to the confidence unless it names its own weight. */
@@ -109,12 +109,8 @@ const COMMONWEALTH_INGREDIENT =
 
 const US_INGREDIENTS = unlessNear(MEASURED_US_INGREDIENT, COMMONWEALTH_INGREDIENT, 30, /\n/);
 
-/**
- * The word `Fahrenheit` where it names the scale. A number straight after it makes it a
- * title, as in `Fahrenheit 451` or `Fahrenheit 9/11`, even on the next line of a wrapped
- * paragraph, though not a number past a blank line or one that opens a numbered list item.
- */
-const SCALE_NAMED = /\bFahrenheit\b(?![^\S\n]*(?:\n[^\S\n]*(?!\d+[.)](?:\s|$)))?\d)/i;
+/** The word `Fahrenheit` where it names the scale, and not a title. */
+const SCALE_NAMED = new RegExp(String.raw`\bFahrenheit\b${NOT_A_TITLE}`, 'i');
 
 /** Every temperature the Fahrenheit rules convert, and the scale named on its own. */
 const FAHRENHEIT: Pick<RegExp, 'test'> = {

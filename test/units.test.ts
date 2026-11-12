@@ -688,6 +688,25 @@ describe('speed, power and economy', () => {
 });
 
 describe('fuel economy', () => {
+  /** Every change and hold the fuel economy rule makes in `text`. */
+  const economyChanges = (text: string): Change[] => {
+    const resolved = resolveOptions({});
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .filter((rule) => rule.id === 'units.economy.mpg')
+      .flatMap((rule) => rule.find(ctx));
+  };
+
+  // `resolveChanges` tests every change against every hold, so a second change or hold for
+  // each range makes a long run of ranges quadratic.
+  it.each`
+    range                   | read
+    ${'20 to 30 mpg, '}     | ${'converted'}
+    ${'twenty to 30 mpg, '} | ${'held'}
+  `('gives one change for each range, $read: "$range"', ({ range }) => {
+    expect(economyChanges(range.repeat(50))).toHaveLength(50);
+  });
+
   it.each`
     input                                             | expected                                   | why
     ${'It does 30 miles/gallon on the highway'}       | ${'It does 7.8 L/100km on the highway'}    | ${'a slash'}

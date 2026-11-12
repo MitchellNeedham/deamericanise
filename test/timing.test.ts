@@ -7,7 +7,11 @@ import { deamericaniseText } from '../src/index.js';
 const convert = (input: string) =>
   deamericaniseText(input, { categories: { spelling: false, vocabulary: false } });
 
-describe('a long run of fuel economy ranges takes time in line with its length', () => {
+// Shared CI runners are too noisy even for a ratio, so CI relies on the count of changes per
+// range in `test/units.test.ts`. A local run still catches a slow path that count cannot see.
+const onCi = Boolean(process.env.CI);
+
+describe.skipIf(onCi)('a long run of fuel economy ranges takes time in line with its length', () => {
   // Two lengths timed in one run, so the speed of the machine cancels out. Four times the
   // ranges take about four times as long; testing every change against a hold for every range
   // takes well over eight times as long.

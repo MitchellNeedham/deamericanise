@@ -17,7 +17,6 @@ import {
   NUMBER_PATTERN,
   NUMBER_START,
   NUMERIC_PATTERN,
-  RANGE_START,
   SOFT_SPACE,
   WHOLE_NUMBER,
   canBeRange,
@@ -43,8 +42,8 @@ const NOT_SECOND_OF_PAIR = String.raw`(?<!\d${softGap(String.raw`(?:[-\u2013\u20
 
 /** A range's first number and its join, ending where the range's second number starts. */
 const RANGE_BEFORE = new RegExp(
-  String.raw`(?<=${NUMBER_START}${RANGE_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=[\d\-−])`,
-  'dy',
+  String.raw`(?<=${NUMBER_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=[\d\-−])`,
+  'diy',
 );
 
 /**
@@ -719,7 +718,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     'gi',
   );
   const range = new RegExp(
-    String.raw`${START}${RANGE_START}(${NUMERIC_PATTERN})${RANGE_JOIN}(${NUMERIC_PATTERN})` +
+    String.raw`${START}(${NUMERIC_PATTERN})${RANGE_JOIN}(${NUMERIC_PATTERN})` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );

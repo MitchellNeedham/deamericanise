@@ -1,4 +1,5 @@
 import type { Precision } from '../../types.js';
+import { MONTH_PATTERN } from '../dates.js';
 
 const VULGAR: Record<string, number> = {
   '¼': 0.25, '½': 0.5, '¾': 0.75,
@@ -256,18 +257,24 @@ export function significantFigures(raw: string): number {
 }
 
 /**
+ * The month and day of a date in words, as the date rules read and write it, up to where its
+ * year starts: `Oct 22, ` and `22 October `.
+ */
+const DATE_BEFORE_YEAR =
+  String.raw`\b(?:(?:${MONTH_PATTERN})\.?\s+\d{1,2}(?:st|nd|rd|th)?,\s*|` +
+  String.raw`\d{1,2}(?:st|nd|rd|th)?\s+(?:${MONTH_PATTERN})\.?\s+)`;
+
+/**
  * Where a number of a measurement may start: not inside a word or a decimal. Straight after
  * `\d-`, `\d/`, `\d,` or `\d:` it is the tail of a date or of a range written tight, of a
  * fraction, of a grouped number such as `1,005`, or the minutes of a time such as `7:30`.
+ * Straight after a currency sign it is a price, and four figures straight after `Oct 22,` or
+ * `22 October` are the year of a date. The optional space after the sign matches the
+ * currency rule, which reads `$ 5` as money.
  */
-export const NUMBER_START = String.raw`(?<![\w.]|\d[-\u2013\u2014/,:])`;
-
-/**
- * Where the first number of a range may start, beyond `NUMBER_START`: not after a currency
- * sign, where it is a price. The optional space matches the currency rule, which reads
- * `$ 5` as money.
- */
-export const RANGE_START = String.raw`(?<![$£€]\s?)`;
+export const NUMBER_START =
+  String.raw`(?<![\w.]|\d[-\u2013\u2014/,:]|[$£€]\s?)` +
+  String.raw`(?!(?=\d{4}(?!\d))(?<=${DATE_BEFORE_YEAR}))`;
 
 /** `from` or `between` before a first number, which opens a range whatever its ends. */
 const RANGE_WORD_BEFORE = /\b(?:from|between)\s+$/i;

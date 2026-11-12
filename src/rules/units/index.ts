@@ -844,17 +844,25 @@ const RANGE_OPENING = new RegExp(
  * The inches of a height open no range, so `6 foot 2 to 6 foot 4 inches` is two heights.
  */
 function endsRangeWhole(text: string, start: number, first: string): boolean {
+  const lowStart = rangeOpening(text, start, first);
+  return lowStart !== null && !isHeightInches(text, lowStart);
+}
+
+/**
+ * Where the first end starts of the range that `endsRangeWhole` asks about, before it asks
+ * whether that end is the inches of a height, or `null` where no such range opens.
+ */
+function rangeOpening(text: string, start: number, first: string): number | null {
   RANGE_OPENING.lastIndex = start;
   const opening = RANGE_OPENING.exec(text);
-  if (opening === null) return false;
+  if (opening === null) return null;
   const [lowRaw, join] = [opening[1]!, opening[2]!];
   const lowStart = opening.indices![1]![0];
-  if (isHeightInches(text, lowStart)) return false;
   const written = isWritten(lowRaw) || isWritten(first);
-  if (written && writtenRange(text, lowStart, lowRaw, join, first) === 'skip') return false;
+  if (written && writtenRange(text, lowStart, lowRaw, join, first) === 'skip') return null;
   const low = parseNumber(lowRaw);
   const high = parseNumber(first);
-  return low === null || high === null || canBeRange(text, lowStart, low, high);
+  return low === null || high === null || canBeRange(text, lowStart, low, high) ? lowStart : null;
 }
 
 const LINE_END = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
@@ -889,17 +897,54 @@ const INCHES_OF_HEIGHT = new RegExp(
 );
 
 /**
- * The number at `start` is the inches of a height that `feetInchesRule` converts before
- * another height, as the `2` of `6 foot 2 to 6 foot 4` is, and not the first end of a range.
+ * The height whose inches start at `start`, with no inch word before another height, where it
+ * starts where a measurement can: its feet and where they start.
  */
-function isHeightInches(text: string, start: number): boolean {
+function heightAt(text: string, start: number): { feet: string; feetStart: number } | null {
   INCHES_OF_HEIGHT.lastIndex = start;
   const match = INCHES_OF_HEIGHT.exec(text);
-  if (match === null || parseNumber(match[1]!) === null) return false;
-  if (!isInchCount(parseNumber(match[2]!))) return false;
+  if (match === null || parseNumber(match[1]!) === null) return null;
+  if (!isInchCount(parseNumber(match[2]!))) return null;
   const feetStart = match.indices![1]![0];
   STARTS_HERE.lastIndex = feetStart;
-  return STARTS_HERE.test(text) && !endsRangeWhole(text, feetStart, match[1]!);
+  return STARTS_HERE.test(text) ? { feet: match[1]!, feetStart } : null;
+}
+
+let inchesText = '';
+const inchesAt = new Map<number, boolean>();
+
+/**
+ * The number at `start` is the inches of a height that `feetInchesRule` converts before
+ * another height, as the `2` of `6 foot 2 to 6 foot 4` is, and not the first end of a range.
+ * Where that height itself ends a range, the answer is the one for the range's first end, so
+ * the walk follows a chain such as `5 to 6 foot 1 to 6 foot 2 to 6 foot 3` back to its start.
+ * Every answer is kept for the text, so a long chain takes time in line with its length, and
+ * the walk is a loop, so no chain is too long for the stack.
+ */
+function isHeightInches(text: string, start: number): boolean {
+  if (text !== inchesText) {
+    inchesText = text;
+    inchesAt.clear();
+  }
+  const walked: number[] = [];
+  let at: number | null = start;
+  let answer = true;
+  while (at !== null) {
+    const known = inchesAt.get(at);
+    if (known !== undefined) {
+      answer = known;
+      break;
+    }
+    walked.push(at);
+    const height = heightAt(text, at);
+    if (height === null) {
+      answer = false;
+      break;
+    }
+    at = rangeOpening(text, height.feetStart, height.feet);
+  }
+  for (const position of walked) inchesAt.set(position, answer);
+  return answer;
 }
 
 /**

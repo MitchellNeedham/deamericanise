@@ -257,13 +257,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     matches: (v) => v.change !== undefined && v.origin?.after.endsWith(`(${v.change.before})`) === true,
   },
   {
-    issue: 155,
-    property: 'paragraphs',
-    input: 'Room 13\n\n- 0°F overnight',
-    options: {},
-    matches: (v) => v.change?.ruleId === 'units.temperature.fahrenheit',
-  },
-  {
     issue: 157,
     property: 'idempotence',
     input: 'grade 10 feet',
@@ -296,25 +289,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
       /^[a-z]/i.test(v.change.before) &&
       v.origin === undefined &&
       follows(/^[\s-]+\d/)(v),
-  },
-  {
-    issue: 165,
-    property: 'idempotence',
-    input: 'Temperatures at 6 p.m. were 10F.',
-    options: {},
-    // A bare F the first run left: something it rewrote had a stop that cut the sentence short.
-    matches: (v) =>
-      v.change?.ruleId === 'units.temperature.fahrenheit' &&
-      /\d\s?F$/.test(v.change.before) &&
-      v.origin === undefined &&
-      !precedes(/\bbaking\b[^.!?]*$/i)(v),
-  },
-  {
-    issue: 166,
-    property: 'idempotence',
-    input: 'Put the cookie sheet in at 350F.',
-    options: localise,
-    matches: (v) => v.change?.ruleId === 'units.temperature.fahrenheit' && precedes(/\bbaking\b[^.!?]*$/i)(v),
   },
   {
     issue: 168,

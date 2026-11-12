@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { analyse, deamericanise, deamericaniseText, resolveOptions } from '../src/index.js';
+import { DIALECTS, analyse, deamericanise, deamericaniseText, resolveOptions } from '../src/index.js';
 import type { Change, Options, RuleContext } from '../src/index.js';
 import { resolveChanges } from '../src/engine/apply.js';
 import { patternRules } from '../src/rules/index.js';
+import { spellingEntries } from '../src/rules/spelling/index.js';
+import { baseVocabulary } from '../src/rules/vocabulary.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
 import { NUMERIC_PATTERN, parseNumber } from '../src/rules/units/number.js';
 
@@ -307,6 +309,20 @@ describe('Fahrenheit ranges', () => {
   it('takes the author figure for a range', () => {
     expect(convert('Bake at 350-375°F (175-190°C).')).toBe('Bake at 175-190°C.');
   });
+
+  it.each`
+    input                                  | expected                                 | why
+    ${'Room 13\n- 0°F overnight'}          | ${'Room 13\n- -17.8°C overnight'}        | ${'a list item is not the dash of a range'}
+    ${'Room 13\n\n- 0°F overnight'}        | ${'Room 13\n\n- -17.8°C overnight'}      | ${'nor across a blank line'}
+    ${'Room 13\n\nto 0°F overnight'}       | ${'Room 13\n\nto -17.8°C overnight'}     | ${'to after a blank line'}
+    ${'Lows between 60\n\nand 70°F'}       | ${'Lows between 60\n\nand 21.1°C'}       | ${'and after a blank line'}
+    ${'Highs of 70\nto 80°F'}              | ${'Highs of 21\nto 27°C'}                | ${'a line break that only wraps the paragraph'}
+    ${'Highs between 60\nand 70°F'}        | ${'Highs between 16\nand 21°C'}          | ${'the same, joined by and'}
+    ${'Highs between\n60 and 70°F'}        | ${'Highs between\n16 and 21°C'}          | ${'the same, after between'}
+    ${'350-375°F'}                         | ${'175-190°C'}                           | ${'a range written tight'}
+  `('stops a range at a new block: $why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
 });
 
 describe('Fahrenheit written as a bare F', () => {
@@ -347,6 +363,10 @@ describe('Fahrenheit written as a bare F', () => {
     ${'Bake at 350F (180C).'}                              | ${'the courtesy figure before Celsius'}
     ${'It was 75F today.'}                                 | ${'no word about heat in the sentence'}
     ${'Bake well.\nApartment 3F'}                          | ${'the word about heat is in another sentence'}
+    ${'Row 350F'}                                          | ${'nothing about heat at all'}
+    ${'Preheat the oven. Mr. Smith set it to 350F.'}       | ${'a title opens a sentence of its own'}
+    ${'Preheat the oven\n\nRow 350F'}                      | ${'a blank line ends the sentence'}
+    ${'Preheat the oven\n- Row 350F'}                      | ${'so does a list item'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });
@@ -367,6 +387,63 @@ describe('Fahrenheit written as a bare F', () => {
     const once = convert('Cook until the chicken reaches 165F.', options);
     expect(once).toBe('Cook until the chicken reaches 73.9°C (165F).');
     expect(convert(once, options)).toBe(once);
+  });
+
+  it.each`
+    input                                   | expected                                  | why
+    ${'Bake for 10 min. at 350F.'}          | ${'Bake for 10 min. at 175°C.'}           | ${'an abbreviation before a word in lower case'}
+    ${'Heat it to max. 450F.'}              | ${'Heat it to max. 230°C.'}               | ${'an abbreviation before a number'}
+    ${'Temperatures at 6 p.m. were 10F.'}   | ${'Temperatures at 6pm were -12.2°C.'}    | ${'the stops of a time'}
+    ${'Temperatures fell to 10F by 6 p.m.'} | ${'Temperatures fell to -12.2°C by 6pm.'} | ${'a time that ends the sentence'}
+    ${'Preheat, said Mr. Smith, to 350F.'}  | ${'Preheat, said Mr. Smith, to 175°C.'}   | ${'a title before a name'}
+    ${'Bake it the U.S. Army way at 350F.'} | ${'Bake it the U.S. Army way at 175°C.'}  | ${'an initialism before a name'}
+    ${'Preheat the oven\nto 350F.'}         | ${'Preheat the oven\nto 175°C.'}          | ${'a line break that only wraps the paragraph'}
+  `('reads the whole sentence past $why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('stops at a time that ends the sentence before another', () => {
+    expect(convert('Bake it at 6 p.m. Row 35F was empty.')).toBe('Bake it at 6pm. Row 35F was empty.');
+  });
+
+  it.each`
+    input                                                 | expected
+    ${'Temperatures at 6 p.m. were 10F.'}                 | ${'Temperatures at 6pm were -12.2°C.'}
+    ${'Preheat, said Mr. Smith, to 350F.'}                | ${'Preheat, said Mr Smith, to 175°C.'}
+    ${'Bake it the U.S. Army way at 350F.'}               | ${'Bake it the US Army way at 175°C.'}
+    ${'At 20C by 6 p.m. Temperatures hit 50F.'}           | ${'At 20C by 6pm. Temperatures hit 10°C.'}
+    ${'Put the cookie sheet in at 350F.'}                 | ${'Put the baking tray in at 175°C.'}
+    ${'Put the baking tray in at 350F.'}                  | ${'Put the baking tray in at 175°C.'}
+  `('decides $input on the first run as the second would', ({ input, expected }) => {
+    const once = deamericaniseText(input, { preset: 'localise' });
+    expect(once).toBe(expected);
+    expect(deamericaniseText(once, { preset: 'localise' })).toBe(once);
+  });
+
+  it('keeps a sentence that opens with a number in words, which a unit rule writes in figures', () => {
+    const once = convert('The heat was bad. Two feet of snow fell at 35F.');
+    expect(once).toMatch(/fell at 1\.7°C\.$/);
+    expect(convert(once)).toBe(once);
+  });
+
+  it.each`
+    input                                       | expected
+    ${'Put the cookie sheet in at 350F.'}       | ${'Put the cookie sheet in at 175°C.'}
+    ${'Slide it under the broiler at 450F.'}    | ${'Slide it under the broiler at 230°C.'}
+    ${'Set the skillet on the burner at 350F.'} | ${'Set the skillet on the burner at 175°C.'}
+  `('reads an American word about heat in $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('reads every word the lexicon rewrites into one about heat as about heat itself', () => {
+    const lexicon = [
+      ...spellingEntries(),
+      ...baseVocabulary(),
+      ...Object.values(DIALECTS).flatMap((pack) => pack.vocabulary),
+    ];
+    const aboutHeat = (word: string) => convert(`Set the ${word} at 350F.`).endsWith('175°C.');
+    const missed = lexicon.filter((entry) => aboutHeat(entry.to) && !aboutHeat(entry.from));
+    expect(missed.map((entry) => entry.from)).toEqual([]);
   });
 });
 

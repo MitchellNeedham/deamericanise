@@ -427,6 +427,11 @@ A measurement never starts straight after a word and `-`, which join a name to i
 `a sub-2 pound tent` is left as written, as `a sub-two pound tent` is. A unit before the
 hyphen ends a quantity, so `5ft-6ft` and `5 ft-6 ft` still become `1.5 m-1.8 m`.
 
+A run of `_` that opens emphasis is no part of a word, so a measurement in underscores
+converts as one in asterisks does: `It is _6 feet_ tall` becomes `It is _1.8 metres_ tall`
+and `Bake at __350°F__` becomes `Bake at __175°C__`. A letter, digit or stop before the run
+joins it to a word, so `MAX_6 feet` is left as written.
+
 A measurement never starts straight after `-`, `/`, `,` or `:` following a digit or a vulgar
 fraction, where the number is the tail of a date, a fraction, a grouped number or a clock
 time. So `3/14/2024 1/2 gallon` converts the `1/2 gallon` alone, and `a 7:30 mile pace` is
@@ -469,8 +474,9 @@ is left as written.
 
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
 `Bake at 175-190°C`, and at every figure of a list, so `Bake at 325, 350 or 375°F` becomes
-`Bake at 165, 175 or 190°C`. A gas mark before `or` gives the same heat on another scale, so
-`gas mark 4 or 350°F` becomes `gas mark 4 or 175°C`. A temperature range wraps and stops at
+`Bake at 165, 175 or 190°C`. A gas mark before a dash, `to` or `or` gives the same heat on
+another scale, so `gas mark 4 or 350°F` becomes `gas mark 4 or 175°C` and
+`gas mark 4 - 350°F` becomes `gas mark 4 - 175°C`. A temperature range wraps and stops at
 a new block as the others do, so `Room 13` above a bullet `- 0°F overnight` is a room and a
 temperature. A change in temperature has no 32° offset to take off, so
 `dropped 20°F` becomes `dropped 11°C` and `10°F warmer` becomes `5.6°C warmer`. The words
@@ -492,7 +498,12 @@ sentence on: `Bake at 350°F. for 20 minutes` becomes `Bake at 175°C for 20 min
 `- 350°F.`, `"Bake at 350°F." he said` and `It was 90°F. Then it rained.` keep their stop.
 The word `Fahrenheit` takes no stop. A spelled-out value keeps the author's singular
 where it describes the noun after it, so `a 350 degree F oven` becomes
-`a 175 degree Celsius oven`, while `Preheat to 350 degrees F` keeps the plural.
+`a 175 degree Celsius oven`, while `Preheat to 350 degrees F` keeps the plural. A hyphen may
+join the number, `degree` and the scale in a modifier, and goes with the conversion as a
+length's does, so `110-degree-Fahrenheit heat` becomes `43.3 degree Celsius heat`. A degree
+that is one factor of a compound unit measures no temperature, so `0.45 °F·ft²·h/BTU` and
+`2 °F/min` are left as written. A slash makes one only before a unit of time, length, energy
+or power, so `225°F/low/slow` and `350°F/gas 4` still convert.
 The word alone does not count after a whole number of four figures, which reads as a year
 (`In 1724 Fahrenheit proposed his scale`), before `thermometers` or `scale`, where the
 number counts them, or before a number, where it is a title (`Fahrenheit 451`). A bare `F`,
@@ -513,7 +524,10 @@ A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `17
 `175 deg C`, `175 Celsius`), as `175 centigrade` or `175 degrees centigrade`, and as a bare
 upper case `C` after a number of two or three figures with at most one space.
 So `Bake at 350°F (180C)` becomes `Bake at 180C` and `180C/350°F/gas 4` stays as it is,
-while `Apartment 3C (65°F)` is a flat and its temperature converts. The words are read in
+while `Apartment 3C (65°F)` is a flat and its temperature converts. The bracket may give the
+gas mark after the Celsius value, joined by `/`, `,`, `;` or `or`, and the gas mark stays in
+it: `Preheat to 350°F (180°C/gas mark 4)` becomes `Preheat to 180°C (gas mark 4)`, and
+`180°C (350°F/gas mark 4)` stays as it is. The words are read in
 any case, as the Fahrenheit value's are, so `350 degrees fahrenheit (180 degrees celsius)`
 becomes `180 degrees celsius`, but a lone `C` only in upper case, after a degree sign or
 `degrees` too, so `Bake at 350°F (180c)` becomes `Bake at 175°C (180c)`.

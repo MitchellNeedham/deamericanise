@@ -81,6 +81,28 @@ describe.skipIf(onCi)('a long chain of weights takes time in line with its lengt
   );
 });
 
+describe.skipIf(onCi)('TeX, maths, front matter and dollar variables take time in line with their length', () => {
+  const markdown = { syntax: 'markdown' } as const;
+  const american = { assumeAmerican: true };
+
+  it.each`
+    piece                                | options                         | wrap                                   | expected
+    ${'\\textcolor{gray}{gray word} '}   | ${{}}                           | ${(s: string) => s}                    | ${'\\textcolor{gray}{grey word} \\textcolor{gray}{grey word} '}
+    ${'$x$ gray '}                       | ${markdown}                     | ${(s: string) => s}                    | ${'$x$ grey $x$ grey '}
+    ${'$5 gray '}                        | ${{ ...markdown, ...american }} | ${(s: string) => s}                    | ${'US$5 grey US$5 grey '}
+    ${'$1 and $2 '}                      | ${american}                     | ${(s: string) => s}                    | ${'$1 and $2 $1 and $2 '}
+    ${'title: The gray cat\n'}           | ${markdown}                     | ${(s: string) => `---\n${s}---\n`}     | ${'---\ntitle: The grey cat\ntitle: The grey cat\n'}
+  `(
+    '"$piece", 2000 times and four times that',
+    ({ piece, options, wrap, expected }) => {
+      const run = (text: string) => deamericaniseText(text, options);
+      expect(run(wrap(piece.repeat(2000))).startsWith(expected)).toBe(true);
+      expect(growth(wrap(piece.repeat(2000)), wrap(piece.repeat(8000)), run)).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});
+
 /** A text broken by a long run of white space, and what the text before the run reads as. */
 const WHITESPACE_RUNS = [
   { before: 'A 7 pound 8 ounce baby.', name: 'spaces', run: ' ', length: 3000, after: 'The color.', expected: 'A 3.4 kilogram baby.' },

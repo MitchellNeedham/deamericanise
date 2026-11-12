@@ -3629,6 +3629,8 @@ describe('a unit the words beside it read in another sense', () => {
     ${'16 oz of water keeps you going.'}           | ${'470 mL of water keeps you going.'}
     ${'Add 8 oz of milk slowly.'}                  | ${'Add 240 mL of milk slowly.'}
     ${'16 oz of gold costs a lot.'}                | ${'500 g of gold costs a lot.'}
+    ${'AC units of 3 tons cool the hall.'}         | ${'AC units of 11 kilowatts cool the hall.'}
+    ${'AC units of 2 to 5 tons cool the hall.'}    | ${'AC units of 7 to 18 kilowatts cool the hall.'}
   `('reads the sense whatever word follows its thing: $input', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -3640,6 +3642,7 @@ describe('a unit the words beside it read in another sense', () => {
     ${'Order 2 oz copper PCBs.'}               | ${'copper that describes a board'}
     ${'Copper weight: 2 oz, on both sides.'}   | ${'copper before the number'}
     ${'The PCB uses 1 oz on inner layers.'}    | ${'a circuit board in the sentence'}
+    ${'Copper weight: 2 ounces suits a board.'} | ${'copper before the number, and a verb after'}
   `('holds the copper weight of a circuit board: $why', ({ unchanged }) => {
     const { text, changes } = deamericanise(unchanged);
     expect(text).toBe(unchanged);
@@ -3655,6 +3658,7 @@ describe('a unit the words beside it read in another sense', () => {
     ${'The bridge carries 40 tons.'}                  | ${'The bridge carries 36 tonnes.'}
     ${'Data in metric tons. A 3-ton truck.'}          | ${'Data in metric tons. A 3-ton truck.'}
     ${'The AC is in a 3-ton truck.'}                  | ${'The AC is in a 2.7 tonne truck.'}
+    ${'The AC is in a 3 ton truck.'}                  | ${'The AC is in a 2.7 tonne truck.'}
     ${'A 5-ton HVAC truck.'}                          | ${'A 4.5 tonne HVAC truck.'}
     ${'The ship has a gross tonnage of 90,000 tons.'} | ${'The ship has a gross tonnage of 82,000 tonnes.'}
     ${'Cooling 3 tons of steel takes a day.'}         | ${'Cooling 2.7 tonnes of steel takes a day.'}

@@ -518,6 +518,15 @@ any case, as the Fahrenheit value's are, so `350 degrees fahrenheit (180 degrees
 becomes `180 degrees celsius`, but a lone `C` only in upper case, after a degree sign or
 `degrees` too, so `Bake at 350°F (180c)` becomes `Bake at 175°C (180c)`.
 
+A Fahrenheit decade near a word about heat or the weather becomes a range, since it
+straddles the Celsius decades: `on mild days in the 70s` becomes
+`on mild days between 21 and 26°C`, and `highs in the mid 90s` becomes
+`highs between 34 and 36°C`. Two decades joined as a range's figures are, by `to`, `and`,
+`or` or a dash, become one range, so `highs in the 70s or 80s` becomes
+`highs between 21 and 32°C`. A decade of the calendar, as in `Back in the 70s`, stays as it
+is, and so does a decade with a Celsius unit after it, in any of the forms above or as a
+bare upper case `C`: `temperatures in the 30s Celsius` and `highs in the 20s °C`.
+
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
 source and never claims more accuracy than was written down. `exact` and a fixed number of

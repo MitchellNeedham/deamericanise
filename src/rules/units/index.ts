@@ -236,17 +236,18 @@ const NOT_A_NOUN = [
   'will', 'would', 'should', 'could',
 ];
 
-/** Every unit the rules read, as written straight after a number in `onelbs`. */
+/** Every unit the rules read. */
 const UNIT_FORMS = alternate(MEASURES.flatMap((measure) => [...measure.words, ...measure.abbrevs]));
 
 /**
  * A word straight after a measurement that may be a noun it describes. A number in words,
- * alone or run into its unit, or a date is not one. Another rule may rewrite either to start
- * with a digit, so reading it as a noun would leave the measurement to a second run.
+ * alone or with its unit (`one-inch`, `onelbs`), or a date is not one. Another rule may
+ * rewrite either to start with a digit, so reading it as a noun would leave the measurement
+ * to a second run.
  */
 const MODIFIES_A_NOUN = new RegExp(
-  String.raw`^[\s-]+(?!(?:${NOT_A_NOUN.join('|')}|(?:${NUMBER_PATTERN})(?:${UNIT_FORMS})?)(?![\w-])|` +
-    String.raw`(?:${MONTH_PATTERN})\.?\s+\d)[a-z]`,
+  String.raw`^[\s-]+(?!(?:${NOT_A_NOUN.join('|')}|(?:${NUMBER_PATTERN})(?:${GAP}(?:${UNIT_FORMS}))?)` +
+    String.raw`(?![\w-])|(?:${MONTH_PATTERN})\.?\s+\d)[a-z]`,
   'i',
 );
 

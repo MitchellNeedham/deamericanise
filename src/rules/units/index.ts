@@ -625,10 +625,11 @@ function pushMeasurement(
 }
 
 /**
- * A number of a measurement in two units, in any shape the single rule reads but unsigned. A
- * minus before the first number stays outside the match, where it negates the whole.
+ * A number of a measurement in two units: in digits, in any shape the single rule reads but
+ * unsigned, or a whole number in words. A minus before the first number stays outside the
+ * match, where it negates the whole.
  */
-const UNSIGNED_NUMBER = String.raw`(?![-−])(?:${NUMERIC_PATTERN})`;
+const UNSIGNED_NUMBER = String.raw`(?:(?![-−])(?:${NUMERIC_PATTERN})|${WHOLE_NUMBER})`;
 
 const STARTS_HERE = new RegExp(NUMBER_START, 'y');
 
@@ -666,13 +667,59 @@ function splitByStart(
   return { found, refused };
 }
 
-/** `6 feet 2 inches`, `6'2"` and `5 ft 11 in` collapse into a single metric height. */
+/** A range's first number and its join, ending where the range's second number starts. */
+const RANGE_OPENING = new RegExp(
+  String.raw`(?<=${NUMBER_START}(${NUMBER_PATTERN})(${RANGE_JOIN}))`,
+  'diy',
+);
+
+/**
+ * The measurement in two units at `start`, whose first number is `first`, ends a range that
+ * the range rule reads or holds, as in `7-8 lb 4 oz` and `five to six feet two inches`.
+ * Whether the range's first end is `7` or `7 lb` cannot be told, so the measurement is held,
+ * the range rule's change splits the hold and is dropped, and the whole range stays as written.
+ */
+function endsRangeWhole(text: string, start: number, first: string): boolean {
+  RANGE_OPENING.lastIndex = start;
+  const opening = RANGE_OPENING.exec(text);
+  if (opening === null) return false;
+  const [lowRaw, join] = [opening[1]!, opening[2]!];
+  const lowStart = opening.indices![1]![0];
+  const written = isWritten(lowRaw) || isWritten(first);
+  if (written && writtenRange(text, lowStart, lowRaw, join, first) === 'skip') return false;
+  const low = parseNumber(lowRaw);
+  const high = parseNumber(first);
+  return low === null || high === null || canBeRange(text, lowStart, low, high);
+}
+
+const LINE_END = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
+
+/**
+ * Where inches may go without their word after `foot` or `feet`, as in `six foot two`: before
+ * nothing that could be a noun. That is punctuation, `tall`, the end of the text, or the end
+ * of a line where the next line is blank or starts with something other than a word, such as
+ * a list marker.
+ */
+const NO_NOUN_AFTER =
+  String.raw`(?=[.,;:!?)\]"'”’]+(?!\w)|${SOFT_SPACE}tall\b|` +
+  String.raw`${INLINE_SPACE}*(?:$|${LINE_END}${INLINE_SPACE}*(?:$|${LINE_END}|[^\sA-Za-z])))`;
+
+/** Inches written without their word: a whole number from 1 to 11. */
+const isInchCount = (value: number | null) =>
+  value !== null && Number.isInteger(value) && value >= 1 && value <= 11;
+
+/**
+ * `6 feet 2 inches`, `6'2"`, `5 ft 11 in`, `six feet two inches` and `six foot two` collapse
+ * into a single metric height.
+ */
 function feetInchesRule(): Rule {
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:feet|foot|ft\.?|′|')` +
+    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:(?:feet|foot|ft\.?|′|')` +
       softGap(String.raw`(?:and(?=\s))?`) +
-      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+-\d+/\d+|\d+/\d+)` +
-      String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|")(?![A-Za-z])`,
+      String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+-\d+/\d+|\d+/\d+|` +
+      String.raw`${WHOLE_NUMBER}(?:${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION})?)` +
+      String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|")(?![A-Za-z])|` +
+      String.raw`(?:feet|foot)${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER})`,
     'gi',
   );
 
@@ -688,8 +735,9 @@ function feetInchesRule(): Rule {
       );
       for (const match of found) {
         const feet = parseNumber(match[1]!);
-        const inches = parseNumber(match[2]!);
-        if (feet === null || inches === null) {
+        const inches = parseNumber(match[2] ?? match[3]!);
+        if (match[3] !== undefined && !isInchCount(inches)) continue;
+        if (feet === null || inches === null || endsRangeWhole(ctx.text, match.index, match[1]!)) {
           changes.push(hold(match.index, match[0], 'units.length.feet-inches', 40));
           continue;
         }
@@ -710,7 +758,6 @@ function feetInchesRule(): Rule {
 }
 
 const NOT_SECOND = new RegExp(NOT_SECOND_OF_PAIR, 'y');
-const NOT_END_OF_RANGE = new RegExp(String.raw`(?<!\d${RANGE_JOIN})`, 'y');
 
 /** `1st`, `21st` and `101st` are ordinals. `11st` is not. */
 const ORDINAL = /^(?:\d*[02-9])?1st(?![a-z])/i;
@@ -726,22 +773,21 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
   // The lookbehind runs only before a letter, and takes a run of spaces whole, because each
   // place it tries inside the run costs a walk over the rest of it.
   const START =
-    String.raw`(?<![\w.])(?<![A-Za-z]-)` +
-    String.raw`(?:(?![A-Za-z])|(?=[A-Za-z])(?<!\b(?:${WHOLE_NUMBER})(?<![-\s])[-\s]+))`;
-  const NUMBER = String.raw`(?:${UNSIGNED_NUMBER}|${WHOLE_NUMBER})`;
+    String.raw`(?<![\w.])` +
+    String.raw`(?:(?![A-Za-z])|(?=[A-Za-z])(?<![A-Za-z]-)(?<!\b(?:${WHOLE_NUMBER})(?<![-\s])\s+))`;
   const AND = softGap(String.raw`(?:and(?=\s))?`);
   const unitOf = (m: Measure) =>
     String.raw`(${alternate([...m.words, ...m.abbrevs, ...(m.compoundAbbrevs ?? [])])})(?![A-Za-z])`;
 
   return COMPOUNDS.map((compound): Rule => {
     const [largest, next, ...rest] = compound.measures.map(unitOf);
-    const part = (unit: string) => String.raw`${AND}(${NUMBER})${GAP}${unit}`;
+    const part = (unit: string) => String.raw`${AND}(${UNSIGNED_NUMBER})${GAP}${unit}`;
     const optional = rest.reduceRight((inner, unit) => `(?:${part(unit)}${inner})?`, '');
     const pattern = new RegExp(
-      String.raw`${START}(${NUMBER})${GAP}${largest}${part(next!)}${optional}`,
+      String.raw`${START}(${UNSIGNED_NUMBER})${GAP}${largest}${part(next!)}${optional}`,
       'gi',
     );
-    const notSecond = hasSides(compound.measures[0]!) ? NOT_SECOND : NOT_END_OF_RANGE;
+    const sided = hasSides(compound.measures[0]!);
 
     return {
       id: compound.id,
@@ -763,10 +809,12 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
           }
 
           const start = match.index;
-          notSecond.lastIndex = start;
+          NOT_SECOND.lastIndex = start;
           const kept =
             forced[compound.id] !== true && parts.some((p) => isKept(p.measure, skip, forced));
-          if (kept || !notSecond.test(ctx.text)) {
+          const second =
+            endsRangeWhole(ctx.text, start, match[1]!) || (sided && !NOT_SECOND.test(ctx.text));
+          if (kept || second) {
             changes.push(hold(start, match[0], compound.id, 40));
             continue;
           }

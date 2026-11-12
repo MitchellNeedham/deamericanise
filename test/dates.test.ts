@@ -39,6 +39,29 @@ describe('numbers that only look like dates', () => {
     expect(dates(input)).toBe(expected);
   });
 
+  // A version number is written with dots, so only a dotted date is refused after a version word.
+  it.each`
+    input                                       | expected
+    ${'Press release 3/14/2024'}                | ${'Press release 2024-03-14'}
+    ${'Version 3/14/2024 notes'}                | ${'Version 2024-03-14 notes'}
+    ${'python 3/14/2024'}                       | ${'python 2024-03-14'}
+    ${'Build 3-14-2024 failed.'}                | ${'Build 2024-03-14 failed.'}
+    ${'Upgrade to v 3/14/2024 today.'}          | ${'Upgrade to v 2024-03-14 today.'}
+    ${'Release 3-14-24 is out.'}                | ${'Release 2024-03-14 is out.'}
+    ${'Version 03/04/2024 notes'}               | ${'Version 2024-03-04 notes'}
+    ${'The press release of 3/14/2024 is out.'} | ${'The press release of 2024-03-14 is out.'}
+  `('reads the slash or hyphen date in $input after a version word', ({ input, expected }) => {
+    expect(dates(input, { assumeAmerican: true })).toBe(expected);
+  });
+
+  it.each([
+    'Upgrade to version 1.13.24 today.',
+    'Upgrade to release 1.13.24 today.',
+    'node 3.14.2024',
+  ])('leaves the dotted %j after a version word alone, even in American text', (unchanged) => {
+    expect(dates(unchanged, { assumeAmerican: true })).toBe(unchanged);
+  });
+
   it.each`
     unchanged                                 | why
     ${'Upgrade to version 1.13.24 today.'}    | ${'a version number'}
@@ -47,8 +70,8 @@ describe('numbers that only look like dates', () => {
     ${'Upgrade to version 1.13.2024 today.'}  | ${'a version word, even before a four-figure year'}
     ${'Python 3.13.2024'}                     | ${'a version after a language'}
     ${'Upgrade to v1.13.24 today.'}           | ${'a v prefix'}
-    ${'Upgrade to v 3/14/2024 today.'}        | ${'v on its own is a version word'}
-    ${'Release 3-14-24 is out.'}              | ${'a version word before any separator'}
+    ${'Upgrade to v 3.14.2024 today.'}        | ${'v on its own is a version word'}
+    ${'Release 03/04/2024 notes'}             | ${'a British date in a British text, after a version word'}
     ${'Speeds of 3.22-1000 km/h.'}            | ${'two different separators make a range'}
     ${'Due 03/04/2024.'}                      | ${'a British date in a British text'}
   `('leaves $unchanged alone ($why)', ({ unchanged }) => {
@@ -181,7 +204,9 @@ describe('a named month pins the order for the numeric dates around it', () => {
     ${'speeds of 22.3-1000 km/h'}     | ${0}     | ${0}   | ${0}       | ${0}
     ${'version 1.13.24'}              | ${0}     | ${0}   | ${0}       | ${0}
     ${'Node 14.2.10'}                 | ${0}     | ${0}   | ${0}       | ${0}
-    ${'version 3/14/2024'}            | ${0}     | ${0}   | ${0}       | ${0}
+    ${'version 3/14/2024'}            | ${1}     | ${0}   | ${0}       | ${0}
+    ${'Build 14-3-2024'}              | ${0}     | ${1}   | ${0}       | ${0}
+    ${'version 3.14.2024'}            | ${0}     | ${0}   | ${0}       | ${0}
     ${'due 2/30/2024'}                | ${0}     | ${0}   | ${0}       | ${0}
     ${'see /3/14/2024/'}              | ${0}     | ${0}   | ${0}       | ${0}
   `('counts $input', ({ input, numMonth, numDay, namedMonth, namedDay }) => {

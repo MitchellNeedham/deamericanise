@@ -101,10 +101,11 @@ export interface NumericDate {
 /**
  * Every numeric date in the text that is a real date read one way round or the other.
  * The same separator joins all three parts. A dotted date needs a four-figure year,
- * because `1.13.24` is far more often a version, and nothing after a version word such
- * as `version` or `Python` is a date. The numeric date rule converts the month-first
- * ones and detection counts the ones that fit only one reading, so the two always agree
- * on what is a date.
+ * because `1.13.24` is far more often a version, and no dotted date after a version word
+ * such as `version` or `Python` is a date. A version number is written with dots, so a
+ * slash or hyphen date after one of those words still is. The numeric date rule converts
+ * the month-first ones and detection counts the ones that fit only one reading, so the
+ * two always agree on what is a date.
  */
 export function* numericDates(text: string): Generator<NumericDate> {
   for (const match of text.matchAll(NUMERIC_DATE)) {
@@ -112,8 +113,7 @@ export function* numericDates(text: string): Generator<NumericDate> {
     const end = start + match[0].length;
     const separator = match[2]!;
     if (text[end] === separator) continue;
-    if (separator === '.' && match[4]!.length !== 4) continue;
-    if (VERSION_WORD.test(wordBefore(text, start))) continue;
+    if (separator === '.' && (match[4]!.length !== 4 || VERSION_WORD.test(wordBefore(text, start)))) continue;
 
     const first = Number(match[1]);
     const second = Number(match[3]);

@@ -82,6 +82,7 @@ describe('file names and paths', () => {
     ${'Open D:/colors/gray first.'}                              | ${'a drive letter and slashes'}
     ${'Edit 01-colors.md and .eslintrc.color.json.'}             | ${'a name starting with a number or a dot'}
     ${'Import node_modules/@types/color/index.d.ts here.'}       | ${'a scoped package'}
+    ${'See src/colors/gray.png here.'}                           | ${'a path ending in an image'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(au(unchanged, american)).toBe(unchanged);
   });
@@ -93,6 +94,7 @@ describe('file names and paths', () => {
     ${'Edit src/colors here.'}                | ${'Edit src/colours here.'}                | ${'a bare two-segment path reads the same'}
     ${'The color.It was gray.'}               | ${'The colour.It was grey.'}               | ${'a missing space after a full stop'}
     ${'It is 3.5 miles.'}                     | ${'It is 5.6 kilometres.'}                 | ${'a number has no letter in its name'}
+    ${'It is 5 feet. The color.'}             | ${'It is 1.5 metres. The colour.'}         | ${'a sentence after a measurement'}
     ${'It makes 300 lb.ft of torque.'}        | ${'It makes 410 N·m of torque.'}           | ${'a dotted unit after a number'}
     ${'It makes 300lb.ft of torque.'}         | ${'It makes 410 N·m of torque.'}           | ${'a dotted unit joined to its number'}
     ${'It is -5lb.ft or 1/2lb.ft.'}           | ${'It is -6.8 N·m or 0.68 N·m.'}           | ${'joined to a signed number or a fraction'}
@@ -153,6 +155,102 @@ describe('long command-line flags', () => {
   it('still holds one-hyphen flags in a source comment', () => {
     const source = '// Set --color-scheme or -color for the color.';
     expect(deamericaniseCode(source, { language: 'ts' }).text).toBe('// Set --color-scheme or -color for the colour.');
+  });
+});
+
+describe('a CSS declaration in a sentence', () => {
+  it.each`
+    unchanged                                              | why
+    ${'Set text-align: center and color: red on the div.'} | ${'a bare name after a hyphenated one'}
+    ${'Add background-color: gray; to the body rule.'}     | ${'a hyphenated name, then a semicolon'}
+    ${'text-align: center;'}                               | ${'a declaration on its own'}
+    ${'Use color: gray and text-align: center on it.'}     | ${'a bare name before a hyphenated one'}
+    ${'Set color: gray, background: white on it.'}         | ${'two bare names together'}
+    ${'Use { color: gray } for it.'}                       | ${'a bare name in braces'}
+    ${'color: gray;'}                                      | ${'a semicolon that ends the line'}
+    ${'Use color: #ccc on it.'}                            | ${'a hex colour'}
+    ${'Use filter: grayscale(1) on it.'}                   | ${'a call'}
+    ${'Set accent-color: gray !important on it.'}          | ${'an important value'}
+    ${'Set -webkit-text-fill-color: gray on it.'}          | ${'a vendor prefix'}
+    ${'Set --brand-color: gray on it.'}                    | ${'a custom property'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                        | expected                                                     | why
+    ${'Set justify-content: center to center the color swatch.'} | ${'Set justify-content: center to centre the colour swatch.'} | ${'the value ends at a function word'}
+    ${'Set text-align: center for the favorite layout.'}         | ${'Set text-align: center for the favourite layout.'}        | ${'the same'}
+    ${'Use color: #ccc for the gray text.'}                      | ${'Use color: #ccc for the grey text.'}                      | ${'the same, after a hex colour'}
+    ${'the color of the sky'}                                    | ${'the colour of the sky'}                                   | ${'no colon'}
+    ${'configure center alignment in CSS'}                       | ${'configure centre alignment in CSS'}                       | ${'no colon'}
+    ${'Note: color matters.'}                                    | ${'Note: colour matters.'}                                   | ${'Note is no CSS property'}
+    ${'Favorite color: gray.'}                                   | ${'Favourite colour: grey.'}                                 | ${'a bare name alone is a key in prose'}
+    ${'Eye color: blue; hair color: gray.'}                      | ${'Eye colour: blue; hair colour: grey.'}                    | ${'a semicolon inside a sentence'}
+    ${'One follow-up: color the gray boxes.'}                    | ${'One follow-up: colour the grey boxes.'}                   | ${'a hyphenated word that names no CSS property'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
+describe('template tags and emoji shortcodes', () => {
+  it.each`
+    unchanged                                    | why
+    ${'{% include picker theme="gray" %}'}       | ${'a Liquid tag and its arguments'}
+    ${'{{ favorite | upcase }} and {{ color }}'} | ${'Liquid or Jinja output'}
+    ${'{# the color is gray #}'}                 | ${'a Jinja comment'}
+    ${':colorful: and :heart:'}                  | ${'emoji shortcodes'}
+    ${'It is (:+1::gray_heart:) now.'}           | ${'a run of shortcodes in brackets'}
+    ${'Ratio 1:2:3'}                             | ${'a ratio'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                         | expected                                       | why
+    ${'{% if favorite %}The color.{% endif %}'}   | ${'{% if favorite %}The colour.{% endif %}'}   | ${'the text between tags is prose'}
+    ${'{% if x %}The color.{% endif %}'}          | ${'{% if x %}The colour.{% endif %}'}          | ${'the same'}
+    ${'{%- if favorite -%}gray{%- endif -%}'}     | ${'{%- if favorite -%}grey{%- endif -%}'}      | ${'the same, with whitespace control'}
+    ${'{% if favorite and the color is gray'}     | ${'{% if favourite and the colour is grey'}    | ${'a tag that never closes is prose'}
+    ${'Note: the color is gray.'}                 | ${'Note: the colour is grey.'}                 | ${'a colon with a space after it'}
+    ${'std::color::gray'}                         | ${'std::colour::grey'}                         | ${'a colon either side is a scope'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it('holds them in a Markdown file', () => {
+    const input = '{% if favorite %}The color.{% endif %}\n\n{{ favorite | upcase }} and {{ color }}\n\n:colorful: and :heart:\n';
+    expect(deamericaniseFile('page.md', input).text).toBe(
+      '{% if favorite %}The colour.{% endif %}\n\n{{ favorite | upcase }} and {{ color }}\n\n:colorful: and :heart:\n',
+    );
+  });
+});
+
+describe('mentions and hashtags', () => {
+  it.each`
+    unchanged                                  | why
+    ${'cc @favorite-color'}                    | ${'a handle with a hyphen'}
+    ${'Tag it #color today.'}                  | ${'a hashtag'}
+    ${'Ask (@gray) or "#favorite" about it.'}  | ${'after a bracket or a quote'}
+    ${'Email jo@color.com today.'}             | ${'an email address, held as before'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                | expected                              | why
+    ${'Thanks @gray for the color fix.'} | ${'Thanks @gray for the colour fix.'} | ${'the words beside a mention'}
+    ${'Meet @ the color store.'}         | ${'Meet @ the colour store.'}         | ${'a lone @'}
+    ${'Drive @60mph there.'}             | ${'Drive @97 km/h there.'}            | ${'an @ before a number means at'}
+    ${'Item #3 is gray.'}                | ${'Item #3 is grey.'}                 | ${'a number'}
+    ${'# of items is gray'}              | ${'# of items is grey'}               | ${'a lone #'}
+    ${'Use C# for the color.'}           | ${'Use C# for the colour.'}           | ${'a # straight after a word'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it('still rewrites a Markdown heading', () => {
+    expect(au('# Color', { syntax: 'markdown' })).toBe('# Colour');
   });
 });
 
@@ -354,6 +452,104 @@ describe('a pre, script, style or textarea element inside another HTML block in 
     const input = '<div>\n<pre>\nThe color\n</pre>\n</div>\n';
     expect(au(input)).toBe('<div>\n<pre>\nThe colour\n</pre>\n</div>\n');
     expect(au(input, { syntax: 'text' })).toBe('<div>\n<pre>\nThe colour\n</pre>\n</div>\n');
+  });
+});
+
+describe('front matter at the start of Markdown', () => {
+  const md = (input: string, options = {}) => au(input, { syntax: 'markdown', ...options });
+
+  it.each`
+    input                                                                                         | expected                                                                                       | why
+    ${'---\nlayout: color-page\nslug: favorite-colors\ntags: [color, behavior]\ntitle: The color guide\n---\n\nThe color.\n'} | ${'---\nlayout: color-page\nslug: favorite-colors\ntags: [color, behavior]\ntitle: The colour guide\n---\n\nThe colour.\n'} | ${'YAML, with a title that is prose'}
+    ${'+++\nlayout = "color-page"\nslug = "favorite-colors"\ntitle = "The color guide"\n+++\n\nThe color.\n'} | ${'+++\nlayout = "color-page"\nslug = "favorite-colors"\ntitle = "The colour guide"\n+++\n\nThe colour.\n'} | ${'TOML'}
+    ${'---\nimage:\n  alt: A gray cat\n  name: gray-cat\n---\n'}                                    | ${'---\nimage:\n  alt: A grey cat\n  name: gray-cat\n---\n'}                                    | ${'a nested prose key'}
+    ${'---\nitems:\n  - title: The gray cat\n    slug: gray-cat\n---\n'}                            | ${'---\nitems:\n  - title: The grey cat\n    slug: gray-cat\n---\n'}                            | ${'a prose key in a list item'}
+    ${'---\nTitle: The gray cat\nSummary: A gray cat\n---\n'}                                     | ${'---\nTitle: The grey cat\nSummary: A grey cat\n---\n'}                                     | ${'keys in any case'}
+    ${'---\ntitle: "Gray" # the color\n---\n'}                                                     | ${'---\ntitle: "Grey" # the color\n---\n'}                                                     | ${'a quoted value and a comment after it'}
+    ${"---\ntitle: 'It''s gray'\n---\n"}                                                           | ${"---\ntitle: 'It''s grey'\n---\n"}                                                           | ${'a single-quoted value'}
+    ${'---\ntitle: The gray cat # the color\n---\n'}                                               | ${'---\ntitle: The grey cat # the color\n---\n'}                                               | ${'a plain value and a comment after it'}
+    ${'---\ndescription: >\n  The gray cat\nsubtitle: [gray]\ncaption: |\n  The gray cat\n---\n'}  | ${'---\ndescription: >\n  The gray cat\nsubtitle: [gray]\ncaption: |\n  The gray cat\n---\n'}  | ${'a block or list as the value of a prose key'}
+    ${'+++\ndescription = """\nThe gray cat\n"""\nexcerpt = \'Gray\'\n[params]\nsummary = "Gray" # c\nslug = "gray"\n+++\n'} | ${'+++\ndescription = """\nThe gray cat\n"""\nexcerpt = \'Grey\'\n[params]\nsummary = "Grey" # c\nslug = "gray"\n+++\n'} | ${'a TOML string over several lines, and keys in a table'}
+    ${'---\r\nlayout: color-page\r\ntitle: The color guide\r\n---\r\n\r\nThe color.\r\n'}          | ${'---\r\nlayout: color-page\r\ntitle: The colour guide\r\n---\r\n\r\nThe colour.\r\n'}         | ${'Windows line endings'}
+    ${'\uFEFF---\nlayout: color-page\n---\nThe color.\n'}                                         | ${'\uFEFF---\nlayout: color-page\n---\nThe colour.\n'}                                        | ${'a byte order mark before it'}
+    ${'---  \nlayout: color-page\n---\t\nThe color.\n'}                                           | ${'---  \nlayout: color-page\n---\t\nThe colour.\n'}                                          | ${'spaces after the fences'}
+    ${'---\nlayout: color-page\nnote: |\n  ~~~\n---\n\nThe color.\n'}                              | ${'---\nlayout: color-page\nnote: |\n  ~~~\n---\n\nThe colour.\n'}                              | ${'a fence inside it opens no block'}
+    ${'---\nlayout: color-page\n---\n\nThe color.\n\n---\n\nThe gray cat.\n'}                    | ${'---\nlayout: color-page\n---\n\nThe colour.\n\n---\n\nThe grey cat.\n'}                    | ${'a thematic break after it'}
+  `('$why', ({ input, expected }) => {
+    expect(md(input)).toBe(expected);
+  });
+
+  it('keeps the quotes of a prose value where they are', () => {
+    expect(md('---\ntitle: "The color guide."\n---\n', { preset: 'localise' })).toBe(
+      '---\ntitle: "The colour guide."\n---\n',
+    );
+  });
+
+  it.each`
+    input                                                   | expected                                                 | why
+    ${'The color.\n\n---\n\nThe gray cat.\n'}               | ${'The colour.\n\n---\n\nThe grey cat.\n'}               | ${'a thematic break with no front matter'}
+    ${'The color.\n---\nlayout: color-page\n---\n'}         | ${'The colour.\n---\nlayout: colour-page\n---\n'}        | ${'fences that do not open the text'}
+    ${'---\nlayout: color-page\n\nThe color.\n'}            | ${'---\nlayout: colour-page\n\nThe colour.\n'}           | ${'an opening fence that nothing closes'}
+    ${'----\nlayout: color-page\n----\nThe color.\n'}       | ${'----\nlayout: colour-page\n----\nThe colour.\n'}      | ${'four hyphens'}
+    ${'---\nlayout: color-page\n+++\nThe color.\n'}         | ${'---\nlayout: colour-page\n+++\nThe colour.\n'}        | ${'fences that differ'}
+  `('reads $why as prose', ({ input, expected }) => {
+    expect(md(input)).toBe(expected);
+  });
+});
+
+describe('TeX commands', () => {
+  it.each`
+    input                                                    | expected                                                  | why
+    ${'Use \\centering and \\color{red} here.'}              | ${'Use \\centering and \\color{red} here.'}               | ${'a command and a colour'}
+    ${'Use \\textcolor{gray}{gray word} here.'}              | ${'Use \\textcolor{gray}{grey word} here.'}               | ${'a colour, and the text it colours'}
+    ${'Use \\textcolor[gray]{0.5}{gray word} here.'}         | ${'Use \\textcolor[gray]{0.5}{grey word} here.'}          | ${'a colour model in brackets'}
+    ${'Use \\colorbox{gray}{gray word} here.'}               | ${'Use \\colorbox{gray}{grey word} here.'}                | ${'a box'}
+    ${'Use \\fcolorbox{gray}{gray}{gray word} here.'}        | ${'Use \\fcolorbox{gray}{gray}{grey word} here.'}         | ${'a framed box'}
+    ${'Use \\definecolor{shade}{gray}{0.9} for gray.'}       | ${'Use \\definecolor{shade}{gray}{0.9} for grey.'}        | ${'a colour definition'}
+    ${'Use \\colorlet{shade}{gray} for gray.'}               | ${'Use \\colorlet{shade}{gray} for grey.'}                | ${'a colour from another'}
+    ${'Use \\pagecolor{gray} and \\rowcolor{gray} for gray.'} | ${'Use \\pagecolor{gray} and \\rowcolor{gray} for grey.'} | ${'a page and a table row'}
+    ${'Use \\begin{center} the color \\end{center} here.'}   | ${'Use \\begin{center} the colour \\end{center} here.'}   | ${'an environment'}
+    ${'Use \\colorful gray here.'}                           | ${'Use \\colorful grey here.'}                            | ${'a longer command that only starts with one of those'}
+    ${'The color is gray.'}                                  | ${'The colour is grey.'}                                  | ${'prose with no command'}
+    ${'C:\\Users\\color\\gray.txt'}                          | ${'C:\\Users\\color\\gray.txt'}                           | ${'a path'}
+  `('$why: $input -> $expected', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
+describe('TeX maths in Markdown', () => {
+  const md = (input: string, options = {}) => au(input, { syntax: 'markdown', ...options });
+  const american = { assumeAmerican: true };
+
+  it.each`
+    input                                                  | options     | expected                                                | why
+    ${'Inline math $\\color{red}{x}$ here.'}               | ${{}}       | ${'Inline maths $\\color{red}{x}$ here.'}               | ${'inline maths'}
+    ${'$$\n\\color{gray} x^2\n$$'}                         | ${{}}       | ${'$$\n\\color{gray} x^2\n$$'}                          | ${'display maths'}
+    ${'The $$gray$$ cat is gray.'}                         | ${{}}       | ${'The $$gray$$ cat is grey.'}                          | ${'display maths inside a sentence'}
+    ${'The $gray$ cat is gray.'}                           | ${{}}       | ${'The $gray$ cat is grey.'}                            | ${'a word inside maths'}
+    ${'The $gray\ncat$ is gray.'}                          | ${{}}       | ${'The $gray\ncat$ is grey.'}                           | ${'maths over a line break'}
+    ${'The cost is $2^n$ for each color.'}                 | ${american} | ${'The cost is $2^n$ for each colour.'}                 | ${'a figure after the opening $'}
+    ${'Let $5x + 3 = 8$ hold.'}                            | ${american} | ${'Let $5x + 3 = 8$ hold.'}                             | ${'an equation'}
+    ${'Run `echo $HOME` and the gray $x$ cat.'}            | ${{}}       | ${'Run `echo $HOME` and the grey $x$ cat.'}             | ${'a $ inside a code span opens nothing'}
+    ${'The $a `b$ and `gray` cat.'}                        | ${{}}       | ${'The $a `b$ and `gray` cat.'}                         | ${'a backtick inside maths opens nothing'}
+  `('holds $why', ({ input, options, expected }) => {
+    expect(md(input, options)).toBe(expected);
+  });
+
+  it.each`
+    input                                    | options     | expected                                  | why
+    ${'It costs $5 and $10.'}                | ${american} | ${'It costs US$5 and US$10.'}             | ${'a digit after the second $'}
+    ${'The $ gray$ cat.'}                    | ${{}}       | ${'The $ grey$ cat.'}                     | ${'a space after the first $'}
+    ${'The $gray $ cat.'}                    | ${{}}       | ${'The $grey $ cat.'}                     | ${'a space before the second $'}
+    ${'The \\$gray$ cat.'}                   | ${{}}       | ${'The \\$grey$ cat.'}                    | ${'an escaped first $'}
+    ${'The $gray\n\ngray$ cat.'}             | ${{}}       | ${'The $grey\n\ngrey$ cat.'}              | ${'a blank line between them'}
+    ${'The $$gray cat.'}                     | ${{}}       | ${'The $$grey cat.'}                      | ${'a $$ that nothing closes'}
+  `('reads $why as prose', ({ input, options, expected }) => {
+    expect(md(input, options)).toBe(expected);
+  });
+
+  it('reads maths only in Markdown', () => {
+    expect(au('The $gray$ cat.')).toBe('The $grey$ cat.');
   });
 });
 

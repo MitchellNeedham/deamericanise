@@ -242,6 +242,7 @@ fuel economy. The volume measures are the US ones, which are not the imperial on
 10 miles        -> 16 kilometres     30 mpg     -> 7.8 L/100km
 1/2 gallon      -> 1.9 litres        5-10 feet  -> 1.5-3 metres
 180 lbs         -> 82 kg             10 acres   -> 4 hectares
+29.92 inHg      -> 1013 hPa          32 psi     -> 220 kPa
 ```
 
 A unit that describes the noun after it stays singular: `a 9 inch dish` becomes
@@ -261,13 +262,47 @@ list of sizes, the count is the number of units, so `a two foot-long sub` become
 `a 61 centimetre long sub`, as `a two-foot-long sub` does, and `a two to three foot-long gap`
 becomes `a 61 to 91 centimetre long gap`.
 A unit that starts a noun leaves the number counting it, so `Bake 1 pound cake`,
-`6 foot soldiers`, `foot traffic`, `8 inch worms` and `5 yard sales` are left as written, while
-`a 2-pound cake` becomes `a 910 gram cake`.
+`6 foot soldiers`, `foot traffic`, `8 inch worms`, `5 yard sales`, `3 yard signs`,
+`the two pound signs` and `3 mile markers` are left as written, while `a 2-pound cake`
+becomes `a 910 gram cake`.
 A length that gives the size of a noun describes it whatever its number, so
 `a 6 foot long table` becomes `a 1.8 metre long table`, `cut into 1/2 inch thick slices`
 becomes `cut into 1.3 centimetre thick slices`, and `a 6-foot-tall fence` becomes
 `a 1.8 metre tall fence`. A size with no noun after it leaves the unit plural, so
 `6 feet long` becomes `1.8 metres long`.
+
+An ounce or a ton measures something else where the words beside it say so. An ounce of a
+drink is a fluid ounce, so `Drink 16 oz of water.` becomes `Drink 470 mL of water.`, and so
+are `a 12 oz can of soda` and `a 16-oz pint glass of beer`. An ounce of gold, silver, platinum,
+palladium or bullion is a troy ounce of 31.1 grams, so `16 oz of gold` becomes `500 g of gold`,
+and `troy ounces`, `troy oz`, `ozt` and `oz t` are troy ounces wherever they stand. A ton of
+air conditioning is a ton of refrigeration (`12,000 BTU` an hour), so
+`a 3-ton central AC unit` becomes `an 11 kilowatt central AC unit`. Circuit boards are ordered
+by the ounces of copper on them the world over, so `2 oz copper` is left as written, and so
+is an ounce in a sentence that names a PCB, FR-4 or a circuit board. A change in another
+sense goes under the id of the measure it converts as, such as `units.volume.fluid-ounce`,
+so `rules` and `unitsKeep` switch it with that measure, and its note says how the unit was
+read.
+
+A metric value the author gives after the quantity decides the sense by its dimension, so
+`8 oz (240 mL) of milk` becomes `240 mL of milk` and `8 oz (230 g) of milk` becomes
+`230 g of milk`. Otherwise the phrase after the unit decides: an optional `of`, at most two
+words that are not function words, and then the thing measured. A container is read
+through to what it holds, so `a 15 oz can of beans` stays a weight. The thing counts
+whatever follows it, so `Add 8 oz of milk slowly.` and `A 5-ton air conditioner cools the hall.`
+read in the sense, but not inside the name of something else: `8 oz cream cheese`,
+`8 oz milk chocolate` and `12 oz coffee beans` are weights, as are `sour cream`, `ice cream`,
+`baking soda` and `ground coffee`. A word ending in `s` between the unit and the thing is a
+plural or a verb, so it stands there alone, and `A 3-ton truck needs AC.` is a weight. A
+drinking glass before another vessel is its material, so `a 16 oz glass jar of honey` is a
+weight. A phrase that names any other
+thing keeps the unit's own sense, as `The AC is in a 3-ton truck` and
+`Dissolve 2 oz of sugar in water` do. Only where nothing after the quantity names a thing do
+the words before the number count, across at most a noun such as `unit` and three function
+words, as in `AC units of 2 to 5 tons` and `Copper weight: 2 oz`, and then, for copper, the
+rest of the sentence. A plural unit word describes no noun, so the word after it names no
+thing, and `AC units of 3 tons cool the hall.` becomes `AC units of 11 kilowatts cool the hall.`,
+while `The truck carries 3 tons of gravel.` stays a weight. `tonnage` says nothing, since a ship's tonnage is a weight.
 
 A unit of more than one word is read in the singular as well as the plural, so
 `half a pound per square inch` becomes `3.4 kilopascals` and `1 mile per hour` becomes
@@ -439,6 +474,11 @@ A measurement never starts straight after a word and `-`, which join a name to i
 `a sub-2 pound tent` is left as written, as `a sub-two pound tent` is. A unit before the
 hyphen ends a quantity, so `5ft-6ft` and `5 ft-6 ft` still become `1.5 m-1.8 m`.
 
+A run of `_` that opens emphasis is no part of a word, so a measurement in underscores
+converts as one in asterisks does: `It is _6 feet_ tall` becomes `It is _1.8 metres_ tall`
+and `Bake at __350°F__` becomes `Bake at __175°C__`. A letter, digit or stop before the run
+joins it to a word, so `MAX_6 feet` is left as written.
+
 A measurement never starts straight after `-`, `/`, `,` or `:` following a digit or a vulgar
 fraction, where the number is the tail of a date, a fraction, a grouped number or a clock
 time. So `3/14/2024 1/2 gallon` converts the `1/2 gallon` alone, and `a 7:30 mile pace` is
@@ -485,8 +525,9 @@ is left as written.
 
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
 `Bake at 175-190°C`, and at every figure of a list, so `Bake at 325, 350 or 375°F` becomes
-`Bake at 165, 175 or 190°C`. A gas mark before `or` gives the same heat on another scale, so
-`gas mark 4 or 350°F` becomes `gas mark 4 or 175°C`. A temperature range wraps and stops at
+`Bake at 165, 175 or 190°C`. A gas mark before a dash, `to` or `or` gives the same heat on
+another scale, so `gas mark 4 or 350°F` becomes `gas mark 4 or 175°C` and
+`gas mark 4 - 350°F` becomes `gas mark 4 - 175°C`. A temperature range wraps and stops at
 a new block as the others do, so `Room 13` above a bullet `- 0°F overnight` is a room and a
 temperature. A change in temperature has no 32° offset to take off, so
 `dropped 20°F` becomes `dropped 11°C` and `10°F warmer` becomes `5.6°C warmer`. The words
@@ -506,9 +547,17 @@ stays, and so does one before a figure or a bracket. `°F` and `℉` are symbols
 is usually the sentence's own, so it goes only where a word in lower case carries the
 sentence on: `Bake at 350°F. for 20 minutes` becomes `Bake at 175°C for 20 minutes`, while
 `- 350°F.`, `"Bake at 350°F." he said` and `It was 90°F. Then it rained.` keep their stop.
+Before its own Celsius value in brackets, the pair still collapses, and the same test runs
+past the bracket: `Bake at 350°F. (175°C) Then stir.` becomes `Bake at 175°C. Then stir.`,
+and `Bake at 350 degrees F. (175°C) for an hour.` becomes `Bake at 175°C for an hour.`
 The word `Fahrenheit` takes no stop. A spelled-out value keeps the author's singular
 where it describes the noun after it, so `a 350 degree F oven` becomes
-`a 175 degree Celsius oven`, while `Preheat to 350 degrees F` keeps the plural.
+`a 175 degree Celsius oven`, while `Preheat to 350 degrees F` keeps the plural. A hyphen may
+join the number, `degree` and the scale in a modifier, and goes with the conversion as a
+length's does, so `110-degree-Fahrenheit heat` becomes `43.3 degree Celsius heat`. A degree
+that is one factor of a compound unit measures no temperature, so `0.45 °F·ft²·h/BTU` and
+`2 °F/min` are left as written. A slash makes one only before a unit of time, length, energy
+or power, so `225°F/low/slow` and `350°F/gas 4` still convert.
 The word alone does not count after a whole number of four figures, which reads as a year
 (`In 1724 Fahrenheit proposed his scale`), before `thermometers` or `scale`, where the
 number counts them, or before a number, where it is a title (`Fahrenheit 451`). A bare `F`,
@@ -521,7 +570,9 @@ at a blank line, a list item, a heading, or a stop before a capitalised word, bu
 the stops of `10 min. at` or `6 p.m. were`. As the abbreviation rules decide, a title such
 as `Mr.` never ends one before a name, and an initialism such as `U.S.` ends one only
 before a word that cannot continue a name. A number, in figures or in words, never opens
-a sentence. `Cook until the chicken
+a sentence, but a date that starts with a figure does, as `1 December 2024` and
+`01/12/2024` do, since those are what the date rules write for `December 1, 2024`.
+`Cook until the chicken
 reaches 165F` becomes `73.9°C`, while `Apartment 3F`, `seat 23F`, `the Boeing 777F`,
 `#33F`, `F-150` and the courtesy figure in `180C/350F/gas 4` stay as they are.
 
@@ -529,14 +580,29 @@ A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `17
 `175 deg C`, `175 Celsius`), as `175 centigrade` or `175 degrees centigrade`, and as a bare
 upper case `C` after a number of two or three figures with at most one space.
 So `Bake at 350°F (180C)` becomes `Bake at 180C` and `180C/350°F/gas 4` stays as it is,
-while `Apartment 3C (65°F)` is a flat and its temperature converts. The words are read in
+while `Apartment 3C (65°F)` is a flat and its temperature converts. The bracket may give the
+gas mark after the Celsius value, joined by `/`, `,`, `;` or `or`, and the gas mark stays in
+it: `Preheat to 350°F (180°C/gas mark 4)` becomes `Preheat to 180°C (gas mark 4)`, and
+`180°C (350°F/gas mark 4)` stays as it is. The words are read in
 any case, as the Fahrenheit value's are, so `350 degrees fahrenheit (180 degrees celsius)`
 becomes `180 degrees celsius`, but a lone `C` only in upper case, after a degree sign or
 `degrees` too, so `Bake at 350°F (180c)` becomes `Bake at 175°C (180c)`.
 
+A Fahrenheit decade near a word about heat or the weather becomes a range, since it
+straddles the Celsius decades: `on mild days in the 70s` becomes
+`on mild days between 21 and 26°C`, and `highs in the mid 90s` becomes
+`highs between 34 and 36°C`. Two decades joined as a range's figures are, by `to`, `and`,
+`or` or a dash, become one range, so `highs in the 70s or 80s` becomes
+`highs between 21 and 32°C`. A decade of the calendar, as in `Back in the 70s`, stays as it
+is, and so does a decade with a Celsius unit after it, in any of the forms above or as a
+bare upper case `C`: `temperatures in the 30s Celsius` and `highs in the 20s °C`.
+
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
-source and never claims more accuracy than was written down. `exact` and a fixed number of
+source and never claims more accuracy than was written down. Inches of mercury are the
+exception: an altimeter setting is read in whole hectopascals, so `30 inHg` becomes
+`1016 hPa` and each end of a range is whole too, while a value under one hectopascal keeps
+the figures, as `0.01 inHg` becomes `0.34 hPa`. `exact` and a fixed number of
 decimal places are both available, as is keeping the original alongside:
 
 ```ts
@@ -580,13 +646,29 @@ becomes `Cut 1.8 metres or 3 metres of rope`, and `Cut 3 metres or 6 feet of rop
 `Cut 3 metres or 1.8 metres of rope`. A slash with no figure after it is a rate, so
 `5 gallons/minute` becomes `19 litres/minute`.
 
-Measurements that are imperial worldwide are left alone: screens, wheels, pipes, vinyl.
-`a 15 inch laptop` stays a 15 inch laptop, and so do `monitors of 27 inches` and
+Measurements that are imperial worldwide are left alone: screens, wheels, pipes, vinyl,
+drive bays, audio jacks and telescopes. `a 15 inch laptop` stays a 15 inch laptop, and so do
+`a 2.5-inch SATA SSD`, `the 1/4-inch TRS jack`, `monitors of 27 inches` and
 `wheels between 15 and 17 inches`, which name the thing first. So does a unit that is part
-of a name, such as `the 40 yard line` or `the 147-pound division`. A range or dimension of
-them stays whole, so `bolts of ½-¾ inch`, `a 3/8" to 1/2" socket` and `a 15" x 17" panel`
-are left exactly as written, with no piece of them converted on its own. `units: { respectConventions: false }`
-converts all of them.
+of a name, such as `the 40 yard line`, `the 26-mile marker` or `the 147-pound division`. A
+range or dimension of them stays whole, so `bolts of ½-¾ inch`, `a 3/8" to 1/2" socket` and
+`a 15" x 17" panel` are left exactly as written, with no piece of them converted on its own.
+`units: { respectConventions: false }` converts all of them.
+
+A distance or a position from such a thing is a measurement. `away`, `apart`, `off`,
+`above`, `below`, `behind`, `beneath` or `from` straight after the size makes it one, so
+`Place the monitor 20 inches from your eyes` becomes
+`Place the monitor 51 centimetres from your eyes`. `from corner to corner` spans the thing
+itself, so `The screen is 27 inches from corner to corner.` is left as written. `jack` and
+`plug` name a thing only after its size, since before one they are verbs, so
+`Plug the 2 inch hole` converts.
+
+A shipping container of a standard length in feet, one of `10`, `20`, `40`, `45`, `48` and
+`53`, is named by it, so `a 40-foot high-cube container` and `the twenty-foot equivalent unit`
+are left as written, while `a 30-foot container` converts. An aviation altitude stays in feet beside `MSL`,
+`AMSL`, `AGL`, `QNH` or `QFE`, or in a sentence with `flight level`, `cruising altitude` or a
+service, absolute or cloud `ceiling`, so `35,000 feet MSL` is left as written. A room has a
+ceiling too, so `a 10-foot ceiling` converts, and so does `The plane is 200 feet long.`
 
 A unit word with a capital is part of a name when the next word has one too, or when the
 next word that title case would capitalise does. So `Track 7 Miles Davis`,
@@ -611,8 +693,14 @@ An abbreviation's stop goes with it, so `It is 12 in. long.` becomes `It is 30 c
 `Add 5 lb. of beef.` becomes `Add 2.3 kg of beef.` The stop stays when it also ends the
 sentence, as a time's does, so `The fence is 6 ft. It is new.` becomes
 `The fence is 1.8 m. It is new.` Any capitalised word after the stop starts a new sentence,
-a number in words included, but a word in capitals does not, so `Buy a 6 ft. HDMI cable.`
-becomes `Buy a 1.8 m HDMI cable.`
+a number in words included, and so does a date that starts with a figure, as
+`1 December 2024` does, but a word in capitals does not, so `Buy a 6 ft. HDMI cable.`
+becomes `Buy a 1.8 m HDMI cable.` The stop also stays as the first dot of an ellipsis, so
+`The board is 12 in...` becomes `The board is 30 cm...`, while `It is 12 in.... long`
+becomes `It is 30 cm... long`. Where a measurement collapses into its own metric value, the
+stop is decided past that value, so `The bag weighs 2.2 lb. (1 kg) Then stir.` becomes
+`The bag weighs 1 kg. Then stir.` and `The bag weighs 2.2 lb. (1 kg) of flour.` becomes
+`The bag weighs 1 kg of flour.`
 
 A spaced `in` with no stop after it is the preposition, so `There are 6 in total.` stays as
 written. A spaced `in.` that ends the sentence is the particle of a verb that takes `in`
@@ -653,12 +741,20 @@ numeric date are not its year, so `On March 1, 1900 square kilometres burned.` a
 **Times and currency.** `3:00 P.M.` becomes `3:00pm`; a 12-hour clock is
 normal outside America too, so only the styling goes. The last stop stays when it also
 ends the sentence, so `It starts at 3 P.M. Bring snacks.` becomes
-`It starts at 3pm. Bring snacks.` A time that runs on, as in `3 P.M. Tuesday` or
+`It starts at 3pm. Bring snacks.`, and as the first dot of an ellipsis, so `5 p.m...`
+becomes `5pm...`. A time that runs on, as in `3 P.M. Tuesday`, `3 P.M. 5 March` or
 `8 P.M. ET`, loses it. `times: { to24Hour: true }` gives `15:00` if you want it.
 Amounts are never converted, because exchange rates move; a bare
 `$500` becomes `US$500` when the text is American. 
 A scale stays with the amount only as a whole word: `$5 million` and `$50k` become
 `US$5 million` and `US$50k`, and the word after `$50 modernizing` is still respelt.
+A `$` and one figure, with no decimal, comma or scale, is a variable rather than an amount
+in a sentence about code: one that says `capture group`, `regex`, `regular expression`,
+`replacement string`, `back-reference`, `script name`, `sed`, `awk`, `bash` or `perl`, or
+names a variable such as `$HOME`, `${name}` or `$@`. Words that prices share, such as
+`group` or `match`, are no sign, and nor is another figure, so `Swap $1 and $2 in sed.`
+stays as written while `Group tickets cost $5.` becomes `Group tickets cost US$5.` and
+`Kids pay $1 and adults pay $2.` becomes `Kids pay US$1 and adults pay US$2.`
 
 **Punctuation** (`localise` only). House style rather than comprehension, so it waits to
 be asked for. `U.S.` becomes `US`, and punctuation that is not part of a quotation moves
@@ -669,8 +765,10 @@ rewritten: `He said "The color is gray."` becomes `He said "The colour is grey".
 mark with a letter or digit straight after it closes nothing, so `Acme Inc.'s` keeps its
 stop.
 
-An initialism keeps its last stop when that stop also ends the sentence, as a time does,
-so `She moved to the U.S. It was cold.` becomes `She moved to the US. It was cold.` A
+An initialism keeps its last stop when that stop also ends the sentence or opens an
+ellipsis, as a time does, so `She moved to the U.S. It was cold.` becomes
+`She moved to the US. It was cold.` and `She moved to the U.K...` becomes
+`She moved to the UK...` A
 capital after an initialism is more often the rest of a name, so `the U.S. Army` becomes
 `the US Army`: only a word that opens sentences and never names anything, such as `It`,
 `The`, `In` or `However`, counts as a new sentence.
@@ -804,6 +902,22 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   any `=value` after it, so `--center`, `--color=gray` and `--label="dark gray"` are held in
   prose as well as in comments. Two hyphens straight after a word are a dash, so
   `the color--that is` is still rewritten.
+  An @mention or a #hashtag is held where a token starts, so `Thanks @gray` and `#color`
+  keep their spelling. A lone `@` or `#`, a Markdown heading and a hashtag with no letter,
+  such as `#3`, are left to the rules. A Liquid, Jinja or Nunjucks tag on one line, such as
+  `{% if favorite %}`, `{{ color }}` or `{# gray #}`, is held, and the text between two tags
+  is prose. An emoji shortcode such as `:colorful:` is held when no letter, digit or colon
+  touches it, so `1:2:3` and `std::color::gray` are not shortcodes.
+  A CSS declaration in a sentence is held from its property name to the end of its value,
+  which stops at a function word such as `and`, `to` or `the`, so
+  `Set text-align: center to center it` keeps the first `center` and rewrites the second.
+  A hyphenated name from a CSS property family, such as `text-align` or `background-color`,
+  a vendor prefix or a custom property marks a declaration by itself. A bare name such as
+  `color` or `border`, or any other hyphenated word, needs more: another declaration beside
+  it, a value only CSS writes (a hex colour, a call, a length such as `2px`, or
+  `!important`), a closing brace, or a semicolon that ends the line. So `Eye color: blue`
+  and `a follow-up: color it` are still rewritten. A held declaration is held from every
+  rule, so `max-width: 2in` keeps its inches.
   Inline code is paired the way CommonMark pairs it: a span closes on a run of as many
   backticks as opened it, so ``` ``a ` b`` ``` is one span, and it may wrap onto the next
   line of its paragraph. A backtick with no partner before the paragraph ends, or one
@@ -814,7 +928,7 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 
   | `syntax` | |
   | --- | --- |
-  | `'markdown'` | Fences as above, and indented code blocks and `pre`, `script`, `style` and `textarea` blocks and elements as CommonMark reads them |
+  | `'markdown'` | Fences as above, and indented code blocks and `pre`, `script`, `style` and `textarea` blocks and elements as CommonMark reads them, front matter, and `$` and `$$` maths |
   | `'text'` | No such fences, since a line of tildes underlines a heading in `.rst` or `.txt`: three backticks protect everything up to the next three |
   | none (default) | Fences as above, and an indented line is prose |
 
@@ -833,6 +947,28 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   `textarea` element is held from its opening tag to the next closing tag of the same name,
   or to the end of the block. The rest of that block, and HTML comments, hold text that is
   still rewritten, as is a tag in the middle of a sentence.
+
+  Front matter is read as remark-frontmatter reads it: a `---` (YAML) or `+++` (TOML) line
+  that opens the text, closed by the next line that repeats it. Its keys name layouts, URLs
+  and tags, so it is held, except the value of a `title`, `description`, `summary`,
+  `excerpt`, `subtitle`, `caption` or `alt` key that sits on the key's own line, which is
+  rewritten inside any quotes. So `layout: color-page` stays as written and
+  `title: "The color guide"` becomes `title: "The colour guide"`. A value that is a list, a
+  block or a string over several lines is held. A text that opens with a `---` thematic break
+  and has another `---` line further down is read as front matter, as remark-frontmatter
+  reads it.
+
+  Maths is read as Pandoc and GitHub read it. `$$` opens display maths, closed by the next `$$`.
+  A single `$` with no space after it opens inline maths, closed by the next unescaped `$` with
+  no space before it and no digit after it, so `$2^n$` and `$5x + 3 = 8$` are held while
+  `$5 and $10` is two amounts. Neither may cross a blank line, and a code span or maths that
+  opens first holds the other's delimiters.
+- **TeX commands.** A backslash and the letters after it, such as `\centering` or `\color`,
+  with the arguments of colour commands that name a colour, colour model or colour
+  definition (`\color`, `\textcolor`, `\colorbox`, `\fcolorbox`, `\definecolor`, `\colorlet`,
+  `\pagecolor`, `\rowcolor`, `\cellcolor` and `\columncolor`) and the environment that
+  `\begin` and `\end` name. TeX knows each by one spelling. The text a command colours is
+  prose, so `\textcolor{gray}{gray word}` becomes `\textcolor{gray}{grey word}`.
 - **File names and paths,** read from their shape rather than a list of extensions. A file
   name is a name holding a letter, then a dot and an extension in one case with no space
   either side, so `behavior.ts`, `Center.vue` and `GRAY.PNG` are held, and so is a domain or
@@ -1236,7 +1372,7 @@ there each root needs the rules in its own styles.
 | `units.precision` | `'natural'` | `natural`, `exact`, or a number of decimal places |
 | `units.keepOriginal` | `false` | Write `1.8 metres (6 ft)` |
 | `units.fuelEconomy` | `'l-per-100km'` | Or `km-per-l` |
-| `units.respectConventions` | `true` | Leave screen sizes, yard lines and weight classes alone |
+| `units.respectConventions` | `true` | Leave screen sizes, yard lines, container lengths, altitudes and weight classes alone |
 | `dates.format` | `'iso'` | `iso`, `dmy`, `long` |
 | `dates.reorderLongDates` | `localise` only | `March 5, 2024` to `5 March 2024` |
 | `times.to24Hour` | `false` | On gives `15:00` rather than `3pm` |
@@ -1266,6 +1402,9 @@ options it had and goes on following the page under them.
   words joined by slashes (`color/flavor/size`) and a run-on sentence with a lower-case
   word after the stop (`the color.it was`) are held. A file name straight after a number,
   as in `Copy 2 color.ts`, reads as a measurement and is rewritten.
+- A CSS declaration in a sentence is read from its shape. One with a bare property name and
+  nothing else only CSS writes, as in `Set color: gray on it`, reads as a key and its value
+  in prose, as `Eye color: gray` does, and is rewritten.
 - Outside the remark plugin, the paragraph an inline code span may wrap within is found
   from its lines: a blank line, or a line that opens a heading, quote, list item, fence,
   rule or table row, ends it. A span that wraps onto the next `>` line of a block quote is
@@ -1275,9 +1414,10 @@ options it had and goes on following the page under them.
   runs on to the next line that would close it, or to the end of the text. A comment in a
   language that documents in Markdown is read that way, so a tilde heading underline in a
   reStructuredText block comment there leaves the text up to the next one as written.
-- Outside the remark plugin, an indented code block, and the contents of a `pre`, `script`,
-  `style` or `textarea` block, are rewritten like the prose around them unless the text is
-  known to be Markdown: a Markdown file, `syntax: 'markdown'`, or Prettier's Markdown parser.
+- Outside the remark plugin, an indented code block, the contents of a `pre`, `script`,
+  `style` or `textarea` block, front matter and maths are rewritten like the prose around
+  them unless the text is known to be Markdown: a Markdown file, `syntax: 'markdown'`, or
+  Prettier's Markdown parser.
   So `deamericaniseText` with no `syntax`, stdin without `--language md` or
   `--syntax markdown`, and comments rewrite them.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`

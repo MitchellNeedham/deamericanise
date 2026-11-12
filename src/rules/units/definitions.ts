@@ -28,9 +28,10 @@ export interface Measure {
   convert(value: number): MetricValue;
   /**
    * Contexts where the imperial unit is the worldwide convention: screens are sold in
-   * inches everywhere, so are wheels, pipes and vinyl.
+   * inches everywhere, so are wheels, pipes and vinyl. A measurement in any one of them
+   * is left as written.
    */
-  conventional?: { before?: RegExp; after?: RegExp };
+  conventional?: Convention | Convention[];
   /**
    * Skip this measure entirely when the document matches. For units whose name means
    * different things in different places, the document usually says which it means.
@@ -47,6 +48,76 @@ export interface Measure {
    * all, merely imperial-descended and used everywhere.
    */
   keptByDefault?: boolean;
+  /**
+   * Decimal places the metric value is written to under `natural` precision, whatever figures
+   * the source gives, as an altimeter setting is read in whole hectopascals.
+   */
+  decimals?: number;
+  /** Other things the unit may measure, told by the words beside the quantity, in the order tried. */
+  senses?: Sense[];
+}
+
+/**
+ * A sense in which a measure's unit measures something else, told by the words beside the
+ * quantity: an ounce of milk is a fluid ounce, an ounce of gold a troy ounce, and the ton of
+ * an air conditioner a rate of cooling. A metric value the author gives after the quantity
+ * decides by its dimension. Otherwise what the quantity measures, after it, decides, and only
+ * where nothing after it names a thing do the words before it count, and then its sentence.
+ */
+export interface Sense {
+  /**
+   * The id of the measure the quantity converts as. Without one, no conversion fits, and the
+   * quantity is held as written, as the copper weight of a circuit board is.
+   */
+  as?: string;
+  /** Says on each change made in this sense how the unit was read. */
+  note?: string;
+  /**
+   * What the quantity measures or describes in this sense, in the phrase after the unit:
+   * after an optional `of`, with at most two words between that are not function words, and
+   * whatever follows, as `milk` in `Add 8 oz of whole milk slowly` and `AC` in
+   * `a 3-ton central AC unit`.
+   */
+  things: string[];
+  /**
+   * Nouns one of `things` may describe, as `unit` in `AC units of 2 to 5 tons`, where they
+   * stand between the thing and the number. One of `things` before one is its material, as
+   * `glass` is in `a 16 oz glass jar`.
+   */
+  heads?: string[];
+  /** Nouns read through to what they hold, as the `can` of `a 12 oz can of soda`. */
+  vessels?: string[];
+  /**
+   * Names that hold one of `things` and are another thing, as `sour cream` and `cream cheese`
+   * are solids.
+   */
+  except?: string[];
+  /**
+   * Words before the number that say so, with at most one of `heads` and three function words
+   * between, as in `AC units of 2 to 5 tons`.
+   */
+  before?: string[];
+  /** Words that say so anywhere in the quantity's sentence, as `PCB` does. */
+  sentence?: string[];
+}
+
+/** A context where a unit is the worldwide convention, read around one measurement. */
+export interface Convention {
+  /** Matches the text that ends where the measurement starts. */
+  before?: RegExp;
+  /** Matches the text that starts where the measurement ends. */
+  after?: RegExp;
+  /**
+   * Matches the text after the measurement when that text makes it a distance or a position,
+   * as `apart` does in `the bolts 6 inches apart`. The convention then does not hold, whatever
+   * `before` and `after` find, since the thing named is what the distance runs from.
+   */
+  distance?: RegExp;
+  /**
+   * The only values the convention holds, as a shipping container's standard lengths are.
+   * Every figure of a range or dimension must be one of them.
+   */
+  values?: readonly number[];
 }
 
 const m = (value: number, symbol: string, singular: string, plural: string): MetricValue => ({
@@ -93,7 +164,9 @@ export function metricArea(squareMetres: number): MetricValue {
 const SIZED_IN_INCHES = [
   'screen', 'display', 'monitor', 'touchscreen', 'laptop', 'tablet', 'phone', 'macbook', 'tv',
   'television', 'panel', 'wheel', 'rim', 'tyre', 'tire', 'pipe', 'bore', 'vinyl', 'record',
-  'drive', 'disk', 'disc', 'floppy', 'barrel', 'sensor', 'lens', 'pizza', 'subwoofer', 'speaker',
+  'drive', 'disk', 'disc', 'floppy', 'ssd', 'hdd', 'sata', 'nvme', 'barrel', 'sensor', 'lens',
+  'pizza', 'subwoofer', 'speaker', 'jack', 'plug', 'trs', 'trrs', 'phono', 'eyepiece',
+  'telescope', 'dobsonian', 'refractor', 'reflector', 'focuser', 'aperture',
   'nail', 'bolt', 'screw', 'nut', 'washer', 'socket', 'wrench', 'spanner', 'thread', 'hex',
   'ratchet', 'rivet', 'stud', 'dowel', 'tap', 'fitting', 'coupling', 'nipple', 'union', 'elbow',
   'npt', 'unc', 'unf', 'drill', 'bit',
@@ -111,6 +184,22 @@ const BODY_SIZED_IN_INCHES = ['waist', 'chest', 'inseam'];
  */
 const MEASURING_VERBS = new Set(['records', 'drives', 'drills', 'bores']);
 
+/**
+ * Nouns that are also verbs taking what is sized as their object, as in `plug the 2 inch
+ * hole`, so they name a thing only after its size.
+ */
+const SIZING_VERBS = new Set(['plug', 'plugs', 'jack', 'jacks']);
+
+/** Words after a measurement that make it a distance or a position, as in `6 inches apart`. */
+const DISTANCE_WORDS = ['away', 'apart', 'off', 'above', 'below', 'behind', 'beneath', 'from'];
+
+/**
+ * One of `DISTANCE_WORDS`, whole, so `off-white` is none. `from` and then `<word> to <word>`
+ * spans the thing itself, so `27 inches from corner to corner` gives a size.
+ */
+const DISTANCE =
+  String.raw`(?!from\s+[\w-]+\s+to\s+[\w-])(?:${DISTANCE_WORDS.join('|')})(?![\w-])`;
+
 const plural = (noun: string): string =>
   /(?:s|x|ch|sh)$/.test(noun)
     ? `${noun}es`
@@ -120,13 +209,13 @@ const plural = (noun: string): string =>
 
 const withPlurals = (nouns: string[]): string[] => nouns.flatMap((noun) => [noun, plural(noun)]);
 
-const INCH_CONVENTIONS = {
+const INCH_CONVENTIONS: Convention = {
   // A few function words may sit between the thing and its size. A bolt described as up
   // to an inch in diameter is being named; a bolt described as standing away from a wall
   // is being measured. Allowing only function words between the two keeps them apart.
   before: new RegExp(
     String.raw`\b(?:${withPlurals([...SIZED_IN_INCHES, ...BODY_SIZED_IN_INCHES])
-      .filter((noun) => !MEASURING_VERBS.has(noun))
+      .filter((noun) => !MEASURING_VERBS.has(noun) && !SIZING_VERBS.has(noun))
       .join('|')})\b` +
       String.raw`(?:\s+(?:up|to|above|below|over|under|of|and|or|the|a|an|about|approximately|` +
       String.raw`larger|smaller|greater|less|than|from|in|is|are|measuring|between)){0,4}[\s-]*$`,
@@ -138,7 +227,51 @@ const INCH_CONVENTIONS = {
     String.raw`^[\s-]*(?:[\w-]+\s+){0,3}(?:${withPlurals(SIZED_IN_INCHES).join('|')})\b`,
     'i',
   ),
+  distance: new RegExp(String.raw`^[\s-]*${DISTANCE}`, 'i'),
 };
+
+/**
+ * Words that cannot stand between a size and the thing it sizes, as `the` does in
+ * `20 feet towards the container`: a determiner or a preposition starts another phrase.
+ */
+const NOT_A_MODIFIER = [
+  'a', 'an', 'the', 'this', 'that', 'these', 'those', 'its', 'their', 'his', 'her', 'my', 'our',
+  'your', 'of', 'to', 'toward', 'towards', 'into', 'onto', 'at', 'by', 'for', 'in', 'on', 'with',
+  'near', 'past', 'beside', 'between',
+];
+
+/**
+ * Shipping containers are named by their length in feet in every port, metric or not, and
+ * only the standard lengths name one. The TEU, a twenty-foot equivalent unit, counts them.
+ */
+const CONTAINER: Convention = {
+  after: new RegExp(
+    String.raw`^[\s-]*(?:(?!(?:${NOT_A_MODIFIER.join('|')})(?![\w-])|${DISTANCE})[\w-]+\s+){0,2}` +
+      String.raw`(?:containers?|(?:shipping|ISO|high[\s-]cube|reefer|dry|intermodal)\s+box(?:es)?|` +
+      String.raw`TEU|FEU|equivalent\s+units?)\b`,
+    'i',
+  ),
+  values: [10, 20, 40, 45, 48, 53],
+};
+
+/**
+ * Aviation gives altitudes in feet in nearly every country: on charts, in flight levels and
+ * from air traffic control. A room has a ceiling too, so only an aircraft's or a cloud
+ * layer's counts.
+ */
+const AVIATION =
+  String.raw`flight\s+level|cruis(?:e|ing)\s+altitude|(?:service|absolute|cloud)\s+ceiling`;
+
+// A stop ends the sentence unless a digit follows it, as in `Mach 0.85`.
+const IN_SENTENCE = String.raw`(?:[^.!?\n]|\.(?=\d))*`;
+
+const ALTITUDE: Convention[] = [
+  { after: /^\s*(?:MSL|AMSL|AGL|QNH|QFE)\b/i },
+  {
+    before: new RegExp(String.raw`\b(?:${AVIATION})\b${IN_SENTENCE}$`, 'i'),
+    after: new RegExp(String.raw`^${IN_SENTENCE}\b(?:${AVIATION})\b`, 'i'),
+  },
+];
 
 /**
  * Whether the singular unit word `word`, ending the quantity `text.slice(start, end)`, is
@@ -152,7 +285,80 @@ function startsNoun(word: string, nouns: RegExp) {
     unit.test(text.slice(start, end)) && nouns.test(text.slice(end, end + 40));
 }
 
-const poundCake = startsNoun('pound', /^[\s-]+cakes?\b/i);
+const poundNoun = startsNoun('pound', /^[\s-]+(?:cakes?|signs?)\b/i);
+
+/** Drinks and other liquids, which American labels and recipes measure in ounces by volume. */
+const LIQUIDS = [
+  'water', 'milk', 'buttermilk', 'half-and-half', 'cream', 'juice', 'lemonade', 'soda', 'cola',
+  'seltzer', 'tonic', 'coffee', 'espresso', 'broth', 'stock', 'oil', 'vinegar', 'syrup', 'liquid',
+  'drink', 'beer', 'ale', 'lager', 'cider', 'wine', 'champagne', 'sherry', 'vermouth', 'sake',
+  'liquor', 'liqueur', 'whiskey', 'whisky', 'bourbon', 'vodka', 'gin', 'rum', 'tequila', 'brandy',
+  'cognac',
+];
+
+/** Vessels that only ever hold a drink. */
+const DRINKWARE = ['glass', 'mug', 'tumbler', 'pint', 'shot'];
+
+/** Vessels that hold food as often, which is weighed, as `a 15 oz can of beans` is. */
+const VESSELS = ['can', 'bottle', 'cup', 'carton', 'jug', 'jar', 'keg', 'pitcher', 'flask', 'carafe'];
+
+/** Solids named for a liquid. */
+const NOT_LIQUIDS = withPlurals([
+  'sour cream', 'ice cream', 'whipped cream', 'clotted cream', 'cream cheese', 'cream puff',
+  'cream cracker', 'milk chocolate', 'milk powder', 'powdered milk', 'dried milk', 'dry milk',
+  'condensed milk', 'baking soda', 'caustic soda', 'washing soda', 'soda cracker', 'soda bread',
+  'ground coffee', 'instant coffee', 'bean coffee', 'coffee bean', 'coffee ground', 'coffee cake',
+  'water chestnut', 'water cracker', 'beer bread', 'rum cake', 'rum ball', 'wine gum', 'stock cube',
+  'oil paint',
+]);
+
+const FLUID_OUNCES: Sense = {
+  as: 'units.volume.fluid-ounce',
+  note: 'read as fluid ounces, since it measures a liquid',
+  things: withPlurals([...LIQUIDS, ...DRINKWARE]),
+  heads: withPlurals([...DRINKWARE, ...VESSELS, 'box']),
+  vessels: withPlurals(VESSELS),
+  except: NOT_LIQUIDS,
+};
+
+const TROY_OUNCES: Sense = {
+  as: 'units.mass.troy-ounce',
+  note: 'read as troy ounces, in which precious metals are weighed',
+  things: ['gold', 'silver', 'platinum', 'palladium', 'bullion'],
+  except: withPlurals(['silver polish', 'silver paint', 'gold paint', 'silver nitrate']),
+};
+
+/** A circuit board's copper, which boards are ordered by in ounces per square foot. */
+const COPPER_WEIGHT: Sense = {
+  things: ['copper', 'cu', 'cladding', 'copper clad'],
+  heads: withPlurals(['weight', 'thickness', 'pour', 'layer', 'plane', 'trace', 'foil', 'plating', 'board', 'pcb']),
+  except: withPlurals([
+    'copper sulfate', 'copper sulphate', 'copper oxide', 'copper wire', 'copper pipe', 'copper tube',
+  ]),
+  before: ['copper', 'cu'],
+  sentence: withPlurals(['pcb', 'fr-4', 'fr4', 'circuit board', 'printed circuit']),
+};
+
+/**
+ * What a ton of cooling is the rating of. A ship's tonnage is a weight, so `tonnage` says
+ * nothing. `cooling` and the compressor say so only after the quantity, since a block of
+ * steel is cooled and a compressor weighed.
+ */
+const COOLED = [
+  'ac', 'a/c', 'air conditioner', 'air conditioning', 'heat pump', 'condenser', 'chiller', 'hvac',
+  'refrigeration', 'btu', 'seer', 'split system', 'mini split',
+];
+
+const TONS_OF_COOLING: Sense = {
+  as: 'units.power.refrigeration-ton',
+  note: 'read as tons of refrigeration, a rate of cooling',
+  things: withPlurals([...COOLED, 'compressor', 'cooling']),
+  heads: withPlurals([
+    'unit', 'system', 'capacity', 'load', 'size', 'rating', 'tower', 'plant', 'equipment', 'coil',
+  ]),
+  except: withPlurals(['hvac truck', 'hvac van', 'ac adapter']),
+  before: withPlurals(COOLED),
+};
 
 export const MEASURES: Measure[] = [
   // ----- length -----
@@ -173,6 +379,7 @@ export const MEASURES: Measure[] = [
     singular: ['foot'],
     abbrevs: ['ft.', 'ft', '′'],
     convert: (v) => metricLength(v * 0.3048),
+    conventional: [CONTAINER, ...ALTITUDE],
     otherSense: startsNoun('foot', /^[\s-]+(?:soldiers?|traffic)\b/i),
   },
   {
@@ -185,7 +392,7 @@ export const MEASURES: Measure[] = [
     // A gridiron yard line and the 40 yard dash are names for things, not lengths. There
     // is no 37 metre line painted on any field.
     conventional: { after: /^[\s-]*(?:lines?|dash|markers?)\b/i },
-    otherSense: startsNoun('yard', /^[\s-]+sales?\b/i),
+    otherSense: startsNoun('yard', /^[\s-]+(?:sales?|signs?)\b/i),
   },
   {
     id: 'units.length.mile',
@@ -194,6 +401,9 @@ export const MEASURES: Measure[] = [
     singular: ['mile'],
     abbrevs: ['mi'],
     convert: (v) => metricLength(v * 1609.344),
+    // A mile marker is a post, so `the 26-mile marker` stands at mile 26 and is no length.
+    conventional: { after: /^[\s-]*markers?\b/i },
+    otherSense: startsNoun('mile', /^[\s-]+markers?\b/i),
   },
   {
     id: 'units.length.fathom',
@@ -238,6 +448,15 @@ export const MEASURES: Measure[] = [
     singular: ['ounce'],
     abbrevs: ['oz.', 'oz'],
     convert: (v) => metricMass(v * 28.349523125),
+    senses: [FLUID_OUNCES, TROY_OUNCES, COPPER_WEIGHT],
+  },
+  {
+    id: 'units.mass.troy-ounce',
+    keep: 'troy-ounce',
+    words: ['troy ounces', 'troy ounce'],
+    singular: ['troy ounce'],
+    abbrevs: ['troy oz', 'ozt', 'oz t'],
+    convert: (v) => metricMass(v * 31.1034768),
   },
   {
     id: 'units.mass.pound',
@@ -252,7 +471,7 @@ export const MEASURES: Measure[] = [
       after: /^[\s-]*(?:divisions?|classes|class|limits?|bouts?|titles?|champions?|weight)\b/i,
     },
     otherSense: (text, start, end) =>
-      isMoney(text, start, end) || poundCake(text, start, end),
+      isMoney(text, start, end) || poundNoun(text, start, end),
   },
   {
     id: 'units.mass.stone',
@@ -273,6 +492,7 @@ export const MEASURES: Measure[] = [
     // those already, and reading its tons as short tons would be plainly wrong.
     convert: (v) => metricMass(v * 907_184.74),
     ambiguousWhen: /\b(?:metric\s+tons?|tonnes?|long\s+tons?)\b/i,
+    senses: [TONS_OF_COOLING],
   },
 
   // ----- volume. Every one of these is the US measure, which is not the imperial one. -----
@@ -368,12 +588,30 @@ export const MEASURES: Measure[] = [
     convert: (v) => m(v * 6.89475729, 'kPa', 'kilopascal', 'kilopascals'),
   },
   {
+    id: 'units.pressure.inhg',
+    keep: 'inhg',
+    words: ['inches of mercury', 'inch of mercury'],
+    singular: ['inch of mercury'],
+    abbrevs: ['inHg', 'in. Hg', 'in Hg'],
+    convert: (v) => m(v * 33.8639, 'hPa', 'hectopascal', 'hectopascals'),
+    decimals: 0,
+  },
+  {
     id: 'units.power.horsepower',
     keep: 'horsepower',
     words: ['horsepower'],
     singular: [],
     abbrevs: ['hp'],
     convert: (v) => m(v * 0.745699872, 'kW', 'kilowatt', 'kilowatts'),
+  },
+  {
+    // `12,000 BTU` an hour.
+    id: 'units.power.refrigeration-ton',
+    keep: 'refrigeration-ton',
+    words: ['tons of refrigeration', 'ton of refrigeration'],
+    singular: ['ton of refrigeration'],
+    abbrevs: [],
+    convert: (v) => m(v * 3.516852842, 'kW', 'kilowatt', 'kilowatts'),
   },
   {
     id: 'units.energy.btu',

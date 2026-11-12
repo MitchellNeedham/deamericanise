@@ -178,9 +178,9 @@ function change(
 }
 
 /**
- * A measurement left as written, such as a conventional size. Another rule can match a
- * piece of it, such as the `¾ inch` in `bolts of ½-¾ inch`, and the hold keeps that piece
- * as written too.
+ * A span the unit rules leave as written, such as a conventional size or an amount of
+ * money. Another rule can match a piece of it, such as the `¾ inch` in `bolts of ½-¾ inch`,
+ * and the hold keeps that piece as written too.
  */
 function hold(start: number, matched: string, ruleId: string, priority: number): Change {
   return { ...change(start, matched, matched, ruleId, priority), hold: true };
@@ -736,7 +736,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     // A noun straight after claims the words before it: `half a pound cake` is half a cake,
     // and `a mile and a half hour later` is half an hour.
     if (MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) return;
-    if (isOtherSense(ctx, entry, start, start + matched.length)) return;
+    if (isOtherSense(ctx, entry, start, start + matched.length)) {
+      changes.push(hold(start, matched, entry.measure.id, 30));
+      return;
+    }
     if (isAmbiguousHere(entry.measure, ctx.text)) return;
     if (isConventional(ctx, entry.measure, start, start + matched.length)) {
       changes.push(hold(start, matched, entry.measure.id, 30));
@@ -762,7 +765,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     const entry = resolve(alias);
     const value = parseNumber(raw);
     if (!entry || value === null) return;
-    if (isOtherSense(ctx, entry, start, start + matched.length)) return;
+    if (isOtherSense(ctx, entry, start, start + matched.length)) {
+      changes.push(hold(start, matched, entry.measure.id, 30));
+      return;
+    }
     if (isAmbiguousHere(entry.measure, ctx.text)) return;
     if (isBareInch(alias, matched)) return;
     if (isConventional(ctx, entry.measure, start, start + matched.length)) {
@@ -807,7 +813,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const high = parseNumber(match[2]!);
         if (!entry || low === null || high === null || high === 0) continue;
         const start = match.index;
-        if (isOtherSense(ctx, entry, start, start + match[0].length)) continue;
+        if (isOtherSense(ctx, entry, start, start + match[0].length)) {
+          changes.push(hold(start, match[0], entry.measure.id, 35));
+          continue;
+        }
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(match[3]!, match[0])) continue;
         if (isConventional(ctx, entry.measure, start, start + match[0].length)) {
@@ -877,7 +886,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         for (let i = sides.length - 1; i >= 0; i--) units[i] = sides[i]!.entry ?? units[i + 1]!;
         const measures = [...new Set(units.map((u) => u.measure))];
 
-        if (units.some((u) => isOtherSense(ctx, u, start, end))) continue;
+        const otherSense = units.find((u) => isOtherSense(ctx, u, start, end));
+        if (otherSense) {
+          changes.push(hold(start, match[0], otherSense.measure.id, 38));
+          continue;
+        }
         if (measures.some((m) => isAmbiguousHere(m, ctx.text))) continue;
         // After the sense checks, because a count is part of the amount in `It cost 2 x 5 pounds`.
         if (!measures.every(hasSides)) {

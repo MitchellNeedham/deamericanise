@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { deamericanise, deamericaniseText } from '../src/index.js';
-import type { Change } from '../src/index.js';
+import { analyse, deamericanise, deamericaniseText, resolveOptions } from '../src/index.js';
+import type { Change, Options, RuleContext } from '../src/index.js';
 import { resolveChanges } from '../src/engine/apply.js';
+import { patternRules } from '../src/rules/index.js';
 import { MEASURES } from '../src/rules/units/definitions.js';
 import { NUMERIC_PATTERN, parseNumber } from '../src/rules/units/number.js';
 
@@ -552,6 +553,21 @@ describe('a held span in change resolution', () => {
     const whole = at(8, 22);
     const beside = at(0, 5);
     expect(resolveChanges([held, whole, beside], [])).toEqual([beside, whole]);
+  });
+
+  it('keeps a change that writes its part of it back as it was', () => {
+    const quote = at(19, 22, { before: 'x."', after: 'x".' });
+    expect(resolveChanges([held, quote], [])).toEqual([quote]);
+    expect(resolveChanges([held, at(19, 22, { before: 'x."', after: 'y".' })], [])).toEqual([]);
+  });
+
+  it.each`
+    input                                                  | expected
+    ${'The sign said "It cost 500 pounds."'}               | ${'The sign said "It cost 500 pounds".'}
+    ${'They called it "a fine of 200 pounds," then left.'} | ${'They called it "a fine of 200 pounds", then left.'}
+    ${'She said "I need bolts of ½-¾ inch."'}              | ${'She said "I need bolts of ½-¾ inch".'}
+  `('moves the stop out of a quotation that ends in a held span: $input', ({ input, expected }) => {
+    expect(deamericaniseText(input, { preset: 'localise' })).toBe(expected);
   });
 });
 
@@ -1312,6 +1328,8 @@ describe('pounds of money are not weights', () => {
     ${'Beef is £4 a pound, so 3 pounds comes to £12.'}          | ${'Beef is £4 a pound, so 1.4 kilograms comes to £12.'}      | ${'a price by the pound'}
     ${'It cost £3. The bag held 5 pounds.'}                     | ${'It cost £3. The bag held 2.3 kilograms.'}                 | ${'the £ is in another sentence'}
     ${'Prices are £4 for 2 lb.'}                                | ${'Prices are £4 for 910 g.'}                                | ${'an abbreviation is never money'}
+    ${'It cost 500 lbs.'}                                       | ${'It cost 230 kg.'}                                         | ${'the same, after a money verb'}
+    ${'I want to lose 2 pounds a week.'}                        | ${'I want to lose 910 grams a week.'}                        | ${'a weight verb outranks a rate'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -1319,6 +1337,40 @@ describe('pounds of money are not weights', () => {
   it('leaves money alone when respectConventions is off', () => {
     const options = { units: { respectConventions: false } };
     expect(convert('It cost 500 pounds.', options)).toBe('It cost 500 pounds.');
+  });
+
+  /** The spans the unit rules hold as written in `text`. */
+  const held = (text: string, options: Options = {}): string[] => {
+    const resolved = resolveOptions(options);
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold)
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                               | amount             | why
+    ${'It cost 500 pounds.'}            | ${'500 pounds'}    | ${'a single amount'}
+    ${'It cost 911 pounds.'}            | ${'911 pounds'}    | ${'a number that is also an emergency number'}
+    ${'It cost 10-20 pounds.'}          | ${'10-20 pounds'}  | ${'a range'}
+    ${'The tickets are 2 x 10 pounds.'} | ${'2 x 10 pounds'} | ${'a dimension'}
+    ${'It cost half a pound.'}          | ${'half a pound'}  | ${'a written-out quantity'}
+  `('holds $amount whole, so no rule can rewrite part of it ($why)', ({ input, amount }) => {
+    expect(held(input)).toContain(amount);
+    expect(held(input, { units: { respectConventions: false } })).toContain(amount);
+  });
+
+  it.each`
+    input                                      | dialect
+    ${'It cost 911 pounds.'}                   | ${'en-AU'}
+    ${'It cost 911 pounds.'}                   | ${'en-GB'}
+    ${'The prize is 911 pounds and a trophy.'} | ${'en-AU'}
+  `('leaves "$input" whole in $dialect under localise', ({ input, dialect }) => {
+    expect(deamericaniseText(input, { preset: 'localise', dialect })).toBe(input);
+    expect(
+      deamericaniseText(input, { preset: 'localise', dialect, units: { respectConventions: false } }),
+    ).toBe(input);
   });
 });
 

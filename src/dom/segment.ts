@@ -20,6 +20,12 @@ const SKIPPED = new Set([
 /** Generic font families that draw every character at the same width. */
 const MONOSPACE = new Set(['monospace', 'ui-monospace']);
 
+/**
+ * `white-space` values that keep every space as written, and the `white-space-collapse` values
+ * a browser may list there when no single keyword names the pair.
+ */
+const KEEPS_SPACES = new Set(['pre', 'pre-wrap', 'break-spaces', 'preserve', 'preserve-spaces']);
+
 /** A change that crosses the edge of one of these would move words into or out of it. */
 const ANCHORS = new Set(['a', 'button', 'label']);
 
@@ -171,6 +177,21 @@ function drawnAsCode(element: Element): boolean {
   const style = view.getComputedStyle(element);
   const whiteSpace = style.whiteSpace;
   if (whiteSpace === '' || whiteSpace === 'normal') return false;
+  return inMonospace(style);
+}
+
+/**
+ * Whether the page draws an inline element as inline code: in a font that falls back to a
+ * generic monospace family, with every space kept. A page set wholly in a monospace font keeps
+ * a phone number or a measurement on one line with `nowrap`, so that alone is not enough.
+ */
+function drawnAsInlineCode(style: CSSStyleDeclaration): boolean {
+  const whiteSpace = style.whiteSpace;
+  if (whiteSpace === '' || whiteSpace === 'normal') return false;
+  return whiteSpace.split(' ').some((value) => KEEPS_SPACES.has(value)) && inMonospace(style);
+}
+
+function inMonospace(style: CSSStyleDeclaration): boolean {
   // A quoted name is a font called "monospace", not the generic family.
   const unquoted = style.fontFamily.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""');
   return unquoted.split(',').some((family) => MONOSPACE.has(family.trim().toLowerCase()));
@@ -206,15 +227,18 @@ export function joinsRun(element: Element): boolean {
 }
 
 /**
- * Whether the browser lays the element out inside the line around it. A span that is a flex
- * item, or styled as a block or an inline-block, sits in a box of its own, so text on either
- * side of its edge never reads as one word. Without styles to go on, the tag decides.
+ * Whether the browser lays the element out inside the line around it, drawn as part of the
+ * text. A span that is a flex item, or styled as a block or an inline-block, sits in a box of
+ * its own, so text on either side of its edge never reads as one word. A span drawn as inline
+ * code ends the run the way `code` does. Without styles to go on, the tag decides.
  */
 function laidOutInline(element: Element): boolean {
   const view = element.ownerDocument.defaultView;
   if (!view) return true;
-  const display = view.getComputedStyle(element).display;
-  return display === '' || display === 'inline' || display === 'contents';
+  const style = view.getComputedStyle(element);
+  const display = style.display;
+  if (display !== '' && display !== 'inline' && display !== 'contents') return false;
+  return !drawnAsInlineCode(style);
 }
 
 /**

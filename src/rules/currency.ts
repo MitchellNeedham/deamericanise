@@ -6,7 +6,9 @@ import type { Change, Rule, RuleContext } from '../types.js';
  * actually gets wrong.
  */
 export function currencyRules(): Rule[] {
-  const bareDollar = /(?<![A-Za-z$])\$\s?(\d[\d,]*(?:\.\d+)?)\s*([BMK]|billion|million|trillion|thousand)?/gi;
+  // Ends at the last digit or a whole scale word: the text after it may belong to another rule.
+  const bareDollar =
+    /(?<![A-Za-z$])\$\s?(\d(?:[\d,]*\d)?(?:\.\d+)?)(?:[^\S\n]?(billion|million|trillion|thousand|[BMK])(?![\p{L}\p{N}]))?/giu;
   const spelled = /(?<![\w-])(\d[\d,]*(?:\.\d+)?)\s+dollars(?![\w-])/gi;
 
   const rule: Rule = {

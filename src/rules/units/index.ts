@@ -1,5 +1,5 @@
 import { buildGate, resolveOptions, type Gate } from '../../config.js';
-import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
+import type { Change, Confidence, Precision, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
 import { CLOSING, LIST_MARKER, OPENING, endsSentence, stopStays } from '../sentence.js';
 import {
@@ -297,13 +297,27 @@ function contextText(text: string): string {
   return lastPlain;
 }
 
-function isConventional(ctx: RuleContext, measure: Measure, start: number, end: number): boolean {
-  const rules = measure.conventional;
-  if (!rules || !ctx.options.units.respectConventions) return false;
+/**
+ * Whether the measurement `text.slice(start, end)` in `measure`, whose figures are `values`,
+ * is in one of the measure's conventional contexts.
+ */
+function isConventional(
+  ctx: RuleContext,
+  measure: Measure,
+  start: number,
+  end: number,
+  values: readonly number[],
+): boolean {
+  if (!measure.conventional || !ctx.options.units.respectConventions) return false;
   const text = contextText(ctx.text);
   const before = text.slice(Math.max(0, start - CONTEXT_WINDOW), start);
   const after = text.slice(end, end + CONTEXT_WINDOW);
-  return Boolean((rules.before?.test(before)) || (rules.after?.test(after)));
+  return [measure.conventional].flat().some(
+    (rules) =>
+      (rules.values === undefined || values.every((value) => rules.values!.includes(value))) &&
+      !rules.distance?.test(after) &&
+      Boolean(rules.before?.test(before) || rules.after?.test(after)),
+  );
 }
 
 function isOtherSense(ctx: RuleContext, alias: Alias, start: number, end: number): boolean {
@@ -698,6 +712,25 @@ function hold(start: number, matched: string, ruleId: string, priority: number):
   return { ...change(start, matched, matched, ruleId, priority), hold: true };
 }
 
+/**
+ * `value`, in the metric unit `measure` converts to, as the unit rules write it. A measure with
+ * `decimals` takes that many places under `natural` precision, unless they would write a value
+ * that is not zero as zero.
+ */
+function formatIn(
+  measure: Measure,
+  value: number,
+  precision: Precision,
+  figures: number,
+  maxDecimals: number,
+): string {
+  if (precision === 'natural' && measure.decimals !== undefined) {
+    const fixed = formatNumber(value, measure.decimals, figures, maxDecimals);
+    if (value === 0 || Number(fixed.replace(/,/g, '')) !== 0) return fixed;
+  }
+  return formatNumber(value, precision, figures, maxDecimals);
+}
+
 function withOriginal(ctx: RuleContext, body: string, original: string): string {
   return ctx.options.units.keepOriginal ? `${body} (${original})` : body;
 }
@@ -764,7 +797,10 @@ const METRIC_UNITS = {
     [String.raw`grams?|g`, BASE],
     [String.raw`mg`, times(0.001)],
   ],
-  pressure: [[String.raw`kilopascals?|kPa`, BASE]],
+  pressure: [
+    [String.raw`kilopascals?|kPa`, BASE],
+    [String.raw`hectopascals?|hPa`, times(0.1)],
+  ],
   power: [[String.raw`kilowatts?|kW`, BASE]],
   energy: [[String.raw`kilojoules?|kJ`, BASE]],
 } satisfies Record<string, MetricUnit[]>;
@@ -1940,14 +1976,20 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       return;
     }
     if (isAmbiguousHere(entry.measure, ctx.text)) return;
-    if (isConventional(ctx, entry.measure, start, start + matched.length)) {
+    if (isConventional(ctx, entry.measure, start, start + matched.length, [value])) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
 
     const target = entry.measure.convert(value);
     const { precision, maxDecimals } = ctx.options.units;
-    const number = formatNumber(target.value, precision, significantFigures(matched), maxDecimals);
+    const number = formatIn(
+      entry.measure,
+      target.value,
+      precision,
+      significantFigures(matched),
+      maxDecimals,
+    );
     const body = `${number} ${unitWord(target, Number(number.replace(/,/g, '')))}`;
     pushMeasurement(ctx, changes, start, matched, body, entry.measure.id, 30);
   };
@@ -1994,7 +2036,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     if (isBareInch(alias, matched)) return;
     if (
       isInParticle(ctx.text, start, start + matched.length, alias) ||
-      isConventional(ctx, entry.measure, start, start + matched.length)
+      isConventional(ctx, entry.measure, start, start + matched.length, [value])
     ) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
@@ -2002,7 +2044,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
 
     const target = entry.measure.convert(value);
     const { precision, maxDecimals } = ctx.options.units;
-    const number = formatNumber(target.value, precision, significantFigures(raw), maxDecimals);
+    const number = formatIn(
+      entry.measure,
+      target.value,
+      precision,
+      significantFigures(raw),
+      maxDecimals,
+    );
     const numberStart = start + (/^an?\s+/i.exec(raw)?.[0].length ?? 0);
     const attributive =
       entry.isWord &&
@@ -2073,7 +2121,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         }
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(alias, matched)) continue;
-        const conventional = isConventional(ctx, entry.measure, start, end);
+        const values = [...earlier.map((figure) => figure.value), low, high];
+        const conventional = isConventional(ctx, entry.measure, start, end, values);
         const particle = isInParticle(ctx.text, start, end, alias);
         if (reading === 'hold' || conventional || secondOfPair || particle) {
           changes.push(hold(start, matched, entry.measure.id, 35));
@@ -2086,9 +2135,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const figures = Math.max(...raws.map(significantFigures));
         const { precision, maxDecimals } = ctx.options.units;
         const texts = [...earlier.map((figure) => figure.value), low].map((value) =>
-          formatNumber(value * perSourceUnit, precision, figures, maxDecimals),
+          formatIn(entry.measure, value * perSourceUnit, precision, figures, maxDecimals),
         );
-        texts.push(formatNumber(target.value, precision, figures, maxDecimals));
+        texts.push(formatIn(entry.measure, target.value, precision, figures, maxDecimals));
         const gap = pair.slice(lowRaw.length + join.length + highRaw.length, -alias.length);
         const attributive = entry.isSingular && describesNoun(ctx.text, start, high, gap, end);
         const unit = entry.isWord
@@ -2245,7 +2294,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const unclear = sides.some(
           (s, i) => !s.entry && i > 0 && units[i - 1]!.measure !== units[i]!.measure,
         );
-        if (unclear || measures.some((m) => isConventional(ctx, m, start, end))) {
+        const values = sides.map((s) => s.value!);
+        if (unclear || measures.some((m) => isConventional(ctx, m, start, end, values))) {
           changes.push(hold(start, match[0], entry.measure.id, 38));
           continue;
         }

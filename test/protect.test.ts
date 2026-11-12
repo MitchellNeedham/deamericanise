@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deamericaniseText } from '../src/index.js';
+import { deamericaniseCode, deamericaniseFile, deamericaniseText } from '../src/index.js';
 
 const au = (input: string, options = {}) => deamericaniseText(input, options);
 const code = (input: string) => deamericaniseText(input, { protectIdentifiers: true });
@@ -114,6 +114,43 @@ describe('file names and paths', () => {
   it('holds the whole path where identifiers are protected', () => {
     const input = 'Edit src/colors/center.ts and docs/behavior.md.';
     expect(au(input, { ...american, protectIdentifiers: true })).toBe(input);
+  });
+});
+
+describe('long command-line flags', () => {
+  it.each`
+    unchanged                                                  | why
+    ${'Pass --center to the tool.'}                            | ${'a flag'}
+    ${'Run it with --color=gray and --no-color.'}              | ${'a flag with a value, and one at the end of a sentence'}
+    ${'Use the --favorite-color flag.'}                        | ${'a flag of two words'}
+    ${'Pass --label="dark gray" or --label=\'light gray\' here.'} | ${'a quoted value with a space in it'}
+    ${'Pass (--center) or "--center" to it.'}                  | ${'a flag in brackets or quotes'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                          | expected                                        | why
+    ${'The color--that is, the hue--was gray.'}    | ${'The colour--that is, the hue--was grey.'}    | ${'two hyphens straight after a word are a dash'}
+    ${'The color -- gray -- was fine.'}            | ${'The colour -- grey -- was fine.'}            | ${'two hyphens with a space after them'}
+    ${'The color---gray---was fine.'}              | ${'The colour---grey---was fine.'}              | ${'three hyphens'}
+    ${'Pass `--center` to the tool.'}              | ${'Pass `--center` to the tool.'}               | ${'a flag in a code span, held as before'}
+    ${'- The color is gray.'}                      | ${'- The colour is grey.'}                      | ${'a list marker'}
+    ${'A well-known color.'}                       | ${'A well-known colour.'}                       | ${'a hyphenated word'}
+    ${'Use -color for the color.'}                 | ${'Use -colour for the colour.'}                | ${'one hyphen, which in prose is seldom a flag'}
+    ${'<!--color and gray-->'}                     | ${'<!--colour and grey-->'}                     | ${'an HTML comment opened straight onto a word'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it('holds a flag in a Markdown file and a plain text file', () => {
+    expect(deamericaniseFile('README.md', 'Pass --center to the tool.\n').text).toBe('Pass --center to the tool.\n');
+    expect(deamericaniseFile('notes.txt', 'Use --color=gray here.\n').text).toBe('Use --color=gray here.\n');
+  });
+
+  it('still holds one-hyphen flags in a source comment', () => {
+    const source = '// Set --color-scheme or -color for the color.';
+    expect(deamericaniseCode(source, { language: 'ts' }).text).toBe('// Set --color-scheme or -color for the colour.');
   });
 });
 
@@ -274,6 +311,47 @@ describe('raw HTML blocks in Markdown, read the way CommonMark reads them', () =
     const input = 'The color.\n\n<pre>\nThe color\n</pre>\n';
     expect(au(input)).toBe('The colour.\n\n<pre>\nThe colour\n</pre>\n');
     expect(au(input, { syntax: 'text' })).toBe('The colour.\n\n<pre>\nThe colour\n</pre>\n');
+  });
+});
+
+describe('a pre, script, style or textarea element inside another HTML block in Markdown', () => {
+  const md = (input: string) => au(input, { syntax: 'markdown' });
+
+  it.each`
+    input                                                                         | expected                                                                       | why
+    ${'<div align="center">\n<pre>\nconst color = "gray";\n</pre>\n</div>\n'}    | ${'<div align="center">\n<pre>\nconst color = "gray";\n</pre>\n</div>\n'}     | ${'a pre in a div'}
+    ${'<details>\n<summary>The color</summary>\n<pre>\nThe color\n</pre>\n</details>\n'} | ${'<details>\n<summary>The colour</summary>\n<pre>\nThe color\n</pre>\n</details>\n'} | ${'a pre in details, after a summary that is prose'}
+    ${'<div>\n<script>\nThe color\n</script>\n</div>'}                            | ${'<div>\n<script>\nThe color\n</script>\n</div>'}                             | ${'a script'}
+    ${'<div>\n<style>\nThe color\n</style>\n</div>'}                              | ${'<div>\n<style>\nThe color\n</style>\n</div>'}                               | ${'a style'}
+    ${'<div>\n<textarea>\nThe color\n</textarea>\n</div>'}                        | ${'<div>\n<textarea>\nThe color\n</textarea>\n</div>'}                         | ${'a textarea'}
+    ${'<span>\n<pre>\nThe color\n</pre>\n</span>'}                                | ${'<span>\n<pre>\nThe color\n</pre>\n</span>'}                                 | ${'a block opened by any tag alone on its line'}
+    ${'<DIV>\n<PRE class="x">\nThe color\n</PRE >\n</DIV>'}                       | ${'<DIV>\n<PRE class="x">\nThe color\n</PRE >\n</DIV>'}                        | ${'tags in capitals, with an attribute and a space'}
+    ${'<div><pre>The color</pre> The color</div>\nThe color'}                     | ${'<div><pre>The color</pre> The colour</div>\nThe colour'}                    | ${'an element in the middle of a line, and the text after it'}
+    ${'<div>\n<pre>\nThe color\n</pre>\nThe color\n</div>'}                       | ${'<div>\n<pre>\nThe color\n</pre>\nThe colour\n</div>'}                       | ${'a line after the closing tag'}
+    ${'<div>\n<pre>\nThe color\n</script>\nThe color\n</pre>\nThe color'}         | ${'<div>\n<pre>\nThe color\n</script>\nThe color\n</pre>\nThe colour'}         | ${'only a closing tag of the same name ends one'}
+    ${'<div>\n<pre>\nThe color\n\nThe color.'}                                    | ${'<div>\n<pre>\nThe color\n\nThe colour.'}                                    | ${'an element that never closes runs to the end of the block'}
+    ${'<div>\n<pre>A</pre>\nThe color\n<pre>The color</pre>\n</div>'}             | ${'<div>\n<pre>A</pre>\nThe colour\n<pre>The color</pre>\n</div>'}             | ${'two elements in one block'}
+    ${'> <div>\n> <pre>\n> The color\n> </pre>\n> </div>\n\nThe color.'}          | ${'> <div>\n> <pre>\n> The color\n> </pre>\n> </div>\n\nThe colour.'}          | ${'a block in a quote'}
+    ${'<div>\r\n<pre>\r\nThe color\r\n</pre>\r\n</div>\r\nThe color'}             | ${'<div>\r\n<pre>\r\nThe color\r\n</pre>\r\n</div>\r\nThe colour'}             | ${'Windows line endings'}
+  `('$why', ({ input, expected }) => {
+    expect(md(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                    | expected                                                  | why
+    ${'<div align="center">\nThe color\n</div>'}             | ${'<div align="center">\nThe colour\n</div>'}             | ${'a div holding text'}
+    ${'<details>\n<summary>The color</summary>'}             | ${'<details>\n<summary>The colour</summary>'}             | ${'a summary'}
+    ${'<div>\n<!-- <pre> -->\nThe color\n</div>'}            | ${'<div>\n<!-- <pre> -->\nThe colour\n</div>'}            | ${'a tag inside an HTML comment'}
+    ${'<div>\n<prefix>\nThe color\n</div>'}                  | ${'<div>\n<prefix>\nThe colour\n</div>'}                  | ${'a tag whose name only starts with pre'}
+    ${'Use the <pre> tag for the color.'}                    | ${'Use the <pre> tag for the colour.'}                    | ${'a tag inside a sentence, which opens no HTML block'}
+  `('reads $why as prose', ({ input, expected }) => {
+    expect(md(input)).toBe(expected);
+  });
+
+  it('rewrites the element when the syntax is unknown or plain text, as before', () => {
+    const input = '<div>\n<pre>\nThe color\n</pre>\n</div>\n';
+    expect(au(input)).toBe('<div>\n<pre>\nThe colour\n</pre>\n</div>\n');
+    expect(au(input, { syntax: 'text' })).toBe('<div>\n<pre>\nThe colour\n</pre>\n</div>\n');
   });
 });
 

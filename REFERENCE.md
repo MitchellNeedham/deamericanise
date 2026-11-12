@@ -312,12 +312,26 @@ A weight in two units is one weight, as a height in feet and inches is one heigh
 mixed number or a decimal, so `1 1/2 pounds 3 ounces` becomes `765 grams` and
 `2.5 feet 3 inches` becomes `83.8 centimetres`. Any part can be a whole number in words, so
 `six feet two inches` becomes `1.88 metres`. After `foot` or `feet` the inch word can be
-left out where nothing that could be a noun follows, so `He is six foot two.` becomes
-`He is 1.88 metres.`, while `6 feet 2 cars` is two things. It can also be left out before a
-join and another measurement in feet, so `6 foot 2 to 6 foot 4` becomes
-`1.88 metres to 1.93 metres` and `2 feet 6 to 3 feet` becomes
-`76.2 centimetres to 91 centimetres`. A number straight after a length is a smaller unit of
-it, never the first end of a range in the same unit, so `5 ft 6 to 6 ft` and
+left out where nothing that could be a noun follows: before punctuation, the end of the
+text, or a word that cannot open a noun, such as a preposition or a conjunction. So
+`He is six foot two.` becomes `He is 1.88 metres.` and `6 foot 4 with long arms` becomes
+`1.93 metres with long arms`, while `6 feet 2 cars` is two things. Of those words, `in` is
+the inch abbreviation, and `to`, `and`, `or` or `by` before a number carry the inches on to
+a range or a side, so `6 feet 2 to 3 inches` becomes `1.8 metres 5.1 to 7.6 centimetres`. The
+inch word can also be left out before a join and another measurement in feet, so
+`6 foot 2 to 6 foot 4` becomes `1.88 metres to 1.93 metres` and `2 feet 6 to 3 feet`
+becomes `76.2 centimetres to 91 centimetres`. A spaced `in` after the inches is the
+preposition when a word or number that opens its object follows, so
+`She stands 5 feet 4 in her socks.` becomes `She stands 1.63 metres in her socks.`, while
+`She is 5 feet 4 in tall.` becomes `She is 1.63 metres tall.` and `a 6 ft 2 in man` keeps
+the `in` as the unit of a height that describes the man. A hyphen may tie each number to a
+unit word or abbreviation, and the inches to the foot word or mark: `six-foot-two` and
+`6′-2″` become `1.88 metres`, and `a 6-foot 2-inch pipe` becomes `a 1.88 metre pipe`. Only
+inches below a foot, with no unit of their own, are tied that way, so `5 feet-6 feet` stays
+a range and `2 feet-18 inches` two lengths, while `5 feet-6 inches` becomes `1.68 metres`. A
+height hyphenated to its inches is one word, so a noun after it is what it describes:
+`a six-foot-two man` becomes `a 1.88 metre man`. A number straight after a length is a
+smaller unit of it, never the first end of a range in the same unit, so `5 ft 6 to 6 ft` and
 `3 yards 2 to 4 yards` are left as written. Together the parts claim three significant
 figures. A height that describes the noun after it keeps the singular where its inch unit is
 the singular word or a determiner opens it: `a 6 foot 2 inch man` and `a 6 ft 2 in man` both
@@ -437,6 +451,16 @@ converts as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule 
 
 Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F`, `degrees Fahrenheit` or
 `95 Fahrenheit`, with `º` or `˚` accepted for the degree sign, as phone keyboards type it.
+A bare letter `F`, as in `degrees F`, `deg F` or `350 F`, takes the stop after it as an
+abbreviation does, so `Bake at 350 degrees F. for 20 minutes` becomes
+`Bake at 175 degrees Celsius for 20 minutes`, while a stop that also ends the sentence
+stays, and so does one before a figure or a bracket. `°F` and `℉` are symbols, whose stop
+is usually the sentence's own, so it goes only where a word in lower case carries the
+sentence on: `Bake at 350°F. for 20 minutes` becomes `Bake at 175°C for 20 minutes`, while
+`- 350°F.`, `"Bake at 350°F." he said` and `It was 90°F. Then it rained.` keep their stop.
+The word `Fahrenheit` takes no stop. A spelled-out value keeps the author's singular
+where it describes the noun after it, so `a 350 degree F oven` becomes
+`a 175 degree Celsius oven`, while `Preheat to 350 degrees F` keeps the plural.
 The word alone does not count after a whole number of four figures, which reads as a year
 (`In 1724 Fahrenheit proposed his scale`), before `thermometers` or `scale`, where the
 number counts them, or before a number, where it is a title (`Fahrenheit 451`). A bare `F`,
@@ -457,7 +481,10 @@ A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `17
 `175 deg C`, `175 Celsius`), as `175 centigrade` or `175 degrees centigrade`, and as a bare
 upper case `C` after a number of two or three figures with at most one space.
 So `Bake at 350°F (180C)` becomes `Bake at 180C` and `180C/350°F/gas 4` stays as it is,
-while `Apartment 3C (65°F)` is a flat and its temperature converts.
+while `Apartment 3C (65°F)` is a flat and its temperature converts. The words are read in
+any case, as the Fahrenheit value's are, so `350 degrees fahrenheit (180 degrees celsius)`
+becomes `180 degrees celsius`, but a lone `C` only in upper case, after a degree sign or
+`degrees` too, so `Bake at 350°F (180c)` becomes `Bake at 175°C (180c)`.
 
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
 metres. Precision defaults to `natural`, which matches the significant figures of the
@@ -522,8 +549,11 @@ Pounds of money are left alone, because British prose spells amounts out. A mone
 such as `cost`, `paid`, `earns`, `worth` or `a fine of` claims the amount straight after
 it, across at most a pronoun or a hedge: `It cost him nearly 500 pounds`. So do
 `sterling`, a rate (`30,000 pounds a year`), pence (`5 pounds 50`) and a thing priced in
-pounds (`a 10-pound note`). A money word reaches only its own amount, so
-`It cost $20 for 5 pounds of beef` still converts. A `£` reaches the whole sentence, but a
+pounds (`a 10-pound note`). Pence may come before the preposition `in`, as in
+`5 pounds 50 in total`, but `12 in.` and `12in` are inches and never pence, so
+`The box is 5 pounds 12 in. wide.` becomes `The box is 2.3 kilograms 30 cm wide.` A money
+word reaches only its own amount, so `It cost $20 for 5 pounds of beef` still converts.
+A `£` reaches the whole sentence, but a
 weight word in the measurement's own phrase (`lost`, `weighs`, `of beef`, `a 5-pound bag`)
 outranks it. `lb` and `lbs` are never money, and `respectConventions: false` does not
 convert money. An amount of money is held whole, as a conventional size is, so no other
@@ -535,6 +565,14 @@ sentence, as a time's does, so `The fence is 6 ft. It is new.` becomes
 `The fence is 1.8 m. It is new.` Any capitalised word after the stop starts a new sentence,
 a number in words included, but a word in capitals does not, so `Buy a 6 ft. HDMI cable.`
 becomes `Buy a 1.8 m HDMI cable.`
+
+A spaced `in` with no stop after it is the preposition, so `There are 6 in total.` stays as
+written. A spaced `in.` that ends the sentence is the particle of a verb that takes `in`
+when that verb governs the count, across at most a word such as `only`, `another` or `the`.
+The verbs are `let`, `put`, `bring`, `come`, `fit`, `squeeze`, `pack`, `invite`, `allow`,
+`send` and `call`, in any form. So `The driver let only 3 in.` and `I put 2-3 in.` stay as
+written, while `Trim the board to 12 in.` becomes `Trim the board to 30 cm.` and
+`Put a 12 in. tile in the gap.` becomes `Put a 30 cm tile in the gap.`
 
 **Dates.** `3/14/2024` becomes `2024-03-14` without needing to be told anything, because
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
@@ -655,7 +693,10 @@ the cooking: a word that names a thing (`bake sale`, `bake-off`, `baked goods`,
 `baked beans`, `baking tin`) is no cue, and a verb that takes an amount of its own
 (`came to`, `rose to`, `raised`, `cost`, `sold`) stops the search, so
 `The bake sale takings came to 320.` has no oven in it, while
-`Bake at 350 and sell them at the bake sale.` does. A setting has to be followed by its
+`Bake at 350 and sell them at the bake sale.` does. Another temperature, in any unit a
+setting takes or in any Celsius form the unit rules read, stops the search too, so the oven
+in `Heat the oven to 180℃ or to 400F` is set by its first value and counts for nothing. A
+setting has to be followed by its
 unit (any Fahrenheit unit the temperature rule reads, a bare `F`, or a degree with no
 scale, as in `350 deg F`, `a 350℉ oven` or `350 degrees`) or by the rest of the
 instruction: punctuation, a joining word such as `for`, `until`, `till` or `before`, a
@@ -869,6 +910,26 @@ with a Lisp declaration or special form in lower case, such as `(defun`, `(setq`
 `; (setq color 1)` and `;; (let ((color 1)) color)` are left alone, while
 `; (See the color chart.)` is rewritten.
 
+A call alone on a line, a name (dotted or not) straight against its bracket with nothing
+after the bracket closes, reads as code: `// pick(color)` and `// render(color, size)` are
+left alone. A bracket holding only a plural ending is prose, so `// color(s)` is rewritten.
+
+A line that reads as code and leaves a bracket open opens a form, and every line up to the
+one that closes it is left alone, however it reads by itself. That keeps the body of a
+commented-out block whole, and the inside of a commented-out Lisp form:
+
+```
+// if (x) {                      <- left alone
+//   paint the center            <- left alone, inside the block
+// }                             <- left alone
+```
+
+Brackets of every kind count, but not those in a string or a character literal, such as
+`"("`, `'('`, `?\(` and `#\(`, nor those in a line commented on top of a comment. A
+closing bracket closes the innermost open bracket of its own kind, so the `)` of the
+interval `[a, b)` closes nothing. A form may run to the end of the comment and no further.
+One still open there holds no line beyond those that read as code by themselves.
+
 A run of the marker that a language writes by convention is one marker, not two: `;;`,
 `;;;` and `;;;;` in Lisp, `'''` in Visual Basic, `%%` and `%%%` in Erlang, MATLAB and
 LaTeX, and `!!` in Fortran. So `;; Pick the color.` is rewritten, while `;;; ;; old note`,
@@ -879,9 +940,10 @@ alone. `LexerSpec.markerRuns` sets these per language.
 The costs are lopsided: a missed rewrite inside a commented-out block is invisible, while
 a rewrite there is a broken build. The threshold is set accordingly, so the occasional
 prose line that reads like code is left alone, such as `// (when ready, center it)` in any
-language. It works line by line, so a block comment can hold prose and an `@example` at
-once, and doc tags keep their operands: the name in `@param {string} color` is protected
-while the description beside it is not.
+language, and so are the lines up to the end of a parenthetical that such a line leaves
+open. Outside a form it works line by line, so a block comment can hold prose and an
+`@example` at once, and doc tags keep their operands: the name in `@param {string} color`
+is protected while the description beside it is not.
 
 Turn it off with `protectCommentedCode: false` or `--no-code-guard`.
 
@@ -1034,8 +1096,13 @@ keeps putting back is left to it after three attempts.
   unwrapped with `nowrap`. Prose that keeps its white space in a proportional font, as chat
   apps show it, still converts, and so does a heading in a monospace font that wraps as
   usual. On a page set wholly in a monospace font, a label kept on one line with `nowrap` is
-  left alone too. The styles are read again once the page's stylesheets have loaded, and
-  attributes are still rewritten.
+  left alone too. Inside a sentence, a `span` or other inline element in such a font whose
+  `white-space` keeps every space (`pre`, `pre-wrap` or `break-spaces`) is inline code: it
+  ends the run, as `code` does, and the sentence around it still converts. A span that is only kept on one line
+  with `nowrap` still joins the sentence, so on a monospace page
+  `6 feet <span>2 inches</span>` held together that way converts as one measurement. The
+  styles are read again once the page's stylesheets have loaded, and attributes are still
+  rewritten.
 - Anything editable: `contenteditable`, and a document in design mode. Text that becomes
   editable after it was rewritten gets its original back.
 - Anything marked `translate="no"` or `class="notranslate"`, the markers sites already use
@@ -1136,7 +1203,8 @@ unit, throws an `Error` that names the value and the ones it accepts, such as `U
 preset: Localise. Expected one of read, localise.` For a unit, those are the unit keys. It
 throws even when there is no text to read, such as a source file with no comments or a page
 with no prose. Only the ids in `DIALECTS` are dialects, so a name every object has, such as
-`toString`, is rejected the same way.
+`toString`, is rejected the same way. A `DomRewriter` whose `setOptions` throws keeps the
+options it had and goes on following the page under them.
 
 ## Known limits
 
@@ -1170,9 +1238,9 @@ with no prose. Only the ids in `DIALECTS` are dialects, so a name every object h
   the start of the next, or `two and a` then `half feet`, is not read as one. The fraction
   converts on its own and the written-out number is left as written. A web page is read the
   way it is usually laid out, with a line break in its source counting as a space.
-- On a web page, only an element that starts a run of its own is checked for being drawn as
-  code. A `span` inside a sentence that is set in a monospace font, with no `code` element
-  or `role="code"` to mark it, is read as part of the sentence.
+- On a web page, a `span` inside a sentence that is set in a monospace font but wraps as
+  usual, keeps only its line breaks (`pre-line`) or is only kept on one line (`nowrap`),
+  with no `code` element or `role="code"` to mark it, is read as part of the sentence.
 - `a third mile` is read as a fraction, though it can also mean one more mile after two.
   The same goes for `a fourth`, `an eighth` and `a sixteenth`.
 - A word after a unit that is an adverb in one phrase and an adjective in another is always

@@ -11,6 +11,7 @@ import {
   type MetricValue,
 } from './definitions.js';
 import { BARE_CELSIUS_FIGURE, FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
+import { PREPOSITION_IN } from './money.js';
 import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
@@ -382,6 +383,8 @@ const COUNT_APART = new RegExp(
   'i',
 );
 
+const BARE_INCH = new RegExp(String.raw`${PREPOSITION_IN}$`, 'i');
+
 const COUNT_IN_WORDS = new RegExp(String.raw`^(?:${SECOND_END_WORDS})$`, 'i');
 
 /** A determiner that takes one of a noun, so the number after it cannot count the noun. */
@@ -445,7 +448,35 @@ function mayBeYear(text: string, start: number, raw: string, gap: string, end: n
 
 /** `6 in` is usually the preposition. `6in` never is. */
 function isBareInch(alias: string, whole: string): boolean {
-  return alias.toLowerCase() === 'in' && /\s$/.test(whole.slice(0, whole.length - alias.length));
+  return alias.toLowerCase() === 'in' && BARE_INCH.test(whole);
+}
+
+/** Verbs that take `in` as their particle, in every form: `let`, `brought`, `squeezing`. */
+const IN_PARTICLE_VERB =
+  String.raw`let(?:s|ting)?|put(?:s|ting)?|br(?:ing(?:s|ing)?|ought)|c(?:omes?|oming|ame)|` +
+  String.raw`fit(?:s|ted|ting)?|squeez(?:e|es|ed|ing)|pack(?:s|ed|ing)?|invit(?:e|es|ed|ing)|` +
+  String.raw`allow(?:s|ed|ing)?|sen(?:d|ds|t|ding)|call(?:s|ed|ing)?`;
+
+/** Such a verb governing the count after it, across at most a word such as `only` or `the`. */
+const IN_PARTICLE_VERB_BEFORE = new RegExp(
+  String.raw`\b(?:${IN_PARTICLE_VERB})\s+(?:(?:only|just|another|all|the|these|those|my|your|` +
+    String.raw`his|her|its|our|their|some|about|around|nearly|almost|roughly)\s+)?$`,
+  'i',
+);
+
+/**
+ * Whether the spaced `in.` ending the quantity `text.slice(start, end)` is the particle of
+ * a verb before it, as in `let only 3 in.` and `I put 2 in.`: the verb takes `in` and the
+ * stop ends the sentence. `It is 12 in. long` and `Put a 12 in. tile in the gap` read the
+ * inch.
+ */
+function isInParticle(text: string, start: number, end: number, alias: string): boolean {
+  return (
+    alias.toLowerCase() === 'in.' &&
+    /\s$/.test(text.slice(start, end - alias.length)) &&
+    IN_PARTICLE_VERB_BEFORE.test(text.slice(Math.max(0, start - CONTEXT_WINDOW), start)) &&
+    endsSentence(text, start, end, AFTER_UNIT)
+  );
 }
 
 /**
@@ -572,17 +603,24 @@ const BASE = times(1);
 // Unlike `\b`, this holds before the closing `_` of emphasis, as in `_175 degrees Celsius_`.
 const UNIT_END = String.raw`(?![A-Za-z\d])`;
 
+/** `word` in any case, as `celsius`, `Celsius` and `CELSIUS` all are. */
+const anyCase = (word: string) => word.replace(/[a-z]/g, (letter) => `[${letter}${letter.toUpperCase()}]`);
+const DEGREES_WORD = `${anyCase('degree')}[sS]?`;
+const CELSIUS_WORD = `${anyCase('celsius')}${UNIT_END}`;
+
 /**
  * Metric units by dimension, in every form the unit rules write them, in the American
  * spellings, and in the shorthand of a hand-written temperature such as `180C` or `180ºC`.
+ * The words of a temperature are read in any case, as the Fahrenheit value's are, but a lone
+ * `C` only in upper case, so `180c` is no Celsius value.
  * Each key names a capture group, which is how a match reports its dimension.
  */
 const METRIC_UNITS = {
   temperature: [
     [
-      String.raw`degrees?\s+(?:Celsius|C)${UNIT_END}|[°º˚]\s*C(?:elsius${UNIT_END})?|` +
-        String.raw`Celsius${UNIT_END}|℃|deg\.?\s*C${UNIT_END}|` +
-        String.raw`(?:degrees?\s+)?[Cc]entigrade${UNIT_END}`,
+      String.raw`${DEGREES_WORD}\s+(?:${CELSIUS_WORD}|C${UNIT_END})|[°º˚]\s*(?:${CELSIUS_WORD}|C)|` +
+        String.raw`${CELSIUS_WORD}|℃|${anyCase('deg')}\.?\s*C${UNIT_END}|` +
+        String.raw`(?:${DEGREES_WORD}\s+)?${anyCase('centigrade')}${UNIT_END}`,
       BASE,
     ],
     [String.raw`C${UNIT_END}`, BASE, BARE_CELSIUS_FIGURE],
@@ -624,11 +662,17 @@ type Dimension = keyof typeof METRIC_UNITS;
 // `METRIC_FORMS` reads a unit apart from its figure, so the figure a form needs is checked here.
 const afterFigure = ([forms, , figure]: MetricUnit) => (figure ? `(?<=${figure})(?:${forms})` : forms);
 
+/** A dimension's metric units as the source of one pattern, each form after the figure it needs. */
+export function metricUnitForms(dimension: Dimension): string {
+  const units: MetricUnit[] = METRIC_UNITS[dimension];
+  return units.map(afterFigure).join('|');
+}
+
 const METRIC_NUMBER = String.raw`[-−]?\d[\d,]*(?:\.\d+)?`;
 const METRIC_VALUE =
   String.raw`${METRIC_NUMBER}(?:\s*(?:-|–|—|to|and|x|×|by)\s*${METRIC_NUMBER})*\s*-?\s*` +
-  `(?:${Object.entries(METRIC_UNITS)
-    .map(([dimension, units]) => `(?<${dimension}>${units.map(afterFigure).join('|')})`)
+  `(?:${(Object.keys(METRIC_UNITS) as Dimension[])
+    .map((dimension) => `(?<${dimension}>${metricUnitForms(dimension)})`)
     .join('|')})`;
 
 /**
@@ -787,10 +831,10 @@ const MPG_FORMS = [
  */
 const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
   temperature: [
-    String.raw`[°º˚]\s*F(?:ahrenheit)?`,
-    '℉',
-    String.raw`degrees?\s+F(?:ahrenheit)?`,
-    String.raw`deg\.?\s*F`,
+    String.raw`[°º˚]\s*F(?:ahrenheit|\.)?`,
+    String.raw`℉\.?`,
+    String.raw`degrees?\s+F(?:ahrenheit|\.)?`,
+    String.raw`deg\.?\s*F\.?`,
     'Fahrenheit',
   ],
   economy: [...MPG_FORMS],
@@ -1033,6 +1077,33 @@ function redundantMetric(
  */
 const AFTER_UNIT = /(?:)/y;
 
+/** Whether `matched`, a measurement at `start`, ends in a stop that also ends the sentence. */
+function keepsStop(text: string, start: number, matched: string): boolean {
+  return matched.endsWith('.') && endsSentence(text, start, start + matched.length, AFTER_UNIT);
+}
+
+/** `°F` or `℉` and a stop: a symbol, which has no stop of its own. */
+const SYMBOL_STOP = /(?:[°º˚]\s*F|℉)\.$/i;
+
+/** Space that stays in the paragraph, then a word in lower case, so the sentence plainly goes on. */
+const LOWER_CASE_NEXT = new RegExp(String.raw`(?=\s)${SOFT_SPACE}\p{Ll}`, 'uy');
+
+function continuesInLowerCase(text: string, at: number): boolean {
+  LOWER_CASE_NEXT.lastIndex = at;
+  return LOWER_CASE_NEXT.test(text);
+}
+
+/**
+ * Whether the stop that ends `matched`, a Fahrenheit value at `start`, stays in the text. A
+ * bare letter `F` abbreviates the scale, so its stop goes as an abbreviation's does, unless
+ * it also ends the sentence. A symbol's stop is usually the sentence's own, but authors also
+ * write `350°F. for 20 minutes`, so it goes only before a word in lower case.
+ */
+function fahrenheitKeepsStop(text: string, start: number, matched: string): boolean {
+  if (!SYMBOL_STOP.test(matched)) return keepsStop(text, start, matched);
+  return !continuesInLowerCase(text, start + matched.length);
+}
+
 /**
  * `pushMeasurement`, with the change it makes widened over a hyphen that joins a length to
  * the size it gives. The metric unit stands apart from its number, so `6-foot-tall` reads
@@ -1105,7 +1176,7 @@ function pushMeasurement(
     return;
   }
   let after = withOriginal(ctx, body, matched);
-  if (matched.endsWith('.') && endsSentence(ctx.text, start, start + matched.length, AFTER_UNIT)) after += '.';
+  if (keepsStop(ctx.text, start, matched)) after += '.';
   changes.push(change(start, matched, after, ruleId, priority));
 }
 
@@ -1194,14 +1265,24 @@ const ANOTHER_HEIGHT =
   String.raw`${RANGE_JOIN}${NUMBER_START}(?:${UNSIGNED_NUMBER})${GAP}(?:feet|foot|ft)(?![A-Za-z])`;
 
 /**
+ * A word from `NOT_A_NOUN` after inches with no inch word, so nothing follows that the inches
+ * could count, as in `6 foot 4 with long arms`. `in` may be the inch abbreviation, and a join
+ * or `by` before a number carries the inches on to a range or a side, as in
+ * `6 feet 2 to 3 inches` and `a 6-foot 2 by 4`.
+ */
+const NO_NOUN_WORD =
+  String.raw`(?!(?:to|and|or|by)${SOFT_SPACE}(?<=\s)(?:${NUMERIC_FIRST}|${WHOLE_NUMBER}|${FRACTION_WORDS}))` +
+  String.raw`(?:${NOT_A_NOUN.filter((word) => word !== 'in').join('|')})(?!\w|${HYPHEN})`;
+
+/**
  * Where inches may go without their word after `foot` or `feet`, as in `six foot two`: before
- * nothing that could be a noun, or before another height. That is punctuation, `tall`, the end
- * of the text, the end of a line where the next line is blank or starts with something other
- * than a word, such as a list marker, or a join and a measurement in feet, as in
- * `6 foot 2 to 6 foot 4`.
+ * nothing that could be a noun, or before another height. That is punctuation, a word that
+ * cannot open a noun, the end of the text, the end of a line where the next line is blank or
+ * starts with something other than a word, such as a list marker, or a join and a measurement
+ * in feet, as in `6 foot 2 to 6 foot 4`.
  */
 const NO_NOUN_AFTER =
-  String.raw`(?=[.,;:!?)\]"'”’]+(?!\w)|${SOFT_SPACE}tall\b|${ANOTHER_HEIGHT}|` +
+  String.raw`(?=[.,;:!?)\]"'”’]+(?!\w)|${SOFT_SPACE}(?<=\s)${NO_NOUN_WORD}|${ANOTHER_HEIGHT}|` +
   String.raw`${INLINE_SPACE}*(?:$|${LINE_END}${INLINE_SPACE}*(?:$|${LINE_END}|[^\sA-Za-z])))`;
 
 /** Inches written without their word: a whole number from 1 to 11. */
@@ -1209,12 +1290,18 @@ const isInchCount = (value: number | null) =>
   value !== null && Number.isInteger(value) && value >= 1 && value <= 11;
 
 /**
+ * A whole number in words straight after a hyphen, as the `two` of `six-foot-two`, which
+ * `WHOLE_NUMBER` refuses so that a number never starts inside a hyphenated word.
+ */
+const WORDS_AFTER_HYPHEN = String.raw`(?<=${HYPHEN})(?:${SECOND_END_WORDS})`;
+
+/**
  * The feet of a height with no inch word before another height, and its inches starting where
  * the pattern is tried. The same shape as the last alternative of `feetInchesRule`.
  */
 const INCHES_OF_HEIGHT = new RegExp(
-  String.raw`(?<=(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:feet|foot)${SOFT_SPACE})(?<=\s)` +
-    String.raw`(${WHOLE_NUMBER})(?=${ANOTHER_HEIGHT})`,
+  String.raw`(?<=(?<![\w.])(${UNSIGNED_NUMBER})${GAP}(?:feet|foot)(?:${SOFT_SPACE}|${HYPHEN}))` +
+    String.raw`(?<=\s|${HYPHEN})(${WHOLE_NUMBER}|${WORDS_AFTER_HYPHEN})(?=${ANOTHER_HEIGHT})`,
   'diy',
 );
 
@@ -1269,18 +1356,52 @@ function isHeightInches(text: string, start: number): boolean {
   return answer;
 }
 
+/** Determiners and object pronouns, the words of `NOT_A_NOUN` that open a preposition's object. */
+const OPENS_OBJECT = [
+  'a', 'an', 'the', 'this', 'that', 'these', 'those', 'his', 'her', 'its', 'their', 'my', 'our',
+  'your', 'some', 'any', 'no', 'all', 'both', 'every', 'me', 'him', 'it', 'us', 'them', 'you',
+];
+
 /**
- * `6 feet 2 inches`, `6'2"`, `5 ft 11 in`, `six feet two inches` and `six foot two` collapse
- * into a single metric height.
+ * A word or number straight after a preposition that opens its object, as `her socks`,
+ * `shoes` and `2019` do. A word that cannot open a noun opens none, and nor does the `x` of
+ * a dimension, so `5 feet 4 in tall` and `5 ft 4 in x 3 ft` have no object after the `in`.
+ */
+const OBJECT_AFTER = new RegExp(
+  String.raw`(?=\s)${SOFT_SPACE}` +
+    String.raw`(?!(?:${[...NOT_A_NOUN.filter((word) => !OPENS_OBJECT.includes(word)), 'x'].join('|')})` +
+    String.raw`(?!\w|${HYPHEN}))[a-z\d]`,
+  'iy',
+);
+
+/** What follows a height's inches: the gap, then the inch word or mark. */
+const INCH_UNIT = new RegExp(String.raw`^((?:\s|${HYPHEN})*)(.*)$`, 's');
+
+/**
+ * A unit straight after a number: one the rules read, or a metric one. A number after
+ * `feet-` with a unit of its own ends a range, as the `6` of `5 feet-6 feet` does, and is
+ * no inches.
+ */
+const UNIT_OF_ITS_OWN =
+  String.raw`(?=\s)${SOFT_SPACE}(?:${UNIT_FORMS}|` +
+  String.raw`${Object.values(METRIC_UNITS).flat().map(afterFigure).join('|')})(?![A-Za-z\d])`;
+
+/**
+ * `6 feet 2 inches`, `6'2"`, `5 ft 11 in`, `six feet two inches`, `six foot two` and
+ * `six-foot-two` collapse into a single metric height.
  */
 function feetInchesRule(): Rule {
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:(?:feet|foot|ft\.?|′|${FOOT_MARK})` +
-      softGap(String.raw`(?:and(?=\s))?`) +
+    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})` +
+      String.raw`(?:(?:${GAP}(?:feet|foot|ft\.?)|${SOFT_SPACE}(?:′|${FOOT_MARK}))` +
+      String.raw`(?:${HYPHEN}|${softGap(String.raw`(?:and(?=\s))?`)})` +
       String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+${HYPHEN}\d+/\d+|\d+/\d+|` +
-      String.raw`${WHOLE_NUMBER}(?:${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION})?)` +
-      String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|["”])(?![A-Za-z])|` +
-      String.raw`(?:feet|foot)${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER})`,
+      String.raw`(?:${WHOLE_NUMBER}|${WORDS_AFTER_HYPHEN})` +
+      String.raw`(?:${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION})?)` +
+      String.raw`(?:${GAP}(?:inches|inch|in\.?)|${SOFT_SPACE}(?:″|["”]))(?![A-Za-z])|` +
+      String.raw`${GAP}(?:feet|foot)(?:${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER}|` +
+      // A hyphen makes the height one word, so a noun may follow it: `a six-foot-two man`.
+      String.raw`${HYPHEN}(\d+|${WORDS_AFTER_HYPHEN})(?!\w|${HYPHEN}|[.,/:]\d|${UNIT_OF_ITS_OWN})))`,
     'dgi',
   );
   const sticky = new RegExp(pattern.source, 'iy');
@@ -1314,8 +1435,14 @@ function feetInchesRule(): Rule {
         const match = beforeQuote(whole);
         if (match === undefined) continue;
         const feet = parseNumber(match[1]!);
-        const inches = parseNumber(match[2] ?? match[3]!);
-        if (match[3] !== undefined && !isInchCount(inches)) continue;
+        const bare = match[3] ?? match[4];
+        const inches = parseNumber(match[2] ?? bare!);
+        if (bare !== undefined && !isInchCount(inches)) continue;
+        // Hyphened to the foot word, only a number of inches below a foot makes a height, so
+        // `2 feet-18 inches` stays two lengths.
+        const tied =
+          match[2] !== undefined && TIGHT_HYPHEN.test(ctx.text.charAt(match.indices![2]![0] - 1));
+        if (tied && !(inches !== null && inches < 12)) continue;
         if (feet === null || inches === null || endsRangeWhole(ctx.text, match.index, match[1]!)) {
           changes.push(hold(match.index, match[0], 'units.length.feet-inches', 40));
           continue;
@@ -1328,19 +1455,28 @@ function feetInchesRule(): Rule {
           3,
           ctx.options.units.maxDecimals,
         );
-        const end = match.index + match[0].length;
+        let end = match.index + match[0].length;
         let attributive = false;
         if (match[2] !== undefined) {
-          const unitText = ctx.text.slice(match.indices![2]![1], end);
-          const [, gap, inchUnit] = /^(\s*)(.*)$/s.exec(unitText)!;
+          const inchesEnd = match.indices![2]![1];
+          const [, gap, inchUnit] = INCH_UNIT.exec(ctx.text.slice(inchesEnd, end))!;
           // An abbreviation or mark is neither singular nor plural, so it counts as the singular
           // after one, which describes a noun only after a determiner: `a 6 ft 2 in man`.
           const value = /^inch$/i.test(inchUnit!) ? inches : 1;
           attributive = describesNoun(ctx.text, match.index, value, gap!, end);
+          OBJECT_AFTER.lastIndex = end;
+          // The `in` of `5 feet 4 in her socks` is the preposition, and stays after the height.
+          if (!attributive && isBareInch(inchUnit!, match[0]) && OBJECT_AFTER.test(ctx.text)) {
+            end = inchesEnd;
+          }
+        } else if (match[4] !== undefined) {
+          const hyphen = ctx.text.charAt(match.indices![4]![0] - 1);
+          attributive = describesNoun(ctx.text, match.index, inches, hyphen, end);
         }
         const unit = attributive ? target.singular : unitWord(target, Number(number));
         const body = `${number} ${unit}`;
-        pushMeasurement(ctx, changes, match.index, match[0], body, 'units.length.feet-inches', 40);
+        const matched = ctx.text.slice(match.index, end);
+        pushMeasurement(ctx, changes, match.index, matched, body, 'units.length.feet-inches', 40);
       }
       return changes;
     },
@@ -1590,7 +1726,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     }
     if (isAmbiguousHere(entry.measure, ctx.text)) return;
     if (isBareInch(alias, matched)) return;
-    if (isConventional(ctx, entry.measure, start, start + matched.length)) {
+    if (
+      isInParticle(ctx.text, start, start + matched.length, alias) ||
+      isConventional(ctx, entry.measure, start, start + matched.length)
+    ) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
@@ -1657,7 +1796,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(alias, matched)) continue;
         const conventional = isConventional(ctx, entry.measure, start, start + matched.length);
-        if (reading === 'hold' || conventional) {
+        const particle = isInParticle(ctx.text, start, start + matched.length, alias);
+        if (reading === 'hold' || conventional || particle) {
           changes.push(hold(start, matched, entry.measure.id, 35));
           continue;
         }
@@ -1980,7 +2120,9 @@ function fahrenheitReadings(
     let values = parsed as number[];
 
     const start = match.index;
-    let end = start + match[0].length;
+    // A stop that stays in the text stays outside the value and any kept original.
+    const valueEnd = start + match[0].length - (fahrenheitKeepsStop(ctx.text, start, match[0]) ? 1 : 0);
+    let end = valueEnd;
     const beside = wordsBeside(ctx.text, start, end);
     const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
     const zero = FROM_ZERO.exec(after);
@@ -2000,9 +2142,13 @@ function fahrenheitReadings(
       numbers = formatEnds(ctx, values.map((v) => ((v - 32) * 5) / 9), raw);
     }
 
-    const spelled = /degrees?/i.test(match[4] ?? '');
-    const single = numbers.length === 1 && Math.abs(Number(numbers[0])) === 1;
-    const suffix = spelled ? ` ${single ? 'degree' : 'degrees'} Celsius` : '°C';
+    const unit = match[4] ?? '';
+    const spelled = /degrees?/i.test(unit);
+    const gap = /\s*$/.exec(match[0].slice(0, match[0].length - unit.length))![0];
+    const singular =
+      (numbers.length === 1 && Math.abs(Number(numbers[0])) === 1) ||
+      (/^degree(?!s)/i.test(unit) && describesNoun(ctx.text, start, values.at(-1)!, gap, valueEnd));
+    const suffix = spelled ? ` ${singular ? 'degree' : 'degrees'} Celsius` : '°C';
     readings.push({
       start,
       matched: ctx.text.slice(start, end),
@@ -2083,7 +2229,9 @@ function temperatureDecadeRule(): Rule {
   const DECADE = String.raw`(low|mid|middle|high|upper|lower)?(?:\s|${HYPHEN})*(1[01]0|\d0)['\u2019]?s`;
   const pattern = new RegExp(
     String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
-      String.raw`(?:\s*(?:and|to|${HYPHEN}|\u2013)\s*${DECADE})?(?!\w)(\s*(?:${FAHRENHEIT}|Fahrenheit\b))?`,
+      String.raw`(?:\s*(?:and|to|${HYPHEN}|\u2013)\s*${DECADE})?(?!\w)` +
+      // A bare `degrees` after a decade can only be its unit, unless a Celsius unit begins there.
+      String.raw`(\s*(?:${FAHRENHEIT}|Fahrenheit\b|(?!${metricUnitForms('temperature')})degrees\b))?`,
     'gi',
   );
 
@@ -2140,7 +2288,7 @@ function temperatureDecadeRule(): Rule {
           start,
           end,
           before: match[0],
-          after: body,
+          after: fahrenheitKeepsStop(ctx.text, start, match[0]) ? `${body}.` : body,
           ruleId: 'units.temperature.decade',
           category: 'units',
           confidence: 'risky',
@@ -2292,8 +2440,7 @@ function fuelEconomyRule(): Rule {
 
       single.lastIndex = 0;
       for (const match of ctx.text.matchAll(single)) {
-        // Its range settles it. `resolveChanges` tests every change against every hold, so a
-        // second change or hold for each range is quadratic in a long run of ranges.
+        // Its range settles it.
         if (rangeEnds.has(match.index + match[0].length)) continue;
         const mpg = Number(match[1]);
         if (!mpg || endsRange(ctx.text, match.index, mpg)) {

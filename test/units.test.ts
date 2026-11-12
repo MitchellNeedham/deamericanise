@@ -283,6 +283,56 @@ describe('mass and volume', () => {
   });
 });
 
+describe('the stop of a unit abbreviation', () => {
+  it.each`
+    input                                          | expected                                       | why
+    ${'The board is 12 in.'}                       | ${'The board is 30 cm.'}                       | ${'the end of the text'}
+    ${'The fence is 6 ft. It is new.'}             | ${'The fence is 1.8 m. It is new.'}            | ${'before a new sentence'}
+    ${'Add 2 fl. oz.'}                             | ${'Add 59 mL.'}                                | ${'an abbreviation of two words'}
+    ${'The fence is 6 ft.\nIt is new.'}            | ${'The fence is 1.8 m.\nIt is new.'}           | ${'before a sentence on the next line'}
+    ${'The board is 12 in. One end is red.'}       | ${'The board is 30 cm. One end is red.'}       | ${'before a number in words that opens a sentence'}
+    ${'(The board is 12 in.)'}                     | ${'(The board is 30 cm.)'}                     | ${'inside a closing bracket'}
+    ${'He is 6 ft. 2 in.'}                         | ${'He is 1.88 metres.'}                        | ${'feet and inches'}
+    ${'The gap is 6-12 in.'}                       | ${'The gap is 15-30 cm.'}                      | ${'a range'}
+    ${'The sheet is 4 ft. x 8 ft.'}                | ${'The sheet is 1.2 x 2.4 m.'}                 | ${'a dimension'}
+    ${'It weighs 5 lb.'}                           | ${'It weighs 2.3 kg.'}                         | ${'pounds'}
+    ${'It weighs 5 lbs. The bag is full.'}         | ${'It weighs 2.3 kg. The bag is full.'}        | ${'pounds, plural'}
+    ${'Add 8 oz.'}                                 | ${'Add 230 g.'}                                | ${'ounces'}
+    ${'The baby weighed 7 lb. 8 oz.'}              | ${'The baby weighed 3.4 kg.'}                  | ${'a weight in two units'}
+  `('keeps the stop that also ends the sentence: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                          | expected                                       | why
+    ${'It is 12 in. long.'}                        | ${'It is 30 cm long.'}                         | ${'before a word in lower case'}
+    ${'Cut 6 ft. of rope.'}                        | ${'Cut 1.8 m of rope.'}                        | ${'the same, feet'}
+    ${'Add 8 oz. of cheese and 5 lb. of beef.'}    | ${'Add 230 g of cheese and 2.3 kg of beef.'}   | ${'ounces and pounds'}
+    ${'Add 5 lbs. of beef.'}                       | ${'Add 2.3 kg of beef.'}                       | ${'pounds, plural'}
+    ${'Buy a 5 lb. bag of flour.'}                 | ${'Buy a 2.3 kg bag of flour.'}                | ${'before the noun it describes'}
+    ${'The baby weighed 7 lb. 8 oz. at birth.'}    | ${'The baby weighed 3.4 kg at birth.'}         | ${'a weight in two units'}
+    ${'Buy a 6 ft. HDMI cable.'}                   | ${'Buy a 1.8 m HDMI cable.'}                   | ${'before a word in capitals'}
+    ${'Is it 12 in.?'}                             | ${'Is it 30 cm?'}                              | ${'before another stop'}
+    ${'Add 8 oz of cheese.'}                       | ${'Add 230 g of cheese.'}                      | ${'no stop of its own'}
+    ${'There are 6 in total.'}                     | ${'There are 6 in total.'}                     | ${'the preposition'}
+    ${'The engine makes 100 lb-ft of torque.'}     | ${'The engine makes 140 N·m of torque.'}       | ${'torque'}
+  `('drops the stop that only ends the abbreviation: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('keeps the stop after the original, outside its bracket', () => {
+    expect(convert('The board is 12 in.', { units: { keepOriginal: true } })).toBe('The board is 30 cm (12 in.).');
+  });
+
+  it.each`
+    input                                     | expected
+    ${'The bag weighs 2.2 lb. (1 kg).'}       | ${'The bag weighs 1 kg.'}
+    ${'The bag weighs 1 kg (2.2 lb.) today.'} | ${'The bag weighs 1 kg (2.2 lb.) today.'}
+  `('reads a dotted weight whole beside its metric value: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
 describe('temperature', () => {
   it.each`
     input                       | expected                | why
@@ -1360,7 +1410,7 @@ describe('a dimension with a different unit on each side', () => {
   it.each`
     input                               | expected                              | why
     ${'the board is 2 feet x 6 inches'} | ${'the board is 61 x 15 centimetres'} | ${'each side in its own unit'}
-    ${'the sheet is 4 ft x 8 in.'}      | ${'the sheet is 1.2 x 0.2 m'}         | ${'all in the unit for the largest'}
+    ${'the sheet is 4 ft x 8 in.'}      | ${'the sheet is 1.2 x 0.2 m.'}        | ${'all in the unit for the largest'}
     ${'the deck is 10 ft x 12 in'}      | ${'the deck is 3 x 0.3 m'}            | ${'"in" after a side with a unit is the unit'}
     ${'10 ft by 6 in'}                  | ${'3 by 0.15 m'}                      | ${'the same, joined by "by"'}
     ${'3 ft x 2 ft x 6 in'}             | ${'91 x 61 x 15 cm'}                  | ${'three sides'}

@@ -40,6 +40,89 @@ describe('feet and inches together', () => {
   `('$input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
+
+  it.each`
+    input                                   | expected                       | why
+    ${'He stood six feet two inches tall.'} | ${'He stood 1.88 metres tall.'} | ${'both numbers in words'}
+    ${'five feet eleven inches'}            | ${'1.8 metres'}                | ${'eleven inches'}
+    ${'6 feet two inches'}                  | ${'1.88 metres'}               | ${'the inches in words'}
+    ${'six feet 2 inches'}                  | ${'1.88 metres'}               | ${'the feet in words'}
+    ${'six feet and two inches'}            | ${'1.88 metres'}               | ${'joined by "and"'}
+    ${'six feet two and a half inches'}     | ${'1.89 metres'}               | ${'a fraction in words of an inch'}
+    ${'twenty-one feet three inches'}       | ${'6.48 metres'}               | ${'feet in two words'}
+    ${'six feet two\ninches'}               | ${'1.88 metres'}               | ${'the inch word on the next line'}
+  `('reads a height in words: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                | expected                     | why
+    ${'He is six foot two.'}             | ${'He is 1.88 metres.'}      | ${'before a full stop'}
+    ${'He is 6 foot 2.'}                 | ${'He is 1.88 metres.'}      | ${'in digits'}
+    ${'He is six feet eleven, I think.'} | ${'He is 2.11 metres, I think.'} | ${'before a comma'}
+    ${'(six foot one)'}                  | ${'(1.85 metres)'}           | ${'before a bracket'}
+    ${'a man six foot two tall'}         | ${'a man 1.88 metres tall'}  | ${'before "tall"'}
+    ${'He is six foot two'}              | ${'He is 1.88 metres'}       | ${'at the end of the text'}
+    ${'six foot two\n\nNext'}            | ${'1.88 metres\n\nNext'}     | ${'before a blank line'}
+    ${'- six foot two\n- next'}          | ${'- 1.88 metres\n- next'}   | ${'before a list item'}
+    ${'He is six foot\ntwo.'}            | ${'He is 1.88 metres.'}      | ${'the inches on the next line'}
+  `('reads inches with no inch word: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                       | expected                     | why
+    ${'6 feet 2 cars'}          | ${'1.8 metres 2 cars'}       | ${'a noun follows the number'}
+    ${'six foot two\nboxes'}    | ${'1.8 metres two\nboxes'}   | ${'a word follows on the next line'}
+    ${'six foot twelve.'}       | ${'1.8 metres twelve.'}      | ${'twelve is not a number of inches'}
+    ${'He is 6 foot 2.5.'}      | ${'He is 1.8 metres 2.5.'}   | ${'nor is a decimal'}
+    ${'He is 6 ft 2.'}          | ${'He is 1.8 m 2.'}          | ${'only "foot" or "feet" lets the inch word go'}
+    ${'6 feet\n\n2 inches tall'} | ${'1.8 metres\n\n5.1 centimetres tall'} | ${'a blank line ends the height'}
+    ${'six feet tall'}          | ${'1.8 metres tall'}         | ${'feet on their own'}
+    ${'6 feet 2 inches'}        | ${'1.88 metres'}             | ${'both numbers in digits'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a measurement in two units that ends a range is left whole', () => {
+  it.each`
+    unchanged                                            | why
+    ${'He is 5 - 6 feet 2 inches tall.'}                 | ${'a height after a spaced dash'}
+    ${'He is 5 to 6 feet 2 inches tall.'}                | ${'after "to"'}
+    ${'between 5 and 6 feet 2 inches'}                   | ${'after "and" in a range'}
+    ${'He is 5-6 feet 2 inches tall.'}                   | ${'after a dash written tight'}
+    ${'He is five to six feet two inches tall.'}         | ${'a height in words'}
+    ${'between five and six feet two inches'}            | ${'a height in words after "and" in a range'}
+    ${'five - six feet two inches'}                      | ${'a height in words after a spaced dash'}
+    ${'five to 6 feet 2 inches'}                         | ${'a first end in words'}
+    ${'He is five to six foot two.'}                     | ${'a height with no inch word'}
+    ${'Babies weigh five to seven pounds eight ounces.'} | ${'a weight in words'}
+    ${'between five and seven pounds eight ounces'}      | ${'a weight in words after "and" in a range'}
+    ${'five to 7 pounds 8 ounces'}                       | ${'a first end in words'}
+    ${'five - seven pounds eight ounces'}                | ${'a weight in words after a spaced dash'}
+    ${'five-7 pounds 8 ounces'}                          | ${'a first end in words before a dash'}
+    ${'two and a half to three pounds eight ounces'}     | ${'a first end with a fraction in words'}
+    ${'5 to 7 pounds 8 ounces'}                          | ${'a range in digits'}
+  `('leaves "$unchanged" as written ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                          | expected                           | why
+    ${'seven pounds eight ounces'}                 | ${'3.4 kilograms'}                 | ${'a weight in words on its own'}
+    ${'five to seven pounds'}                      | ${'2.3 to 3.2 kilograms'}          | ${'a range in one unit'}
+    ${'one hundred and seven pounds eight ounces'} | ${'48.8 kilograms'}                | ${'"and" inside one number'}
+    ${'five and seven pounds eight ounces'}        | ${'five and 3.4 kilograms'}        | ${'"and" without "between" joins no range in words'}
+    ${'reduce by half to 2 pounds 3 ounces'}       | ${'reduce by half to 992 grams'}   | ${'"half to" is an idiom'}
+    ${'6 feet 2 inches to 6 feet 4 inches'}        | ${'1.88 metres to 1.93 metres'}    | ${'a range of two heights'}
+    ${'Model 900 - 6 feet 2 inches tall'}          | ${'Model 900 - 1.88 metres tall'}  | ${'a first number that cannot open the range'}
+    ${'Model 900 - 7 pounds 8 ounces'}             | ${'Model 900 - 3.4 kilograms'}     | ${'the same, before a weight'}
+    ${'5-10 feet'}                                 | ${'1.5-3 metres'}                  | ${'a range in one unit, in digits'}
+    ${'6 feet 2 inches (1.88 m)'}                  | ${'1.88 m'}                        | ${'a height before its metric value'}
+  `('still converts $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
 });
 
 describe('a weight in two units is one weight', () => {
@@ -164,6 +247,9 @@ describe('a long run of whitespace takes time in line with its length', () => {
     ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'5 feet'}                | ${'A 3.4 kilogram baby.'}
     ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'half a mile'}           | ${'A 3.4 kilogram baby.'}
     ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'seven pounds 8 ounces'} | ${'A 3.4 kilogram baby.'}
+    ${'He is six foot two'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'tall.'}                 | ${'He is 1.88 metres'}
+    ${'He is six foot two'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'The color.'}            | ${'He is 1.8 metres two'}
+    ${'Weigh five to'}             | ${'spaces'}   | ${' '}  | ${3000}  | ${'seven pounds 8 ounces'} | ${'Weigh five to'}
     ${'It weighs 7 pounds'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'The color.'}            | ${'It weighs 3.2 kilograms'}
     ${'It is 5'}                   | ${'spaces'}   | ${' '}  | ${30000} | ${'The color.'}            | ${'It is 5'}
   `('"$before", $length $name, then "$after"', ({ before, run, length, after, expected }) => {

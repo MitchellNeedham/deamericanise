@@ -377,6 +377,15 @@ whole. With `units.range` or `units.dimensions` switched off, a range or dimensi
 written, never half converted, so `½-¾ inch`, `½ to ¾ inch` and `1½ x 2 inch` stay as they
 are.
 
+Fuel economy is read as `mpg`, `miles per gallon`, `miles-per-gallon`, `miles/gallon` or
+`mi/gal`, so `30 miles/gallon` becomes `7.8 L/100km`, never kilometres per gallon, and
+`7.8 L/100km (30 mi/gal)` is a restatement. A range converts at both ends and gives the
+smaller number first, though litres per 100 km fall as miles per gallon rise: `20 to 30 mpg`
+becomes `7.8 to 12 L/100km`, and `8.5 to 13 km/L` with `fuelEconomy: 'km-per-l'`. After
+`from` the order shows a direction, so it stays: `improved from 20 to 30 mpg` becomes
+`improved from 12 to 7.8 L/100km`. A range of fuel economy with a first end in words or a
+fraction, or an end of zero, as in `twenty to 30 mpg`, is left as written.
+
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
 `Bake at 175-190°C`. A temperature range wraps and stops at a new block as the others do,
 so `Room 13` above a bullet `- 0°F overnight` is a room and a temperature. A change in
@@ -407,8 +416,9 @@ a sentence. `Cook until the chicken
 reaches 165F` becomes `73.9°C`, while `Apartment 3F`, `seat 23F`, `the Boeing 777F`,
 `#33F`, `F-150` and the courtesy figure in `180C/350F/gas 4` stay as they are.
 
-A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `175 Celsius`),
-and as a bare upper case `C` after a number of two or three figures with at most one space.
+A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `175℃`,
+`175 deg C`, `175 Celsius`), as `175 centigrade` or `175 degrees centigrade`, and as a bare
+upper case `C` after a number of two or three figures with at most one space.
 So `Bake at 350°F (180C)` becomes `Bake at 180C` and `180C/350°F/gas 4` stays as it is,
 while `Apartment 3C (65°F)` is a flat and its temperature converts.
 
@@ -433,16 +443,26 @@ line, but not after a blank line. `1.8 metres (6 feet)` is left as
 it is, because the bracket only restates the metric value in front of it. That is the
 form `keepOriginal` writes, so running it again changes nothing. The same holds for any
 quantity in words the unit rules convert, as in `1.3 centimetres (half an inch)` and
-`2.4 kilometres (a mile and a half)`, and after emphasis or code that closes on the metric
-value, as in `**1.8 metres** (6 feet)`. Here too the bracket may start on the next line,
+`2.4 kilometres (a mile and a half)`. Here too the bracket may start on the next line,
 but not after a blank line. The bracket can open
 with a word such as `about`, but it has to hold nothing else, and the dimension has to
 match: `2 metres (6 pounds)` still converts.
 
+Inline markup on either value or on the bracket is read past: emphasis, code or an inline
+HTML tag that closes on the first value, opens on the bracket or the second value, or wraps
+the measurement inside the bracket. So `**1.8 metres** (6 feet)`,
+`<b>1.8 metres</b> (6 feet)`, `1.8 metres *(6 feet)*` and `1.8 metres (*6 feet*)` are left
+as they are. Where the bracket goes, markup that closes on the imperial value closes on the
+metric one, and the bracket's own markup goes with it: `**6 feet** (1.8 m)` becomes
+`**1.8 m**`, and `6 feet *(1.8 m)*` becomes `1.8 m`. Markup that opens on the bracket has to
+close on it, or the bracket is not read. No change rewrites across an HTML tag, so
+`<b>6 feet</b> (1.8 m)` is left as it is.
+
 A `/` or `or` between the two values reads the same way as a bracket, by the same test of
 agreement. `350°F/180°C` and `350°F or 180°C` become `180°C`, and
 `Preheat to 350°F/180°C/gas 4` becomes `Preheat to 180°C/gas 4`. `180°C/350°F` and
-`180°C or 350°F` are left as they are. A pair can also offer two different measurements,
+`180°C or 350°F` are left as they are, and markup reads as it does with a bracket:
+`**350°F**/180°C` becomes `**180°C**`. A pair can also offer two different measurements,
 so the values have to agree with the metric one first too: `Cut 6 feet or 3 metres of rope`
 becomes `Cut 1.8 metres or 3 metres of rope`, and `Cut 3 metres or 6 feet of rope` becomes
 `Cut 3 metres or 1.8 metres of rope`. A slash with no figure after it is a rate, so
@@ -465,6 +485,13 @@ weight word in the measurement's own phrase (`lost`, `weighs`, `of beef`, `a 5-p
 outranks it. `lb` and `lbs` are never money, and `respectConventions: false` does not
 convert money. An amount of money is held whole, as a conventional size is, so no other
 rule rewrites any part of it.
+
+An abbreviation's stop goes with it, so `It is 12 in. long.` becomes `It is 30 cm long.` and
+`Add 5 lb. of beef.` becomes `Add 2.3 kg of beef.` The stop stays when it also ends the
+sentence, as a time's does, so `The fence is 6 ft. It is new.` becomes
+`The fence is 1.8 m. It is new.` Any capitalised word after the stop starts a new sentence,
+a number in words included, but a word in capitals does not, so `Buy a 6 ft. HDMI cable.`
+becomes `Buy a 1.8 m HDMI cable.`
 
 **Dates.** `3/14/2024` becomes `2024-03-14` without needing to be told anything, because
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
@@ -507,6 +534,11 @@ A scale stays with the amount only as a whole word: `$5 million` and `$50k` beco
 **Punctuation** (`localise` only). House style rather than comprehension, so it waits to
 be asked for. `U.S.` becomes `US`, and punctuation that is not part of a quotation moves
 outside the closing quote.
+
+Logical quoting moves only the stop or comma, so the quotation's last word is still
+rewritten: `He said "The color is gray."` becomes `He said "The colour is grey".` A quote
+mark with a letter or digit straight after it closes nothing, so `Acme Inc.'s` keeps its
+stop.
 
 An initialism keeps its last stop when that stop also ends the sentence, as a time does,
 so `She moved to the U.S. It was cold.` becomes `She moved to the US. It was cold.` A
@@ -580,7 +612,13 @@ the cooking: a word that names a thing (`bake sale`, `bake-off`, `baked goods`,
 `baked beans`, `baking tin`) is no cue, and a verb that takes an amount of its own
 (`came to`, `rose to`, `raised`, `cost`, `sold`) stops the search, so
 `The bake sale takings came to 320.` has no oven in it, while
-`Bake at 350 and sell them at the bake sale.` does. A cup is no evidence at all,
+`Bake at 350 and sell them at the bake sale.` does. A setting has to be followed by its
+unit (any Fahrenheit unit the temperature rule reads, a bare `F`, or a degree with no
+scale, as in `350 deg F`, `a 350℉ oven` or `350 degrees`) or by the rest of the
+instruction: punctuation, a joining word such as `for`, `until`, `till` or `before`, a
+manner such as `uncovered`, a dash between clauses, or a cooking time such as
+`20 minutes`. A quantity never follows it, so `in the oven for up to 300 minutes` has no
+oven setting, and nor does `300 - 400 minutes`. A cup is no evidence at all,
 since Australia and New Zealand cook in metric cups. A measured ingredient under a name
 only Americans use, such as `1 cup all-purpose flour` or `2 tablespoons cornstarch`,
 counts like any other vocabulary, unless the local name sits beside it, as it does in
@@ -590,7 +628,11 @@ A temperature counts as `Fahrenheit` in exactly the forms the unit rules convert
 `165 degrees F` counts, `Cook until the chicken reaches 165F` counts, and `Apartment 3F`
 does not. The word `Fahrenheit` on its own counts too where it names the scale, as in
 `Set the thermostat in Fahrenheit`, but not straight before a number, where it is part
-of a title such as `Fahrenheit 451` or `Fahrenheit 9/11`.
+of a title such as `Fahrenheit 451` or `Fahrenheit 9/11`. A Fahrenheit value that restates
+the Celsius value before it, as in `Bake at 175°C (350°F)` or `180°C or 350°F`, is the
+courtesy figure the unit rules leave as written, so neither it nor the word `Fahrenheit`
+inside it counts. `Bake at 350°F (175°C)` converts and counts, and so does
+`Heat to 180°C or 400°F`, where the two values disagree.
 
 Pounds count as `imperial units` only where the unit rules read them as a weight, so
 `2 pounds of ground beef` counts, and the money in `It cost 1,500 pounds` or
@@ -625,7 +667,11 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 - **Proper nouns.** Pearl Harbor, the World Trade Center, the Department of Defense, the
   Australian Labor Party, rigor mortis, Fahrenheit 451, the MIT License, Prolog, and
   trademarks such as Band-Aid and Realtor.
-- **Structure.** URLs, email addresses, inline code, fenced code blocks and HTML tags.
+- **Structure.** URLs, email addresses, long command-line flags, inline code, fenced code
+  blocks and HTML tags. A long flag is two hyphens and a letter at the start of a token, with
+  any `=value` after it, so `--center`, `--color=gray` and `--label="dark gray"` are held in
+  prose as well as in comments. Two hyphens straight after a word are a dash, so
+  `the color--that is` is still rewritten.
   Inline code is paired the way CommonMark pairs it: a span closes on a run of as many
   backticks as opened it, so ``` ``a ` b`` ``` is one span, and it may wrap onto the next
   line of its paragraph. A backtick with no partner before the paragraph ends, or one
@@ -636,7 +682,7 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 
   | `syntax` | |
   | --- | --- |
-  | `'markdown'` | Fences as above, and indented code blocks and `pre`, `script`, `style` and `textarea` blocks as CommonMark reads them |
+  | `'markdown'` | Fences as above, and indented code blocks and `pre`, `script`, `style` and `textarea` blocks and elements as CommonMark reads them |
   | `'text'` | No such fences, since a line of tildes underlines a heading in `.rst` or `.txt`: three backticks protect everything up to the next three |
   | none (default) | Fences as above, and an indented line is prose |
 
@@ -649,8 +695,12 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   and runs to the end of the line that holds a closing tag of any of the four, blank lines
   included, or to the end of the list item or quote it sits in. CommonMark passes it through
   as raw HTML, so all of it is held, including text after the closing tag on its last line.
-  Other HTML blocks, such as `<div align="center">` on a line of its own, and HTML comments
-  hold text that is still rewritten, as is a tag in the middle of a sentence.
+
+  Another HTML block, such as one opened by `<div align="center">` or `<details>` on a line
+  of its own, runs to the next blank line. Inside it, each `pre`, `script`, `style` or
+  `textarea` element is held from its opening tag to the next closing tag of the same name,
+  or to the end of the block. The rest of that block, and HTML comments, hold text that is
+  still rewritten, as is a tag in the middle of a sentence.
 - **File names and paths,** read from their shape rather than a list of extensions. A file
   name is a name holding a letter, then a dot and an extension in one case with no space
   either side, so `behavior.ts`, `Center.vue` and `GRAY.PNG` are held, and so is a domain or
@@ -661,12 +711,13 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   `src/colors`, are prose (write `./src/colors` or a code span to hold one); `The color.It`
   is a missing space, since `It` is mixed case; `3.5mi` is a number, since `3` has no
   letter; an initialism such as `U.S.` or `Ph.D.` is an initialism; and a unit straight
-  after a number, such as `300 lb.ft` or `32 ft/s/s`, is a measurement.
+  after a number, or after a number and a degree sign, such as `300 lb.ft`, `32 ft/s/s` or
+  `225°F/low/slow`, is a measurement.
 - **Identifiers,** when `protectIdentifiers` is on (the default for source files):
   `normalizeInput`, `MAX_COLOR_VALUE`, `background-color`, `theme.colors.gray`,
-  `--color-scheme`, `getColor()`. An initialism, where every part is one or two letters
-  followed by a stop, is not a dotted name, so `U.S.`, `Ph.D.` and `p.m.` in a comment are
-  rewritten as they are in prose.
+  a one-hyphen flag such as `-color`, `getColor()`. An initialism, where every part is one or
+  two letters followed by a stop, is not a dotted name, so `U.S.`, `Ph.D.` and `p.m.` in a
+  comment are rewritten as they are in prose.
 - **Anything you name:**
 
   ```ts
@@ -768,6 +819,13 @@ value. A weighted score over those signals separates code from prose across C, P
 SQL, CSS and the rest with one rule set, and a line that already starts with the host
 language's comment marker is taken as commented-out on sight.
 
+An s-expression puts its name after the bracket, so a line also reads as code when it opens
+with a Lisp declaration or special form in lower case, such as `(defun`, `(setq`, `(let` or
+`(when`, or when it opens or closes two of the same bracket at once, as `((color` and
+`color))` do. A mixed pair, as in the citation `(see [1])`, counts for nothing.
+`; (setq color 1)` and `;; (let ((color 1)) color)` are left alone, while
+`; (See the color chart.)` is rewritten.
+
 A run of the marker that a language writes by convention is one marker, not two: `;;`,
 `;;;` and `;;;;` in Lisp, `'''` in Visual Basic, `%%` and `%%%` in Erlang, MATLAB and
 LaTeX, and `!!` in Fortran. So `;; Pick the color.` is rewritten, while `;;; ;; old note`,
@@ -777,9 +835,10 @@ alone. `LexerSpec.markerRuns` sets these per language.
 
 The costs are lopsided: a missed rewrite inside a commented-out block is invisible, while
 a rewrite there is a broken build. The threshold is set accordingly, so the occasional
-prose line that reads like code is left alone. It works line by line, so a block comment
-can hold prose and an `@example` at once, and doc tags keep their operands: the name in
-`@param {string} color` is protected while the description beside it is not.
+prose line that reads like code is left alone, such as `// (when ready, center it)` in any
+language. It works line by line, so a block comment can hold prose and an `@example` at
+once, and doc tags keep their operands: the name in `@param {string} color` is protected
+while the description beside it is not.
 
 Turn it off with `protectCommentedCode: false` or `--no-code-guard`.
 
@@ -1062,10 +1121,6 @@ with no prose. Only the ids in `DIALECTS` are dialects, so a name every object h
   known to be Markdown: a Markdown file, `syntax: 'markdown'`, or Prettier's Markdown parser.
   So `deamericaniseText` with no `syntax`, stdin without `--language md` or
   `--syntax markdown`, and comments rewrite them.
-- Outside the remark plugin, a `pre`, `script`, `style` or `textarea` element inside another
-  HTML block, such as a `<pre>` between `<div>` and `</div>` with no blank line between them,
-  is read as CommonMark reads it: part of the outer block, so its contents are rewritten. The
-  remark plugin leaves every HTML block alone.
 - Unit conversion is lossy at the default precision, by design. Use `precision: 'exact'`
   or `keepOriginal` where the numbers matter.
 - A number that a hard wrap splits, such as `1` at the end of one line and `1/2 gallons` at

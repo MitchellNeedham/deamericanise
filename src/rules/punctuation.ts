@@ -113,7 +113,9 @@ function abbreviationRule(): Rule {
  * is not part of the quotation. Logical quoting puts it where it belongs.
  */
 function quotationRule(): Rule {
-  const pattern = /([A-Za-z0-9)\]])([,.])(["'’”])/g;
+  // Only the stop and the quote are rewritten, so a rule that rewrites the quotation's last
+  // word applies too. A quote mark before a letter or digit is an apostrophe or opens a quote.
+  const pattern = /(?<=[A-Za-z0-9)\]])([,.])(["'’”])(?![\p{L}\p{N}])/gu;
 
   return {
     id: 'punctuation.logical-quotes',
@@ -127,7 +129,7 @@ function quotationRule(): Rule {
           start: match.index,
           end: match.index + match[0].length,
           before: match[0],
-          after: `${match[1]}${match[3]}${match[2]}`,
+          after: `${match[2]}${match[1]}`,
           ruleId: 'punctuation.logical-quotes',
           category: 'punctuation',
           confidence: 'risky',

@@ -93,6 +93,22 @@ describe('identifiers inside comments survive', () => {
   });
 });
 
+describe('an initialism in a comment is not a dotted name', () => {
+  it.each`
+    source                                  | options                   | expected
+    ${'// Only ships to the U.S.\n'}        | ${{ preset: 'localise' }} | ${'// Only ships to the US.\n'}
+    ${'// Ask a Ph.D. student.\n'}          | ${{ preset: 'localise' }} | ${'// Ask a PhD student.\n'}
+    ${'// Two P.M.s and a Ph.D.\n'}         | ${{ preset: 'localise' }} | ${'// Two PMs and a PhD.\n'}
+    ${'// Runs at 3 p.m. every day.\n'}     | ${{}}                     | ${'// Runs at 3pm every day.\n'}
+    ${'// e.g. the color\n'}                | ${{}}                     | ${'// e.g. the colour\n'}
+    ${'// see theme.colors.gray.\n'}        | ${{}}                     | ${'// see theme.colors.gray.\n'}
+    ${'// call os.path.join() first\n'}     | ${{}}                     | ${'// call os.path.join() first\n'}
+    ${'// read io.Color.Gray.\n'}           | ${{}}                     | ${'// read io.Color.Gray.\n'}
+  `('$source -> $expected', ({ source, options, expected }) => {
+    expect(deamericaniseCode(source, { language: 'ts', ...options }).text).toBe(expected);
+  });
+});
+
 describe('inline code inside a comment', () => {
   it.each`
     source                                                              | expected                                                             | why

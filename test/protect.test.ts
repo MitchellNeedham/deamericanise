@@ -51,6 +51,56 @@ describe('structure that is never prose', () => {
   });
 });
 
+describe('file names and paths', () => {
+  const american = { assumeAmerican: true };
+
+  it.each`
+    unchanged                                                    | why
+    ${'Edit src/colors/center.ts to change it.'}                 | ${'a path of three segments'}
+    ${'See docs/behavior.md and assets/gray.svg.'}               | ${'two segments ending in a file name'}
+    ${'Rename Center.vue and behavior.ts.'}                      | ${'file names, whatever the extension'}
+    ${'Copy color-picker.tsx and GRAY.PNG.'}                     | ${'a hyphen in the name, an extension in capitals'}
+    ${'The theme lives in ./styles/color and ~/favorites/gray.'} | ${'paths from a root'}
+    ${'Install to /usr/share/color and ../colors.'}              | ${'more roots'}
+    ${'Open C:\\Users\\me\\Favorites\\color.txt first.'}         | ${'a drive letter and backslashes'}
+    ${'Open D:/colors/gray first.'}                              | ${'a drive letter and slashes'}
+    ${'Edit 01-colors.md and .eslintrc.color.json.'}             | ${'a name starting with a number or a dot'}
+    ${'Import node_modules/@types/color/index.d.ts here.'}       | ${'a scoped package'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged, american)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                     | expected                                   | why
+    ${'Pick a color/flavor.'}                 | ${'Pick a colour/flavour.'}                | ${'two words joined by a slash'}
+    ${'colors and/or behaviors'}              | ${'colours and/or behaviours'}             | ${'and/or'}
+    ${'Edit src/colors here.'}                | ${'Edit src/colours here.'}                | ${'a bare two-segment path reads the same'}
+    ${'The color.It was gray.'}               | ${'The colour.It was grey.'}               | ${'a missing space after a full stop'}
+    ${'It is 3.5 miles.'}                     | ${'It is 5.6 kilometres.'}                 | ${'a number has no letter in its name'}
+    ${'It makes 300 lb.ft of torque.'}        | ${'It makes 410 N·m of torque.'}           | ${'a dotted unit after a number'}
+    ${'It makes 300lb.ft of torque.'}         | ${'It makes 410 N·m of torque.'}           | ${'a dotted unit joined to its number'}
+    ${'It is -5lb.ft or 1/2lb.ft.'}           | ${'It is -6.8 N·m or 0.68 N·m.'}           | ${'joined to a signed number or a fraction'}
+    ${'Use a 25-lb.ft or 10-20lb.ft wrench.'} | ${'Use a 34 N·m or 14-27 N·m wrench.'}     | ${'joined by a hyphen, or to a range'}
+    ${'It falls at 32 ft/s/s.'}               | ${'It falls at 9.8 m/s/s.'}                | ${'a unit of three segments after a number'}
+    ${'Runs at 3p.m. daily.'}                 | ${'Runs at 3pm daily.'}                    | ${'a time joined to its number'}
+    ${'It was 3/4/2024 then.'}                | ${'It was 2024-03-04 then.'}               | ${'a date has no letter'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input, american)).toBe(expected);
+  });
+
+  it('reads initialisms as initialisms, not file names', () => {
+    const input = 'Two P.M.s met a Ph.D. from the U.S.A. at 3 P.M. on the Canada/U.S. border.';
+    expect(au(input, { ...american, preset: 'localise' })).toBe(
+      'Two PMs met a PhD from the USA at 3pm on the Canada/US border.',
+    );
+  });
+
+  it('holds the whole path where identifiers are protected', () => {
+    const input = 'Edit src/colors/center.ts and docs/behavior.md.';
+    expect(au(input, { ...american, protectIdentifiers: true })).toBe(input);
+  });
+});
+
 describe('fenced code, read the way CommonMark reads it', () => {
   it.each`
     input                                                                     | expected                                                                   | why

@@ -198,7 +198,8 @@ function collectCode(text: string, syntax: Syntax | undefined, into: Range[]): v
 const STRUCTURAL: RegExp[] = [
   /\bhttps?:\/\/\S+/g,
   /\bwww\.\S+/g,
-  /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
+  // Starting only where the token starts, so a long dotted token is walked once, not once per word.
+  /(?<![\w.+-])[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
   /<[a-zA-Z/][^>\n]*>/g,
   PATH,
   // Never after a separator: `PATH` holds those, and starting there walks a path once per segment.

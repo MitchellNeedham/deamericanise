@@ -39,6 +39,7 @@ describe('structure that is never prose', () => {
     unchanged                                       | why
     ${'see https://example.com/color/center'}       | ${'a URL'}
     ${'mail color@favorite.org'}                    | ${'an email address'}
+    ${'mail the-color+theater@favorite.org'}        | ${'an email address with a hyphen and a plus'}
     ${'use `color` here'}                           | ${'inline code'}
     ${'<div class="color">'}                        | ${'markup'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
@@ -48,6 +49,21 @@ describe('structure that is never prose', () => {
   it('leaves a fenced code block alone', () => {
     const input = '```\nconst color = 1;\n```\nthe color is red';
     expect(au(input)).toBe('```\nconst color = 1;\n```\nthe colour is red');
+  });
+});
+
+describe('a long dotted, hyphenated or plus-joined token takes time in line with its length', () => {
+  // Generous, since each of these takes a few milliseconds. A pattern that walks the token
+  // from every word in it takes several seconds.
+  const LIMIT_MS = 1000;
+
+  it.each(['a.', 'a-', 'a+'])('a run of "%s"', (unit) => {
+    const text = (n: number) => `${unit.repeat(n)} The color.`;
+    au(text(1), { assumeAmerican: true });
+    const started = performance.now();
+    const output = au(text(50000), { assumeAmerican: true });
+    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+    expect(output.endsWith(' The colour.')).toBe(true);
   });
 });
 

@@ -4244,6 +4244,11 @@ describe('a number after a name is part of it', () => {
     ${'It rose. About 5 mph.'}         | ${'It rose. About 8 km/h.'}               | ${'the same, after a stop'}
     ${'About 3.12 ft. of snow fell.'}  | ${'About 95.1 cm of snow fell.'}          | ${'a decimal before a word that opens no noun'}
     ${'Season 2 pounds of pork.'}      | ${'Season 910 grams of pork.'}            | ${'a verb that opens a recipe step'}
+    ${'On Monday 40 mph gusts hit the coast.'}   | ${'On Monday 64 km/h gusts hit the coast.'}   | ${'a day is no name'}
+    ${'In March 40 mph winds are common.'}       | ${'In March 64 km/h winds are common.'}       | ${'nor is a month'}
+    ${'Mount Everest 29,032 ft. is the summit.'} | ${'Mount Everest 8.849 km is the summit.'}    | ${'a figure grouped with a comma'}
+    ${'Track 3 miles a day.'}                    | ${'Track 4.8 kilometres a day.'}              | ${'a verb that opens a sentence'}
+    ${'Cut 2.25 ft. lengths of pipe.'}           | ${'Cut 68.6 cm lengths of pipe.'}             | ${'a plural in lower case after the feet'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input, { assumeAmerican: true })).toBe(expected);
   });

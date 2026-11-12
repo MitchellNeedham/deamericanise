@@ -6,14 +6,18 @@ import { endsSentence } from './sentence.js';
 // `PM.` leaves the sentence's stop outside the match.
 const MERIDIEM = String.raw`(?:[ap]\.\s?m\.?|[ap]m)`;
 
+/** A day of the week or a month, in full or abbreviated. */
+export const CALENDAR_WORD =
+  String.raw`Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|` +
+  String.raw`Mon|Tues?|Wed|Thu(?:rs?)?|Fri|Sat|Sun|Sept|${MONTH_PATTERN}`;
+
 /**
  * Any capitalised word after a time starts a new sentence, except one that carries the time
  * on, as in `8 p.m. Eastern` or `3 p.m. Tuesday`.
  */
 export const OPENER = new RegExp(
   String.raw`(?!(?:Eastern|Central|Mountain|Pacific|Atlantic|Alaska|Hawaii|` +
-    String.raw`Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|` +
-    String.raw`Mon|Tues?|Wed|Thu(?:rs?)?|Fri|Sat|Sun|Sept|${MONTH_PATTERN})(?!\p{L}))`,
+    String.raw`${CALENDAR_WORD})(?!\p{L}))`,
   'uy',
 );
 

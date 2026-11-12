@@ -2,6 +2,7 @@ import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
 import { CLOSING, LIST_MARKER, OPENING, endsSentence } from '../sentence.js';
+import { CALENDAR_WORD } from '../times.js';
 import {
   COMPOUNDS,
   MEASURES,
@@ -340,16 +341,22 @@ function isPartOfName(text: string, written: string, end: number, count?: number
 }
 
 /**
- * Words that take a designation after them, as `Route` does in `Route 66 miles`. `Season` is
- * not one, since a recipe opens a sentence with it as a verb: `Season 2 pounds of pork.`
+ * Words that take a designation after them, as `Route` does in `Route 66 miles`. `Season` and
+ * `Track` are not, since a sentence may open with either as a verb: `Season 2 pounds of pork.`
+ * and `Track 3 miles a day.`
  */
 const DESIGNATIONS = [
-  'Model', 'Version', 'Route', 'Highway', 'Interstate', 'Flight', 'Track', 'Episode', 'Chapter',
-  'Room',
+  'Model', 'Version', 'Route', 'Highway', 'Interstate', 'Flight', 'Episode', 'Chapter', 'Room',
 ];
 
 /** A capitalised word and the space after it, ending where a number starts. */
 const WORD_BEFORE = new RegExp(String.raw`(?<=\b([A-Z][a-z]+)(?=\s)${SOFT_SPACE})`, 'dy');
+
+/** A day or a month, which dates the figure after it rather than naming it. */
+const CALENDAR = new RegExp(`^(?:${CALENDAR_WORD})$`);
+
+/** A figure grouped with commas, as `29,032` is, which counts rather than names. */
+const GROUPED = /\d{1,3}(?:,\d{3})+(?!\d)/y;
 
 /**
  * Where a sentence opens: at the start of the text or a line, or of a list item there, or
@@ -366,6 +373,9 @@ const OPENS_SENTENCE = new RegExp(
 /** A version number, with two figures or more after its point, as `3.12` and `20.04` have. */
 const VERSION = /^\d+\.\d{2,}$/;
 
+/** A plural in lower case next, which feet measure, as in `2.25 ft. lengths`. */
+const PLURAL_NEXT = /^\s+[a-z]*[a-rt-z]s(?![\w-])/;
+
 /**
  * Where the name starts that the number `raw` at `start`, before the unit written `written`
  * that ends at `end`, is part of, as `66` is in `Route 66 miles`, or null where it is part of
@@ -373,8 +383,10 @@ const VERSION = /^\d+\.\d{2,}$/;
  * capitalised word an abbreviation makes it one too, as in `A Boeing 747 mph record`, unless
  * that word opens the sentence, as `About` does in `About 5 mph`, since a quantity before an
  * abbreviation rarely has a name in front of it. A version number after any capitalised word,
- * before `ft.` and then a word that may open a noun, is a version and a credit, as in
- * `Python 3.12 ft. new syntax`. A rule holds the name with its number, since another rule may
+ * before `ft.` and then a word that may open a noun but is no plural in lower case, is a
+ * version and a credit, as in `Python 3.12 ft. new syntax`. A day or a month is no name, as
+ * in `On Monday 40 mph gusts`, and a figure grouped with commas is part of none, as in
+ * `Mount Everest 29,032 ft.`. A rule holds the name with its number, since another rule may
  * rewrite the word into one that names nothing, as `Thumbtack` becomes `Drawing pin`.
  */
 function nameBefore(
@@ -387,11 +399,14 @@ function nameBefore(
 ): number | null {
   WORD_BEFORE.lastIndex = start;
   const before = WORD_BEFORE.exec(text);
-  if (before === null) return null;
+  if (before === null || CALENDAR.test(before[1]!)) return null;
+  GROUPED.lastIndex = start;
+  if (GROUPED.test(text)) return null;
   const nameStart = before.indices![1]![0];
   if (DESIGNATIONS.includes(before[1]!)) return nameStart;
+  const after = text.slice(end);
   const credit = written.toLowerCase() === 'ft.' && VERSION.test(raw);
-  if (credit && MODIFIES_A_NOUN.test(text.slice(end))) return nameStart;
+  if (credit && MODIFIES_A_NOUN.test(after) && !PLURAL_NEXT.test(after)) return nameStart;
   OPENS_SENTENCE.lastIndex = nameStart;
   return !isWord && !OPENS_SENTENCE.test(text) ? nameStart : null;
 }

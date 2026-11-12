@@ -10,13 +10,14 @@ import {
   type Measure,
   type MetricValue,
 } from './definitions.js';
-import { BARE_CELSIUS_FIGURE, FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
+import { BARE_CELSIUS_FIGURE, DEGREES, FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
 import { PREPOSITION_IN } from './money.js';
 import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
   HYPHEN,
   INLINE_SPACE,
+  LIST_END,
   MEASUREMENT_START,
   NOT_IN_COMPOUND,
   NUMBER_PATTERN,
@@ -31,16 +32,18 @@ import {
   formatNumber,
   formatTemperature,
   isOvenSetting,
+  listReader,
   parseNumber,
   plainHyphens,
   significantFigures,
   softGap,
+  type ListFigure,
 } from './number.js';
 
 const CONTEXT_WINDOW = 48;
 /** Between a number and its unit: a space, a hyphen (`6-foot`), or nothing (`6ft`). */
 const GAP = softGap(`${HYPHEN}?`);
-const RANGE_JOIN = softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and)`);
+const RANGE_JOIN = softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and|or)`);
 const DIMENSION_JOIN = softGap('(?:x|×|by)');
 const TIGHT_HYPHEN = new RegExp(`^${HYPHEN}$`);
 
@@ -49,7 +52,7 @@ const TIGHT_HYPHEN = new RegExp(`^${HYPHEN}$`);
  * pair does not match as a whole: `14 1/2 gallon` in `2024-03-14 1/2 gallon`.
  */
 const NOT_SECOND_OF_PAIR =
-  String.raw`(?<!${NUMERIC_LAST}${softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and|x|×|by)`)})`;
+  String.raw`(?<!${NUMERIC_LAST}${softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and|or|x|×|by)`)})`;
 
 /** A range's first number and its join, ending where the range's second number starts. */
 const RANGE_BEFORE = new RegExp(
@@ -57,16 +60,68 @@ const RANGE_BEFORE = new RegExp(
   'diy',
 );
 
+const readListBefore = listReader(NUMBER_PATTERN);
+
 /**
- * The number at `start` is the second end of a range, as the `10` of `5 - 10 feet` is, and
- * not a measurement of its own, even where the range does not match as a whole. A first
- * number that cannot open the range leaves it free: `Price $5 - 10 inches`, `In 2024 - 5 feet`,
- * and the inches of `2 feet 6 to 3 feet`.
+ * The figures before a range's first end, at `start` and worth `low`, where the range is the
+ * last two figures of a list, as `10 and 15` is in `5, 10 and 15 feet`. `high` is the second
+ * end. A list ends in `and`, `or` or a comma, so `to` and a dash end none. Null where a comma
+ * joins the range and no figure comes before it, as in `Serves 4, 2 pounds`, a count and then
+ * a measurement.
+ */
+function figuresBefore(
+  text: string,
+  start: number,
+  low: number,
+  high: number,
+  join: string,
+  read = readListBefore,
+): ListFigure[] | null {
+  if (!/^\s*(?:,|and|or)/i.test(join)) return [];
+  const figures = read(text, start, low, false, high);
+  return figures.length === 0 && join.includes(',') ? null : figures;
+}
+
+/**
+ * The figures before a measurement's first figure, at `start` and worth `first`, that it is
+ * the end of a list with. For a range, `join` joins its ends and `high` is the second. One
+ * figure ends a list only of three or more, as the `8` of `4, 6, 8 inches` does.
+ */
+function listedBefore(
+  text: string,
+  start: number,
+  first: number,
+  range?: { join: string; high: number },
+  read = readListBefore,
+): ListFigure[] {
+  if (range !== undefined) return figuresBefore(text, start, first, range.high, range.join, read) ?? [];
+  const figures = read(text, start, first, true);
+  return figures.length >= 2 ? figures : [];
+}
+
+/** A join as a converted range or list writes it: ` to `, ` and `, ` or `, `, `, `, or `, or `-`. */
+function separator(join: string): string {
+  const [, comma = '', word] = /^\s*(,?)\s*(to|and|or)?\s*$/i.exec(join) ?? [];
+  if (word !== undefined) return `${comma} ${word.toLowerCase()} `;
+  return comma ? ', ' : '-';
+}
+
+/** The figures of a range or list with the joins between them. */
+function interleave(figures: string[], joins: string[]): string {
+  return figures.reduce((out, figure, i) => out + joins[i - 1]! + figure);
+}
+
+/**
+ * The number at `start` is the second end of a range, as the `10` of `5 - 10 feet` is, or
+ * the last figure of a list, as the `8` of `4, 6, 8 inches` is, and not a measurement of its
+ * own, even where the range does not match as a whole. A first number that cannot open the
+ * range leaves it free: `Price $5 - 10 inches`, `In 2024 - 5 feet`, and the inches of
+ * `2 feet 6 to 3 feet`.
  */
 function endsRange(text: string, start: number, value: number): boolean {
   RANGE_BEFORE.lastIndex = start;
   const before = RANGE_BEFORE.exec(text);
-  if (before === null) return false;
+  if (before === null) return listedBefore(text, start, value).length > 0;
   const lowStart = before.indices![1]![0];
   if (isHeightInches(text, lowStart)) return false;
   const low = parseNumber(before[1]!);
@@ -82,9 +137,9 @@ const isWritten = (raw: string) => /[a-z]/i.test(raw);
 const isUncounted = (raw: string) => !READABLE_NUMBER.test(raw) && /^(?:an?\s+)?[a-z]+$/i.test(raw);
 
 /**
- * What the range rule does with a range that has an end in words. `to` joins whole numbers
- * as it joins digits, and so does `and` after `between`, unless the `and` is inside one
- * number, as in `between one hundred and twenty feet and two hundred feet`. `half` or
+ * What the range rule does with a range that has an end in words. `to` and `or` join whole
+ * numbers as they join digits, and so does `and` after `between`, unless the `and` is inside
+ * one number, as in `between one hundred and twenty feet and two hundred feet`. `half` or
  * `a quarter` opens an idiom, as in `reduce by half to 2 quarts`, so it is not a range. A
  * dash, or a fraction in words, cannot be read whole, so the range is held as written:
  * `five-10 miles`, `two and a half to three miles`. So is `two to three hundred`, which may
@@ -98,16 +153,32 @@ function writtenRange(
   high: string,
 ): 'read' | 'hold' | 'skip' {
   if (isUncounted(low) || isUncounted(high)) return 'skip';
-  const word = /^\s*(to|and)\s*$/i.exec(join)?.[1]!.toLowerCase();
+  const word = /^\s*(to|and|or)\s*$/i.exec(join)?.[1]!.toLowerCase();
   if (word === 'and') {
     const between = /\bbetween\s+$/i.test(text.slice(Math.max(0, start - 16), start));
     if (!between || READABLE_NUMBER.test(low + join + high)) return 'skip';
   }
-  const scaled = (end: string) => /\b(?:hundred|thousand)\b/i.test(end);
-  const shared = isWritten(low) && !scaled(low) && scaled(high) && !/^an?\s/i.test(high);
+  const shared = sharesScale(low, high);
   return word !== undefined && !shared && READABLE_NUMBER.test(low) && READABLE_NUMBER.test(high)
     ? 'read'
     : 'hold';
+}
+
+/** `two` before `three hundred` may mean 200. */
+function sharesScale(low: string, high: string): boolean {
+  const scaled = (end: string) => /\b(?:hundred|thousand)\b/i.test(end);
+  return isWritten(low) && !scaled(low) && scaled(high) && !/^an?\s/i.test(high);
+}
+
+/**
+ * `writtenRange` for the figures of a range or a list, with the joins between them. A list's
+ * `and` needs no `between`, as in `five, ten and fifteen feet`, but every figure has to be a
+ * number `READABLE_NUMBER` reads, sharing no scale with the next, or the list is held.
+ */
+function writtenList(text: string, start: number, raws: string[], joins: string[]): 'read' | 'hold' | 'skip' {
+  if (raws.length === 2) return writtenRange(text, start, raws[0]!, joins[0]!, raws[1]!);
+  const readable = raws.every((raw) => READABLE_NUMBER.test(raw));
+  return readable && !raws.some((raw, i) => i > 0 && sharesScale(raws[i - 1]!, raw)) ? 'read' : 'hold';
 }
 
 /**
@@ -237,10 +308,10 @@ const OTHER_SENSES = new Map(
 
 /**
  * The number that ends where a unit word starts, begun where the rules begin it: a range at
- * its first number, and `1,500` or `two and a half` whole.
+ * its first number, and `1,500` or `two and a half` whole. A list is begun by `listedBefore`.
  */
 const NUMBER_BEFORE_UNIT = new RegExp(
-  String.raw`(?<![\w.])(?:(?:${NUMERIC_PATTERN})${RANGE_JOIN})?(?:${NUMBER_PATTERN})${GAP}$`,
+  String.raw`(?<![\w.])(?:(${NUMERIC_PATTERN})(${RANGE_JOIN}))?(${NUMBER_PATTERN})${GAP}$`,
   'i',
 );
 
@@ -260,7 +331,12 @@ export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: num
   if (!otherSense) return false;
   const from = Math.max(0, unitStart - NUMBER_REACH);
   const number = NUMBER_BEFORE_UNIT.exec(text.slice(from, unitStart));
-  return number !== null && otherSense(contextText(text), from + number.index, unitEnd);
+  if (number === null) return false;
+  const start = from + number.index;
+  const [first, high] = [parseNumber(number[1] ?? number[3]!), parseNumber(number[3]!)];
+  const range = number[1] === undefined || high === null ? undefined : { join: number[2]!, high };
+  const listed = first === null ? [] : listedBefore(text, start, first, range);
+  return otherSense(contextText(text), listed[0]?.start ?? start, unitEnd);
 }
 
 /**
@@ -670,8 +746,10 @@ export function metricUnitForms(dimension: Dimension): string {
 }
 
 const METRIC_NUMBER = String.raw`[-−]?\d[\d,]*(?:\.\d+)?`;
+// A comma joins only before a space, or a failing match would try every way to split `1,2,3,4`.
 const METRIC_VALUE =
-  String.raw`${METRIC_NUMBER}(?:\s*(?:-|–|—|to|and|x|×|by)\s*${METRIC_NUMBER})*\s*-?\s*` +
+  String.raw`${METRIC_NUMBER}(?:(?:\s*(?:-|–|—|to|and|or|x|×|by)|,(?=\s)(?:\s+(?:and|or)(?=\s))?)` +
+  String.raw`\s*${METRIC_NUMBER})*\s*-?\s*` +
   `(?:${(Object.keys(METRIC_UNITS) as Dimension[])
     .map((dimension) => `(?<${dimension}>${metricUnitForms(dimension)})`)
     .join('|')})`;
@@ -879,7 +957,7 @@ const AND_FRACTION = String.raw`and${INLINE_SPACE}+(${COUNTED_FRACTION})`;
  */
 const PIECE_NUMBER = [FRACTION_OF, AND_FRACTION, NUMBER_PATTERN, COUNT_BEFORE_FRACTION].join('|');
 
-const JOINER = String.raw`[-–—]|(?:to|and|x|×|by)(?![A-Za-z])`;
+const JOINER = String.raw`[-–—,]|(?:to|and|or|x|×|by)(?![A-Za-z])`;
 
 const IMPERIAL_UNIT = Object.values(IMPERIAL_UNITS)
   .flat()
@@ -1238,8 +1316,9 @@ const RANGE_OPENING = new RegExp(
 );
 
 /**
- * The measurement in two units at `start`, whose first number is `first`, ends a range that
- * the range rule reads or holds, as in `7-8 lb 4 oz` and `five to six feet two inches`.
+ * The measurement in two units at `start`, whose first number is `first`, ends a range or
+ * list that the range rule reads or holds, as in `7-8 lb 4 oz`, `five to six feet two inches`
+ * and `5, 6, 7 feet 2 inches`.
  * Whether the range's first end is `7` or `7 lb` cannot be told, so the measurement is held,
  * the range rule's change splits the hold and is dropped, and the whole range stays as written.
  * The inches of a height open no range, so `6 foot 2 to 6 foot 4 inches` is two heights.
@@ -1251,12 +1330,16 @@ function endsRangeWhole(text: string, start: number, first: string): boolean {
 
 /**
  * Where the first end starts of the range that `endsRangeWhole` asks about, before it asks
- * whether that end is the inches of a height, or `null` where no such range opens.
+ * whether that end is the inches of a height, or `null` where no such range opens. A list
+ * with no range join before its last figure opens at its first.
  */
 function rangeOpening(text: string, start: number, first: string): number | null {
   RANGE_OPENING.lastIndex = start;
   const opening = RANGE_OPENING.exec(text);
-  if (opening === null) return null;
+  if (opening === null) {
+    const value = parseNumber(first);
+    return value === null ? null : (listedBefore(text, start, value)[0]?.start ?? null);
+  }
   const [lowRaw, join] = [opening[1]!, opening[2]!];
   const lowStart = opening.indices![1]![0];
   const written = isWritten(lowRaw) || isWritten(first);
@@ -1600,8 +1683,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     'gi',
   );
   const SECOND_END = String.raw`(?<=\b(?:to|and)\s+)(?:${SECOND_END_WORDS})|${NUMBER_PATTERN}`;
+  // The last two figures of a range or a list. `rangeRule` reads back to a list's first.
   const range = new RegExp(
-    String.raw`${START}(${NUMBER_PATTERN})(${RANGE_JOIN})(${SECOND_END})` +
+    String.raw`${START}(${NUMBER_PATTERN})(${RANGE_JOIN}|${LIST_END})(${SECOND_END})` +
       String.raw`${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
   );
@@ -1764,61 +1848,72 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       const changes: Change[] = [];
       range.lastIndex = 0;
       for (const match of ctx.text.matchAll(range)) {
-        const matched = match[0];
+        const pair = match[0];
         const [lowRaw, join, highRaw, alias] = [match[1]!, match[2]!, match[3]!, match[4]!];
-        const start = match.index;
+        const pairStart = match.index;
+        const end = pairStart + pair.length;
         const entry = resolve(alias);
         const low = parseNumber(lowRaw);
         const high = parseNumber(highRaw);
         if (!entry || low === null || high === null || high === 0) continue;
-        if (isQuotationMark(ctx.text, start + matched.length - 1)) continue;
-        const written = isWritten(lowRaw) || isWritten(highRaw);
-        const reading = written ? writtenRange(ctx.text, start, lowRaw, join, highRaw) : 'read';
-        if (reading === 'skip') continue;
+        if (isQuotationMark(ctx.text, end - 1)) continue;
         // `2-3/4` is one number, which the single measurement rule reads.
-        if (!written && TIGHT_HYPHEN.test(join) && parseNumber(`${lowRaw}-${highRaw}`) !== null) continue;
-        if (!canBeRange(ctx.text, start, low, high)) continue;
+        const pairWritten = isWritten(lowRaw) || isWritten(highRaw);
+        if (!pairWritten && TIGHT_HYPHEN.test(join) && parseNumber(`${lowRaw}-${highRaw}`) !== null) continue;
+        if (!canBeRange(ctx.text, pairStart, low, high)) continue;
+        const earlier = figuresBefore(ctx.text, pairStart, low, high, join);
+        if (earlier === null) continue;
+        const start = earlier[0]?.start ?? pairStart;
+        const matched = ctx.text.slice(start, end);
+        const raws = [...earlier.map((figure) => figure.raw), lowRaw, highRaw];
+        const joins = [...earlier.map((figure) => figure.join), join];
+        const written = raws.some(isWritten);
+        const reading = written ? writtenList(ctx.text, start, raws, joins) : 'read';
+        if (reading === 'skip') continue;
+        // A list that starts as the second number of a pair, as in `1 to 2, 4 or 6 feet`.
+        NOT_SECOND.lastIndex = start;
+        const secondOfPair = earlier.length > 0 && !NOT_SECOND.test(ctx.text);
         const measurementStart = sameLengthBefore(ctx.text, start, entry.measure);
         if (measurementStart !== null) {
           // The inches of a height are for `feetInchesRule`. Any other smaller unit cannot be
           // read, so the measurement and range stay as written.
           if (!isHeightInches(ctx.text, start)) {
-            const held = ctx.text.slice(measurementStart, start + matched.length);
+            const held = ctx.text.slice(measurementStart, end);
             changes.push(hold(measurementStart, held, entry.measure.id, 35));
           }
           continue;
         }
         if (
-          isOtherSense(ctx, entry, start, start + matched.length) ||
-          (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length))
+          isOtherSense(ctx, entry, start, end) ||
+          (entry.isWord && isPartOfName(ctx.text, alias, end))
         ) {
           changes.push(hold(start, matched, entry.measure.id, 35));
           continue;
         }
         if (isAmbiguousHere(entry.measure, ctx.text)) continue;
         if (isBareInch(alias, matched)) continue;
-        const conventional = isConventional(ctx, entry.measure, start, start + matched.length);
-        const particle = isInParticle(ctx.text, start, start + matched.length, alias);
-        if (reading === 'hold' || conventional || particle) {
+        const conventional = isConventional(ctx, entry.measure, start, end);
+        const particle = isInParticle(ctx.text, start, end, alias);
+        if (reading === 'hold' || conventional || secondOfPair || particle) {
           changes.push(hold(start, matched, entry.measure.id, 35));
           continue;
         }
 
-        // Both ends share the unit chosen for the larger one, so the range stays readable.
+        // Every figure shares the unit chosen for the last, so the range or list stays readable.
         const target = entry.measure.convert(high);
         const perSourceUnit = target.value / high;
-        const figures = Math.max(significantFigures(lowRaw), significantFigures(highRaw));
+        const figures = Math.max(...raws.map(significantFigures));
         const { precision, maxDecimals } = ctx.options.units;
-        const lowText = formatNumber(low * perSourceUnit, precision, figures, maxDecimals);
-        const highText = formatNumber(target.value, precision, figures, maxDecimals);
-        const separator = /to/i.test(join) ? ' to ' : /and/i.test(join) ? ' and ' : '-';
-        const gap = matched.slice(lowRaw.length + join.length + highRaw.length, -alias.length);
-        const attributive =
-          entry.isSingular && describesNoun(ctx.text, start, high, gap, start + matched.length);
+        const texts = [...earlier.map((figure) => figure.value), low].map((value) =>
+          formatNumber(value * perSourceUnit, precision, figures, maxDecimals),
+        );
+        texts.push(formatNumber(target.value, precision, figures, maxDecimals));
+        const gap = pair.slice(lowRaw.length + join.length + highRaw.length, -alias.length);
+        const attributive = entry.isSingular && describesNoun(ctx.text, start, high, gap, end);
         const unit = entry.isWord
           ? ` ${attributive ? target.singular : target.plural}`
           : ` ${target.symbol}`;
-        const body = `${lowText}${separator}${highText}${unit}`;
+        const body = interleave(texts, joins.map(separator)) + unit;
 
         pushBeforeSize(ctx, changes, start, matched, body, entry.measure.id, 35);
       }
@@ -2110,20 +2205,28 @@ function formatEnds(ctx: RuleContext, values: number[], raw: string[]): string[]
   return texts;
 }
 
+const readDegreesBefore = listReader(DEGREES);
+
+/** What each Fahrenheit match gives, with a list such as `325, 350 or 375°F` read whole. */
 function fahrenheitReadings(
   ctx: RuleContext,
   matches: Iterable<RegExpExecArray> = fahrenheitTemperatures(ctx.text),
 ): FahrenheitReading[] {
   const readings: FahrenheitReading[] = [];
   for (const match of matches) {
-    const raw = match[1] === undefined ? [match[3]!] : [match[1], match[3]!];
-    const parsed = raw.map(parseNumber);
+    const pair = match[1] === undefined ? [match[3]!] : [match[1], match[3]!];
+    const parsed = pair.map(parseNumber);
     if (parsed.some((v) => v === null)) continue;
-    let values = parsed as number[];
+    const range = match[2] === undefined ? undefined : { join: match[2], high: parsed[1]! };
+    const listed = listedBefore(ctx.text, match.index, parsed[0]!, range, readDegreesBefore);
+    const raw = [...listed.map((figure) => figure.raw), ...pair];
+    const joins = [...listed.map((figure) => figure.join), ...(range === undefined ? [] : [range.join])];
+    let values = [...listed.map((figure) => figure.value), ...(parsed as number[])];
 
-    const start = match.index;
+    const start = listed[0]?.start ?? match.index;
+    const whole = ctx.text.slice(start, match.index + match[0].length);
     // A stop that stays in the text stays outside the value and any kept original.
-    const valueEnd = start + match[0].length - (fahrenheitKeepsStop(ctx.text, start, match[0]) ? 1 : 0);
+    const valueEnd = start + whole.length - (fahrenheitKeepsStop(ctx.text, start, whole) ? 1 : 0);
     let end = valueEnd;
     const beside = wordsBeside(ctx.text, start, end);
     const after = ctx.text.slice(end, end + CONTEXT_WINDOW);
@@ -2154,7 +2257,7 @@ function fahrenheitReadings(
     readings.push({
       start,
       matched: ctx.text.slice(start, end),
-      body: numbers.join(match[2] ?? '') + suffix,
+      body: interleave(numbers, joins) + suffix,
       ruleId: difference ? DIFFERENCE_ID : ABSOLUTE_ID,
     });
   }
@@ -2378,9 +2481,10 @@ function coinSizeRule(): Rule {
 /**
  * `30 mpg`, `30 miles per gallon` and `30 mi/gal` become litres per 100 km, or km per litre.
  * A range converts both ends and gives the smaller first, though litres per 100 km fall as
- * miles per gallon rise: `20 to 30 mpg` becomes `7.8 to 12 L/100km`. After `from` the order
- * shows a direction, so it stays: `from 20 to 30 mpg` becomes `from 12 to 7.8 L/100km`. A
- * range or figure the rule cannot convert whole is held, so the length rule never reads its
+ * miles per gallon rise: `20 to 30 mpg` becomes `7.8 to 12 L/100km`. A list does the same,
+ * so `20, 25 or 30 mpg` becomes `7.8, 9.4 or 12 L/100km`. After `from` the order shows a
+ * direction, so it stays: `from 20 to 30 mpg` becomes `from 12 to 7.8 L/100km`. A range, list
+ * or figure the rule cannot convert whole is held, so the length rule never reads its
  * `miles`.
  */
 function fuelEconomyRule(): Rule {
@@ -2391,7 +2495,10 @@ function fuelEconomyRule(): Rule {
   const single = new RegExp(String.raw`${NUMBER_START}(${MPG})${UNIT}`, 'gi');
   // Must start where the range rule starts, so the two read the same ranges.
   const START = String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})${NOT_SECOND_OF_PAIR}|(?!${NUMERIC_FIRST}))`;
-  const range = new RegExp(String.raw`${START}(${NUMBER_PATTERN})(${RANGE_JOIN})(${MPG})${UNIT}`, 'gi');
+  const range = new RegExp(
+    String.raw`${START}(${NUMBER_PATTERN})(${RANGE_JOIN}|${LIST_END})(${MPG})${UNIT}`,
+    'gi',
+  );
   const FROM_BEFORE = /\bfrom\s+$/i;
 
   return {
@@ -2412,32 +2519,40 @@ function fuelEconomyRule(): Rule {
 
       range.lastIndex = 0;
       for (const match of ctx.text.matchAll(range)) {
-        const [matched, lowRaw, join, highRaw] = [match[0], match[1]!, match[2]!, match[3]!];
-        const start = match.index;
+        const [pair, lowRaw, join, highRaw] = [match[0], match[1]!, match[2]!, match[3]!];
+        const pairStart = match.index;
         const low = parseNumber(lowRaw);
         const high = Number(highRaw);
-        if (low === null) continue;
-        const reading = isWritten(lowRaw) ? writtenRange(ctx.text, start, lowRaw, join, highRaw) : 'read';
-        if (reading === 'skip' || !canBeRange(ctx.text, start, low, high)) continue;
-        rangeEnds.add(start + matched.length);
-        if (reading === 'hold' || !PLAIN_MPG.test(lowRaw) || low === 0 || high === 0) {
+        if (low === null || !canBeRange(ctx.text, pairStart, low, high)) continue;
+        const earlier = figuresBefore(ctx.text, pairStart, low, high, join);
+        if (earlier === null) continue;
+        const start = earlier[0]?.start ?? pairStart;
+        const end = pairStart + pair.length;
+        const matched = ctx.text.slice(start, end);
+        const raws = [...earlier.map((figure) => figure.raw), lowRaw, highRaw];
+        const joins = [...earlier.map((figure) => figure.join), join];
+        const reading = raws.some(isWritten) ? writtenList(ctx.text, start, raws, joins) : 'read';
+        if (reading === 'skip') continue;
+        rangeEnds.add(end);
+        const values = [...earlier.map((figure) => figure.value), low, high];
+        if (reading === 'hold' || !raws.every((raw) => PLAIN_MPG.test(raw)) || values.includes(0)) {
           changes.push(hold(start, matched, id, 35));
           continue;
         }
-        const figures = Math.max(2, significantFigures(lowRaw), significantFigures(highRaw));
-        const separator = /to/i.test(join) ? ' to ' : /and/i.test(join) ? ' and ' : '-';
-        const write = (first: number, second: number) =>
-          `${economy(first, figures)}${separator}${economy(second, figures)} ${unit}`;
-        const end = start + matched.length;
-        const asWritten = write(low, high);
+        const figures = Math.max(2, ...raws.map(significantFigures));
+        const separators = joins.map(separator);
+        const write = (order: number[]) =>
+          `${interleave(order.map((mpg) => economy(mpg, figures)), separators)} ${unit}`;
+        const asWritten = write(values);
         const keepOrder =
-          rate(low) <= rate(high) ||
+          rate(values[0]!) <= rate(high) ||
           FROM_BEFORE.test(ctx.text.slice(Math.max(0, start - 16), start)) ||
           // An author's own metric value may give the ends in the source's order, and
           // `pushMeasurement` keeps it in place of the conversion.
           redundantMetric(ctx, end, asWritten, id) !== null ||
           followsItsMetric(ctx, start, end, asWritten, id);
-        pushMeasurement(ctx, changes, start, matched, keepOrder ? asWritten : write(high, low), id, 35);
+        const body = keepOrder ? asWritten : write([...values].reverse());
+        pushMeasurement(ctx, changes, start, matched, body, id, 35);
       }
 
       single.lastIndex = 0;

@@ -364,6 +364,68 @@ export function canBeRange(text: string, start: number, low: number, high: numbe
   return RANGE_WORD_BEFORE.test(text.slice(Math.max(0, start - 16), start));
 }
 
+/** A comma and the space after it, between two figures of a list: the first of `5, 10 and 15 feet`. */
+const LIST_COMMA = String.raw`${softGap(',')}(?<=\s)`;
+
+/**
+ * What joins the last figure of a list to the one before it: a comma, `and` or `or`, or a
+ * comma and either word, as in `5, 10, and 15 feet`.
+ */
+export const LIST_END = String.raw`${softGap(String.raw`(?:,(?:${SOFT_SPACE}(?:and|or))?|and|or)`)}(?<=\s)`;
+
+/** Where a figure is the day of a date, as the `22` of `Oct 22, 5 and 10 feet` is. */
+const DAY_OF_MONTH = new RegExp(String.raw`(?<=\b(?:${MONTH_PATTERN})\.?${INLINE_SPACE}+)`, 'y');
+
+export interface ListFigure {
+  raw: string;
+  start: number;
+  value: number;
+  /** What joins it to the figure after it. */
+  join: string;
+}
+
+/**
+ * Reads back from a figure along the list it is part of, giving the figures before it in
+ * order: from the `15` of `5, 10 and 15 feet`, the `5` and `10`. Each figure is one that
+ * `figure` matches, and starts where a measurement can. `last` says the figure ends the list,
+ * so the join before it may be the list's `and`, `or` or comma. Every join before that is a
+ * comma. `after` is the figure after it, if any. A figure that cannot open a range with the
+ * one after it ends the walk, as the year of `In 2024, 5 and 10 feet` does, and so does the
+ * day of a date, or a figure out of the order the rest of the list runs in, as the count of
+ * `Serves 4, 2 or 3 pounds beef` is.
+ */
+export function listReader(
+  figure: string,
+): (text: string, start: number, value: number, last: boolean, after?: number) => ListFigure[] {
+  const before = (join: string) =>
+    new RegExp(String.raw`(?<=${NUMBER_START}(${figure})(${join}))`, 'diy');
+  const comma = before(LIST_COMMA);
+  const end = before(LIST_END);
+  return (text, start, value, last, after) => {
+    const figures: ListFigure[] = [];
+    let at = start;
+    let next = value;
+    let order = after === undefined ? 0 : Math.sign(after - value);
+    for (let pattern = last ? end : comma; ; pattern = comma) {
+      pattern.lastIndex = at;
+      const match = pattern.exec(text);
+      if (match === null) break;
+      const from = match.indices![1]![0];
+      const parsed = parseNumber(match[1]!);
+      if (parsed === null || !canBeRange(text, from, parsed, next)) break;
+      const step = Math.sign(next - parsed);
+      if (order !== 0 && step !== 0 && step !== order) break;
+      DAY_OF_MONTH.lastIndex = from;
+      if (DAY_OF_MONTH.test(text)) break;
+      figures.push({ raw: match[1]!, start: from, value: parsed, join: match[2]! });
+      order ||= step;
+      at = from;
+      next = parsed;
+    }
+    return figures.reverse();
+  };
+}
+
 function roundToSignificant(value: number, figures: number): number {
   if (value === 0) return 0;
   const magnitude = Math.ceil(Math.log10(Math.abs(value)));

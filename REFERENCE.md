@@ -339,11 +339,12 @@ the singular word or a determiner opens it: `a 6 foot 2 inch man` and `a 6 ft 2 
 become `a 1.88 metre man`. Where a unit of the weight is kept, by the dialect or by `unitsKeep`,
 the whole weight is left as written, so an `en-GB` `11 stone 4 pounds` never becomes
 `11 stone 1.8 kilograms`. Turning on `units.mass.stone` or `units.mass.stone-pounds`
-converts it. A weight or height at the end of a range, as in `7-8 lb 4 oz`,
-`5 to 6 feet 2 inches` or `five to seven pounds eight ounces`, is left as written too, since
-its first end could be in either unit. So is a height or weight that starts where no
-measurement can (see below), as in `At 7:30 feet 2 inches` and `catch-22 feet 2 inches`, or
-whose first number in words is the tail of a longer one, as in `five-seven pounds eight ounces`.
+converts it. A weight or height at the end of a range or list, as in `7-8 lb 4 oz`,
+`5 to 6 feet 2 inches`, `five to seven pounds eight ounces` or `5, 6, 7 feet 2 inches`, is
+left as written too, since its first end could be in either unit. So is a height or weight
+that starts where no measurement can (see below), as in `At 7:30 feet 2 inches` and
+`catch-22 feet 2 inches`, or whose first number in words is the tail of a longer one, as in
+`five-seven pounds eight ounces`.
 `st` is read only in such a weight, because `1st` on its own is an ordinal.
 A weight in two units describes a noun as one unit does, so `7 pound 8 ounce babies` becomes
 `3.4 kilogram babies`.
@@ -372,9 +373,21 @@ the second end of a range, so `hundreds of miles`, `a few hundred feet` and
 `between one hundred and two hundred miles` becomes `between 160 and 320 kilometres`.
 `It cost a hundred pounds.` is still money.
 
-A range may have a whole number in words at either end when `to` joins it, or `and` after
-`between`: `five to 10 miles` becomes `8 to 16 kilometres`, and `between one and two pounds`
-becomes `between 450 and 910 grams`. A dash joins a range only between digits, since
+A range joined by `or` converts at both ends, as one joined by `to` does: `5 or 6 feet`
+becomes `1.5 or 1.8 metres`. So does every figure of a list before one unit, sharing the unit
+chosen for the last and keeping the list's commas and its last `and` or `or`:
+`5, 10, and 15 feet` becomes `1.5, 3, and 4.6 metres`, and `4, 6, 8 inches` becomes
+`10, 15, 20 centimetres`. One figure and a comma before a measurement is no list, so
+`Serves 4, 2 pounds beef` keeps its count. A list starts after a figure that cannot open a
+range with the one after it, a figure out of the list's order, or the day of a date, so
+`In 2024, 5 and 10 feet` keeps its year and `Serves 4, 2 or 3 pounds beef` its count. A list
+that starts as the second end of a range, as in `1 to 2, 4 or 6 feet`, is left as written.
+
+A range may have a whole number in words at either end when `to` or `or` joins it, or `and`
+after `between`: `five to 10 miles` becomes `8 to 16 kilometres`, and
+`between one and two pounds` becomes `between 450 and 910 grams`. A list may have them too,
+with no `between` before its `and`, so `five, ten and fifteen feet` becomes
+`1.5, 3 and 4.6 metres`. A dash joins a range only between digits, since
 `one-half` and `twenty-two` are single numbers, so `five-10 miles` is left as written. So is
 a range with a fraction in words at either end, as in `two and a half to three miles`, and
 `two to three hundred feet`, which may mean 200 to 300. `half to` is an idiom, so
@@ -441,13 +454,17 @@ Fuel economy is read as `mpg`, `miles per gallon`, `miles-per-gallon`, `miles/ga
 smaller number first, though litres per 100 km fall as miles per gallon rise: `20 to 30 mpg`
 becomes `7.8 to 12 L/100km`, and `8.5 to 13 km/L` with `fuelEconomy: 'km-per-l'`. After
 `from` the order shows a direction, so it stays: `improved from 20 to 30 mpg` becomes
-`improved from 12 to 7.8 L/100km`. A range of fuel economy with a first end in words or a
-fraction, or an end of zero, as in `twenty to 30 mpg`, is left as written.
+`improved from 12 to 7.8 L/100km`. A list gives its smallest first too, so
+`20, 25 or 30 mpg` becomes `7.8, 9.4 or 12 L/100km`. A range or list of fuel economy with a
+figure in words or a fraction before its last, or a figure of zero, as in `twenty to 30 mpg`,
+is left as written.
 
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
-`Bake at 175-190°C`. A temperature range wraps and stops at a new block as the others do,
-so `Room 13` above a bullet `- 0°F overnight` is a room and a temperature. A change in
-temperature has no 32° offset to take off, so
+`Bake at 175-190°C`, and at every figure of a list, so `Bake at 325, 350 or 375°F` becomes
+`Bake at 165, 175 or 190°C`. A gas mark before `or` gives the same heat on another scale, so
+`gas mark 4 or 350°F` becomes `gas mark 4 or 175°C`. A temperature range wraps and stops at
+a new block as the others do, so `Room 13` above a bullet `- 0°F overnight` is a room and a
+temperature. A change in temperature has no 32° offset to take off, so
 `dropped 20°F` becomes `dropped 11°C` and `10°F warmer` becomes `5.6°C warmer`. The words
 beside the number tell the two apart: a verb of change or `by` before it, a comparative
 or a noun such as `drop` after it. They are read past a Celsius value given beside the

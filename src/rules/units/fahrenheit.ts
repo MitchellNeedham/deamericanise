@@ -46,19 +46,19 @@ export const FAHRENHEIT =
   // The lookahead comes first so the lookbehinds never walk a run of spaces from every place in it.
   String.raw`(?=Fahrenheit\b)(?<=\d${INLINE_SPACE}*)(?<!(?<![\d.])\d{4}${INLINE_SPACE}*)` +
   String.raw`Fahrenheit\b(?!${INLINE_SPACE}+(?:thermometers?|scales?)\b)${NOT_A_TITLE}`;
-const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
+export const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
 
 /** `165F` and `350 F`, with any `STOP` after it. `F-150` and `F-type` are names. */
 const BARE = String.raw`${INLINE_SPACE}?F(?![\w'’]|[-–][A-Za-z])${STOP}`;
 
-const JOIN = softGap(String.raw`(?:${HYPHEN}|\u2013|\u2014|to)`);
+const JOIN = softGap(String.raw`(?:${HYPHEN}|\u2013|\u2014|to|or)`);
 const BETWEEN_AND =
   String.raw`(?<=\bbetween(?=\s)${SOFT_SPACE}${DEGREES})` + softGap(String.raw`(?<=\s)and(?=\s)`);
 
 /**
  * One temperature, or a range of them with the unit written once: `350-375°F`,
- * `350 to 375°F`, `between 60 and 70°F`. `and` joins a range only after `between`. A range
- * crosses a line break that only wraps the paragraph, never a new block.
+ * `350 to 375°F`, `350 or 375°F`, `between 60 and 70°F`. `and` joins a range only after
+ * `between`. A range crosses a line break that only wraps the paragraph, never a new block.
  */
 const PATTERN = new RegExp(
   String.raw`${NUMBER_START}(?:(${DEGREES})(${JOIN}|${BETWEEN_AND}))?` +
@@ -150,6 +150,14 @@ function bareIsFahrenheit(text: string, match: RegExpExecArray): boolean {
   return ABOUT_HEAT.test(sentence) && !CELSIUS.test(sentence);
 }
 
+const GAS_MARK_BEFORE = /\bgas(?:\s+mark)?\s+$/i;
+
+/** `gas mark 4 or 350°F` gives one heat on two scales, so its `or` joins no range. */
+function givesGasMark(text: string, match: RegExpExecArray): boolean {
+  const before = text.slice(Math.max(0, match.index - 16), match.index);
+  return /^\s*or\s*$/i.test(match[2]!) && GAS_MARK_BEFORE.test(before);
+}
+
 /**
  * Every Fahrenheit temperature in the text. Groups 1 and 2 are the first number of a
  * range and what joins it to the second, group 3 is the number the unit follows, and
@@ -161,7 +169,10 @@ export function* fahrenheitTemperatures(text: string): Generator<RegExpExecArray
   const pattern = new RegExp(PATTERN);
   for (let match: RegExpExecArray | null; (match = pattern.exec(text)) !== null; ) {
     const low = match[1] === undefined ? null : parseNumber(match[1]);
-    if (low !== null && !canBeRange(text, match.index, low, parseNumber(match[3]!)!)) {
+    if (
+      low !== null &&
+      (!canBeRange(text, match.index, low, parseNumber(match[3]!)!) || givesGasMark(text, match))
+    ) {
       // The scan goes on as past a start the pattern refused, so the second number can still
       // be a temperature of its own.
       pattern.lastIndex = match.index + 1;

@@ -39,12 +39,18 @@ const GROUP_SPACES = [' ', String.raw`\u00A0`, String.raw`\u202F`];
 const GROUP_SPACE = `[${GROUP_SPACES.join('')}]`;
 
 /**
+ * What a figure inside a word or a decimal follows. A run of `_` between opens emphasis on the
+ * figure, as in `_6 feet_`, unless a letter, digit or stop stands before the run, as in `MAX_6`.
+ */
+const IN_WORD = String.raw`[A-Za-z\d.]_*`;
+
+/**
  * What figures that lead no group follow: what no number starts after, as the `98` of
  * `10/20/98` and the `30` of `7:30` do not, and a written-out month, whose day the `5` of
  * `June 5` is.
  */
 const NO_LEAD =
-  String.raw`[\w.]|${NUMERIC_LAST}(?:${HYPHEN}|[\u2013\u2014/,:])|` +
+  String.raw`${IN_WORD}|${NUMERIC_LAST}(?:${HYPHEN}|[\u2013\u2014/,:])|` +
   String.raw`\b(?:${MONTH_PATTERN})\.?${INLINE_SPACE}+`;
 
 /** One to three digits and a group space, which three digits after continue, as in `1 000`. */
@@ -409,13 +415,10 @@ const DATE_BEFORE_YEAR =
  */
 const NAME_HYPHEN = String.raw`(?:\b[A-Za-z]+-|[${UNICODE_HYPHENS}])(?<!${JOINING_HYPHEN})`;
 
-/**
- * Not inside a word or a decimal. A run of `_` before a number opens emphasis, as in
- * `_6 feet_`, unless a letter, digit or stop stands before the run, as in `MAX_6`.
- */
+/** Not inside a word or a decimal, as `IN_WORD` reads one. */
 export const OUTSIDE_WORD =
   // The lookahead comes first so the lookbehind walks a run of `_` only from its end.
-  String.raw`(?!_)(?<![A-Za-z\d.]_*)`;
+  String.raw`(?!_)(?<!${IN_WORD})`;
 
 /**
  * Where a number of a measurement may start: not inside a word, a decimal or a number such

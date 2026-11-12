@@ -3575,6 +3575,7 @@ describe('a measurement in underscore emphasis', () => {
     ${'Bake at __350 degrees Fahrenheit__.'} | ${'Bake at __175 degrees Celsius__.'}     | ${'a temperature spelled out'}
     ${'Bake the cake at _350F_ today.'}     | ${'Bake the cake at _175°C_ today.'}       | ${'a bare F'}
     ${'It weighs _5 pounds_.'}              | ${'It weighs _2.3 kilograms_.'}            | ${'a weight'}
+    ${'It is _1 000 miles_ away.'}          | ${'It is _1 600 kilometres_ away.'}        | ${'a number grouped with a space'}
     ${'It is _two feet_ long.'}             | ${'It is _61 centimetres_ long.'}          | ${'a number in words'}
     ${'It is _half an inch_ thick.'}        | ${'It is _1.3 centimetres_ thick.'}        | ${'half an inch'}
     ${'It is _a mile and a half_ away.'}    | ${'It is _2.4 kilometres_ away.'}          | ${'a mile and a half'}

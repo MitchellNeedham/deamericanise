@@ -80,6 +80,12 @@ function fail(message: string): never {
   process.exit(2);
 }
 
+/** The values `--rule <id>=<value>` accepts, in any case. */
+const RULE_SETTINGS = new Map([
+  ['true', true], ['on', true], ['1', true], ['yes', true],
+  ['false', false], ['off', false], ['0', false], ['no', false],
+]);
+
 function list(value: string | undefined): string[] {
   return value ? value.split(',').map((s) => s.trim()).filter(Boolean) : [];
 }
@@ -257,10 +263,16 @@ export async function main(argv: string[]): Promise<number> {
   // Every dialect's ids, so one command line runs under them all: en-CA has no dialect.* rule.
   const knownRules = ruleEntries.length ? (Object.keys(DIALECTS) as Dialect[]).flatMap((d) => ruleIds(d)) : [];
   for (const entry of ruleEntries) {
-    const [id, value = 'false'] = entry.split('=');
+    const separator = entry.indexOf('=');
+    const id = separator === -1 ? entry : entry.slice(0, separator);
+    const value = separator === -1 ? 'false' : entry.slice(separator + 1);
     if (!id) fail('--rule expects <id>=<true|false>');
     if (!knownRules.some((ruleId) => matchesRuleId(id, ruleId))) fail(`unknown rule "${id}". Try --list-rules.`);
-    rules[id] = value !== 'false' && value !== '0' && value !== 'off';
+    const setting = RULE_SETTINGS.get(value.toLowerCase());
+    if (setting === undefined) {
+      fail(`unknown rule value "${value}" in "${entry}". Known: ${[...RULE_SETTINGS.keys()].join(', ')}`);
+    }
+    rules[id] = setting;
   }
 
   const unitsKeep = list(values['units-keep']).map((name) => {

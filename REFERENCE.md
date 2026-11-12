@@ -490,6 +490,9 @@ stays, and so does one before a figure or a bracket. `°F` and `℉` are symbols
 is usually the sentence's own, so it goes only where a word in lower case carries the
 sentence on: `Bake at 350°F. for 20 minutes` becomes `Bake at 175°C for 20 minutes`, while
 `- 350°F.`, `"Bake at 350°F." he said` and `It was 90°F. Then it rained.` keep their stop.
+Before its own Celsius value in brackets, the pair still collapses, and the same test runs
+past the bracket: `Bake at 350°F. (175°C) Then stir.` becomes `Bake at 175°C. Then stir.`,
+and `Bake at 350 degrees F. (175°C) for an hour.` becomes `Bake at 175°C for an hour.`
 The word `Fahrenheit` takes no stop. A spelled-out value keeps the author's singular
 where it describes the noun after it, so `a 350 degree F oven` becomes
 `a 175 degree Celsius oven`, while `Preheat to 350 degrees F` keeps the plural.
@@ -505,7 +508,9 @@ at a blank line, a list item, a heading, or a stop before a capitalised word, bu
 the stops of `10 min. at` or `6 p.m. were`. As the abbreviation rules decide, a title such
 as `Mr.` never ends one before a name, and an initialism such as `U.S.` ends one only
 before a word that cannot continue a name. A number, in figures or in words, never opens
-a sentence. `Cook until the chicken
+a sentence, but a date that starts with a figure does, as `1 December 2024` and
+`01/12/2024` do, since those are what the date rules write for `December 1, 2024`.
+`Cook until the chicken
 reaches 165F` becomes `73.9°C`, while `Apartment 3F`, `seat 23F`, `the Boeing 777F`,
 `#33F`, `F-150` and the courtesy figure in `180C/350F/gas 4` stay as they are.
 
@@ -595,8 +600,14 @@ An abbreviation's stop goes with it, so `It is 12 in. long.` becomes `It is 30 c
 `Add 5 lb. of beef.` becomes `Add 2.3 kg of beef.` The stop stays when it also ends the
 sentence, as a time's does, so `The fence is 6 ft. It is new.` becomes
 `The fence is 1.8 m. It is new.` Any capitalised word after the stop starts a new sentence,
-a number in words included, but a word in capitals does not, so `Buy a 6 ft. HDMI cable.`
-becomes `Buy a 1.8 m HDMI cable.`
+a number in words included, and so does a date that starts with a figure, as
+`1 December 2024` does, but a word in capitals does not, so `Buy a 6 ft. HDMI cable.`
+becomes `Buy a 1.8 m HDMI cable.` The stop also stays as the first dot of an ellipsis, so
+`The board is 12 in...` becomes `The board is 30 cm...`, while `It is 12 in.... long`
+becomes `It is 30 cm... long`. Where a measurement collapses into its own metric value, the
+stop is decided past that value, so `The bag weighs 2.2 lb. (1 kg) Then stir.` becomes
+`The bag weighs 1 kg. Then stir.` and `The bag weighs 2.2 lb. (1 kg) of flour.` becomes
+`The bag weighs 1 kg of flour.`
 
 A spaced `in` with no stop after it is the preposition, so `There are 6 in total.` stays as
 written. A spaced `in.` that ends the sentence is the particle of a verb that takes `in`
@@ -637,7 +648,8 @@ numeric date are not its year, so `On March 1, 1900 square kilometres burned.` a
 **Times and currency.** `3:00 P.M.` becomes `3:00pm`; a 12-hour clock is
 normal outside America too, so only the styling goes. The last stop stays when it also
 ends the sentence, so `It starts at 3 P.M. Bring snacks.` becomes
-`It starts at 3pm. Bring snacks.` A time that runs on, as in `3 P.M. Tuesday` or
+`It starts at 3pm. Bring snacks.`, and as the first dot of an ellipsis, so `5 p.m...`
+becomes `5pm...`. A time that runs on, as in `3 P.M. Tuesday`, `3 P.M. 5 March` or
 `8 P.M. ET`, loses it. `times: { to24Hour: true }` gives `15:00` if you want it.
 Amounts are never converted, because exchange rates move; a bare
 `$500` becomes `US$500` when the text is American. 
@@ -653,8 +665,10 @@ rewritten: `He said "The color is gray."` becomes `He said "The colour is grey".
 mark with a letter or digit straight after it closes nothing, so `Acme Inc.'s` keeps its
 stop.
 
-An initialism keeps its last stop when that stop also ends the sentence, as a time does,
-so `She moved to the U.S. It was cold.` becomes `She moved to the US. It was cold.` A
+An initialism keeps its last stop when that stop also ends the sentence or opens an
+ellipsis, as a time does, so `She moved to the U.S. It was cold.` becomes
+`She moved to the US. It was cold.` and `She moved to the U.K...` becomes
+`She moved to the UK...` A
 capital after an initialism is more often the rest of a name, so `the U.S. Army` becomes
 `the US Army`: only a word that opens sentences and never names anything, such as `It`,
 `The`, `In` or `However`, counts as a new sentence.

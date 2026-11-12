@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deamericaniseText } from '../src/index.js';
+import { analyse, deamericaniseText, resolveOptions } from '../src/index.js';
+import { patternRules } from '../src/rules/index.js';
 
 // A file of its own: a worker that has already run many tests slows the longer input more
 // than the shorter one, which breaks the comparison.
@@ -116,5 +117,29 @@ describe.skipIf(onCi)('a long run of whitespace takes time in line with its leng
     const started = performance.now();
     convert(whitespaceText(row));
     expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+  });
+});
+
+describe.skipIf(onCi)('the decade rule takes time in line with a long run of spaces', () => {
+  // The rule alone, so the time the rest of the pipeline takes on the run cannot hide its own.
+  const options = resolveOptions({});
+  const decade = patternRules(options).find((rule) => rule.id === 'units.temperature.decade')!;
+  // Generous, since the rule takes a few milliseconds here. A pattern that tries every split
+  // of the run takes most of a second.
+  const LIMIT_MS = 100;
+
+  it.each`
+    before                   | expected
+    ${'the'}                 | ${[]}
+    ${'Highs in the'}        | ${[]}
+    ${'Highs in the mid'}    | ${[]}
+    ${'Highs in the 70s or'} | ${['between 21 and 26°C']}
+  `('"$before", 30000 spaces, then "x"', ({ before, expected }) => {
+    const text = `${before}${' '.repeat(30000)}x`;
+    const signals = analyse(text);
+    const started = performance.now();
+    const changes = decade.find({ text, options, signals, american: true });
+    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+    expect(changes.map((change) => change.after)).toEqual(expected);
   });
 });

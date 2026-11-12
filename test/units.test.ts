@@ -3734,6 +3734,9 @@ describe('Fahrenheit decades', () => {
     ${'highs in the upper 80s degrees today'}      | ${'highs between 31 and 32°C today'}
     ${'temperatures in the 80s and 90s degrees'}   | ${'temperatures between 27 and 37°C'}
     ${'highs in the 80s degrees F today'}          | ${'highs between 27 and 32°C today'}
+    ${'Highs in the mid-80s.'}                     | ${'Highs between 29 and 30°C.'}
+    ${'Highs in the mid 80s.'}                     | ${'Highs between 29 and 30°C.'}
+    ${'highs in the\n   80s'}                      | ${'highs between 27 and 32°C'}
   `('$input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -3763,6 +3766,7 @@ describe('Fahrenheit decades', () => {
     ${'Interest rates in the 80s hit records.'}      | ${'no temperature context'}
     ${'a 1.70s delay in the forecast'}               | ${'part of a decimal'}
     ${'Ford trucks from the 70s F series'}           | ${'a bare F is a letter, not a marker'}
+    ${'Lows in the -20s overnight.'}                 | ${'a minus sign, which no band explains'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });

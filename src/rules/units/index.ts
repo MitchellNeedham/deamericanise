@@ -2500,7 +2500,9 @@ function temperatureRules(): Rule[] {
 function temperatureDecadeRule(): Rule {
   // A decade, optionally banded (`low`, `mid`, `upper`), optionally paired with a second
   // decade (`the 70s and 80s`). `70's` and `low-70s` are both written in the wild.
-  const DECADE = String.raw`(low|mid|middle|high|upper|lower)?(?:\s|${HYPHEN})*(1[01]0|\d0)['\u2019]?s`;
+  // Only a band takes the space before the figure, or a failing match after `the` would try
+  // every split of the run of spaces that follows it.
+  const DECADE = String.raw`(?:(low|mid|middle|high|upper|lower)(?:\s|${HYPHEN})*)?(1[01]0|\d0)['\u2019]?s`;
   const pattern = new RegExp(
     String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
       String.raw`(?:\s*(?:and|to|${HYPHEN}|\u2013)\s*${DECADE})?(?!\w)` +

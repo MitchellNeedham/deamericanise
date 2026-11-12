@@ -66,6 +66,8 @@ describe('prose comments are not mistaken for code', () => {
     ${'(defaults to gray)'}
     ${'The color (gray (dark)).'}
     ${'The gray color :))'}
+    ${'Pick the color (see [1])'}
+    ${'The color ([1]) is gray.'}
   `('"$line"', ({ line }) => {
     expect(looksLikeCode(line as string)).toBe(false);
   });
@@ -107,6 +109,10 @@ describe('commented-out Lisp is left alone', () => {
     ${'lisp'}    | ${'; (let ((color 1)) color)'}
     ${'clojure'} | ${'; (def color "gray")'}
     ${'lisp'}    | ${';; (when (gray-p color)\n;;   (pick color)))'}
+    ${'clojure'} | ${'; (let [color 1])'}
+    ${'clojure'} | ${'; (defn pick [color] [color])'}
+    ${'clojure'} | ${'; (def color {:a 1})'}
+    ${'clojure'} | ${';   {:color "gray"}))'}
   `('$language leaves "$source" alone', ({ language, source }) => {
     expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(source);
   });
@@ -118,6 +124,9 @@ describe('commented-out Lisp is left alone', () => {
     ${'lisp'}   | ${'; (See the color chart.)'}    | ${'; (See the colour chart.)'}
     ${'ts'}     | ${'// (see the color chart)'}    | ${'// (see the colour chart)'}
     ${'ts'}     | ${'// Set the default color.'}   | ${'// Set the default colour.'}
+    ${'ts'}     | ${'// Pick the color (see [1])'}  | ${'// Pick the colour (see [1])'}
+    ${'ts'}     | ${'// Pick the color [(see below)]'} | ${'// Pick the colour [(see below)]'}
+    ${'ts'}     | ${'// The color ([1]) is gray.'}  | ${'// The colour ([1]) is grey.'}
   `('$language still rewrites "$source"', ({ language, source, expected }) => {
     expect(deamericaniseCode(source as string, { language: language as string }).text).toBe(expected);
   });

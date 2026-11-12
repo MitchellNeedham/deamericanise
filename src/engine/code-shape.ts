@@ -25,10 +25,13 @@ const SIGNALS: Array<[weight: number, pattern: RegExp]> = [
     3,
     /^\s*\((?:def|defn|defun|defmacro|defvar|defparameter|defconst|defconstant|defcustom|defstruct|defclass|defmethod|defonce|define|lambda|fn|let\*?|setq|setf|ns|require|progn|cond|when|unless)(?=[\s()[\]{}]|$)/,
   ],
-  // Brackets that close or open two forms at once, as in `color))` and `((color`. Prose
-  // seldom nests one bracket straight inside another. A run after `:`, `;`, `=` or `-` is a
-  // face such as `:))`, which no Lisp writes.
-  [3, /(?<![:;=)\]}-])[)\]}]{2,}\s*$|(?<![:;=([{-])[([{]{2}/],
+  // The same bracket closing or opening two forms at once, as in `color))` and `((color`. A
+  // mixed pair is a citation in prose, as in `(see [1])` and `([1])`. A run after `:`, `;`,
+  // `=` or `-` is a face such as `:))`, which no Lisp writes.
+  [
+    3,
+    /(?:(?<![:;=)-])\){2,}|(?<![:;=\]-])\]{2,}|(?<![:;=}-])\}{2,})\s*$|(?<![:;=(-])\(\(|(?<![:;=[-])\[\[|(?<![:;={-])\{\{/,
+  ],
   // Something being assigned to: the heart of almost every statement.
   [3, /^\s*[A-Za-z_$@][\w$.[\]'"]*\s*(?:=|:=|<-|\+=|-=)\s*[^=\s]/],
   // A keyword followed by exactly one token, as in `return color`. Prose keeps going:

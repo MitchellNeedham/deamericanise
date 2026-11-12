@@ -770,7 +770,8 @@ language's comment marker is taken as commented-out on sight.
 
 An s-expression puts its name after the bracket, so a line also reads as code when it opens
 with a Lisp declaration or special form in lower case, such as `(defun`, `(setq`, `(let` or
-`(when`, or when it opens or closes two brackets at once, as `((color` and `color))` do.
+`(when`, or when it opens or closes two of the same bracket at once, as `((color` and
+`color))` do. A mixed pair, as in the citation `(see [1])`, counts for nothing.
 `; (setq color 1)` and `;; (let ((color 1)) color)` are left alone, while
 `; (See the color chart.)` is rewritten.
 

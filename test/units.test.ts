@@ -3612,13 +3612,31 @@ describe('a unit the words beside it read in another sense', () => {
     ${'Use 8 oz (about 1 cup) of milk.'}                  | ${'Use 240 mL (about 1 cup) of milk.'}
     ${'Drink 16 oz (470 mL) of water.'}                   | ${'Drink 470 mL of water.'}
     ${'Leave 240 mL (8 oz) of water.'}                    | ${'Leave 240 mL (8 oz) of water.'}
+    ${'Drink 16 oz sports drink.'}                        | ${'Drink 470 mL sports drink.'}
+    ${'A 3-ton AC unit costs more.'}                      | ${'An 11 kilowatt AC unit costs more.'}
+    ${'Pour 8 oz of milk into the pan.'}                  | ${'Pour 240 mL of milk into the pan.'}
+    ${'She bought 16 oz of gold coins.'}                  | ${'She bought 500 g of gold coins.'}
   `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                         | expected
+    ${'A 5-ton air conditioner cools the hall.'}   | ${'An 18 kilowatt air conditioner cools the hall.'}
+    ${'A 5-ton heat pump heats the hall.'}         | ${'An 18 kilowatt heat pump heats the hall.'}
+    ${'The 5-ton air conditioner cools the hall.'} | ${'The 18 kilowatt air conditioner cools the hall.'}
+    ${'Drink 16 oz of water daily.'}               | ${'Drink 470 mL of water daily.'}
+    ${'16 oz of water keeps you going.'}           | ${'470 mL of water keeps you going.'}
+    ${'Add 8 oz of milk slowly.'}                  | ${'Add 240 mL of milk slowly.'}
+    ${'16 oz of gold costs a lot.'}                | ${'500 g of gold costs a lot.'}
+  `('reads the sense whatever word follows its thing: $input', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 
   it.each`
     unchanged                                  | why
     ${'Order the board with 2 oz copper.'}     | ${'the copper of a circuit board'}
+    ${'The 2 oz copper board costs more.'}     | ${'copper before a verb'}
     ${'Order 2 oz copper PCBs.'}               | ${'copper that describes a board'}
     ${'Copper weight: 2 oz, on both sides.'}   | ${'copper before the number'}
     ${'The PCB uses 1 oz on inner layers.'}    | ${'a circuit board in the sentence'}
@@ -3631,6 +3649,9 @@ describe('a unit the words beside it read in another sense', () => {
   it.each`
     input                                             | expected
     ${'A 3-ton truck.'}                               | ${'A 2.7 tonne truck.'}
+    ${'A 3-ton truck needs AC.'}                      | ${'A 2.7 tonne truck needs AC.'}
+    ${'The 3-ton trucks need AC.'}                    | ${'The 2.7 tonne trucks need AC.'}
+    ${'The truck carries 3 tons of gravel.'}          | ${'The truck carries 2.7 tonnes of gravel.'}
     ${'The bridge carries 40 tons.'}                  | ${'The bridge carries 36 tonnes.'}
     ${'Data in metric tons. A 3-ton truck.'}          | ${'Data in metric tons. A 3-ton truck.'}
     ${'The AC is in a 3-ton truck.'}                  | ${'The AC is in a 2.7 tonne truck.'}
@@ -3641,6 +3662,7 @@ describe('a unit the words beside it read in another sense', () => {
     ${'Add 8 oz sour cream.'}                         | ${'Add 230 g sour cream.'}
     ${'Add 8 oz ice cream.'}                          | ${'Add 230 g ice cream.'}
     ${'Add 8 oz milk chocolate.'}                     | ${'Add 230 g milk chocolate.'}
+    ${'Buy 12 oz coffee beans.'}                      | ${'Buy 340 g coffee beans.'}
     ${'Add 2 oz baking soda.'}                        | ${'Add 57 g baking soda.'}
     ${'Add 14 oz sweetened condensed milk.'}          | ${'Add 400 g sweetened condensed milk.'}
     ${'Buy 12 oz whole bean coffee.'}                 | ${'Buy 340 g whole bean coffee.'}
@@ -3648,6 +3670,7 @@ describe('a unit the words beside it read in another sense', () => {
     ${'A 16 oz T-bone steak.'}                        | ${'A 450 g T-bone steak.'}
     ${'Dissolve 2 oz of sugar in water.'}             | ${'Dissolve 57 g of sugar in water.'}
     ${'Open a 15 oz can of beans.'}                   | ${'Open a 430 g can of beans.'}
+    ${'Open a 15 oz can of tomatoes.'}                | ${'Open a 430 g can of tomatoes.'}
     ${'Fill a 16 oz glass jar of honey.'}             | ${'Fill a 450 g glass jar of honey.'}
     ${'Drink 8 oz (230 g) of milk.'}                  | ${'Drink 230 g of milk.'}
     ${'Add 8 fl oz of milk.'}                         | ${'Add 240 mL of milk.'}

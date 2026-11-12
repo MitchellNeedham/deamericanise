@@ -1,4 +1,4 @@
-import { INLINE_SPACE, NUMBER_START, canBeRange, parseNumber } from './number.js';
+import { INLINE_SPACE, NUMBER_START, SOFT_SPACE, canBeRange, parseNumber, softGap } from './number.js';
 
 /** `°F`, `℉`, `degrees Fahrenheit` and the like: Fahrenheit written as a unit. */
 export const FAHRENHEIT = String.raw`°\s*F\b|℉|°\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|degrees?\s+F\b|deg\.?\s*F\b`;
@@ -7,12 +7,17 @@ const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
 /** `165F` and `350 F`. `F-150` and `F-type` are names. */
 const BARE = String.raw`${INLINE_SPACE}?F(?![\w'’]|[-–][A-Za-z])`;
 
+const JOIN = softGap(String.raw`(?:-|\u2013|\u2014|to)`);
+const BETWEEN_AND =
+  String.raw`(?<=\bbetween(?=\s)${SOFT_SPACE}${DEGREES})` + softGap(String.raw`(?<=\s)and(?=\s)`);
+
 /**
  * One temperature, or a range of them with the unit written once: `350-375°F`,
- * `350 to 375°F`, `between 60 and 70°F`. `and` joins a range only after `between`.
+ * `350 to 375°F`, `between 60 and 70°F`. `and` joins a range only after `between`. A range
+ * crosses a line break that only wraps the paragraph, never a new block.
  */
 const PATTERN = new RegExp(
-  String.raw`${NUMBER_START}(?:(${DEGREES})(\s*(?:-|\u2013|\u2014|to)\s*|(?<=\bbetween\s+${DEGREES})\s+and\s+))?` +
+  String.raw`${NUMBER_START}(?:(${DEGREES})(${JOIN}|${BETWEEN_AND}))?` +
     String.raw`(${DEGREES})(?:\s*(${FAHRENHEIT})|(${BARE}))`,
   'gi',
 );

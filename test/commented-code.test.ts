@@ -88,6 +88,7 @@ describe('a line commented on top of a comment', () => {
   it.each`
     language     | source
     ${'ts'}      | ${'// // the color of the theater'}
+    ${'ts'}      | ${'//// the color of the theater'}
     ${'python'}  | ${'# # the color of the theater'}
     ${'sql'}     | ${'-- -- the color of the theater'}
   `('$language leaves "$source" alone', ({ language, source }) => {
@@ -116,6 +117,16 @@ describe('prose and code in the same comment', () => {
         ' */',
       ].join('\n'),
     );
+  });
+
+  it('reads each line of a doc comment without its star', () => {
+    const source = '/**\n * const color = 1;\n * The color.\n */';
+    expect(deamericaniseCode(source, { language: 'ts' }).text).toBe('/**\n * const color = 1;\n * The colour.\n */');
+  });
+
+  it('reads each line of a run of line comments as a line', () => {
+    const source = '// const color = 1;\n// The color.\n';
+    expect(deamericaniseCode(source, { language: 'ts' }).text).toBe('// const color = 1;\n// The colour.\n');
   });
 
   it('still rewrites a trailing comment beside real code', () => {

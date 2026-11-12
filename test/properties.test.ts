@@ -638,6 +638,21 @@ const LANGUAGES: Language[] = [
       [`// ${line}\nlet note = "`, false], [literal, true], [`";\n/* ${block} */\n`, false],
     ],
   },
+  {
+    id: 'ts',
+    // Lines a doc comment or a run of line comments wraps, which are read as one text.
+    render: (_line, block, literal) => [
+      [`/**\n * ${block.replace(/\n/g, '\n * ')}\n */\nconst note = '`, false],
+      [literal, true],
+      [`';\n/// ${block.replace(/\n/g, '\n/// ')}\n`, false],
+    ],
+  },
+  {
+    id: 'python',
+    render: (_line, block, literal) => [
+      [`# ${block.replace(/\n/g, '\n# ')}\nnote = "`, false], [literal, true], [`"\n`, false],
+    ],
+  },
 ];
 
 interface GeneratedSource extends Generated {

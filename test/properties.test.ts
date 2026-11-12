@@ -201,12 +201,6 @@ interface KnownFailure {
   matches(violation: Violation): boolean;
 }
 
-/** A second run rewrites a replacement the first run wrote. */
-const rewritesReplacement =
-  (...afters: string[]) =>
-  (v: Violation): boolean =>
-    v.origin !== undefined && afters.includes(v.origin.after.toLowerCase());
-
 const VOCABULARY = [...baseVocabulary(), ...Object.values(DIALECTS).flatMap((pack) => pack.vocabulary)];
 
 /** Must match `CONTEXT_WINDOW` in src/engine/lexicon.ts. */

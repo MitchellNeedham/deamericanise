@@ -9,7 +9,7 @@ import { CLOSING, endsSentence } from './sentence.js';
  * Truncations keep it, so `Prof.` (Professor), `Rev.` (Reverend), `Capt.` (Captain),
  * `Gen.` (General), `Co.` and `No.` are correct everywhere and are not listed here.
  */
-const CONTRACTIONS = ['Mr', 'Mrs', 'Ms', 'Dr', 'St', 'Jr', 'Sr', 'Fr', 'Sgt', 'Lt', 'Ltd', 'Mme', 'Mlle'];
+export const CONTRACTIONS = ['Mr', 'Mrs', 'Ms', 'Dr', 'St', 'Jr', 'Sr', 'Fr', 'Sgt', 'Lt', 'Ltd', 'Mme', 'Mlle'];
 
 /**
  * Words that can open a sentence but never continue a name. A capital after an initialism
@@ -25,7 +25,7 @@ const OPENERS = [
   'Then', 'Now', 'Later', 'However', 'Meanwhile', 'Instead', 'Also', 'Even',
 ];
 // A word joined to a hyphen, digit or stop belongs to a name, as in `A-10`, `I-95` or `A.I.`.
-const OPENER = new RegExp(String.raw`(?:${OPENERS.join('|')})(?![\p{L}\p{N}.‐‑-])`, 'uy');
+export const OPENER = new RegExp(String.raw`(?:${OPENERS.join('|')})(?![\p{L}\p{N}.‐‑-])`, 'uy');
 
 /** Number words that can end a written time, as in `ten P.M.` or `ten forty-five P.M.`. */
 const TIME_WORDS = [

@@ -1,8 +1,19 @@
 import { DIALECTS } from '../../dialects/index.js';
 import { toPattern } from '../../engine/lexicon.js';
+import { CONTRACTIONS, OPENER as AFTER_INITIALISM } from '../punctuation.js';
+import { sentenceBounds } from '../sentence.js';
 import { spellingEntries } from '../spelling/index.js';
+import { DOTTED_TIME, OPENER as AFTER_TIME } from '../times.js';
 import { baseVocabulary } from '../vocabulary.js';
-import { INLINE_SPACE, NUMBER_START, SOFT_SPACE, canBeRange, parseNumber, softGap } from './number.js';
+import {
+  INLINE_SPACE,
+  NUMBER_PATTERN,
+  NUMBER_START,
+  SOFT_SPACE,
+  canBeRange,
+  parseNumber,
+  softGap,
+} from './number.js';
 
 /** `°F`, `℉`, `degrees Fahrenheit` and the like: Fahrenheit written as a unit. */
 export const FAHRENHEIT = String.raw`°\s*F\b|℉|°\s*Fahrenheit\b|degrees?\s+Fahrenheit\b|degrees?\s+F\b|deg\.?\s*F\b`;
@@ -58,14 +69,34 @@ const ABOUT_HEAT = new RegExp(String.raw`\b(?:${[HEAT_WORDS, ...AMERICAN_HEAT_WO
 /** A Celsius value beside a bare `F` makes it the courtesy figure, as in `180C/350F/gas 4`. */
 const CELSIUS = /\d(?:\s*[°º˚]\s*|\s?)C\b|℃|\b[Cc](?:elsius|entigrade)\b/;
 
-/** A full stop inside a number such as `98.6` does not end the sentence. */
-const SENTENCE_END = /[.!?](?!\d)|\n/;
+/** From a stop to the word after it, past any closing and opening marks. */
+const TO_WORD = String.raw`[^\p{L}\p{N}]+`;
+const TIME_STOP = String.raw`${DOTTED_TIME}${TO_WORD}`;
+const INITIALISM_STOP = String.raw`\p{L}\.\s?\p{L}\.${TO_WORD}`;
+const TITLE_STOP = String.raw`\b(?:${CONTRACTIONS.join('|')})\.${TO_WORD}`;
+
+/**
+ * A word that starts a new sentence after a stop, by the test of the rule that rewrites that
+ * stop, so no rewrite moves a sentence's end: after a time such as `6 p.m.`, the time rule's;
+ * after an initialism such as `U.S.`, the abbreviation rule's; after a title such as `Mr.`,
+ * none, since that rule drops the stop before a name. After any other word, any capitalised
+ * word starts one. A number in words never does, as one in figures cannot, since the unit
+ * rules write `Two feet` as `61 centimetres`.
+ */
+const OPENER = new RegExp(
+  String.raw`(?!(?:${NUMBER_PATTERN})(?![\p{L}\p{N}]))(?:` +
+    String.raw`(?<=${TIME_STOP})${AFTER_TIME.source}` +
+    String.raw`|(?<!${TIME_STOP})(?<=${INITIALISM_STOP})${AFTER_INITIALISM.source}` +
+    String.raw`|(?<!${INITIALISM_STOP}|${TITLE_STOP}))`,
+  'iuy',
+);
+
 const REACH = 120;
 
+/** The words either side of a match in its sentence. */
 function sentenceAround(text: string, start: number, end: number): string {
-  const before = text.slice(Math.max(0, start - REACH), start).split(SENTENCE_END).pop()!;
-  const after = text.slice(end, end + REACH).split(SENTENCE_END)[0]!;
-  return `${before} ${after}`;
+  const [from, to] = sentenceBounds(text, start, end, OPENER, REACH);
+  return `${text.slice(from, start)} ${text.slice(end, to)}`;
 }
 
 /**

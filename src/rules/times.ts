@@ -10,12 +10,18 @@ const MERIDIEM = String.raw`(?:[ap]\.\s?m\.?|[ap]m)`;
  * Any capitalised word after a time starts a new sentence, except one that carries the time
  * on, as in `8 p.m. Eastern` or `3 p.m. Tuesday`.
  */
-const OPENER = new RegExp(
+export const OPENER = new RegExp(
   String.raw`(?!(?:Eastern|Central|Mountain|Pacific|Atlantic|Alaska|Hawaii|` +
     String.raw`Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|` +
     String.raw`Mon|Tues?|Wed|Thu(?:rs?)?|Fri|Sat|Sun|Sept|${MONTH_PATTERN})(?!\p{L}))`,
   'uy',
 );
+
+/**
+ * A time the clock rule rewrites, up to the last stop of a dotted meridiem as in `6 p.m.`:
+ * the stops `OPENER` decides. Spelt out in both cases, so it reads alike with or without `i`.
+ */
+export const DOTTED_TIME = String.raw`(?<![\w:])(?:0?[1-9]|1[0-2])(?::[0-5]\d){0,2}\s*[aApP]\.\s?[mM]\.`;
 
 /**
  * Two separate habits. `P.M.` with capitals and full stops is an American house style,

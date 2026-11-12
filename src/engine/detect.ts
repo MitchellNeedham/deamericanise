@@ -38,12 +38,29 @@ function unlessNear(pattern: RegExp, veto: RegExp, reach: number, boundary: RegE
 const SETTING = String.raw`(?:[34]\d\d|500)(?![.,]?\d)`;
 const CELSIUS = String.raw`[\s-]*(?:°|º|˚|degrees?)?\s*(?:C\b|Celsius|centigrade)`;
 
+/**
+ * A baking word that names a thing rather than the act of cooking. `Bake off` without a
+ * hyphen is left out, because bakeries use it as a verb for finishing par-baked bread.
+ */
+const BAKED_THING =
+  String.raw`bake(?:[\s-]+sales?|-offs?)\b|baked\s+(?:goods|beans)\b|` +
+  String.raw`baking\s+(?:tins?|trays?|sheets?|dish(?:es)?|pans?|paper|parchment|powder|soda)\b`;
+
+/**
+ * A verb that takes an amount of its own, as in `came to 320` or `raised 500`. Forms a
+ * recipe uses to change the heat (`reduce to`, `raise the heat to`, `until it gets to`)
+ * are left out.
+ */
+const AMOUNT_VERB =
+  String.raw`\b(?:(?:came|got|gotten|rose|fell|grew|climbed|amounted)\s+(?:up\s+|down\s+)?to|` +
+  String.raw`raised|raises|totall?ed|totals|totall?ing|costs?|costing|sold|sells?|selling|priced)\b`;
+
 /** An oven setting from 300 to 500 that is not marked Celsius. */
 const OVEN_SETTING = new RegExp(
   // The gap may not cross another temperature, so `oven to 180C or to 400F` is read by
-  // its first setting.
-  String.raw`\b(?:ovens?|pre-?heat(?:s|ed|ing)?|bak(?:e|es|ed|ing)|roast(?:s|ed|ing)?)\b` +
-    String.raw`(?:(?!\d\s*(?:°|º|˚|degrees?|C\b))[^.\n]){0,40}?\b(?:to|at)\s+(?:about\s+|around\s+)?` +
+  // its first setting. Nor may it cross an amount verb, whose `to` or `at` is its own.
+  String.raw`\b(?:ovens?|pre-?heat(?:s|ed|ing)?|(?!${BAKED_THING})bak(?:e|es|ed|ing)|roast(?:s|ed|ing)?)\b` +
+    String.raw`(?:(?!\d\s*(?:°|º|˚|degrees?|C\b)|${AMOUNT_VERB})[^.\n]){0,40}?\b(?:to|at)\s+(?:about\s+|around\s+)?` +
     String.raw`${SETTING}(?!${CELSIUS})` +
     // A setting is followed by its unit or the rest of the instruction, never a quantity:
     // `the baking powder to 300 g of flour`, `in the oven for up to 300 minutes`.
@@ -92,9 +109,16 @@ const COMMONWEALTH_INGREDIENT =
 
 const US_INGREDIENTS = unlessNear(MEASURED_US_INGREDIENT, COMMONWEALTH_INGREDIENT, 30, /\n/);
 
+/**
+ * The word `Fahrenheit` where it names the scale. A number straight after it makes it a
+ * title, as in `Fahrenheit 451` or `Fahrenheit 9/11`, even on the next line of a wrapped
+ * paragraph, though not a number past a blank line or one that opens a numbered list item.
+ */
+const SCALE_NAMED = /\bFahrenheit\b(?![^\S\n]*(?:\n[^\S\n]*(?!\d+[.)](?:\s|$)))?\d)/i;
+
 /** Every temperature the Fahrenheit rules convert, and the scale named on its own. */
 const FAHRENHEIT: Pick<RegExp, 'test'> = {
-  test: (text) => !fahrenheitTemperatures(text).next().done || /\bFahrenheit\b/i.test(text),
+  test: (text) => !fahrenheitTemperatures(text).next().done || SCALE_NAMED.test(text),
 };
 
 // The number may be written out, as older prose and most recipes do.

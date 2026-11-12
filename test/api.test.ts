@@ -302,6 +302,7 @@ describe('the Fahrenheit marker', () => {
     'It was 70℉ outside.',
     'A fever of 102.5F needs a doctor.',
     'Bake at 350-375F.',
+    'It was 72 degrees Fahrenheit.',
   ];
 
   const NOT_READ = [
@@ -320,6 +321,8 @@ describe('the Fahrenheit marker', () => {
     'Scale it by 100f before baking.',
     'Preheat the oven to 180C/350F/gas 4.',
     'Heat the oven to 180C fan or to 400F.',
+    'I read Fahrenheit 451 at school.',
+    'The film Fahrenheit 9/11 opened in 2004.',
   ];
 
   it.each(READ)('finds Fahrenheit in "%s"', (input) => {
@@ -330,8 +333,35 @@ describe('the Fahrenheit marker', () => {
     expect(analyse(input).markers).not.toContain(FAHRENHEIT);
   });
 
-  it('still counts the scale named on its own', () => {
-    expect(analyse('Set the thermostat in Fahrenheit.').markers).toContain(FAHRENHEIT);
+  it.each([
+    'Set the thermostat in Fahrenheit.',
+    'The Fahrenheit scale puts water at 32 when it freezes.',
+    'Temperatures are in Fahrenheit: 72 is comfortable.',
+    'Temperatures in Fahrenheit\n2. Warm the milk.',
+    '## Temperatures in Fahrenheit\n\n1. Warm the milk.',
+  ])('still counts the scale named on its own in %j', (input) => {
+    expect(analyse(input).markers).toContain(FAHRENHEIT);
+  });
+
+  it.each([
+    'I read Fahrenheit 451 at school.',
+    'FAHRENHEIT 451 by Ray Bradbury',
+    'We watched Fahrenheit 9/11.',
+    'I read Fahrenheit\n451 at school.',
+  ])('does not count the title in %j', (input) => {
+    expect(analyse(input).markers).toEqual([]);
+  });
+
+  it('still counts a protected place name beside the title', () => {
+    expect(analyse('I read Fahrenheit 451 on the way to Pearl Harbor.').markers).toEqual(['US spellings of places']);
+  });
+
+  it('keeps a British date British in a review of the novel', () => {
+    const text = 'We organized a screening of Fahrenheit 451 in color with Mr. Jones on 03/04/2024.';
+    expect(analyse(text).confidence).toBeCloseTo(0.45);
+    expect(deamericaniseText(text)).toBe(
+      'We organised a screening of Fahrenheit 451 in colour with Mr. Jones on 03/04/2024.',
+    );
   });
 
   it.each([...READ, ...NOT_READ])('agrees with the temperature rule on "%s"', (input) => {
@@ -425,6 +455,14 @@ describe('analyse on recipes', () => {
     ${'Put the dish in a 350-degree oven.'}               | ${OVEN}
     ${'Bake in a 375° oven.'}                             | ${OVEN}
     ${'Bake in a 325 oven.'}                              | ${OVEN}
+    ${'Bake at 350 and sell them at the bake sale.'}      | ${OVEN}
+    ${'Grease a baking tin and bake at 350.'}             | ${OVEN}
+    ${'Bake for 10 minutes, then reduce to 350.'}         | ${OVEN}
+    ${'Roast for 20 minutes, then raise the heat to 450.'} | ${OVEN}
+    ${'Preheat the oven until it gets to 350.'}           | ${OVEN}
+    ${'Bake the risen loaf at 450 for 30 minutes.'}       | ${OVEN}
+    ${'Bake for a total of 40 minutes at 350.'}           | ${OVEN}
+    ${'Bake off the par-baked rolls at 400.'}             | ${OVEN}
     ${'Melt 1 stick of butter.'}                          | ${STICK}
     ${'2 sticks unsalted butter, softened'}               | ${STICK}
     ${'1/2 cup (1 stick) butter, melted'}                 | ${STICK}
@@ -455,8 +493,27 @@ describe('analyse on recipes', () => {
     ${'Cook in the oven for up to 300 minutes.'}               | ${'a time, not a setting'}
     ${'The factory made 400 ovens a week.'}                    | ${'a count of ovens'}
     ${'Microwave oven at 500 watts.'}                          | ${'a power, not a temperature'}
+    ${'The bake sale takings came to 320.'}                    | ${'a bake sale and its total'}
+    ${'We set out to raise 500 at the bake sale and got to 450.'} | ${'a bake sale and its total'}
+    ${'Sales of baked goods rose to 350 on Saturday.'}         | ${'baked goods and their sales'}
+    ${'The bake-off had entries from 300 to 400.'}             | ${'a bake-off is a thing'}
+    ${'Tins of baked beans went up to 350.'}                   | ${'baked beans are a thing'}
+    ${'The shop sells baking tins in sizes up to 400.'}        | ${'a baking tin is a thing'}
+    ${'The cakes we baked came to 320.'}                       | ${'the to belongs to came'}
+    ${'Sales of ovens rose to 400.'}                           | ${'the to belongs to rose'}
+    ${'We baked 200 cakes, which sold at 350.'}                | ${'the at belongs to sold'}
+    ${'Baking supplies cost up to 400.'}                       | ${'the to belongs to cost'}
+    ${'The bakers baked all day and raised the total to 400.'} | ${'the to belongs to raised'}
   `('finds no oven setting in "$input" ($why)', ({ input }) => {
     expect(analyse(input).markers).not.toContain(OVEN);
+  });
+
+  it('keeps a British date British beside a bake sale total', () => {
+    const text = 'The bake sale takings came to 320. We organized it through Mr. Jones on 03/04/2024.';
+    expect(analyse(text).confidence).toBeCloseTo(0.3);
+    expect(deamericaniseText(text)).toBe(
+      'The bake sale takings came to 320. We organised it through Mr. Jones on 03/04/2024.',
+    );
   });
 
   it.each`

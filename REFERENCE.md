@@ -426,16 +426,26 @@ line, but not after a blank line. `1.8 metres (6 feet)` is left as
 it is, because the bracket only restates the metric value in front of it. That is the
 form `keepOriginal` writes, so running it again changes nothing. The same holds for any
 quantity in words the unit rules convert, as in `1.3 centimetres (half an inch)` and
-`2.4 kilometres (a mile and a half)`, and after emphasis or code that closes on the metric
-value, as in `**1.8 metres** (6 feet)`. Here too the bracket may start on the next line,
+`2.4 kilometres (a mile and a half)`. Here too the bracket may start on the next line,
 but not after a blank line. The bracket can open
 with a word such as `about`, but it has to hold nothing else, and the dimension has to
 match: `2 metres (6 pounds)` still converts.
 
+Inline markup on either value or on the bracket is read past: emphasis, code or an inline
+HTML tag that closes on the first value, opens on the bracket or the second value, or wraps
+the measurement inside the bracket. So `**1.8 metres** (6 feet)`,
+`<b>1.8 metres</b> (6 feet)`, `1.8 metres *(6 feet)*` and `1.8 metres (*6 feet*)` are left
+as they are. Where the bracket goes, markup that closes on the imperial value closes on the
+metric one, and the bracket's own markup goes with it: `**6 feet** (1.8 m)` becomes
+`**1.8 m**`, and `6 feet *(1.8 m)*` becomes `1.8 m`. Markup that opens on the bracket has to
+close on it, or the bracket is not read. No change rewrites across an HTML tag, so
+`<b>6 feet</b> (1.8 m)` is left as it is.
+
 A `/` or `or` between the two values reads the same way as a bracket, by the same test of
 agreement. `350°F/180°C` and `350°F or 180°C` become `180°C`, and
 `Preheat to 350°F/180°C/gas 4` becomes `Preheat to 180°C/gas 4`. `180°C/350°F` and
-`180°C or 350°F` are left as they are. A pair can also offer two different measurements,
+`180°C or 350°F` are left as they are, and markup reads as it does with a bracket:
+`**350°F**/180°C` becomes `**180°C**`. A pair can also offer two different measurements,
 so the values have to agree with the metric one first too: `Cut 6 feet or 3 metres of rope`
 becomes `Cut 1.8 metres or 3 metres of rope`, and `Cut 3 metres or 6 feet of rope` becomes
 `Cut 3 metres or 1.8 metres of rope`. A slash with no figure after it is a rate, so

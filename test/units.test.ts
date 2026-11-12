@@ -1877,6 +1877,61 @@ describe('a value paired with its metric value by a slash or "or"', () => {
   });
 });
 
+describe('markup on a measurement given in both systems', () => {
+  it.each`
+    input                                          | expected                           | why
+    ${'It is **6 feet** (1.8 m) tall.'}            | ${'It is **1.8 m** tall.'}         | ${'bold closes on the metric value'}
+    ${'It is 6 feet *(1.8 m)* tall.'}              | ${'It is 1.8 m tall.'}             | ${'emphasis on the bracket goes with it'}
+    ${'It is 6 feet (*1.8 m*) tall.'}              | ${'It is 1.8 m tall.'}             | ${'emphasis inside the bracket goes too'}
+    ${'It is **6 feet** *(1.8 m)* tall.'}          | ${'It is **1.8 m** tall.'}         | ${'both'}
+    ${'It is **6 feet (1.8 m)** tall.'}            | ${'It is **1.8 m** tall.'}         | ${'bold around both'}
+    ${'It is **6 feet**\n(1.8 m) tall.'}           | ${'It is **1.8 m** tall.'}         | ${'bold and a wrapped line'}
+    ${'Bake at **350°F**/180°C.'}                  | ${'Bake at **180°C**.'}            | ${'a slash after bold'}
+    ${'Bake at **350°F**/**180°C**.'}              | ${'Bake at **180°C**.'}            | ${'both values bold'}
+    ${'Bake at 350°F (_175 degrees Celsius_).'}    | ${'Bake at 175 degrees Celsius.'}  | ${'an underscore after the written-out Celsius'}
+    ${'It was **20°F** (11°C) warmer.'}            | ${'It was **11°C** warmer.'}       | ${'a change in temperature'}
+    ${'It is 6 feet (1.8 m) tall.'}                | ${'It is 1.8 m tall.'}             | ${'no markup'}
+    ${'Bake at 350°F/180°C.'}                      | ${'Bake at 180°C.'}                | ${'the same, joined by a slash'}
+    ${'It is 6 feet\n\n(1.8 m) tall.'}             | ${'It is 1.8 metres\n\n(1.8 m) tall.'} | ${'a blank line ends the measurement'}
+    ${'It is **6 feet**\n\n(1.8 m) tall.'}         | ${'It is **1.8 metres**\n\n(1.8 m) tall.'} | ${'the same, after bold'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+    expect(convert(input, { syntax: 'markdown' })).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                                    | why
+    ${'It is <b>1.8 metres</b> (6 feet) tall.'}                  | ${'an HTML tag closes on the metric value'}
+    ${'It is 1.8 metres <i>(6 feet)</i> tall.'}                  | ${'an HTML tag opens on the bracket'}
+    ${'It is 1.8 metres *(6 feet)* tall.'}                       | ${'emphasis on the bracket'}
+    ${'It is 1.8 metres (*6 feet*) tall.'}                       | ${'emphasis inside the bracket'}
+    ${'It is 1.8 metres (about *6 feet*) tall.'}                 | ${'the same, after a word of approximation'}
+    ${'Bake at _175 degrees Celsius_ (350 degrees Fahrenheit).'} | ${'an underscore after the written-out Celsius'}
+    ${'Bake at _175 degrees C_ (350 degrees F).'}                | ${'the same, abbreviated'}
+    ${'Bake at **180°C**/350°F.'}                                | ${'a slash after bold'}
+    ${'Bake at **180°C**/**350°F**.'}                            | ${'both values bold'}
+    ${'Bake at <b>180°C</b>/350°F.'}                             | ${'a slash after an HTML tag'}
+    ${'It is <b>6 feet</b> (1.8 m) tall.'}                       | ${'no change can rewrite across a tag, so the pair is held'}
+    ${'Bake at <b>350°F</b>/180°C.'}                             | ${'the same, joined by a slash'}
+    ${'It is **1.8 metres** (6 feet) tall.'}                     | ${'bold closes on the metric value'}
+    ${'Bake at 180°C/350°F.'}                                    | ${'no markup'}
+    ${'Bake at 175°C (350°F).'}                                  | ${'the same, in brackets'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+    expect(convert(unchanged, { syntax: 'markdown' })).toBe(unchanged);
+  });
+
+  it.each`
+    input                                                      | expected                                                   | why
+    ${'The rope is 2 metres long (the old one was ten feet).'} | ${'The rope is 2 metres long (the old one was 3 metres).'} | ${'a bracket that says more'}
+    ${'It is 1.8 metres (*6 feet* for the old one) tall.'}     | ${'It is 1.8 metres (*1.8 metres* for the old one) tall.'} | ${'the same, with emphasis inside'}
+    ${'It is <div>1.8 metres</div> (6 feet) tall.'}            | ${'It is <div>1.8 metres</div> (1.8 metres) tall.'}        | ${'a block tag ends the metric value'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+    expect(convert(input, { syntax: 'markdown' })).toBe(expected);
+  });
+});
+
 describe('a Celsius value written with a bare C', () => {
   it.each`
     input                               | expected                  | why

@@ -325,14 +325,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
     matches: (v) => v.change?.ruleId === 'units.temperature.fahrenheit' && precedes(/\bbaking\b[^.!?]*$/i)(v),
   },
   {
-    issue: 167,
-    property: 'idempotence',
-    input: 'On March 1, 732 square miles burned.',
-    options: localise,
-    // A number the first run wrote reads as the year of a date before it.
-    matches: (v) => v.change?.ruleId === 'dates.long' && v.origin !== undefined,
-  },
-  {
     issue: 168,
     property: 'idempotence',
     input: 'Choose US Letter or 8.5 x 11 inches.',

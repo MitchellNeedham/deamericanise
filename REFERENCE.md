@@ -362,17 +362,29 @@ rule rewrites any part of it.
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the
 surrounding text is American enough to trust; see below. Output is ISO by default, with `dmy` and `long` available.
 
+A `dmy` date whose day is 12 or under, such as `04/03/2024`, reads as an ambiguous
+month-first date again. So a second run forced American with `assumeAmerican: true`
+(`--assume-american`) over `dmy` output swaps that date back. Detect mode leaves it alone
+where the first run removed the American evidence, but not where that evidence survives,
+as the named date in `Filed March 5, 2024. Due 03/04/2024.` does under the default preset.
+`long` and `iso` write a date no second run can read the other way round, so use one of
+them with `--write` and the plugins.
+
 The same separator has to appear twice, so `3.22-1000` is a range, not a date. A dotted
 date needs a four-figure year, because `1.13.24` is far more often a version number, and
-nothing straight after a version word such as `version`, `v`, `release`, `Node` or
+no dotted date straight after a version word such as `version`, `v`, `release`, `Node` or
 `Python` is a date. So `On 3.14.2024 we left.` becomes `On 2024-03-14 we left.`, while
-`Upgrade to version 1.13.24` and `Node 1.13.24` stay as written.
+`Upgrade to version 1.13.24` and `Node 3.14.2024` stay as written. A version number is
+written with dots, so a slash or hyphen date after one of those words is still a date:
+`Press release 3/14/2024` becomes `Press release 2024-03-14`.
 
 `March 5, 2024` names its month, so nobody can misread it. Reordering it to `5 March 2024`
 is local convention rather than translation, and waits for `localise` (or
 `dates: { reorderLongDates: true }`). It is still read as evidence: a named month written
 first is about the strongest signal there is that a document is American, and it settles
-the ambiguous numeric dates around it.
+the ambiguous numeric dates around it. Four figures followed by a unit or by the rest of a
+numeric date are not its year, so `On March 1, 1900 square kilometres burned.` and
+`May 24, 2024-03-28` stay as written and count for nothing.
 
 **Times and currency.** `3:00 P.M.` becomes `3:00pm`; a 12-hour clock is
 normal outside America too, so only the styling goes. The last stop stays when it also
@@ -466,7 +478,8 @@ Pounds count as `imperial units` only where the unit rules read them as a weight
 
 A numeric date counts as month-first or day-first in exactly the forms the date rule
 reads, so `3/14/2024` counts as month-first and `14/3/2024` as day-first, while the range
-`3.22-1000` and the version in `Node 14.2.10` count for neither.
+`3.22-1000` and the version in `Node 14.2.10` count for neither. A named date counts as
+month-first in exactly the forms the long date rule reorders, `Sep. 1, 1939` among them.
 
 Ambiguous dates ask a narrower question first, because a document writes its dates one way
 round: a sibling date that states its own order, whether by a day above 12 or by a named
@@ -483,6 +496,9 @@ answer rather than an obvious one. Override it, or skip the question entirely:
 deamericaniseText(text, { assumeAmerican: true });
 deamericaniseText(text, { minAmericanConfidence: 0.4 });
 ```
+
+A forced verdict reads the tool's own `dmy` output as American too, so a second forced run
+swaps back a `dmy` date whose day is 12 or under; see Dates above.
 
 ## What it will not touch
 

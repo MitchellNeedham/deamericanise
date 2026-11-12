@@ -145,6 +145,93 @@ describe('feet and inches together', () => {
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
+
+  it.each`
+    input                                  | expected                                 | why
+    ${'He is 6 foot 4 with long arms.'}    | ${'He is 1.93 metres with long arms.'}   | ${'a preposition'}
+    ${'He is 6 foot 4 and strong.'}        | ${'He is 1.93 metres and strong.'}       | ${'"and" before a word'}
+    ${'He is 6 foot 4 but slim.'}          | ${'He is 1.93 metres but slim.'}         | ${'a conjunction'}
+    ${'He is 6 foot 4 by now.'}            | ${'He is 1.93 metres by now.'}           | ${'"by" before a word'}
+    ${'He is six foot two or so.'}         | ${'He is 1.88 metres or so.'}            | ${'"or" before a word'}
+    ${'He is six foot two he said.'}       | ${'He is 1.88 metres he said.'}          | ${'a pronoun'}
+  `('reads inches with no inch word before a word that opens no noun: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                        | expected                                  | why
+    ${'6 feet 2 and 3 inches'}   | ${'1.8 metres 5.1 and 7.6 centimetres'}   | ${'"and" before a number joins a range'}
+    ${'6 foot 2 by 3 feet'}      | ${'1.8 metres 61 by 91 centimetres'}      | ${'"by" before a number joins a dimension'}
+  `('reads no inches before a join and a number: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('reads no inches before "or" and a number', () => {
+    expect(convert('6 feet 2 or 3 inches')).not.toContain('1.88');
+  });
+});
+
+describe('a spaced "in" after a height that opens a phrase is the preposition', () => {
+  it.each`
+    input                                    | expected                                      | why
+    ${'She stands 5 feet 4 in her socks.'}   | ${'She stands 1.63 metres in her socks.'}     | ${'a determiner after "in"'}
+    ${'He is 6 foot 2 in height.'}           | ${'He is 1.88 metres in height.'}             | ${'a noun after "in"'}
+    ${'He is 6 feet 2 in shoes.'}            | ${'He is 1.88 metres in shoes.'}              | ${'a plural noun after "in"'}
+    ${'She is 5 ft 4 in her socks.'}         | ${'She is 1.63 metres in her socks.'}         | ${'after "ft"'}
+    ${'She is 5 feet 4.5 in her socks.'}     | ${'She is 1.64 metres in her socks.'}         | ${'inches with a decimal'}
+    ${'The average is 5 ft 9 in men.'}       | ${'The average is 1.75 metres in men.'}       | ${'no determiner opens the height'}
+    ${'She is 5 feet 4\nin her socks.'}      | ${'She is 1.63 metres\nin her socks.'}        | ${'"in" on the next line'}
+    ${'He is 6 foot 2 in his socks and 6 foot 4 in boots.'} | ${'He is 1.88 metres in his socks and 1.93 metres in boots.'} | ${'two heights'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                         | expected                                   | why
+    ${'She is 5 feet 4 in tall.'}                 | ${'She is 1.63 metres tall.'}              | ${'a size after "in"'}
+    ${'She is 5 ft 4 in.'}                        | ${'She is 1.63 metres.'}                   | ${'"in." ends the sentence'}
+    ${'He is 6 foot 2 in.'}                       | ${'He is 1.88 metres.'}                    | ${'after "foot"'}
+    ${'He is 6 ft 2 in and strong.'}              | ${'He is 1.88 metres and strong.'}         | ${'a conjunction after "in"'}
+    ${'a 6 ft 2 in man'}                          | ${'a 1.88 metre man'}                      | ${'the height describes the noun'}
+    ${'5 ft 4 in x 3 ft'}                         | ${'1.63 metres x 91 cm'}                   | ${'a dimension'}
+    ${'She stands 5 feet 4 inches in her socks.'} | ${'She stands 1.63 metres in her socks.'}  | ${'the inch word written'}
+  `('keeps the "in" as the inch unit: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a hyphenated height is one height', () => {
+  it.each`
+    input                               | expected                             | why
+    ${'He is six-foot-two.'}            | ${'He is 1.88 metres.'}              | ${'in words'}
+    ${'a 6-foot-2 man'}                 | ${'a 1.88 metre man'}                | ${'in digits before a noun'}
+    ${'a six-foot-two man'}             | ${'a 1.88 metre man'}                | ${'in words before a noun'}
+    ${'He is six-foot two.'}            | ${'He is 1.88 metres.'}              | ${'a hyphen after the feet'}
+    ${'He is 6-foot 2.'}                | ${'He is 1.88 metres.'}              | ${'the same in digits'}
+    ${'He is six foot-two.'}            | ${'He is 1.88 metres.'}              | ${'a hyphen before the inches'}
+    ${'a 6-foot-2-inch man'}            | ${'a 1.88 metre man'}                | ${'with its inch word'}
+    ${'6-foot-2-inch pipes'}            | ${'1.88 metre pipes'}                | ${'with its inch word and no determiner'}
+    ${'a 6-foot 2-inch pipe'}           | ${'a 1.88 metre pipe'}               | ${'each number hyphenated to its unit'}
+    ${'a 6-ft 2-in pipe'}               | ${'a 1.88 metre pipe'}               | ${'in abbreviations'}
+    ${'6′-2″'}                          | ${'1.88 metres'}                     | ${'in primes'}
+    ${'six-foot-two to six-foot-four'}  | ${'1.88 metres to 1.93 metres'}      | ${'two heights joined by "to"'}
+    ${'6-foot 2 to 6-foot 4'}           | ${'1.88 metres to 1.93 metres'}      | ${'with spaced inches'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                     | expected                     | why
+    ${'6 feet 2 inches'}      | ${'1.88 metres'}             | ${'no hyphen'}
+    ${'a 6-foot fence'}       | ${'a 1.8 metre fence'}       | ${'feet alone'}
+    ${'a 2 foot 6 inch pipe'} | ${'a 76.2 centimetre pipe'}  | ${'spaced before a noun'}
+  `('still converts $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('leaves a hyphenated height at the end of a range as written', () => {
+    expect(convert('He is five to six-foot-two.')).toBe('He is five to six-foot-two.');
+  });
 });
 
 describe('a measurement in two units that ends a range is left whole', () => {
@@ -335,7 +422,8 @@ describe('a long run of whitespace takes time in line with its length', () => {
     ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'half a mile'}           | ${'A 3.4 kilogram baby.'}
     ${'A 7 pound 8 ounce baby.'}   | ${'spaces'}   | ${' '}  | ${3000}  | ${'seven pounds 8 ounces'} | ${'A 3.4 kilogram baby.'}
     ${'He is six foot two'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'tall.'}                 | ${'He is 1.88 metres'}
-    ${'He is six foot two'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'The color.'}            | ${'He is 1.8 metres two'}
+    ${'He is six foot two'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'boxes.'}                | ${'He is 1.8 metres two'}
+    ${'He is six foot two'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'with boxes.'}           | ${'He is 1.88 metres'}
     ${'Weigh five to'}             | ${'spaces'}   | ${' '}  | ${3000}  | ${'seven pounds 8 ounces'} | ${'Weigh five to'}
     ${'It weighs 7 pounds'}        | ${'spaces'}   | ${' '}  | ${3000}  | ${'The color.'}            | ${'It weighs 3.2 kilograms'}
     ${'It is 5'}                   | ${'spaces'}   | ${' '}  | ${30000} | ${'The color.'}            | ${'It is 5'}

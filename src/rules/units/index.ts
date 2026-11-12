@@ -1127,14 +1127,24 @@ const ANOTHER_HEIGHT =
   String.raw`${RANGE_JOIN}${NUMBER_START}(?:${UNSIGNED_NUMBER})${GAP}(?:feet|foot|ft)(?![A-Za-z])`;
 
 /**
+ * A word from `NOT_A_NOUN` after inches with no inch word, so nothing follows that the inches
+ * could count, as in `6 foot 4 with long arms`. `in` may be the inch abbreviation, and a join
+ * or `by` before a number carries the inches on to a range or a side, as in
+ * `6 feet 2 to 3 inches` and `a 6-foot 2 by 4`.
+ */
+const NO_NOUN_WORD =
+  String.raw`(?!(?:to|and|or|by)${SOFT_SPACE}(?<=\s)(?:${NUMERIC_FIRST}|${WHOLE_NUMBER}|${FRACTION_WORDS}))` +
+  String.raw`(?:${NOT_A_NOUN.filter((word) => word !== 'in').join('|')})(?!\w|${HYPHEN})`;
+
+/**
  * Where inches may go without their word after `foot` or `feet`, as in `six foot two`: before
- * nothing that could be a noun, or before another height. That is punctuation, `tall`, the end
- * of the text, the end of a line where the next line is blank or starts with something other
- * than a word, such as a list marker, or a join and a measurement in feet, as in
- * `6 foot 2 to 6 foot 4`.
+ * nothing that could be a noun, or before another height. That is punctuation, a word that
+ * cannot open a noun, the end of the text, the end of a line where the next line is blank or
+ * starts with something other than a word, such as a list marker, or a join and a measurement
+ * in feet, as in `6 foot 2 to 6 foot 4`.
  */
 const NO_NOUN_AFTER =
-  String.raw`(?=[.,;:!?)\]"'”’]+(?!\w)|${SOFT_SPACE}tall\b|${ANOTHER_HEIGHT}|` +
+  String.raw`(?=[.,;:!?)\]"'”’]+(?!\w)|${SOFT_SPACE}(?<=\s)${NO_NOUN_WORD}|${ANOTHER_HEIGHT}|` +
   String.raw`${INLINE_SPACE}*(?:$|${LINE_END}${INLINE_SPACE}*(?:$|${LINE_END}|[^\sA-Za-z])))`;
 
 /** Inches written without their word: a whole number from 1 to 11. */
@@ -1142,12 +1152,18 @@ const isInchCount = (value: number | null) =>
   value !== null && Number.isInteger(value) && value >= 1 && value <= 11;
 
 /**
+ * A whole number in words straight after a hyphen, as the `two` of `six-foot-two`, which
+ * `WHOLE_NUMBER` refuses so that a number never starts inside a hyphenated word.
+ */
+const WORDS_AFTER_HYPHEN = String.raw`(?<=${HYPHEN})(?:${SECOND_END_WORDS})`;
+
+/**
  * The feet of a height with no inch word before another height, and its inches starting where
  * the pattern is tried. The same shape as the last alternative of `feetInchesRule`.
  */
 const INCHES_OF_HEIGHT = new RegExp(
-  String.raw`(?<=(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:feet|foot)${SOFT_SPACE})(?<=\s)` +
-    String.raw`(${WHOLE_NUMBER})(?=${ANOTHER_HEIGHT})`,
+  String.raw`(?<=(?<![\w.])(${UNSIGNED_NUMBER})${GAP}(?:feet|foot)(?:${SOFT_SPACE}|${HYPHEN}))` +
+    String.raw`(?<=\s|${HYPHEN})(${WHOLE_NUMBER}|${WORDS_AFTER_HYPHEN})(?=${ANOTHER_HEIGHT})`,
   'diy',
 );
 
@@ -1202,18 +1218,43 @@ function isHeightInches(text: string, start: number): boolean {
   return answer;
 }
 
+/** Determiners and object pronouns, the words of `NOT_A_NOUN` that open a preposition's object. */
+const OPENS_OBJECT = [
+  'a', 'an', 'the', 'this', 'that', 'these', 'those', 'his', 'her', 'its', 'their', 'my', 'our',
+  'your', 'some', 'any', 'no', 'all', 'both', 'every', 'me', 'him', 'it', 'us', 'them', 'you',
+];
+
 /**
- * `6 feet 2 inches`, `6'2"`, `5 ft 11 in`, `six feet two inches` and `six foot two` collapse
- * into a single metric height.
+ * A word or number straight after a preposition that opens its object, as `her socks`,
+ * `shoes` and `2019` do. A word that cannot open a noun opens none, and nor does the `x` of
+ * a dimension, so `5 feet 4 in tall` and `5 ft 4 in x 3 ft` have no object after the `in`.
+ */
+const OBJECT_AFTER = new RegExp(
+  String.raw`(?=\s)${SOFT_SPACE}` +
+    String.raw`(?!(?:${[...NOT_A_NOUN.filter((word) => !OPENS_OBJECT.includes(word)), 'x'].join('|')})` +
+    String.raw`(?!\w|${HYPHEN}))[a-z\d]`,
+  'iy',
+);
+
+/** What follows a height's inches: the gap, then the inch word or mark. */
+const INCH_UNIT = new RegExp(String.raw`^((?:\s|${HYPHEN})*)(.*)$`, 's');
+
+/**
+ * `6 feet 2 inches`, `6'2"`, `5 ft 11 in`, `six feet two inches`, `six foot two` and
+ * `six-foot-two` collapse into a single metric height.
  */
 function feetInchesRule(): Rule {
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})${SOFT_SPACE}(?:(?:feet|foot|ft\.?|′|${FOOT_MARK})` +
-      softGap(String.raw`(?:and(?=\s))?`) +
+    String.raw`(?<![\w.])(${UNSIGNED_NUMBER})` +
+      String.raw`(?:(?:${GAP}(?:feet|foot|ft\.?)|${SOFT_SPACE}(?:′|${FOOT_MARK}))` +
+      String.raw`(?:${HYPHEN}|${softGap(String.raw`(?:and(?=\s))?`)})` +
       String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+${HYPHEN}\d+/\d+|\d+/\d+|` +
-      String.raw`${WHOLE_NUMBER}(?:${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION})?)` +
-      String.raw`${SOFT_SPACE}(?:inches|inch|in\.?|″|["”])(?![A-Za-z])|` +
-      String.raw`(?:feet|foot)${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER})`,
+      String.raw`(?:${WHOLE_NUMBER}|${WORDS_AFTER_HYPHEN})` +
+      String.raw`(?:${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION})?)` +
+      String.raw`(?:${GAP}(?:inches|inch|in\.?)|${SOFT_SPACE}(?:″|["”]))(?![A-Za-z])|` +
+      String.raw`${GAP}(?:feet|foot)(?:${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER}|` +
+      // A hyphen makes the height one word, so a noun may follow it: `a six-foot-two man`.
+      String.raw`${HYPHEN}(\d+|${WORDS_AFTER_HYPHEN})(?!\w|${HYPHEN}|[.,/:]\d)))`,
     'dgi',
   );
   const sticky = new RegExp(pattern.source, 'iy');
@@ -1247,8 +1288,9 @@ function feetInchesRule(): Rule {
         const match = beforeQuote(whole);
         if (match === undefined) continue;
         const feet = parseNumber(match[1]!);
-        const inches = parseNumber(match[2] ?? match[3]!);
-        if (match[3] !== undefined && !isInchCount(inches)) continue;
+        const bare = match[3] ?? match[4];
+        const inches = parseNumber(match[2] ?? bare!);
+        if (bare !== undefined && !isInchCount(inches)) continue;
         if (feet === null || inches === null || endsRangeWhole(ctx.text, match.index, match[1]!)) {
           changes.push(hold(match.index, match[0], 'units.length.feet-inches', 40));
           continue;
@@ -1261,19 +1303,28 @@ function feetInchesRule(): Rule {
           3,
           ctx.options.units.maxDecimals,
         );
-        const end = match.index + match[0].length;
+        let end = match.index + match[0].length;
         let attributive = false;
         if (match[2] !== undefined) {
-          const unitText = ctx.text.slice(match.indices![2]![1], end);
-          const [, gap, inchUnit] = /^(\s*)(.*)$/s.exec(unitText)!;
+          const inchesEnd = match.indices![2]![1];
+          const [, gap, inchUnit] = INCH_UNIT.exec(ctx.text.slice(inchesEnd, end))!;
           // An abbreviation or mark is neither singular nor plural, so it counts as the singular
           // after one, which describes a noun only after a determiner: `a 6 ft 2 in man`.
           const value = /^inch$/i.test(inchUnit!) ? inches : 1;
           attributive = describesNoun(ctx.text, match.index, value, gap!, end);
+          OBJECT_AFTER.lastIndex = end;
+          // The `in` of `5 feet 4 in her socks` is the preposition, and stays after the height.
+          if (!attributive && isBareInch(inchUnit!, match[0]) && OBJECT_AFTER.test(ctx.text)) {
+            end = inchesEnd;
+          }
+        } else if (match[4] !== undefined) {
+          const hyphen = ctx.text.charAt(match.indices![4]![0] - 1);
+          attributive = describesNoun(ctx.text, match.index, inches, hyphen, end);
         }
         const unit = attributive ? target.singular : unitWord(target, Number(number));
         const body = `${number} ${unit}`;
-        pushMeasurement(ctx, changes, match.index, match[0], body, 'units.length.feet-inches', 40);
+        const matched = ctx.text.slice(match.index, end);
+        pushMeasurement(ctx, changes, match.index, matched, body, 'units.length.feet-inches', 40);
       }
       return changes;
     },

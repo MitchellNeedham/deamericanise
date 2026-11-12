@@ -12,10 +12,13 @@ import { FAHRENHEIT, fahrenheitTemperatures } from './fahrenheit.js';
 import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
+  HYPHEN,
   INLINE_SPACE,
   NOT_IN_COMPOUND,
   NUMBER_PATTERN,
   NUMBER_START,
+  NUMERIC_FIRST,
+  NUMERIC_LAST,
   NUMERIC_PATTERN,
   SECOND_END_WORDS,
   SOFT_SPACE,
@@ -31,19 +34,21 @@ import {
 
 const CONTEXT_WINDOW = 48;
 /** Between a number and its unit: a space, a hyphen (`6-foot`), or nothing (`6ft`). */
-const GAP = softGap('-?');
-const RANGE_JOIN = softGap(String.raw`(?:[-\u2013\u2014]|to|and)`);
+const GAP = softGap(`${HYPHEN}?`);
+const RANGE_JOIN = softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and)`);
 const DIMENSION_JOIN = softGap('(?:x|×|by)');
+const TIGHT_HYPHEN = new RegExp(`^${HYPHEN}$`);
 
 /**
  * The second number of a range or dimension is not a measurement of its own, even where the
  * pair does not match as a whole: `14 1/2 gallon` in `2024-03-14 1/2 gallon`.
  */
-const NOT_SECOND_OF_PAIR = String.raw`(?<!\d${softGap(String.raw`(?:[-\u2013\u2014]|to|and|x|×|by)`)})`;
+const NOT_SECOND_OF_PAIR =
+  String.raw`(?<!${NUMERIC_LAST}${softGap(String.raw`(?:${HYPHEN}|[\u2013\u2014]|to|and|x|×|by)`)})`;
 
 /** A range's first number and its join, ending where the range's second number starts. */
 const RANGE_BEFORE = new RegExp(
-  String.raw`(?<=${NUMBER_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=[\d\-−])`,
+  String.raw`(?<=${NUMBER_START}(${NUMERIC_PATTERN})${RANGE_JOIN})(?=${NUMERIC_FIRST})`,
   'diy',
 );
 
@@ -808,12 +813,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   if (!alternation) return [];
 
   const S = INLINE_SPACE;
-  // The pair guard can only apply before a digit, and is too costly to run at every word.
-  const START = String.raw`${NUMBER_START}(?:(?=[\d\-−])${NOT_SECOND_OF_PAIR}|(?![\d\-−]))`;
+  // The pair guard can only apply before a number in digits, and is too costly to run at every
+  // word.
+  const START = String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})${NOT_SECOND_OF_PAIR}|(?!${NUMERIC_FIRST}))`;
   // Only a dimension's second number is refused here. `endsRange` judges a range's, which
   // needs both numbers.
   const SINGLE_START =
-    String.raw`${NUMBER_START}(?:(?=[\d\-−])(?<!\d${DIMENSION_JOIN})|(?![\d\-−]))`;
+    String.raw`${NUMBER_START}(?:(?=${NUMERIC_FIRST})(?<!${NUMERIC_LAST}${DIMENSION_JOIN})|(?!${NUMERIC_FIRST}))`;
   const single = new RegExp(
     String.raw`${SINGLE_START}(${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])`,
     'gi',
@@ -844,7 +850,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
   );
   // A count straight after `/` or `-` is the tail of `1 1/2` or `twenty-two`, not a number.
   const andAFraction = new RegExp(
-    String.raw`${START}(an?(?=\s)|(?<![-−/])${WHOLE_NUMBER})${SOFT_SPACE}(${words})` +
+    String.raw`${START}(an?(?=\s)|(?<!${HYPHEN}|[−/])${WHOLE_NUMBER})${SOFT_SPACE}(${words})` +
       String.raw`${S}+and${S}+(${COUNTED_FRACTION})(?![\w-])`,
     'gi',
   );
@@ -948,7 +954,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const reading = written ? writtenRange(ctx.text, start, lowRaw, join, highRaw) : 'read';
         if (reading === 'skip') continue;
         // `2-3/4` is one number, which the single measurement rule reads.
-        if (!written && join === '-' && parseNumber(`${lowRaw}-${highRaw}`) !== null) continue;
+        if (!written && TIGHT_HYPHEN.test(join) && parseNumber(`${lowRaw}-${highRaw}`) !== null) continue;
         if (!canBeRange(ctx.text, start, low, high)) continue;
         if (isOtherSense(ctx, entry, start, start + matched.length)) {
           changes.push(hold(start, matched, entry.measure.id, 35));
@@ -1271,10 +1277,10 @@ function temperatureRules(): Rule[] {
 function temperatureDecadeRule(): Rule {
   // A decade, optionally banded (`low`, `mid`, `upper`), optionally paired with a second
   // decade (`the 70s and 80s`). `70's` and `low-70s` are both written in the wild.
-  const DECADE = String.raw`(low|mid|middle|high|upper|lower)?[\s-]*(1[01]0|\d0)['\u2019]?s`;
+  const DECADE = String.raw`(low|mid|middle|high|upper|lower)?(?:\s|${HYPHEN})*(1[01]0|\d0)['\u2019]?s`;
   const pattern = new RegExp(
     String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
-      String.raw`(?:\s*(?:and|to|-|\u2013)\s*${DECADE})?(?!\w)(\s*(?:${FAHRENHEIT}|Fahrenheit\b))?`,
+      String.raw`(?:\s*(?:and|to|${HYPHEN}|\u2013)\s*${DECADE})?(?!\w)(\s*(?:${FAHRENHEIT}|Fahrenheit\b))?`,
     'gi',
   );
 

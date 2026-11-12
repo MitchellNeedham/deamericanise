@@ -564,9 +564,12 @@ function countsSizedNoun(text: string, start: number, raw: string, gap: string, 
 const YEAR_PREPOSITION_BEFORE = new RegExp(
   String.raw`(?<=(?:(?:^|[\n\r])(?:[^\S\n\r]*${LIST_MARKER})?|[.!?…]${CLOSING}*\s|[,;:])` +
     String.raw`[^\S\n\r]*${OPENING}*` +
-    String.raw`(in|by|since|until|before|after|during)\s+)`,
+    String.raw`(in|by|since|until|before|after|during|from|between)\s+)`,
   'diy',
 );
+
+/** The prepositions of `YEAR_PREPOSITION_BEFORE` that take a range of years, and never one. */
+const RANGE_PREPOSITION = /^(?:from|between)$/i;
 
 /** Punctuation or the end of the text, after which a unit word starts no noun. */
 const CLOSES_CLAUSE = /\s*(?:[,.;:!?)\]]|$)/y;
@@ -578,14 +581,32 @@ const CLOSES_CLAUSE = /\s*(?:[,.;:!?)\]]|$)/y;
  * middle of a clause they are a quantity, as in `The wreck lies in 1500 feet of water.`, and so
  * they are before a unit word that closes the clause, which names no thing the year could
  * date: `It rose by 1200 feet.`
+ *
+ * `earlier` holds the figures before `raw` of a range or list that starts at `start`, before a
+ * unit in `measure`. Each may be a year where each is later than the one before, as in
+ * `In 2020-2024 miles were driven.`, and a range of years may follow `from` or `between` too,
+ * as in `From 2019 to 2024 miles driven rose.` A range or list in feet is a height, never
+ * years, as in `From 1000 to 2000 feet the air thins.`
  */
-function mayBeYear(text: string, start: number, raw: string, gap: string, end: number): boolean {
-  if (!/^[12]\d{3}$/.test(raw) || !/^\s+$/.test(gap)) return false;
+function mayBeYear(
+  text: string,
+  start: number,
+  raw: string,
+  gap: string,
+  end: number,
+  earlier: string[] = [],
+  measure?: Measure,
+): boolean {
+  if (earlier.length > 0 && measure?.id === 'units.length.foot') return false;
+  const years = [...earlier, raw];
+  if (!years.every((year) => /^[12]\d{3}$/.test(year)) || !/^\s+$/.test(gap)) return false;
+  if (years.some((year, i) => i > 0 && Number(year) <= Number(years[i - 1]))) return false;
   CLOSES_CLAUSE.lastIndex = end;
   if (CLOSES_CLAUSE.test(text)) return false;
   YEAR_PREPOSITION_BEFORE.lastIndex = start;
   const preposition = YEAR_PREPOSITION_BEFORE.exec(text);
   if (preposition === null) return false;
+  if (earlier.length === 0 && RANGE_PREPOSITION.test(preposition[1]!)) return false;
   // After a number on the line above, `in` may be the inch of a wrapped height and `by` a
   // dimension's join, so the reading would change once a first run converts that number.
   NUMBER_ENDS_HERE.lastIndex = preposition.indices![1]![0];
@@ -1619,6 +1640,22 @@ function rangeOpening(text: string, start: number, first: string): number | null
   return low === null || high === null || canBeRange(text, lowStart, low, high) ? lowStart : null;
 }
 
+/**
+ * Where the range rule starts the range or list that the figure at `start`, written `first`,
+ * ends: where `rangeOpening` finds its first end, or at the first figure of a list that ends
+ * in that range, as at the `5` of `5, 10 or 15 feet`.
+ */
+function rangeStart(text: string, start: number, first: string): number | null {
+  const lowStart = rangeOpening(text, start, first);
+  if (lowStart === null) return null;
+  RANGE_OPENING.lastIndex = start;
+  const opening = RANGE_OPENING.exec(text);
+  const low = opening === null ? null : parseNumber(opening[1]!);
+  const high = parseNumber(first);
+  if (opening === null || low === null || high === null) return lowStart;
+  return figuresBefore(text, lowStart, low, high, opening[2]!)?.[0]?.start ?? lowStart;
+}
+
 const LINE_END = String.raw`(?:\r\n?|[\n\v\f\u2028\u2029])`;
 
 /** A join and a measurement in feet, as the ` to 6 foot` of `6 foot 2 to 6 foot 4`. */
@@ -2079,11 +2116,12 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     'gi',
   );
   const SECOND_END = String.raw`(?<=\b(?:to|and)\s+)(?:${SECOND_END_WORDS})|${NUMBER_PATTERN}`;
-  // The last two figures of a range or a list. `rangeRule` reads back to a list's first.
+  // The last two figures of a range or a list. `rangeRule` reads back to a list's first. An
+  // optional unit after the first, so `15 inches to 17 inches` is one range.
   const range = new RegExp(
-    String.raw`${START}(${NUMBER_PATTERN})(${RANGE_JOIN}|${LIST_END})(${SECOND_END})` +
-      String.raw`${GAP}(${alternation})(?![A-Za-z])`,
-    'gi',
+    String.raw`${START}(${NUMBER_PATTERN})(?:${GAP}(${alternation})(?![A-Za-z]))?` +
+      String.raw`(${RANGE_JOIN}|${LIST_END})(${SECOND_END})${GAP}(${alternation})(?![A-Za-z])`,
+    'dgi',
   );
 
   // A spaced `'`, or one after a word, is a quote mark. One before a digit starts the inches
@@ -2158,6 +2196,24 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     if (sense === undefined) return entry;
     if (sense.measure === undefined || isKept(sense.measure, skip, forced)) return null;
     return { ...entry, measure: sense.measure, note: sense.note };
+  };
+
+  /**
+   * What a measurement in `measure` that `sameUnitBefore` finds before the range or list whose
+   * first figure starts at `start` makes of it: undefined where there is none, and null where a
+   * height or weight in two units reads that figure as its smaller unit, as `feetInchesRule`
+   * reads the `6` of `2 feet 6 to 3 feet`. Otherwise no rule can read the figure, and this is
+   * where the measurement starts, to be held with the range as written, as `5 ft 6 to 6 ft` is.
+   * The range and single rules both ask this, so the span stays whole with either one off.
+   */
+  const beforeRange = (
+    text: string,
+    start: number,
+    measure: Measure,
+  ): number | null | undefined => {
+    const measurementStart = sameUnitBefore(text, start, measure);
+    if (measurementStart === null) return undefined;
+    return isSmallerPart(text, start) ? null : measurementStart;
   };
 
   /** A written-out quantity with its unit inside it, as in `half a mile`. */
@@ -2289,6 +2345,19 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     noteSense(changes, made, entry.note);
   };
 
+  /**
+   * Whether the unit after the first number of `match`, a match of `range`, is in `measure`,
+   * the second number's unit, so the two ends are one span, as in `from 15 inches to 17 inches`.
+   * Units that differ, as in `from 6 feet to 10 inches`, give two measurements. A spaced `in`
+   * may be the preposition, and a `"` that closes a quotation is no inch mark.
+   */
+  const joinsSameUnit = (text: string, match: RegExpExecArray, measure: Measure): boolean => {
+    const inner = match[2]!;
+    const innerEnd = match.indices![2]![1];
+    if (resolve(inner)?.measure !== measure || isQuotationMark(text, innerEnd - 1)) return false;
+    return !isBareInch(inner, text.slice(match.index, innerEnd));
+  };
+
   const rangeRule: Rule = {
     id: 'units.range',
     category: 'units',
@@ -2297,9 +2366,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     find(ctx: RuleContext) {
       const changes: Change[] = [];
       range.lastIndex = 0;
-      for (const match of ctx.text.matchAll(range)) {
+      for (let match: RegExpExecArray | null; (match = range.exec(ctx.text)) !== null; ) {
         const pair = match[0];
-        const [lowRaw, join, highRaw, alias] = [match[1]!, match[2]!, match[3]!, match[4]!];
+        const [lowRaw, join, highRaw, alias] = [match[1]!, match[3]!, match[4]!, match[5]!];
+        const inner = match[2];
+        // After a unit, the second number may open a range of its own, as the `10 inches` of
+        // `6 feet to 10 inches to 12 inches` does.
+        if (inner !== undefined) range.lastIndex = match.indices![4]![0];
         const pairStart = match.index;
         const end = pairStart + pair.length;
         let entry = resolve(alias);
@@ -2307,28 +2380,51 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const high = parseNumber(highRaw);
         if (!entry || low === null || high === null || high === 0) continue;
         if (isQuotationMark(ctx.text, end - 1)) continue;
+        if (inner !== undefined && !joinsSameUnit(ctx.text, match, entry.measure)) continue;
         // `2-3/4` is one number, which the single measurement rule reads.
         const pairWritten = isWritten(lowRaw) || isWritten(highRaw);
-        if (!pairWritten && TIGHT_HYPHEN.test(join) && parseNumber(`${lowRaw}-${highRaw}`) !== null) continue;
+        if (
+          inner === undefined &&
+          !pairWritten &&
+          TIGHT_HYPHEN.test(join) &&
+          parseNumber(`${lowRaw}-${highRaw}`) !== null
+        ) {
+          continue;
+        }
         if (!canBeRange(ctx.text, pairStart, low, high)) continue;
-        const earlier = figuresBefore(ctx.text, pairStart, low, high, join);
+        // A list's figures share the unit at its end, so none comes before one with its own.
+        const earlier =
+          inner === undefined ? figuresBefore(ctx.text, pairStart, low, high, join) : [];
         if (earlier === null) continue;
         const start = earlier[0]?.start ?? pairStart;
         const matched = ctx.text.slice(start, end);
         const raws = [...earlier.map((figure) => figure.raw), lowRaw, highRaw];
         const joins = [...earlier.map((figure) => figure.join), join];
-        const written = raws.some(isWritten);
+        const gap = ctx.text.slice(match.indices![4]![1], match.indices![5]![0]);
+        // Each end's own unit marks where its number ends, so words read as digits do.
+        const written = inner === undefined && raws.some(isWritten);
         const reading = written ? writtenList(ctx.text, start, raws, joins) : 'read';
-        if (reading === 'skip') continue;
+        if (reading === 'skip' || (inner !== undefined && raws.some(isUncounted))) continue;
+        if (
+          inner === undefined &&
+          entry.isSingular &&
+          raws.every((raw) => COUNT_IN_WORDS.test(raw)) &&
+          countsSizedNoun(ctx.text, start, highRaw, gap, end)
+        ) {
+          // The figures count the noun, and the unit is one of itself, as the foot of
+          // `two to three foot-long subs` is.
+          pushSingle(ctx, changes, end - alias.length, alias, '', alias, 1);
+          continue;
+        }
         // A list that starts as the second number of a pair, as in `1 to 2, 4 or 6 feet`.
         NOT_SECOND.lastIndex = start;
         const secondOfPair = earlier.length > 0 && !NOT_SECOND.test(ctx.text);
-        const measurementStart = sameUnitBefore(ctx.text, start, entry.measure);
-        if (measurementStart !== null) {
+        const measurementStart = beforeRange(ctx.text, start, entry.measure);
+        if (measurementStart !== undefined) {
           // The inches of a height are for `feetInchesRule`, and the next unit of a weight for
           // its compound rule. Any other smaller unit cannot be read, so the measurement and
           // range stay as written.
-          if (!isSmallerPart(ctx.text, start)) {
+          if (measurementStart !== null) {
             const held = ctx.text.slice(measurementStart, end);
             changes.push(hold(measurementStart, held, entry.measure.id, 35));
           }
@@ -2336,7 +2432,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         }
         if (
           isOtherSense(ctx, entry, start, end) ||
-          (entry.isWord && isPartOfName(ctx.text, alias, end))
+          (entry.isWord && isPartOfName(ctx.text, alias, end)) ||
+          // A unit after the first number makes it a quantity, as in `From 1500 feet to 2000 feet`.
+          (entry.isWord &&
+            inner === undefined &&
+            mayBeYear(ctx.text, start, highRaw, gap, end, raws.slice(0, -1), entry.measure))
         ) {
           changes.push(hold(start, matched, entry.measure.id, 35));
           continue;
@@ -2356,6 +2456,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           changes.push(hold(start, matched, entry.measure.id, 35));
           continue;
         }
+        // Only `to` makes one range of two measurements. Joined any other way, as in
+        // `5 feet or 6 feet` and `5ft-6ft`, each keeps its unit, and the single rule converts each.
+        if (inner !== undefined && WORD_JOIN.exec(join)?.[1]!.toLowerCase() !== 'to') continue;
 
         // Every figure shares the unit chosen for the last, so the range or list stays readable.
         const target = entry.measure.convert(high);
@@ -2366,7 +2469,6 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           formatIn(entry.measure, value * perSourceUnit, precision, figures, maxDecimals),
         );
         texts.push(formatIn(entry.measure, target.value, precision, figures, maxDecimals));
-        const gap = pair.slice(lowRaw.length + join.length + highRaw.length, -alias.length);
         const attributive = entry.isSingular && describesNoun(ctx.text, start, high, gap, end);
         const unit = entry.isWord
           ? ` ${attributive ? target.singular : target.plural}`
@@ -2561,11 +2663,21 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         if (isQuotationMark(ctx.text, match.index + match[0].length - 1)) continue;
         const entry = resolve(match[2]!);
         const value = parseNumber(match[1]!);
+        const endsPair =
+          entry !== undefined && value !== null && endsRange(ctx.text, match.index, match[1]!);
+        if (endsPair) {
+          const listStart = rangeStart(ctx.text, match.index, match[1]!);
+          const held =
+            listStart === null ? undefined : beforeRange(ctx.text, listStart, entry.measure);
+          if (typeof held === 'number') {
+            const end = match.index + match[0].length;
+            changes.push(hold(held, ctx.text.slice(held, end), 'units.measurement', 30));
+          }
+        }
         if (
           entry &&
           value !== null &&
-          (endsRange(ctx.text, match.index, match[1]!) ||
-            endsSide(ctx.text, match.index, entry.measure))
+          (endsPair || endsSide(ctx.text, match.index, entry.measure))
         ) {
           // Resumes at the next character, as past a start the pattern refused, so a measurement
           // that starts inside this match is still found.

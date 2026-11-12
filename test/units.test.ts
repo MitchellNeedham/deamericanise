@@ -1863,6 +1863,59 @@ describe('a year after a preposition is not a measurement', () => {
   it('holds the year and its unit word whole', () => {
     expect(held('In 2024 miles were driven.')).toContain('2024 miles');
   });
+
+  it.each`
+    unchanged                                            | why
+    ${'In 2020-2024 miles were driven.'}                 | ${'joined by a hyphen'}
+    ${'In 2020–2024 miles were driven.'}                 | ${'joined by an en dash'}
+    ${'In 2020 - 2024 miles were driven.'}               | ${'joined by a spaced hyphen'}
+    ${'In 2020 to 2024 miles were driven.'}              | ${'joined by "to"'}
+    ${'In 2020 and 2024 miles were driven.'}             | ${'joined by "and"'}
+    ${'In 2020 or 2024 miles were driven.'}              | ${'joined by "or"'}
+    ${'In 2020, 2022 or 2024 miles were driven.'}        | ${'a list ending in "or"'}
+    ${'In 2020, 2022, and 2024 miles were driven.'}      | ${'a list ending in a comma and "and"'}
+    ${'In 2020, 2022, 2024 miles were driven.'}          | ${'a list with commas alone'}
+    ${'In 2020-2024 acre prices doubled.'}               | ${'a singular unit before a noun'}
+    ${'From 2019 to 2024 miles driven rose.'}            | ${'after "from"'}
+    ${'Between 2020 and 2024 acres were farmed.'}        | ${'after "between"'}
+    ${'Last year, from 2019 to 2024 miles driven rose.'} | ${'after a comma'}
+    ${'- Between 2020 and 2024 acres were farmed.'}      | ${'opening a list item'}
+    ${'Until 1999 to 2001 square miles were mapped.'}    | ${'a unit of two words'}
+  `('leaves the years of "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    unchanged
+    ${'In 2020-2024 miles were driven.'}
+    ${'In 2020, 2022 or 2024 miles were driven.'}
+  `('leaves the years of "$unchanged" alone with the range rule off', ({ unchanged }) => {
+    expect(convert(unchanged, { rules: { 'units.range': false } })).toBe(unchanged);
+  });
+
+  it.each`
+    input                                    | expected                                       | why
+    ${'It climbed from 1000 to 2000 feet.'}  | ${'It climbed from 300 to 610 metres.'}        | ${'a preposition inside the clause'}
+    ${'We drove 1500-2000 miles that year.'} | ${'We drove 2400-3200 kilometres that year.'}  | ${'no preposition before the range'}
+    ${'5-10 feet'}                           | ${'1.5-3 metres'}                              | ${'numbers too short to be years'}
+    ${'In 2024 - 5 feet of snow fell.'}      | ${'In 2024 - 1.5 metres of snow fell.'}        | ${'a year that cannot open the range'}
+    ${'In 1000-2000 feet, turn right.'}      | ${'In 300-610 metres, turn right.'}            | ${'a unit before a comma'}
+    ${'In 2024-2020 miles were driven.'}     | ${'In 3257-3251 kilometres were driven.'}      | ${'a second end before the first'}
+    ${'In 2020-3024 miles were driven.'}     | ${'In 3251-4867 kilometres were driven.'}      | ${'four figures too large for a year'}
+    ${'In 2020-2024-mile races they tired.'} | ${'In 3251-3257 kilometre races they tired.'}  | ${'a hyphen ties the number to the unit'}
+    ${'From 2019 miles driven rose.'}        | ${'From 3249 kilometres driven rose.'}         | ${'"from" before one number'}
+    ${'From 1500 feet to 2000 feet the trail climbs.'} | ${'From 460 to 610 metres the trail climbs.'} | ${'a unit after the first number'}
+    ${'From 1000 to 2000 feet the air thins.'} | ${'From 300 to 610 metres the air thins.'} | ${'a range of heights in feet'}
+    ${'Between 2000 and 2500 feet the trail steepens.'} | ${'Between 610 and 760 metres the trail steepens.'} | ${'the same, after "between"'}
+    ${'In 1500-2000 foot climbs we rested.'} | ${'In 460-610 metre climbs we rested.'} | ${'the same, in the singular before a noun'}
+    ${'From 2019 to 2024 feet the air thins.'} | ${'From 615.4 to 616.9 metres the air thins.'} | ${'the same, though its figures may be years'}
+  `('still converts $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('holds a range of years and its unit word whole', () => {
+    expect(held('In 2020-2024 miles were driven.')).toEqual(['2020-2024 miles']);
+  });
 });
 
 describe('a price is not a measurement', () => {
@@ -2223,6 +2276,68 @@ describe('a conventional size is never half converted', () => {
       '15-17 inch wheels and 1.8 metres of pipe',
     );
   });
+
+  it.each`
+    unchanged                                  | why
+    ${'rims from 15 inches to 17 inches'}      | ${'the noun before the range'}
+    ${'a 3/8" to 1/2" socket'}                 | ${'the noun after the range, with inch marks'}
+    ${'a 3/8″ to 1/2″ socket'}                 | ${'the same, with double primes'}
+    ${'a 2 inch to 3 inch pipe'}               | ${'a singular unit on both ends'}
+    ${'rims of 15 inches - 17 inches'}         | ${'joined by a spaced hyphen'}
+    ${'rims of 15 inches – 17 inches'}         | ${'joined by an en dash'}
+    ${'rims of 15 inches or 17 inches'}        | ${'joined by "or"'}
+    ${'rims between 15 inches and 17 inches'}  | ${'joined by "and"'}
+    ${'fits 15″-17″ wheels'}                   | ${'joined by a hyphen written tight'}
+  `('leaves "$unchanged" alone, with the unit on both ends of the range ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                 | expected
+    ${'rims from 15 inches to 17 inches'} | ${'rims from 38 to 43 centimetres'}
+    ${'a 3/8" to 1/2" socket'}            | ${'a 0.95 to 1.3 cm socket'}
+  `('converts all of $input when respectConventions is off', ({ input, expected }) => {
+    expect(convert(input, { units: { respectConventions: false } })).toBe(expected);
+  });
+});
+
+describe('a range with its unit on both ends', () => {
+  it.each`
+    input                                       | expected                              | why
+    ${'from 15 inches to 17 inches'}            | ${'from 38 to 43 centimetres'}        | ${'joined by "to"'}
+    ${'It rose from 6 feet to 8 feet.'}         | ${'It rose from 1.8 to 2.4 metres.'}  | ${'in a sentence'}
+    ${'from 5 ft to 6 ft'}                      | ${'from 1.5 to 1.8 m'}                | ${'abbreviations'}
+    ${'from 2 feet to 6 ft'}                    | ${'from 0.61 to 1.8 m'}               | ${'a word and an abbreviation of one unit'}
+    ${'a 2 inch to 3 inch board'}               | ${'a 5.1 to 7.6 centimetre board'}    | ${'describing a noun'}
+    ${'from two feet to three feet'}            | ${'from 61 to 91 centimetres'}        | ${'ends in words'}
+    ${'from two and a half feet to three feet'} | ${'from 76 to 91 centimetres'}        | ${'a fraction in words, which its unit ends'}
+    ${'from 1 1/2 inches to 2 inches'}          | ${'from 3.8 to 5.1 centimetres'}      | ${'a mixed number'}
+  `('converts both ends as one range: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                                  | why
+    ${'from 6 feet to 10 inches'}          | ${'from 1.8 metres to 25 centimetres'}    | ${'two units'}
+    ${'6 feet to 10 inches to 12 inches'}  | ${'1.8 metres to 25 to 30 centimetres'}   | ${'a range after a measurement in another unit'}
+    ${'6 feet 2 inches'}                   | ${'1.88 metres'}                          | ${'a height'}
+    ${'5 feet to 6 feet 2 inches'}         | ${'1.5 metres to 1.88 metres'}            | ${'a height at the second end'}
+    ${'5 feet or 6 feet'}                  | ${'1.5 metres or 1.8 metres'}             | ${'joined by "or"'}
+    ${'between 5 feet and 6 feet'}         | ${'between 1.5 metres and 1.8 metres'}    | ${'joined by "and"'}
+    ${'5 feet - 6 feet'}                   | ${'1.5 metres - 1.8 metres'}              | ${'joined by a spaced hyphen'}
+    ${'5ft-6ft'}                           | ${'1.5 m-1.8 m'}                          | ${'joined by a hyphen written tight'}
+    ${'It is 5 feet, 10 feet and 15 feet.'} | ${'It is 1.5 metres, 3 metres and 4.6 metres.'} | ${'a list'}
+    ${'Put 5 in to 6 inches of water.'}    | ${'Put 5 in to 15 centimetres of water.'} | ${'a spaced "in" that may be the preposition'}
+  `('converts each measurement on its own: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('keeps the original of the range, and runs twice without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('from 15 inches to 17 inches', options);
+    expect(once).toBe('from 38 to 43 centimetres (15 inches to 17 inches)');
+    expect(convert(once, options)).toBe(once);
+  });
 });
 
 describe('a pair is never half converted with its rule switched off', () => {
@@ -2291,6 +2406,31 @@ describe('a pair is never half converted with its rule switched off', () => {
     ${'one by two feet'}    | ${'"one by", which the dimension rule holds'}
   `('leaves "$unchanged" alone without dimensions ($why)', ({ unchanged }) => {
     expect(convert(unchanged, noDimensions)).toBe(unchanged);
+  });
+
+  it.each`
+    unchanged                      | why
+    ${'5 ft 6 to 6 ft'}            | ${'a number after a length in the range unit'}
+    ${'3 yards 2 to 4 yards'}      | ${'after yards'}
+    ${'10 feet 12 to 15 feet'}     | ${'twelve is no number of inches'}
+    ${'11 stone 20 to 12 stone'}   | ${'twenty is no number of pounds'}
+    ${'5 ft 6 or 6 ft'}            | ${'joined by "or"'}
+    ${'5 ft 6, 7 or 8 ft'}         | ${'a list'}
+    ${'5 ft 6, 7, 8 ft'}           | ${'a list with commas alone'}
+  `('leaves "$unchanged" whole without ranges, where the range rule holds it ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+    expect(convert(unchanged, noRanges)).toBe(unchanged);
+  });
+
+  it.each`
+    input                       | expected                                 | options
+    ${'2 feet 6 to 3 feet'}     | ${'76.2 centimetres to 91 centimetres'}  | ${{}}
+    ${'2 feet 6 to 3 feet'}     | ${'76.2 centimetres to 91 centimetres'}  | ${noRanges}
+    ${'6 feet 2 to 3 inches'}   | ${'1.8 metres 5.1 to 7.6 centimetres'}   | ${{}}
+    ${'6 feet 2 to 3 inches'}   | ${'1.8 metres 2 to 3 inches'}            | ${noRanges}
+    ${'11 stone 4 to 12 stone'} | ${'71.7 kilograms to 76 kilograms'}      | ${noRanges}
+  `('still reads $input with $options, where a height, a weight or another unit takes the number', ({ input, expected, options }) => {
+    expect(convert(input, options)).toBe(expected);
   });
 
   it.each`
@@ -4862,6 +5002,34 @@ describe('a count before an attributive measurement stays out of it', () => {
 
   it('leaves "a foot-long sub" alone, with no number to read', () => {
     expect(convert('a foot-long sub')).toBe('a foot-long sub');
+  });
+
+  it.each`
+    input                                          | expected                                              | why
+    ${'Buy two to three foot-long subs.'}          | ${'Buy two to three 30 centimetre long subs.'}        | ${'joined by "to"'}
+    ${'Buy two or three foot-long subs.'}          | ${'Buy two or three 30 centimetre long subs.'}        | ${'joined by "or"'}
+    ${'Cut five to six inch-thick steaks.'}        | ${'Cut five to six 2.5 centimetre thick steaks.'}     | ${'another unit and size'}
+    ${'Buy two, three or four foot-long subs.'}    | ${'Buy two, three or four 30 centimetre long subs.'}  | ${'a list'}
+    ${'Buy two to three hundred foot-long subs.'}  | ${'Buy two to three hundred 30 centimetre long subs.'} | ${'a count that may mean 200, which stays as written'}
+    ${'the two to three foot-long subs'}           | ${'the two to three 30 centimetre long subs'}         | ${'after a determiner that takes a count'}
+  `('reads a range of counts spaced before a unit tied to its size as counting the noun: $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('leaves a range of counts before a unit tied to its size as written with the range rule off', () => {
+    const unchanged = 'Buy two to three foot-long subs.';
+    expect(convert(unchanged, { rules: { 'units.range': false } })).toBe(unchanged);
+  });
+
+  it.each`
+    input                                       | expected                                       | why
+    ${'a two to three foot-long gap'}           | ${'a 61 to 91 centimetre long gap'}            | ${'a determiner that takes one of the noun'}
+    ${'a foot-long, three to four foot-wide board'} | ${'a foot-long, 0.91 to 1.2 metre wide board'} | ${'a list of sizes'}
+    ${'Buy 2 to 3 foot-long subs.'}             | ${'Buy 61 to 91 centimetre long subs.'}        | ${'counts in digits'}
+    ${'5-6 inch pans'}                          | ${'13-15 centimetre pans'}                     | ${'no hyphen after the unit'}
+    ${'two to three feet long'}                 | ${'61 to 91 centimetres long'}                 | ${'no hyphen ties the unit to its size'}
+  `('reads a range before a unit as the number of units: $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
   });
 });
 

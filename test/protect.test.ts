@@ -82,6 +82,7 @@ describe('file names and paths', () => {
     ${'Open D:/colors/gray first.'}                              | ${'a drive letter and slashes'}
     ${'Edit 01-colors.md and .eslintrc.color.json.'}             | ${'a name starting with a number or a dot'}
     ${'Import node_modules/@types/color/index.d.ts here.'}       | ${'a scoped package'}
+    ${'See src/colors/gray.png here.'}                           | ${'a path ending in an image'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(au(unchanged, american)).toBe(unchanged);
   });
@@ -93,6 +94,7 @@ describe('file names and paths', () => {
     ${'Edit src/colors here.'}                | ${'Edit src/colours here.'}                | ${'a bare two-segment path reads the same'}
     ${'The color.It was gray.'}               | ${'The colour.It was grey.'}               | ${'a missing space after a full stop'}
     ${'It is 3.5 miles.'}                     | ${'It is 5.6 kilometres.'}                 | ${'a number has no letter in its name'}
+    ${'It is 5 feet. The color.'}             | ${'It is 1.5 metres. The colour.'}         | ${'a sentence after a measurement'}
     ${'It makes 300 lb.ft of torque.'}        | ${'It makes 410 N·m of torque.'}           | ${'a dotted unit after a number'}
     ${'It makes 300lb.ft of torque.'}         | ${'It makes 410 N·m of torque.'}           | ${'a dotted unit joined to its number'}
     ${'It is -5lb.ft or 1/2lb.ft.'}           | ${'It is -6.8 N·m or 0.68 N·m.'}           | ${'joined to a signed number or a fraction'}

@@ -214,7 +214,9 @@ const STRUCTURAL: RegExp[] = [
   /<[a-zA-Z/][^>\n]*>/g,
   PATH,
   // Never after a separator: `PATH` holds those, and starting there walks a path once per segment.
-  new RegExp(String.raw`(?<![\w$@.\\/-])(?!${UNIT_AFTER_NUMBER})${FILE_NAME}`, 'g'),
+  // The lookahead for how a file name starts keeps the unit lookbehind from walking a run of
+  // spaces from every space in it.
+  new RegExp(String.raw`(?<![\w$@.\\/-])(?=\.?\w)(?!${UNIT_AFTER_NUMBER})${FILE_NAME}`, 'g'),
 ];
 
 /**

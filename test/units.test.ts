@@ -2748,6 +2748,55 @@ describe('a unit that is part of a noun', () => {
   });
 });
 
+describe('a capitalised unit word that is part of a name', () => {
+  it.each`
+    unchanged                                         | why
+    ${'Track 7 Miles Davis'}                          | ${'a first name'}
+    ${'Album: 1959 Miles Davis'}                      | ${'after a year'}
+    ${'From 1955 to 1959 Miles Davis led a quintet.'} | ${'after a range'}
+    ${'Track 7\nMiles Davis'}                         | ${'across a line that wraps'}
+    ${'the 1972 Pound Ridge fire'}                    | ${'a place'}
+    ${'a 1983 Foot Locker ad'}                        | ${'a shop'}
+    ${'Track 3 Gallon Drunk'}                         | ${'a band'}
+    ${'It is 10 Miles to Town'}                       | ${'title case, across a small word'}
+    ${'A Mile and a Half From Home'}                  | ${'title case around a fraction'}
+    ${'The 10 x 12 Feet Room'}                        | ${'title case after a dimension'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+    expect(convert(unchanged, { assumeAmerican: true })).toBe(unchanged);
+  });
+
+  it.each`
+    input                                | expected                                    | why
+    ${'10 miles North of town'}          | ${'16 kilometres North of town'}            | ${'a unit word in lower case'}
+    ${'Walk 10 Miles'}                   | ${'Walk 16 kilometres'}                     | ${'no capitalised word after it'}
+    ${'He walked 10 Miles to the shop.'} | ${'He walked 16 kilometres to the shop.'}   | ${'small words, then one in lower case'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  /** The spans the unit rules hold as written in `text`. */
+  const held = (text: string, options: Options = {}): string[] => {
+    const resolved = resolveOptions(options);
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold)
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                                             | span
+    ${'Track 7 Miles Davis'}                          | ${'7 Miles'}
+    ${'From 1955 to 1959 Miles Davis led a quintet.'} | ${'1955 to 1959 Miles'}
+    ${'A Mile and a Half From Home'}                  | ${'A Mile and a Half'}
+    ${'The 10 x 12 Feet Room'}                        | ${'10 x 12 Feet'}
+  `('holds $span whole, even with respectConventions off', ({ input, span }) => {
+    expect(held(input)).toContain(span);
+    expect(held(input, { units: { respectConventions: false } })).toContain(span);
+  });
+});
+
 describe('a count before an attributive measurement stays out of it', () => {
   it.each`
     input                              | expected                         | why

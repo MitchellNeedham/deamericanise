@@ -499,6 +499,8 @@ describe('the imperial units marker', () => {
 
   const NOUNS = ['Bake 1 pound cake.', 'Send in 6 foot soldiers.', 'Count 8 inch worms.'];
 
+  const NAMES = ['Track 7 Miles Davis', 'From 1955 to 1959 Miles Davis led a quintet.'];
+
   const MONEY = [
     'The apartment cost 400 pounds a week.',
     'He paid a fine of 200 pounds.',
@@ -525,7 +527,11 @@ describe('the imperial units marker', () => {
     expect(analyse(input).markers).not.toContain(IMPERIAL);
   });
 
-  it.each([...MEASURED, ...MONEY, ...NOUNS])('agrees with the unit rules on "%s"', (input) => {
+  it.each(NAMES)('does not count the name in "%s"', (input) => {
+    expect(analyse(input).markers).not.toContain(IMPERIAL);
+  });
+
+  it.each([...MEASURED, ...MONEY, ...NOUNS, ...NAMES])('agrees with the unit rules on "%s"', (input) => {
     const converted = deamericanise(input).changes.some((c) => c.category === 'units');
     expect(analyse(input).markers.includes(IMPERIAL)).toBe(converted);
   });

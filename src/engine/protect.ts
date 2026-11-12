@@ -1,5 +1,7 @@
 import type { Range } from './apply.js';
 import { commentedCodeRanges } from './code-shape.js';
+import { collectIndentedCode } from './indented-code.js';
+import type { Syntax } from '../types.js';
 
 /**
  * Names that contain an Americanism as part of their identity. Pearl Harbor does not
@@ -134,14 +136,21 @@ function collectFencedCode(text: string, into: Range[]): void {
   if (open) into.push({ start: open.start, end: text.length });
 }
 
-/** Fenced code in a prose file that is not Markdown: three backticks, to the next three anywhere. */
+/** Fenced code in plain text: three backticks, to the next three anywhere. */
 const BACKTICK_PAIRS = /`{3}[\s\S]*?`{3}/g;
+
+/** Code spans and code blocks, read by the rules of the text's syntax. */
+function collectCode(text: string, syntax: Syntax | undefined, into: Range[]): void {
+  collect(text, [CODE_SPAN], into);
+  if (syntax === 'text') collect(text, [BACKTICK_PAIRS], into);
+  else collectFencedCode(text, into);
+  if (syntax === 'markdown') collectIndentedCode(text, into);
+}
 
 const STRUCTURAL: RegExp[] = [
   /\bhttps?:\/\/\S+/g,
   /\bwww\.\S+/g,
   /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
-  CODE_SPAN,
   /<[a-zA-Z/][^>\n]*>/g,
 ];
 
@@ -190,8 +199,10 @@ export interface ProtectOptions {
   commentedCode: boolean;
   /** The host language's line-comment markers, for spotting a double-commented line. */
   commentMarkers: string[];
-  /** Read code fences by CommonMark's rule. Off for a prose file that is not Markdown. */
-  markdownFences: boolean;
+  /** The text's markup, which decides how code fences and indented code are read. */
+  syntax: Syntax | undefined;
+  /** The text comes from a parsed document, so a backtick in it is literal and opens no code. */
+  parsed: boolean;
   extra: RegExp[];
 }
 
@@ -208,8 +219,7 @@ function collect(text: string, patterns: RegExp[], into: Range[]): void {
 export function protectedRanges(text: string, options: ProtectOptions): Range[] {
   const ranges: Range[] = [];
   collect(text, [IGNORE_BLOCK, IGNORE_LINE, ...STRUCTURAL], ranges);
-  if (options.markdownFences) collectFencedCode(text, ranges);
-  else collect(text, [BACKTICK_PAIRS], ranges);
+  if (!options.parsed) collectCode(text, options.syntax, ranges);
   if (options.properNouns) collect(text, PROPER_NOUNS, ranges);
   if (options.identifiers) {
     collect(text, IDENTIFIERS, ranges);

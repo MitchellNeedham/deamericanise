@@ -48,6 +48,8 @@ export const LEXERS: LexerSpec[] = [
     extensions: ['py', 'pyi', 'pyw'],
     lineComments: ['#'],
     blockComments: [],
+    // Docstrings are reStructuredText by convention (PEP 287).
+    docMarkup: 'rst',
     strings: [
       { open: '"""', close: '"""', escape: true, multiline: true, doc: true },
       { open: "'''", close: "'''", escape: true, multiline: true, doc: true },

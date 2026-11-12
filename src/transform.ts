@@ -38,7 +38,8 @@ export function findChanges({ text, options, signals }: TransformInput): Change[
     identifiers: options.protectIdentifiers,
     commentedCode: options.protectCommentedCode,
     commentMarkers: options.commentMarkers,
-    markdownFences: options.markdownFences,
+    syntax: options.syntax,
+    parsed: options.parsed,
     extra: options.protect,
   });
 

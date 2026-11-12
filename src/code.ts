@@ -2,8 +2,8 @@ import { applyChanges, offsetChanges } from './engine/apply.js';
 import { detectAmerican } from './engine/detect.js';
 import { resolveOptions } from './config.js';
 import { commentSpans, lexerFor, PROSE_EXTENSIONS } from './lexers/index.js';
-import { findChanges, transformProse } from './transform.js';
-import type { Change, Options, Result } from './types.js';
+import { deamericanise, findChanges } from './transform.js';
+import type { Change, Options, Result, Syntax } from './types.js';
 
 export interface CodeOptions extends Options {
   /** A language id (`python`), an extension (`.ts`) or a filename (`Dockerfile`). */
@@ -34,6 +34,9 @@ export function deamericaniseCode(source: string, options: CodeOptions = {}): Re
   const resolved = resolveOptions(rest, { protectIdentifiers: true });
   // Lets the detector spot a line that was commented on top of a comment.
   resolved.commentMarkers = lexer.lineComments;
+  // Comments follow their language's doc markup, never `syntax`. A Markdown comment reads as
+  // unknown syntax: the marker that starts each of its lines throws off a reading of indented code.
+  resolved.syntax = lexer.docMarkup === 'rst' ? 'text' : undefined;
   const spans = commentSpans(source, lexer, docstrings ?? false);
 
   // The verdict on whether this file is American comes from its prose, not its syntax.
@@ -64,17 +67,19 @@ function isProseLanguage(language: string): boolean {
 
 const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdx']);
 
+/** The syntax a file type names: Markdown, plain text for any other prose type, or none. */
+function syntaxOf(type: string): Syntax | undefined {
+  const cleaned = type.replace(/^\./, '').toLowerCase();
+  if (MARKDOWN_EXTENSIONS.has(cleaned)) return 'markdown';
+  return PROSE_EXTENSIONS.has(cleaned) ? 'text' : undefined;
+}
+
 /**
- * Rewrites a prose file of the given type. A prose type other than Markdown, such as `rst` or
- * `txt`, turns off CommonMark's fences, since a line of tildes there underlines a heading or
- * divides sections. A type that is not a prose type says nothing, so it is read as
- * `deamericanise` reads text.
+ * Rewrites a prose file of the given type. A `syntax` option wins over the one the type names,
+ * and a type that is not a prose type names none, so it is read as `deamericanise` reads text.
  */
 function deamericaniseProse(source: string, type: string, options: CodeOptions): Result {
-  const resolved = resolveOptions(proseOptions(options));
-  const cleaned = type.replace(/^\./, '').toLowerCase();
-  resolved.markdownFences = MARKDOWN_EXTENSIONS.has(cleaned) || !PROSE_EXTENSIONS.has(cleaned);
-  return transformProse(source, resolved);
+  return deamericanise(source, { ...proseOptions(options), syntax: options.syntax ?? syntaxOf(type) });
 }
 
 /** Whether `deamericaniseFile` accepts this as `language`: a prose type or a name `lexerFor` knows. */

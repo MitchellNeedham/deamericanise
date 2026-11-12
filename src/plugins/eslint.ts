@@ -63,7 +63,9 @@ const rule = {
       Program(): void {
         for (const comment of sourceCode.getAllComments()) {
           if (!comment.range) continue;
-          const { changes } = deamericanise(comment.value, { protectIdentifiers: true, ...options });
+          // A comment follows its language's doc markup, as in `deamericaniseCode`, never `syntax`.
+          const commentOptions = { protectIdentifiers: true, ...options, syntax: undefined };
+          const { changes } = deamericanise(comment.value, commentOptions);
           const base = comment.range[0] + MARKER_LENGTH;
           const rangeOf = (change: Change): [number, number] => [base + change.start, base + change.end];
 

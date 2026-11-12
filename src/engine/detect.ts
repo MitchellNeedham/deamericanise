@@ -1,7 +1,7 @@
 import type { AmericanSignals } from '../types.js';
 import { longDates, numericDates } from '../rules/dates.js';
 import { FAHRENHEIT as FAHRENHEIT_UNIT, NOT_A_TITLE, fahrenheitTemperatures } from '../rules/units/fahrenheit.js';
-import { isUnitInOtherSense, restatesCelsiusBefore } from '../rules/units/index.js';
+import { isUnitInOtherSense, metricUnitForms, restatesCelsiusBefore } from '../rules/units/index.js';
 
 /** What a marker adds to the confidence unless it names its own weight. */
 const ORDINARY = 0.15;
@@ -44,6 +44,9 @@ const CELSIUS = String.raw`[\s-]*(?:°|º|˚|degrees?)?\s*(?:C\b|Celsius|centigr
  */
 const SETTING_UNIT = String.raw`(?:${FAHRENHEIT_UNIT}|(?:degrees?\b|°|º|˚)(?:[\s-]*F\b)?|F\b)`;
 
+/** A temperature's unit: a setting's, or Celsius in any form the unit rules read beside Fahrenheit. */
+const TEMPERATURE_UNIT = `${SETTING_UNIT}|${metricUnitForms('temperature')}`;
+
 const COOKING_TIME =
   String.raw`\d+(?:\.\d+)?(?:(?:\s*[-\u2013]\s*|\s+to\s+)\d+(?:\.\d+)?)?\s*(?:minutes?|mins?|hours?|hrs?)\b`;
 
@@ -77,7 +80,7 @@ const OVEN_SETTING = new RegExp(
   // The gap may not cross another temperature, so `oven to 180C or to 400F` is read by
   // its first setting. Nor may it cross an amount verb, whose `to` or `at` is its own.
   String.raw`\b(?:ovens?|pre-?heat(?:s|ed|ing)?|(?!${BAKED_THING})bak(?:e|es|ed|ing)|roast(?:s|ed|ing)?)\b` +
-    String.raw`(?:(?!\d\s*(?:°|º|˚|degrees?|C\b)|${AMOUNT_VERB})[^.\n]){0,40}?\b(?:to|at)\s+(?:about\s+|around\s+)?` +
+    String.raw`(?:(?!\d\s*(?:${TEMPERATURE_UNIT})|${AMOUNT_VERB})[^.\n]){0,40}?\b(?:to|at)\s+(?:about\s+|around\s+)?` +
     String.raw`${SETTING}(?!${CELSIUS})` +
     // A setting is followed by its unit or the rest of the instruction, never a quantity:
     // `the baking powder to 300 g of flour`, `in the oven for up to 300 minutes`.

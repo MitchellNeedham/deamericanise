@@ -472,12 +472,12 @@ describe('a spelled-out temperature that describes a noun stays singular', () =>
 describe('the stop of a Fahrenheit F', () => {
   it.each`
     input                                    | expected                                    | why
-    ${'Bake at 350°F.'}                      | ${'Bake at 175°C.'}                         | ${'the end of the text'}
-    ${'Heat it to 350°F. Then stir.'}        | ${'Heat it to 175°C. Then stir.'}           | ${'before a new sentence'}
-    ${'Bake at 350 degrees F. Stir well.'}   | ${'Bake at 175 degrees Celsius. Stir well.'} | ${'spelled out'}
+    ${'Bake at 350 degrees F. Stir well.'}   | ${'Bake at 175 degrees Celsius. Stir well.'} | ${'before a new sentence'}
+    ${'Bake at 350 degrees F. Then rest it.'} | ${'Bake at 175 degrees Celsius. Then rest it.'} | ${'the same'}
+    ${'Preheat to 350 degrees F.'}           | ${'Preheat to 175 degrees Celsius.'}        | ${'the end of the text'}
     ${'Roast at 425 deg F.\nThen rest it.'}  | ${'Roast at 220°C.\nThen rest it.'}         | ${'before a sentence on the next line'}
     ${'Bake at 350F. Stir well.'}            | ${'Bake at 175°C. Stir well.'}              | ${'a bare F'}
-    ${'Highs in the 80s°F. Then rain.'}      | ${'Highs between 27 and 32°C. Then rain.'}  | ${'a decade'}
+    ${'Highs in the 80s degrees F. Then rain.'} | ${'Highs between 27 and 32°C. Then rain.'} | ${'a decade'}
   `('keeps the stop that also ends the sentence: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -485,25 +485,42 @@ describe('the stop of a Fahrenheit F', () => {
   it.each`
     input                                          | expected                                          | why
     ${'Bake at 350 degrees F. for 20 minutes.'}    | ${'Bake at 175 degrees Celsius for 20 minutes.'}  | ${'degrees F'}
-    ${'Bake at 350°F. for 20 minutes.'}            | ${'Bake at 175°C for 20 minutes.'}                | ${'a degree sign'}
     ${'Bake at 350 deg F. for 20 minutes.'}        | ${'Bake at 175°C for 20 minutes.'}                | ${'deg F'}
-    ${'Bake at 350-375°F. for an hour.'}           | ${'Bake at 175-190°C for an hour.'}               | ${'a range'}
+    ${'Bake at 350-375 degrees F. for an hour.'}   | ${'Bake at 175-190 degrees Celsius for an hour.'} | ${'a range'}
     ${'Bake at 350F. for 20 minutes.'}             | ${'Bake at 175°C for 20 minutes.'}                | ${'a bare F'}
     ${'Bake at 350 F. for 20 minutes.'}            | ${'Bake at 175°C for 20 minutes.'}                | ${'a spaced bare F'}
     ${'Use a 350 degree F. oven for it.'}          | ${'Use a 175 degree Celsius oven for it.'}        | ${'before the noun it describes'}
-    ${'Highs in the 80s°F. for days on end.'}      | ${'Highs between 27 and 32°C for days on end.'}   | ${'a decade'}
+    ${'Highs in the 80s degrees F. for days on end.'} | ${'Highs between 27 and 32°C for days on end.'} | ${'a decade'}
+    ${'- 350 degrees F.'}                          | ${'- 175 degrees Celsius'}                        | ${'a label, as for in.'}
+    ${'He said "Bake at 350 degrees F." and left.'} | ${'He said "Bake at 175 degrees Celsius" and left.'} | ${'inside a quote, as for in.'}
   `('drops the stop inside the sentence: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 
   it.each`
-    input                                     | expected                                  | why
-    ${'Bake at 350°F...'}                     | ${'Bake at 175°C...'}                     | ${'an ellipsis'}
-    ${'Bake at 350°F. 2 trays fit.'}          | ${'Bake at 175°C. 2 trays fit.'}          | ${'before a figure'}
-    ${'Bake at 350°F. (180°C) Then stir.'}    | ${'Bake at 175°C. (180°C) Then stir.'}    | ${'before a bracket the sentence may trail'}
-    ${'Set it to 350 F. for an hour.'}        | ${'Set it to 350 F. for an hour.'}        | ${'a bare F with no word about heat'}
-    ${'Bake it at 350 f. for an hour.'}       | ${'Bake it at 350 f. for an hour.'}       | ${'a lower case bare f'}
+    input                                                 | expected                                                  | why
+    ${'Bake at 350 degrees F...'}                         | ${'Bake at 175 degrees Celsius...'}                       | ${'an ellipsis'}
+    ${'Bake at 350 degrees F. 2 trays fit.'}              | ${'Bake at 175 degrees Celsius. 2 trays fit.'}            | ${'before a figure'}
+    ${'Bake at 350 degrees F. (180 degrees C) Then stir.'} | ${'Bake at 175 degrees Celsius. (180 degrees C) Then stir.'} | ${'before a bracket the sentence may trail'}
+    ${'Set it to 350 F. for an hour.'}                    | ${'Set it to 350 F. for an hour.'}                        | ${'a bare F with no word about heat'}
+    ${'Bake it at 350 f. for an hour.'}                   | ${'Bake it at 350 f. for an hour.'}                       | ${'a lower case bare f'}
   `('leaves the stop in the text: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                    | expected                                  | why
+    ${'- 350°F.'}                            | ${'- 175°C.'}                             | ${'a label'}
+    ${'- 350ºF.'}                            | ${'- 175°C.'}                             | ${'the masculine ordinal for the degree sign'}
+    ${'- 350˚F.'}                            | ${'- 175°C.'}                             | ${'the ring above'}
+    ${'"Bake at 350°F." he said'}            | ${'"Bake at 175°C." he said'}             | ${'inside a quote'}
+    ${'Bake at 350°F. for 20 minutes.'}      | ${'Bake at 175°C. for 20 minutes.'}       | ${'before a word in lower case'}
+    ${'Bake at 350°F.'}                      | ${'Bake at 175°C.'}                       | ${'the end of the text'}
+    ${'It was 90°F. Then it rained.'}        | ${'It was 32.2°C. Then it rained.'}       | ${'before a new sentence'}
+    ${'Highs in the 80s°F. for days on end.'} | ${'Highs between 27 and 32°C. for days on end.'} | ${'a decade'}
+    ${'- 350℉.'}                             | ${'- 175°C.'}                             | ${'one sign'}
+    ${'- 350 degrees Fahrenheit.'}           | ${'- 175 degrees Celsius.'}               | ${'the word'}
+  `('leaves the stop after a symbol or the word to the sentence: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 
@@ -511,15 +528,16 @@ describe('the stop of a Fahrenheit F', () => {
     unchanged
     ${'Bake at 175°C (350°F.).'}
     ${'Bake at 175°C (350 degrees F.).'}
-    ${'Bake at 180°C/350°F. Stir well.'}
+    ${'Bake at 180°C/350 degrees F. Stir well.'}
   `('reads "$unchanged" as a restatement of the Celsius value before it', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });
 
   it.each`
-    input                                  | expected
-    ${'Bake at 350°F.'}                    | ${'Bake at 175°C (350°F).'}
-    ${'Bake at 350°F. for 20 minutes.'}    | ${'Bake at 175°C (350°F.) for 20 minutes.'}
+    input                                          | expected
+    ${'Bake at 350°F.'}                            | ${'Bake at 175°C (350°F).'}
+    ${'Preheat to 350 degrees F.'}                 | ${'Preheat to 175 degrees Celsius (350 degrees F).'}
+    ${'Bake at 350 degrees F. for 20 minutes.'}    | ${'Bake at 175 degrees Celsius (350 degrees F.) for 20 minutes.'}
   `('keeps the original of $input and runs twice without converting it again', ({ input, expected }) => {
     const options = { units: { keepOriginal: true } };
     const once = convert(input, options);

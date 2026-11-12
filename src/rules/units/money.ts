@@ -52,16 +52,23 @@ const PRICED_THINGS =
   String.raw`tax(?:es)?|rents?|fares?`;
 
 /**
+ * A spaced `in` after a number, with no stop after it, which the unit rules read as the
+ * preposition, as in `6 in total`. Straight after the number, as in `6in`, or before a stop,
+ * as in `12 in.`, it is the inch.
+ */
+export const PREPOSITION_IN = String.raw`(?<=\s)in(?![.\w])`;
+
+/**
  * Pence after the pounds: `5 pounds 50`, `five pounds fifty`, `3 pounds 99p`. Bare pence
  * have to end the phrase, or the number belongs to whatever follows: `5 pounds 2 inches`,
- * `1 pound 85% lean beef`.
+ * `5 pounds 12 in. wide`, `1 pound 85% lean beef`.
  */
 const PENCE =
   String.raw`(?:\d{1,2}(?![\d.,]?\d)|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)` +
   String.raw`(?:[\s-](?:one|two|three|four|five|six|seven|eight|nine))?|ten|eleven|twelve|` +
   String.raw`thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen)` +
-  String.raw`(?:p\b|\s+pence\b|(?=\s*(?:[.,;:!?)]|$)|\s+(?:for|each|a|an|per|at|in|on|to|and|or|` +
-  String.raw`but|plus|please|then|now)\b))`;
+  String.raw`(?:p\b|\s+pence\b|(?=\s*(?:[.,;:!?)]|$)|\s+(?:for|each|a|an|per|at|on|to|and|or|` +
+  String.raw`but|plus|please|then|now)\b|\s+${PREPOSITION_IN}))`;
 
 const MONEY_BEFORE = new RegExp(
   String.raw`\b(?:(?:${MONEY_VERBS})(?:\s+${FILLER}){0,5}|` +

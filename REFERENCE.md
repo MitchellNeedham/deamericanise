@@ -506,8 +506,11 @@ Pounds of money are left alone, because British prose spells amounts out. A mone
 such as `cost`, `paid`, `earns`, `worth` or `a fine of` claims the amount straight after
 it, across at most a pronoun or a hedge: `It cost him nearly 500 pounds`. So do
 `sterling`, a rate (`30,000 pounds a year`), pence (`5 pounds 50`) and a thing priced in
-pounds (`a 10-pound note`). A money word reaches only its own amount, so
-`It cost $20 for 5 pounds of beef` still converts. A `£` reaches the whole sentence, but a
+pounds (`a 10-pound note`). Pence may come before the preposition `in`, as in
+`5 pounds 50 in total`, but `12 in.` and `12in` are inches and never pence, so
+`The box is 5 pounds 12 in. wide.` becomes `The box is 2.3 kilograms 30 cm wide.` A money
+word reaches only its own amount, so `It cost $20 for 5 pounds of beef` still converts.
+A `£` reaches the whole sentence, but a
 weight word in the measurement's own phrase (`lost`, `weighs`, `of beef`, `a 5-pound bag`)
 outranks it. `lb` and `lbs` are never money, and `respectConventions: false` does not
 convert money. An amount of money is held whole, as a conventional size is, so no other
@@ -519,6 +522,14 @@ sentence, as a time's does, so `The fence is 6 ft. It is new.` becomes
 `The fence is 1.8 m. It is new.` Any capitalised word after the stop starts a new sentence,
 a number in words included, but a word in capitals does not, so `Buy a 6 ft. HDMI cable.`
 becomes `Buy a 1.8 m HDMI cable.`
+
+A spaced `in` with no stop after it is the preposition, so `There are 6 in total.` stays as
+written. A spaced `in.` that ends the sentence is the particle of a verb that takes `in`
+when that verb governs the count, across at most a word such as `only`, `another` or `the`.
+The verbs are `let`, `put`, `bring`, `come`, `fit`, `squeeze`, `pack`, `invite`, `allow`,
+`send` and `call`, in any form. So `The driver let only 3 in.` and `I put 2-3 in.` stay as
+written, while `Trim the board to 12 in.` becomes `Trim the board to 30 cm.` and
+`Put a 12 in. tile in the gap.` becomes `Put a 30 cm tile in the gap.`
 
 **Dates.** `3/14/2024` becomes `2024-03-14` without needing to be told anything, because
 there is no month 14. `03/04/2024` is genuinely ambiguous, so it only moves when the

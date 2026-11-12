@@ -435,6 +435,55 @@ describe('the stop of a unit abbreviation', () => {
   });
 });
 
+describe('a spaced "in." that ends the sentence after a verb taking "in"', () => {
+  it.each`
+    unchanged                                              | why
+    ${'The bus was full, so the driver let only 3 in.'}    | ${'let, across only'}
+    ${'How many sugars? I put 2 in.'}                      | ${'put'}
+    ${'The hall was packed, but they squeezed 6 in.'}      | ${'squeezed'}
+    ${'They brought another 4 in.'}                        | ${'brought, across another'}
+    ${'We called the 3 in.'}                               | ${'called, across a determiner'}
+    ${'The driver let only three in.'}                     | ${'a count in words'}
+    ${'How many sugars? I put 2-3 in.'}                    | ${'a range'}
+    ${'The driver let only 3 in. Then he drove off.'}      | ${'before another sentence'}
+    ${'(I put 2 in.)'}                                     | ${'inside a closing bracket'}
+    ${'The driver let only 3 in and drove off.'}           | ${'a spaced "in" with no stop is the preposition'}
+    ${'There are 6 in total.'}                             | ${'the same'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                 | expected                              | why
+    ${'Trim the board to 12 in.'}         | ${'Trim the board to 30 cm.'}         | ${'no verb that takes "in"'}
+    ${'It is 12 in. long.'}               | ${'It is 30 cm long.'}                | ${'the stop ends only the abbreviation'}
+    ${'Put a 12 in. tile in the gap.'}    | ${'Put a 30 cm tile in the gap.'}     | ${'the same, after a verb that takes "in"'}
+    ${'Let the hem down 2 in.'}           | ${'Let the hem down 5.1 cm.'}         | ${'more than a word between the verb and the count'}
+    ${'He let 3in.'}                      | ${'He let 7.6 cm.'}                   | ${'"in" straight after the number'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  /** The spans the unit rules hold as written in `text`. */
+  const held = (text: string, options: Options = {}): string[] => {
+    const resolved = resolveOptions(options);
+    const ctx: RuleContext = { text, options: resolved, signals: analyse(text), american: true };
+    return patternRules(resolved)
+      .flatMap((rule) => rule.find(ctx))
+      .filter((c) => c.hold)
+      .map((c) => c.before);
+  };
+
+  it.each`
+    input                                    | span
+    ${'The driver let only 3 in.'}           | ${'3 in.'}
+    ${'How many sugars? I put 2-3 in.'}      | ${'2-3 in.'}
+  `('holds $span whole, even with respectConventions off', ({ input, span }) => {
+    expect(held(input)).toContain(span);
+    expect(held(input, { units: { respectConventions: false } })).toContain(span);
+  });
+});
+
 describe('temperature', () => {
   it.each`
     input                       | expected                | why
@@ -2904,6 +2953,9 @@ describe('pounds of money are not weights', () => {
     ${'I get paid 12 pounds an hour.'}                         | ${'an hourly rate'}
     ${'fees of up to 9,250 pounds per year'}                   | ${'a rate with per'}
     ${'It was 5 pounds 50.'}                                   | ${'pence after the pounds'}
+    ${'It came to 5 pounds 50.'}                               | ${'the same'}
+    ${'It came to 5 pounds 50 in total.'}                      | ${'pence before the preposition "in"'}
+    ${'It cost 5 pounds 50 in total.'}                         | ${'the same, after a money verb'}
     ${"That's 3 pounds 99p."}                                  | ${'pence with p'}
     ${"It's two pounds fifty."}                                | ${'pence in words'}
     ${'It costs 3 pounds and 50 pence.'}                       | ${'pence written out'}
@@ -2939,6 +2991,10 @@ describe('pounds of money are not weights', () => {
     ${'The cost of 10 pounds of potatoes rose.'}                | ${'The cost of 4.5 kilograms of potatoes rose.'}             | ${'of potatoes outranks cost'}
     ${'Aim to lose 2 pounds a week.'}                           | ${'Aim to lose 910 grams a week.'}                           | ${'a weight verb outranks a rate'}
     ${'1 pound 85% lean ground beef'}                           | ${'450 grams 85% lean ground beef'}                          | ${'a number after the unit is not pence'}
+    ${'The box is 5 pounds 12 in. wide.'}                       | ${'The box is 2.3 kilograms 30 cm wide.'}                    | ${'nor is a number of inches'}
+    ${'The box is five pounds twelve in. wide.'}                | ${'The box is 2.3 kilograms 30 cm wide.'}                    | ${'the same, in words'}
+    ${'The box is 5 pounds 12in wide.'}                         | ${'The box is 2.3 kilograms 30 cm wide.'}                    | ${'the same, with no space'}
+    ${'The box is 5 pounds 12 inches wide.'}                    | ${'The box is 2.3 kilograms 30 centimetres wide.'}           | ${'the same, written out'}
     ${'won a 20-pound salmon'}                                  | ${'won a 9.1 kilogram salmon'}                               | ${'the article belongs to the salmon'}
     ${'It cost £20 for 5 pounds of beef.'}                      | ${'It cost £20 for 2.3 kilograms of beef.'}                  | ${'of beef outranks the £'}
     ${'It cost £3 and weighed 5 pounds.'}                       | ${'It cost £3 and weighed 2.3 kilograms.'}                   | ${'weighed outranks the £'}
@@ -2955,6 +3011,12 @@ describe('pounds of money are not weights', () => {
   it('leaves money alone when respectConventions is off', () => {
     const options = { units: { respectConventions: false } };
     expect(convert('It cost 500 pounds.', options)).toBe('It cost 500 pounds.');
+  });
+
+  it('converts pounds before a number of inches in one run', () => {
+    const once = deamericaniseText('The box is 5 pounds 12 in. wide.');
+    expect(once).toBe('The box is 2.3 kilograms 30 cm wide.');
+    expect(deamericaniseText(once)).toBe(once);
   });
 
   /** The spans the unit rules hold as written in `text`. */

@@ -396,9 +396,13 @@ after a written-out month, with or without a day, are the year of a date, so
 written. A comma after a bare month frees the number, so `In May, 2000 feet` converts, and a
 shorter number is no year, so
 `In May 5-10 feet` is still a range. Four figures from 1000 to 2999 straight after `in`, `by`,
-`since`, `until`, `before`, `after` or `during` may be a year, so `In 2024 yard sales rose.`
-and `In 2024 miles were driven.` are left as written. A comma in the number, a hyphen before
-the unit or an abbreviation for it makes a quantity, as in `In 2024-mile races` and
+`since`, `until`, `before`, `after` or `during` that opens a sentence or clause may be a
+year, so `In 2024 yard sales rose.` and `Last year, in 2024 miles were driven.` are left as
+written. The preposition opens one at the start of the text or a line, or after a stop,
+comma, semicolon or colon, with only spaces and opening quotes or brackets between. Inside a
+clause the number is a quantity, so `The wreck lies in 1500 feet of water.` becomes
+`The wreck lies in 460 metres of water.` A comma in the number, a hyphen before the unit or
+an abbreviation for it makes a quantity too, as in `In 2024-mile races` and
 `In 1500 ft of water`, and so does a unit word that ends the clause:
 `It rose by 1200 feet.` becomes `It rose by 370 metres.` A range's first number is never
 more than ten times the size of the second, which makes it a year or a count. Where the first number cannot open the
@@ -1175,9 +1179,11 @@ with no prose. Only the ids in `DIALECTS` are dialects, so a name every object h
   diameter` becomes `a 5.1 centimetres inside diameter`, and `round` describes a noun, so
   `a quarter mile round the bend` becomes `a 400 metre round the bend`. `a 2 pound cake` is
   left as written, because it may be a pound cake.
-- Four figures after a preposition that takes a year are left as written before a unit word
-  that does not end the clause, even where they are a quantity, as in
-  `The wreck lies in 1500 feet of water.`
+- Four figures after a preposition that takes a year are read by where the preposition
+  stands. In the middle of a sentence they are converted before a unit word even where they
+  are a year, so `Traffic grew in 2024 miles of road.` becomes
+  `Traffic grew in 3257 kilometres of road.` Opening a sentence or clause they are left as
+  written even where they are a quantity, as in `In 1500 feet of water, it lies.`
 - A line that ends in a number and a line that opens with a unit word are read as one
   measurement, so `Track 7` above `Feet first` becomes `Track 2.1 metres first`. A
   blank line or a list marker between them keeps them apart.

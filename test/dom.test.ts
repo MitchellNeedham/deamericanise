@@ -257,7 +257,7 @@ describe('runs of text in a laid-out page', () => {
       host.remove();
     });
 
-    it('ends the run at a span laid out as a block and drawn as code', () => {
+    it('leaves alone a span laid out as a block and drawn as code', () => {
       const line = '<span style="display: block; font-family: monospace; white-space: pre">the color</span>';
       const host = laidOut(`<div>The color${line}ful theater</div>`);
       deamericaniseDom(host);

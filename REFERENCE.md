@@ -254,9 +254,12 @@ or a date after the unit is no noun: `a quarter mile later` becomes `400 metres 
 `a mile and a half back` becomes `2.4 kilometres back`. A count before an attributive
 measurement counts the noun, so `two quarter-pound burgers` becomes `two 110 gram burgers`.
 So does a count in words spaced before a length that a hyphen ties to its size, which leaves
-the unit one of itself: `two foot-long subs` becomes `two 30 centimetre long subs`. After a
-determiner that takes one of a noun, or in a list of sizes, the count is the number of units,
-so `a two foot-long sub` becomes `a 61 centimetre long sub`, as `a two-foot-long sub` does.
+the unit one of itself: `two foot-long subs` becomes `two 30 centimetre long subs`, and a
+range or list of such counts reads the same, so `two to three foot-long subs` becomes
+`two to three 30 centimetre long subs`. After a determiner that takes one of a noun, or in a
+list of sizes, the count is the number of units, so `a two foot-long sub` becomes
+`a 61 centimetre long sub`, as `a two-foot-long sub` does, and `a two to three foot-long gap`
+becomes `a 61 to 91 centimetre long gap`.
 A unit that starts a noun leaves the number counting it, so `Bake 1 pound cake`,
 `6 foot soldiers`, `foot traffic`, `8 inch worms` and `5 yard sales` are left as written, while
 `a 2-pound cake` becomes `a 910 gram cake`.
@@ -333,7 +336,8 @@ a range and `2 feet-18 inches` two lengths, while `5 feet-6 inches` becomes `1.6
 height hyphenated to its inches is one word, so a noun after it is what it describes:
 `a six-foot-two man` becomes `a 1.88 metre man`. A number straight after a length, or
 after stone or pounds, is a smaller unit of it, never the first end of a range in the same
-unit, so `5 ft 6 to 6 ft` and `3 yards 2 to 4 yards` are left as written. A weight's next
+unit, so `5 ft 6 to 6 ft` and `3 yards 2 to 4 yards` are left as written, with `units.range`
+or `units.measurement` switched off too. A weight's next
 unit word can be left out before a join and another weight in its larger unit too, so
 `11 stone 4 to 12 stone` becomes `71.7 kilograms to 76 kilograms` and `7 lb 8 to 9 lb`
 becomes `3.4 kg to 4.1 kg`, while `11 stone 14 to 12 stone` is left as written. Together the
@@ -401,6 +405,14 @@ A hyphen left hanging on a range's first number, as recipes write it, joins the 
 `Cut into 5.1 to 7.6 centimetre pieces.`, and `Use 8- or 9-inch pans.` becomes
 `Use 20 or 23 centimetre pans.`
 
+A range may give its unit at both ends. Joined by `to`, it converts as one range with one
+unit, so `from 15 inches to 17 inches` becomes `from 38 to 43 centimetres`. Joined by a
+dash, a comma, `and` or `or`, each end keeps its unit, so `5 feet or 6 feet` becomes
+`1.5 metres or 1.8 metres` and `5ft-6ft` becomes `1.5 m-1.8 m`. Either way the two ends are
+one span to every check that leaves a range as written, so a conventional size is never half
+converted: `rims from 15 inches to 17 inches` and `fits 15″-17″ wheels` are left as written.
+Two units that differ, as in `from 6 feet to 10 inches`, are two measurements.
+
 A whole number hyphenated to a fraction below one is a mixed number, as trade writing has
 it: `a 2-3/4 inch board` becomes `a 7 centimetre board`, the same as `a 2 3/4 inch board`.
 `1-3 inches` and `1/2-3/4 inch` are still ranges.
@@ -440,7 +452,10 @@ shorter number is no year, so
 `In May 5-10 feet` is still a range. Four figures from 1000 to 2999 straight after `in`, `by`,
 `since`, `until`, `before`, `after` or `during` that opens a sentence or clause may be a
 year, so `In 2024 yard sales rose.` and `Last year, in 2024 miles were driven.` are left as
-written. The preposition opens one at the start of the text or a line, or of a list item
+written. So may every figure of a range or list of them that rises, after those words or
+`from` or `between`, so `In 2020-2024 miles were driven.`,
+`In 2020, 2022 or 2024 miles were driven.` and `From 2019 to 2024 miles driven rose.` are
+left as written too. The preposition opens one at the start of the text or a line, or of a list item
 there (`- `, `* `, `+ `, `1. ` or `2) `), or after a stop, comma, semicolon or colon, with
 only spaces and opening quotes or brackets between. Inside a
 clause the number is a quantity, so `The wreck lies in 1500 feet of water.` becomes
@@ -568,8 +583,8 @@ Measurements that are imperial worldwide are left alone: screens, wheels, pipes,
 `a 15 inch laptop` stays a 15 inch laptop, and so do `monitors of 27 inches` and
 `wheels between 15 and 17 inches`, which name the thing first. So does a unit that is part
 of a name, such as `the 40 yard line` or `the 147-pound division`. A range or dimension of
-them stays whole, so `bolts of ½-¾ inch` and `a 15" x 17" panel` are left exactly as
-written, with no piece of them converted on its own. `units: { respectConventions: false }`
+them stays whole, so `bolts of ½-¾ inch`, `a 3/8" to 1/2" socket` and `a 15" x 17" panel`
+are left exactly as written, with no piece of them converted on its own. `units: { respectConventions: false }`
 converts all of them.
 
 A unit word with a capital is part of a name when the next word has one too, or when the
@@ -1284,7 +1299,8 @@ options it had and goes on following the page under them.
   stands. In the middle of a sentence they are converted before a unit word even where they
   are a year, so `Traffic grew in 2024 miles of road.` becomes
   `Traffic grew in 3257 kilometres of road.` Opening a sentence or clause they are left as
-  written even where they are a quantity, as in `In 1500 feet of water, it lies.`
+  written even where they are a quantity, as in `In 1500 feet of water, it lies.` and
+  `From 1000 to 2000 feet the air thins.`
 - A line that ends in a number and a line that opens with a unit word are read as one
   measurement, so `Track 7` above `Feet first` becomes `Track 2.1 metres first`. A
   blank line or a list marker between them keeps them apart.

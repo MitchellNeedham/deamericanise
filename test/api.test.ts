@@ -389,7 +389,10 @@ describe('the imperial units marker', () => {
     'It cost 400 pounds and weighed 3 pounds.',
     'Walk 5 miles.',
     'Add 3 gallons of water.',
+    'Bake a 2-pound cake.',
   ];
+
+  const NOUNS = ['Bake 1 pound cake.', 'Send in 6 foot soldiers.', 'Count 8 inch worms.'];
 
   const MONEY = [
     'The apartment cost 400 pounds a week.',
@@ -413,7 +416,11 @@ describe('the imperial units marker', () => {
     expect(analyse(input).markers).not.toContain(IMPERIAL);
   });
 
-  it.each([...MEASURED, ...MONEY])('agrees with the unit rules on "%s"', (input) => {
+  it.each(NOUNS)('does not count the noun in "%s"', (input) => {
+    expect(analyse(input).markers).not.toContain(IMPERIAL);
+  });
+
+  it.each([...MEASURED, ...MONEY, ...NOUNS])('agrees with the unit rules on "%s"', (input) => {
     const converted = deamericanise(input).changes.some((c) => c.category === 'units');
     expect(analyse(input).markers.includes(IMPERIAL)).toBe(converted);
   });

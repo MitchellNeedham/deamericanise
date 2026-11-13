@@ -5,6 +5,114 @@ import { collectVerbatimBlocks } from './indented-code.js';
 import type { Syntax } from '../types.js';
 
 /**
+ * Capitalised words that start a sentence or sit in a title beside a common noun, as in
+ * `Your Honor` and `In Color`, and so never mark the word beside them as part of a name.
+ */
+const FUNCTION_WORDS = [
+  'A', 'An', 'And', 'Any', 'Are', 'As', 'At', 'But', 'By', 'Each', 'Every', 'For', 'From', 'Her',
+  'His', 'How', 'If', 'In', 'Into', 'Is', 'It', 'Its', 'My', 'No', 'Nor', 'Not', 'Of', 'On', 'Or',
+  'Our', 'So', 'Some', 'That', 'The', 'Their', 'These', 'This', 'Those', 'To', 'Was', 'What', 'When',
+  'Where', 'Which', 'Whose', 'With', 'Your',
+];
+
+/** A capitalised word that can be part of a name, as in `Kodak`, `McDonald` and `Children's`. */
+const NAME_WORD = String.raw`(?!(?:${FUNCTION_WORDS.join('|')})\b)[A-Z][A-Za-z]*[a-z](?:['’]s)?`;
+
+/**
+ * A word that names of institutions, awards and venues spell the American way. The French
+ * order is the Legion of Honour in British and Australian writing, so it is no such name.
+ * `Center` has entries of its own in `PROPER_NOUNS`, which read it in headings too.
+ */
+const NAME_PART = String.raw`(?:Organizations?|Labor|Honors?(?<!\bLegion\s+of\s+Honors?)|Theaters?|Colors?)`;
+
+/** The space between two words of a name, which may wrap onto the next line. */
+const NAME_SPACE = String.raw`(?=\s)[^\S\r\n]*(?:\r?\n[^\S\r\n]*)?`;
+
+const NAME_OF = String.raw`${NAME_SPACE}(?:of|for)${NAME_SPACE}`;
+
+/**
+ * Where a sentence starts: the start of the text or of a paragraph, a list item, heading or
+ * quote, or the space after a full stop, question mark or exclamation mark. A word there is
+ * capitalised whether or not it names anything.
+ */
+const SENTENCE_START =
+  String.raw`(?:(?:^|\n[ \t]*\n)[ \t>]*(?:(?:[-+*]|\d{1,9}[.)]|#{1,6})[ \t]+)?` +
+  String.raw`|\n[ \t>]*(?:[-+*]|\d{1,9}[.)]|#{1,6})[ \t]+|[.!?]["'”’)\]]*\s+)`;
+
+/**
+ * One of `NAME_PART` on strong evidence that it is part of a name: two capitalised words
+ * straight before it, as in `World Health Organization`, where a capital at the start of a
+ * sentence does not count, or `of` or `for` joining it to another capitalised word, as in
+ * `Medal of Honor` and `Organization of American States`. A `Color Picker` and a sense of
+ * honour are common nouns. The words before or after it are held too, so the hold
+ * never depends on a word another rule may rewrite.
+ */
+const NAME = new RegExp(
+  String.raw`\b(?=[A-Z])(?:(?<!${SENTENCE_START})${NAME_WORD}${NAME_SPACE}${NAME_WORD}${NAME_SPACE}${NAME_PART}` +
+    String.raw`|${NAME_WORD}${NAME_OF}${NAME_PART}|${NAME_PART}${NAME_OF}${NAME_WORD})\b`,
+  'g',
+);
+
+/** Words a title leaves in lower case, as in `The Favorite Colors of Kids`. */
+const MINOR_WORDS = new Set([
+  'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into', 'nor', 'of', 'off', 'on',
+  'onto', 'or', 'over', 'per', 'so', 'than', 'the', 'to', 'up', 'upon', 'via', 'vs', 'with', 'yet',
+]);
+
+/**
+ * Whether a line is a heading, where every word may be capitalised: a Markdown heading, or a
+ * line in title case, which capitalises its first word and every main word. A line with a
+ * figure in it is never a title, since the rules that rewrite an amount, a time or a
+ * temperature change the words around its figure, and the hold must not change between runs.
+ */
+function isHeading(line: string, next: string | undefined): boolean {
+  if (/^[ \t>]*#{1,6}(?:[ \t]|$)/.test(line)) return true;
+  if (next !== undefined && /\S/.test(line) && /^[ \t]{0,3}(?:=+|-+)[ \t]*\r?$/.test(next)) return true;
+  if (/\p{N}/u.test(line)) return false;
+  const words = line.match(/\p{L}[\p{L}\p{M}'’]*/gu) ?? [];
+  const capitalised = (word: string) => /^\p{Lu}/u.test(word);
+  return (
+    words.length > 0 &&
+    capitalised(words[0]!) &&
+    words.every((word) => capitalised(word) || MINOR_WORDS.has(word))
+  );
+}
+
+/** Holds each `NAME` outside a heading, reading each line once however many names it holds. */
+function collectNames(text: string, into: Range[]): void {
+  let lineStart = 0;
+  let lineEnd = text.indexOf('\n');
+  if (lineEnd === -1) lineEnd = text.length;
+  let heading: { start: number; is: boolean } | undefined;
+  const advanceTo = (point: number) => {
+    while (point > lineEnd && lineEnd < text.length) {
+      lineStart = lineEnd + 1;
+      lineEnd = text.indexOf('\n', lineStart);
+      if (lineEnd === -1) lineEnd = text.length;
+    }
+  };
+  const inHeading = (): boolean => {
+    if (heading?.start !== lineStart) {
+      const nextEnd = lineEnd < text.length ? text.indexOf('\n', lineEnd + 1) : -1;
+      const next = lineEnd < text.length ? text.slice(lineEnd + 1, nextEnd === -1 ? text.length : nextEnd) : undefined;
+      heading = { start: lineStart, is: isHeading(text.slice(lineStart, lineEnd), next) };
+    }
+    return heading.is;
+  };
+  for (const match of text.matchAll(NAME)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    advanceTo(start);
+    let held = !inHeading();
+    if (held && end > lineEnd) {
+      advanceTo(end);
+      held = !inHeading();
+    }
+    if (held) into.push({ start, end });
+  }
+}
+
+/**
  * Names that contain an Americanism as part of their identity. Pearl Harbor does not
  * become Pearl Harbour, and in Australia the Labor Party is spelt that way on purpose.
  */
@@ -18,6 +126,11 @@ const PROPER_NOUNS: RegExp[] = [
   // Two or more capitalised words before it make an institution's name rather than a
   // common noun: the Storm Prediction Center keeps its spelling, a data centre does not.
   /\b(?:[A-Z][a-z]+\s+){2,}Cent(?:er|re)s?\b/g,
+  // Names a heading or a sentence start may hold, where `NAME` does not read one.
+  /\b(?:World Health|World Trade|International|North Atlantic Treaty|World Meteorological|World Intellectual Property|International Labor) Organization\b/g,
+  /\b(?:International Organization for Standardization|Organization of American States)\b/g,
+  /\b(?:Department|Bureau|Secretary|Federation) of Labor\b/g,
+  /\b(?:Medal of Honor|Space Center Houston|Kodak Theater|Color Run)\b/g,
   /\bCenters? for Disease Control\b/g,
   /\b(?:Department|Secretary|Office) of Defense\b/g,
   /\bDefense (?:Department|Intelligence|Advanced|Logistics)\b/g,
@@ -198,8 +311,18 @@ const SEPARATOR = String.raw`[\\/]`;
 /** A segment of a path, or `.` and `..` before a separator. */
 const SEGMENT = String.raw`(?:\.{1,2}(?=[\\/])|\.?[\w@][\w@-]*(?:\.[\w@-]+)*)`;
 
-/** `/`, `./`, `../`, `~/` or a drive letter, with either separator after all but the first. */
-const ROOT = String.raw`(?:(?:\.{1,2}|~|[A-Za-z]:)[\\/]|\/)`;
+/**
+ * Where a token starts: at the start of the text or after a space or an opening bracket or
+ * quote, with any straight quotes and emphasis marks that open there. A slash after closing
+ * markup, as in `(color)/flavor` or `"color"/flavor`, joins two words as it does after a letter.
+ */
+const TOKEN_START = String.raw`(?<=(?:^|[\s([{<“‘«‹„‚])[*_~"']*)`;
+
+/**
+ * `/` where a token starts, `./`, `../`, `~/` or a drive letter, with either separator after all
+ * but the first.
+ */
+const ROOT = String.raw`(?:(?:\.{1,2}|~|[A-Za-z]:)[\\/]|${TOKEN_START}\/)`;
 
 /**
  * A path, held whole: one that starts at a root, runs to three or more segments, or ends in a
@@ -244,19 +367,34 @@ const LONG_FLAG = /(?<![\w!-])--[A-Za-z][\w-]*(?:=(?:"[^"\n]*"|'[^'\n]*'|\S*))?/
 /** A TeX argument in braces, after any optional ones in brackets. */
 const TEX_ARGUMENT = String.raw`(?:[ \t]*\[[^[\]\n]*\])*[ \t]*\{[^{}\n]*\}`;
 
-/** TeX commands whose first argument names a colour, colour model or environment. */
-const TEX_NAMING = 'color|textcolor|colorbox|pagecolor|rowcolor|cellcolor|columncolor|begin|end';
+/**
+ * TeX commands whose first argument is a name TeX looks up: a colour, colour model or
+ * environment, a package, class, file or bibliography style, or a cross-reference key. Each
+ * command that reads a key `\label` sets is here or in `TEX_KEY_PAIR`, since a key held in one
+ * place and respelt in another breaks the reference.
+ */
+const TEX_NAMING = [
+  'color', 'textcolor', 'colorbox', 'pagecolor', 'rowcolor', 'cellcolor', 'columncolor', 'begin', 'end',
+  'usepackage', 'RequirePackage', 'documentclass', 'LoadClass', 'input', 'include', 'bibliographystyle',
+  'label', 'ref', 'eqref', 'pageref', 'autoref', 'cref', 'Cref', 'cpageref', 'Cpageref', 'labelcref',
+  'nameref', 'vref', 'Vref', 'vpageref', 'cite',
+].join('|');
+
+/** TeX commands whose first two arguments are cross-reference keys, as in `\crefrange{a}{b}`. */
+const TEX_KEY_PAIR = 'crefrange|Crefrange|cpagerefrange|Cpagerefrange|vrefrange|vpagerefrange';
 
 /**
- * A TeX command, with the arguments that name a colour, colour model or environment, as in
- * `\color{gray}`, `\definecolor{shade}{gray}{0.9}` and `\begin{center}`. TeX knows each by one
- * spelling, so a respelt one stops the document compiling. The text that `\textcolor{gray}{word}`
- * and `\colorbox` colour is prose.
+ * A TeX command, with the arguments that name something TeX looks up, as in `\color{gray}`,
+ * `\definecolor{shade}{gray}{0.9}`, `\begin{center}`, `\usepackage{color}` and
+ * `\label{fig:color}`. TeX knows each by one spelling, so a respelt package or environment stops
+ * the document compiling, and a key respelt in one place but not another breaks the reference.
+ * The text that `\textcolor{gray}{word}` and `\colorbox` colour is prose.
  */
 const TEX_COMMAND = new RegExp(
   String.raw`\\(?:definecolor(?![A-Za-z])(?:${TEX_ARGUMENT}){0,3}` +
     String.raw`|(?:fcolorbox|colorlet)(?![A-Za-z])(?:${TEX_ARGUMENT}){0,2}` +
-    String.raw`|(?:${TEX_NAMING})(?![A-Za-z])(?:${TEX_ARGUMENT})?` +
+    String.raw`|(?:${TEX_KEY_PAIR})(?![A-Za-z])\*?(?:${TEX_ARGUMENT}){0,2}` +
+    String.raw`|(?:${TEX_NAMING})(?![A-Za-z])\*?(?:${TEX_ARGUMENT})?` +
     String.raw`|[A-Za-z]+)`,
   'g',
 );
@@ -336,6 +474,34 @@ const CSS_DECLARATIONS = new RegExp(
   'gm',
 );
 
+/** The first word of a hyphenated CSS property name, or a vendor prefix and the word after it. */
+const CSS_PROPERTY_START = String.raw`(?:-[a-z]+-[a-z]+|${[...new Set([...CSS_FAMILIES, ...CSS_BARE])].join('|')})`;
+
+/** The property words after `color-` that name a CSS property, as in `color-scheme`. */
+const CSS_COLOR_PROPERTIES = ['adjust', 'interpolation', 'rendering', 'scheme'];
+
+/** CSS functions whose names hold an Americanism. */
+const CSS_FUNCTIONS = ['color', 'color-contrast', 'color-mix', 'contrast-color', 'grayscale'];
+
+/**
+ * A CSS property or function named in a sentence without a value. A property is a hyphenated
+ * name from a CSS property family, or after a vendor prefix, with `color` among its later words,
+ * as in `background-color`, `border-top-color` and `-webkit-text-fill-color`, or one of the few
+ * that start with `color` or hold `behavior`. A prose compound such as `color-coded` or
+ * `white-colored` names no property. A function is held with its arguments where they close on
+ * the line, but `color(s)` marks a plural in prose.
+ */
+const CSS_NAMES = new RegExp(
+  // The lookahead for a hyphen or a bracket after the first word keeps the alternatives below
+  // from running at every word. The second, for a token of lower-case words and hyphens alone,
+  // keeps a long one that fails at its end from being walked again from each `-color` in it.
+  String.raw`(?<![\w$@.\\/-])(?=-?[a-z]+[-(])(?=-?[a-z]+(?:-[a-z]+)*(?![\w-]))(?:` +
+    String.raw`(?:${CSS_PROPERTY_START}(?:-[a-z]+)*-color` +
+    String.raw`|color-(?:${CSS_COLOR_PROPERTIES.join('|')})|(?:over)?scroll-behavior)(?:-[a-z]+)*(?![\w-])` +
+    String.raw`|(?:${CSS_FUNCTIONS.join('|')})\((?!e?s\))(?:(?:[^()\n]|\([^()\n]*\))*\))?)`,
+  'g',
+);
+
 /**
  * A Liquid, Jinja or Nunjucks tag on one line: `{% if favorite %}`, `{{ color | upcase }}` or
  * `{# gray #}`. No tag holds the opening of another, so a search for a close stops at one.
@@ -348,6 +514,20 @@ const TEMPLATE_TAG =
  * side makes it a ratio, a time or a scope, as in `1:2:3` and `std::color::gray`.
  */
 const SHORTCODE = /(?<![\p{L}\p{N}_:])(?::[a-z\d_+-]+:)+(?![\p{L}\p{N}_:])/gu;
+
+/** A name in a scope path, which a PHP static property opens with `$`. */
+const SCOPE_NAME = String.raw`\$?[A-Za-z_]\w*`;
+
+/**
+ * A path of names joined by `::`, as Rust, C++, PHP and Ruby write one: `std::color::gray`,
+ * `Color::Gray` or `::color`. A name starts straight after each `::`, so a labelled list such as
+ * `Favorite color:: gray` and a pair of figures such as `3::2` are prose.
+ */
+const SCOPE_PATH = new RegExp(
+  String.raw`(?<![\w$:])(?=[\w$]*::\$?[A-Za-z_])` +
+    String.raw`(?:(?:::)?${SCOPE_NAME}(?:::${SCOPE_NAME})+|::${SCOPE_NAME})`,
+  'g',
+);
 
 /**
  * An @mention or a #hashtag where a token starts, as in `@gray` and `#color`. A mention starts
@@ -363,8 +543,10 @@ const STRUCTURAL: RegExp[] = [
   LONG_FLAG,
   TEX_COMMAND,
   CSS_DECLARATIONS,
+  CSS_NAMES,
   TEMPLATE_TAG,
   SHORTCODE,
+  SCOPE_PATH,
   HANDLE,
   // Starting only where the token starts, so a long dotted token is walked once, not once per word.
   /(?<![\w.+-])[\w.+-]+@[\w-]+\.[\w.-]+\b/g,
@@ -443,7 +625,10 @@ export function protectedRanges(text: string, options: ProtectOptions): Range[] 
   const ranges: Range[] = [];
   collect(text, [IGNORE_BLOCK, IGNORE_LINE, ...STRUCTURAL], ranges);
   if (!options.parsed) collectCode(text, options.syntax, ranges);
-  if (options.properNouns) collect(text, PROPER_NOUNS, ranges);
+  if (options.properNouns) {
+    collect(text, PROPER_NOUNS, ranges);
+    collectNames(text, ranges);
+  }
   if (options.identifiers) {
     collect(text, IDENTIFIERS, ranges);
     collectTechnicalKebab(text, ranges);

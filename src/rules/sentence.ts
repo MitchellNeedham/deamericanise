@@ -160,9 +160,14 @@ export function sentenceBounds(
 
   const head = Math.max(0, start - reach);
   let from = head;
-  for (const match of text.slice(head, start).matchAll(SENTENCE_BOUND)) {
-    const at = head + match.index;
-    if (bounds(match, at)) from = at + match[0].length;
+  // From the span back, so only the stops after the sentence's start are tested.
+  const before = [...text.slice(head, start).matchAll(SENTENCE_BOUND)];
+  for (let i = before.length - 1; i >= 0; i--) {
+    const at = head + before[i]!.index;
+    if (bounds(before[i]!, at)) {
+      from = at + before[i]![0].length;
+      break;
+    }
   }
 
   const to = Math.min(text.length, end + reach);

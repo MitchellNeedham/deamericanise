@@ -116,6 +116,26 @@ describe('a capital A that is a label', () => {
   });
 });
 
+describe('the case of a capital A that is the article', () => {
+  const localise = { preset: 'localise' } as const;
+
+  it.each`
+    input                       | options     | expected                    | why
+    ${'A 47°F morning.'}        | ${{}}       | ${'An 8.3°C morning.'}      | ${'a unit symbol is no text in capitals'}
+    ${'A 47°F MORNING.'}        | ${{}}       | ${'AN 8.3°C MORNING.'}      | ${'text in capitals'}
+    ${'a 47°F morning'}         | ${{}}       | ${'an 8.3°C morning'}       | ${'a lower case article'}
+    ${'A 15°F night'}           | ${{}}       | ${'A -9.4°C night'}         | ${'unchanged before minus'}
+    ${'A 47°F'}                 | ${{}}       | ${'An 8.3°C'}               | ${'no word after it'}
+    ${'A 50 MPH wind'}          | ${{}}       | ${'An 80 km/h wind'}        | ${'a unit symbol in capitals'}
+    ${'A 47°F NYC morning'}     | ${{}}       | ${'An 8.3°C NYC morning'}   | ${'an initialism after it'}
+    ${'A 47°F NYC MORNING'}     | ${{}}       | ${'AN 8.3°C NYC MORNING'}   | ${'an initialism in text in capitals'}
+    ${'A A.M. radio station'}   | ${localise} | ${'An AM radio station'}    | ${'an initialism of single letters'}
+    ${'A POPSICLE'}             | ${localise} | ${'AN ICY POLE'}            | ${'the replaced word in capitals'}
+  `('follows the words it qualifies: $input -> $expected ($why)', ({ input, options, expected }) => {
+    expect(deamericaniseText(input, options)).toBe(expected);
+  });
+});
+
 describe('a blank line between an article and its word', () => {
   const localise = { preset: 'localise' } as const;
 
@@ -149,6 +169,72 @@ describe('a ute', () => {
     ${'en-NZ'} | ${'He drove a ute.'}
   `('takes a in $dialect', ({ dialect, expected }) => {
     expect(deamericaniseText('He drove a pickup truck.', { preset: 'localise', dialect })).toBe(expected);
+  });
+});
+
+describe('an initialism whose stops are removed', () => {
+  const localise = { preset: 'localise' } as const;
+  const gb = { preset: 'localise', dialect: 'en-GB' } as const;
+
+  it.each`
+    input                      | options     | expected               | why
+    ${'a U.S. firm'}           | ${localise} | ${'a US firm'}         | ${'U is said you'}
+    ${'a U.K. firm'}           | ${localise} | ${'a UK firm'}         | ${'the same with UK'}
+    ${'a U.S.A. firm'}         | ${localise} | ${'a USA firm'}        | ${'the same with USA'}
+    ${'a U.S.-based firm'}     | ${localise} | ${'a US-based firm'}   | ${'before a hyphen'}
+    ${'a U.K.-based firm'}     | ${localise} | ${'a UK-based firm'}   | ${'the same with UK'}
+    ${'A U.K. firm.'}          | ${localise} | ${'A UK firm.'}        | ${'a capital article'}
+    ${'an U.S. firm'}          | ${localise} | ${'a US firm'}         | ${'an article that was wrong'}
+    ${'A U.S. FIRM'}           | ${localise} | ${'A US FIRM'}         | ${'text in capitals'}
+    ${'a US firm'}             | ${localise} | ${'a US firm'}         | ${'written by hand'}
+    ${'an MP'}                 | ${localise} | ${'an MP'}             | ${'written by hand'}
+    ${'AN ERASER'}             | ${localise} | ${'A RUBBER'}          | ${'a word in text in capitals'}
+    ${'an eraser'}             | ${localise} | ${'a rubber'}          | ${'a word'}
+    ${'Take an ELEVATOR now.'} | ${gb}       | ${'Take a LIFT now.'}  | ${'a word set in capitals'}
+    ${'Get a DIAPER now.'}     | ${gb}       | ${'Get a NAPPY now.'}  | ${'the same with N'}
+  `('$input -> $expected ($why)', ({ input, options, expected }) => {
+    expect(deamericaniseText(input, options)).toBe(expected);
+  });
+
+  /** The article `dotted` takes once its stops are removed, or `either` when neither is changed. */
+  function articleFor(dotted: string): string {
+    const kept = ['a', 'an'].filter((article) => {
+      const text = `${article} ${dotted} report`;
+      const start = article.length + 1;
+      const change: Change = {
+        start,
+        end: start + dotted.length,
+        before: dotted,
+        after: dotted.replace(/\./g, ''),
+        ruleId: 'test',
+        category: 'punctuation',
+        confidence: 'safe',
+      };
+      return articleAgreements(text, [change]).length === 0;
+    });
+    return kept.length === 1 ? kept[0]! : 'either';
+  }
+
+  it.each`
+    dotted          | article
+    ${'U.N.'}       | ${'a'}
+    ${'B.B.C.'}     | ${'a'}
+    ${'D.C.'}       | ${'a'}
+    ${'Y.M.C.A.'}   | ${'a'}
+    ${'E.U.'}       | ${'an'}
+    ${'F.B.I.'}     | ${'an'}
+    ${'H.M.O.'}     | ${'an'}
+    ${'L.A.'}       | ${'an'}
+    ${'M.P.'}       | ${'an'}
+    ${'N.H.S.'}     | ${'an'}
+    ${'O.E.D.'}     | ${'an'}
+    ${'R.S.P.C.A.'} | ${'an'}
+    ${'S.U.V.'}     | ${'an'}
+    ${'X.L.'}       | ${'an'}
+    ${'N.A.S.A.'}   | ${'a'}
+    ${'N.A.T.O.'}   | ${'a'}
+  `('$dotted is said by its letter names unless it is said as a word, so takes $article', ({ dotted, article }) => {
+    expect(articleFor(dotted)).toBe(article);
   });
 });
 

@@ -23,8 +23,11 @@ function nameOf(change: Change): string {
 /** A suggestion marked in the text being written. */
 interface Mark {
   change: Change;
-  /** For a text field, this covers the copy of its text in the mirror. */
-  range: StaticRange;
+  /**
+   * A live range, so the mark moves with the text as it is typed. For a text field, it
+   * covers the copy of the field's text in the mirror.
+   */
+  range: Range;
   /** What Ignore stops suggesting, in lower case. */
   word: string;
   replace(): void;
@@ -132,7 +135,10 @@ export class Suggester {
   }
 
   private readonly onInput = (): void => {
-    if (this.target?.kind === 'field') this.changed();
+    if (this.target?.kind !== 'field') return;
+    // Before the next paint, so the marks never sit over the wrong characters.
+    this.mirror.follow(this.target.element.value);
+    this.changed();
   };
 
   private readonly onCompositionStart = (): void => {
@@ -145,10 +151,9 @@ export class Suggester {
     this.changed();
   };
 
-  /** Marks go stale as soon as the text changes, so they come off until typing pauses. */
+  /** The marks move with the text, and the text is read again once typing pauses. */
   private readonly changed = (): void => {
     clearTimeout(this.timer);
-    this.unmark();
     this.tip.hide();
     if (!this.composing) this.timer = setTimeout(this.scan, PAUSE);
   };
@@ -178,7 +183,7 @@ export class Suggester {
       const found = this.suggestions
         .inEditable(target.element, this.shadowRootOf)
         .filter((s) => !this.ignored.has(wordOf(s)));
-      this.paint(found.map((suggestion) => this.editableMark(suggestion)));
+      this.paint(found.flatMap((suggestion) => this.editableMark(suggestion) ?? []));
     }
   };
 
@@ -204,19 +209,20 @@ export class Suggester {
 
   private fieldMark(field: TextField, text: Text, suggestion: Suggestion): Mark {
     const { change } = suggestion;
-    const range = new StaticRange({
-      startContainer: text,
-      startOffset: change.start,
-      endContainer: text,
-      endOffset: change.end,
-    });
-    const replace = () => this.replaceInField(field, suggestion);
+    const range = document.createRange();
+    range.setStart(text, change.start);
+    range.setEnd(text, change.end);
+    const replace = () => this.replaceInField(field, change, range);
     return { change, range, word: wordOf(suggestion), replace };
   }
 
-  private editableMark(suggestion: PlacedSuggestion): Mark {
-    const { change, range } = suggestion;
-    const replace = () => this.replaceInEditable(suggestion);
+  /** Null when the page has changed the text since it was read. */
+  private editableMark(suggestion: PlacedSuggestion): Mark | null {
+    const { change } = suggestion;
+    const range = live(suggestion.range);
+    const edits = suggestion.edits.map(({ range, after }) => ({ range: live(range), after }));
+    if (!range || edits.some((edit) => !edit.range)) return null;
+    const replace = () => this.replaceInEditable(change, range, edits as LiveEdit[]);
     return { change, range, word: wordOf(suggestion), replace };
   }
 
@@ -262,9 +268,7 @@ export class Suggester {
     const area = this.target?.element.getBoundingClientRect();
     if (!area || !within(area, x, y)) return null;
     for (const mark of this.marks) {
-      const range = live(mark.range);
-      if (!range) continue;
-      for (const rect of range.getClientRects()) {
+      for (const rect of mark.range.getClientRects()) {
         if (within(rect, x, y)) return [mark, rect];
       }
     }
@@ -276,9 +280,12 @@ export class Suggester {
     this.paint(this.marks.filter((mark) => mark.word !== word));
   }
 
-  /** A field's text is plain, so one replacement covers an article fix and its word together. */
-  private replaceInField(field: TextField, { change }: Suggestion): void {
-    const { start, end, before, after } = change;
+  /**
+   * A field's text is plain, so one replacement covers an article fix and its word together.
+   * The mark's range in the mirror says where the change sits now, after any typing.
+   */
+  private replaceInField(field: TextField, { before, after }: Change, range: Range): void {
+    const { startOffset: start, endOffset: end } = range;
     if (field.value.slice(start, end) !== before) {
       this.changed();
       return;
@@ -296,25 +303,46 @@ export class Suggester {
    * An editor keeps its own model of the text and expects every edit as an input event, so
    * its text nodes are never written directly.
    */
-  private replaceInEditable({ change, range, edits }: PlacedSuggestion): void {
-    const whole = live(range);
-    const parts = edits.map((edit) => live(edit.range));
-    if (whole?.toString() !== change.before || parts.some((part) => !part)) {
+  private replaceInEditable(change: Change, whole: Range, edits: LiveEdit[]): void {
+    const connected = edits.every(({ range }) => range.startContainer.isConnected);
+    if (whole.toString() !== change.before || !connected) {
       this.changed();
       return;
     }
     const selection = getSelection();
     if (!selection) return;
-    for (const [i, part] of parts.entries()) {
-      const { startContainer, startOffset, endContainer, endOffset } = part!;
+    for (const { range, after } of edits) {
+      const { startContainer, startOffset, endContainer, endOffset } = range;
       selection.setBaseAndExtent(startContainer, startOffset, endContainer, endOffset);
-      if (!insert(edits[i]!.after)) return;
+      if (!insert(after)) return;
     }
     // The last edit is the first in the text, and typing carries on after the whole change.
     if (edits.length > 1 && whole.endContainer.isConnected) {
       selection.collapse(whole.endContainer, whole.endOffset);
     }
   }
+}
+
+interface LiveEdit {
+  range: Range;
+  after: string;
+}
+
+/**
+ * The single edit that turns `before` into `after`: where it starts, how many characters it
+ * replaces and what it puts in their place. Typing makes one such edit at a time.
+ */
+export function textEdit(
+  before: string,
+  after: string,
+): [start: number, count: number, data: string] {
+  const shorter = Math.min(before.length, after.length);
+  let start = 0;
+  while (start < shorter && before[start] === after[start]) start++;
+  let end = 0;
+  const same = (i: number) => before[before.length - 1 - i] === after[after.length - 1 - i];
+  while (end < shorter - start && same(end)) end++;
+  return [start, before.length - start - end, after.slice(start, after.length - end)];
 }
 
 function within(rect: DOMRect, x: number, y: number): boolean {
@@ -396,11 +424,25 @@ class Mirror {
       this.resizes.observe(field);
       this.field = field;
     }
-    // A final line break starts a line of its own only when something follows it.
-    this.text.data = value.endsWith('\n') ? `${value} ` : value;
+    this.sync(value);
     if (!this.box.matches(':popover-open')) this.box.showPopover();
     this.place();
     return this.text;
+  }
+
+  /** Takes the field's new value while the copy is shown, as the field took it: as one edit. */
+  follow(value: string): void {
+    if (!this.field) return;
+    this.sync(value);
+    this.place();
+  }
+
+  /** Changes only what differs, so a live range over the rest of the copy keeps its place. */
+  private sync(value: string): void {
+    // A final line break starts a line of its own only when something follows it.
+    const shown = value.endsWith('\n') ? `${value} ` : value;
+    const [start, count, data] = textEdit(this.text.data, shown);
+    if (count > 0 || data !== '') this.text.replaceData(start, count, data);
   }
 
   hide(): void {
@@ -448,7 +490,7 @@ class Mirror {
     }
     // Important, so no rule on the page can move a character of the copy. No `display` is
     // set, since one would keep the box on screen while the popover is closed.
-    this.box.style.cssText = declarations.map((declaration) => `${declaration} !important`).join(';');
+    this.box.style.cssText = declarations.map((style) => `${style} !important`).join(';');
     this.box.scrollTop = field.scrollTop;
     this.box.scrollLeft = field.scrollLeft;
   }

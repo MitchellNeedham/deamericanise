@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import fc from 'fast-check';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const STATIC = join(dirname(fileURLToPath(import.meta.url)), '..', 'extension', 'static');
@@ -408,6 +409,27 @@ describe('extension: suggestions while writing', () => {
     expect(options).toMatchObject({ assumeAmerican: true, categories: { units: false } });
     expect(options.rules).toEqual({ 'spelling.color': false });
     expect(options).not.toHaveProperty('verdict');
+  });
+
+  it.each([
+    ['typing at the end', 'The colo', 'The colou', [8, 0, 'u']],
+    ['typing a letter that repeats', 'aa', 'aaa', [2, 0, 'a']],
+    ['deleting a letter', 'colour', 'color', [4, 1, '']],
+    ['replacing a selection', 'the gray car', 'the grey car', [6, 1, 'e']],
+    ['changing nothing', 'gray', 'gray', [4, 0, '']],
+  ])('gives the copy of a text box one edit for %s', async (_, before, after, edit) => {
+    const { textEdit } = await import('../extension/src/suggest.js');
+    expect(textEdit(before, after)).toEqual(edit);
+  });
+
+  it('gives the copy of a text box an edit that always makes the new text', async () => {
+    const { textEdit } = await import('../extension/src/suggest.js');
+    fc.assert(
+      fc.property(fc.string(), fc.string(), (before, after) => {
+        const [start, count, data] = textEdit(before, after);
+        expect(before.slice(0, start) + data + before.slice(start + count)).toBe(after);
+      }),
+    );
   });
 
   it('is switched on from the settings page', async () => {

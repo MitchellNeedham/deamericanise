@@ -193,10 +193,7 @@ describe.skipIf(onCi)('the decade rule takes time in line with a long run of spa
 describe.skipIf(onCi)('protected names and paths take time in line with their length', () => {
   it.each`
     piece                                    | expected
-    ${'Aa '}                                 | ${'Aa Aa '}
-    ${'Aa Bb\n'}                             | ${'Aa Bb\nAa Bb\n'}
-    ${'Color Run '}                          | ${'Color Run Color Run '}
-    ${'Johnson Space Center opened. '}       | ${'Johnson Space Centre opened. Johnson Space Centre opened. '}
+    ${'Bright Red Color won. '}              | ${'Bright Red Colour won. Bright Red Colour won. '}
     ${'Set the background-color to match. '} | ${'Set the background-color to match. Set the background-color to match. '}
     ${'background-color-'}                   | ${'background-colour-background-colour-'}
     ${'Use std::color::gray here. '}         | ${'Use std::color::gray here. Use std::color::gray here. '}

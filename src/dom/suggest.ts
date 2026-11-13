@@ -70,12 +70,15 @@ export class WritingSuggestions {
   /**
    * Suggestions in the text of an editable element and the shadow roots `shadowRootOf`
    * finds below it, in no particular order. A change that crosses the edge of a link, button
-   * or label is left out. `translate="no"` and `notranslate` count only inside the element.
+   * or label is left out. `translate="no"`, `notranslate` and `spellcheck="false"` count
+   * only inside the element.
    */
   inEditable(root: Element, shadowRootOf: ShadowLookup = openShadowRoot): PlacedSuggestion[] {
     const lookup: ShadowLookup = (host) => (canHostShadowRoot(host) ? shadowRootOf(host) : null);
+    // An editor that checks spelling itself turns the browser's off on its root, as Draft.js does.
+    const scope = { ...translatable(scopeOf(root)), spellcheck: true };
     const containers: Array<[Node, Scope]> = [];
-    containersAndElementsIn(root, translatable(scopeOf(root)), containers, [], lookup, false);
+    containersAndElementsIn(root, scope, containers, [], lookup, false);
     const runs = containers.flatMap(([node, scope]) => ownRuns(node, scope, suggestionsAllowed));
     const texts = runs.map((run) => run.nodes.map((node) => node.data).join(''));
     // The whole area is one piece of writing, so its dates are read the same way throughout.
@@ -186,8 +189,8 @@ function place(
 
 /**
  * Where someone writing in `element` is writing, or null when suggestions do not belong
- * there. A field must be a `textarea`, or an `input` of type `text`, that can be typed in.
- * Anything marked `spellcheck="false"`, not English or drawn as code is left alone.
+ * there. A field must be a `textarea`, or an `input` of type `text`, that can be typed in,
+ * and is not marked `spellcheck="false"`. Anything not English or drawn as code is left alone.
  */
 export function writingTarget(element: Element): WritingTarget | null {
   const name = element.localName;
@@ -205,6 +208,7 @@ function fieldAllowed(field: TextField): boolean {
   if (!parent) return false;
   const outer = scopeOf(parent);
   // Every field is a tag whose own text is skipped, but the value typed into it is prose.
+  // `spellcheck="false"` still counts: code editors type into hidden textareas marked so.
   return suggestionsAllowed({
     ...translatable(enter(outer, field)),
     editable: true,

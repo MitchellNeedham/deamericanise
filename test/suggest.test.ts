@@ -123,6 +123,7 @@ describe('suggestions: in an editable element', () => {
   it.each([
     ['translate="no"', '<div translate="no"><div id="host" contenteditable="true" translate="no">gray</div></div>'],
     ['notranslate', '<div class="notranslate"><div id="host" contenteditable="true" class="notranslate">gray</div></div>'],
+    ['spellcheck="false"', '<div spellcheck="false"><div id="host" contenteditable="true" spellcheck="false">gray</div></div>'],
   ])('ignores %s on the editor and around it', (_, html) => {
     document.body.innerHTML = html;
     const root = document.getElementById('host')!;

@@ -1549,13 +1549,11 @@ const ADVERB = String.raw`(?:${ADVERBS.join('|')}|(?!jelly${WORD_END})[A-Za-z]+l
 
 /**
  * A word that ends a noun phrase before it: a function word, an adverb, or a word in `s` before
- * the object it takes, which is a verb, as `keeps` is in `16 oz of water keeps you going`. The
- * object must be on the verb's line, since a line of a list of ingredients may end in a plural
- * and the next open with a number or an article, as `8 oz rum raisins` and `4 oz sugar` do.
+ * the object it takes, which is a verb, as `keeps` is in `16 oz of water keeps you going`.
  */
 const ENDS_NOUN =
   String.raw`(?:${FUNCTION_WORD}|${ADVERB}|` +
-  String.raw`${ENDS_IN_S}[\w-]+${INLINE_SPACE}+(?:(?:${OPENS_OBJECT.join('|')})${WORD_END}|\d))`;
+  String.raw`${ENDS_IN_S}[\w-]+${WORD_GAP}(?:(?:${OPENS_OBJECT.join('|')})${WORD_END}|\d))`;
 
 /** Auxiliary verbs, which may follow a plural noun as its verb, as in `8 oz rum truffles are enough`. */
 const AUXILIARIES = [
@@ -1591,12 +1589,12 @@ type Place = 'subject' | 'opening' | 'object';
  * Where a noun phrase ends, in each place: at anything but a word that may be a noun after it, as
  * `raisins` is in `rum raisins`, where `rum` only describes it. A sentence that a quantity opens
  * may be a list item with no verb, as `8 oz rum raisins, chopped` is, so there a word in `s`
- * before a comma, a colon or the end of its line is a noun.
+ * before a comma, a colon or the end of its line is a noun. These read `phraseText`, where the
+ * end of a line that no sentence runs on from is a `;`.
  */
 const PHRASE_ENDS: Record<Place, string> = {
   subject: String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN}|${SUBJECT_VERB})[A-Za-z])`,
-  opening:
-    String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN}|${SUBJECT_VERB}(?![^\S\n\r]*(?:[,;:\n\r]|$)))[A-Za-z])`,
+  opening: String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN}|${SUBJECT_VERB}(?![^\S\n\r]*(?:[,;:]|$)))[A-Za-z])`,
   object: String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN})[A-Za-z])`,
 };
 
@@ -1615,6 +1613,29 @@ const OPENING_ADVERB_BEFORE = new RegExp(
   String.raw`(?<![\w-])(?:then|next|now|finally),?${WORD_GAP}$`,
   'i',
 );
+
+/**
+ * A line break whose next line does not go on in lower case. Case-sensitive, since a capital
+ * there opens the next item of a list, as `A pinch of salt` does, where a hard-wrapped sentence
+ * goes on in lower case.
+ */
+const LIST_LINE_BREAK = /(?:\r\n|[\n\r\v\f\u2028\u2029])(?![^\S\n\r\v\f\u2028\u2029]*[a-z])/g;
+
+let lastPhraseSource = '';
+let lastPhraseText = '';
+
+/**
+ * `text` as the phrase after a quantity is read in it: with each `LIST_LINE_BREAK` as a `;`, so
+ * a phrase never runs from one line of a list into the next, as from `8 oz rum raisins` into
+ * `4 oz sugar`, while it runs on through a hard-wrapped sentence. Each offset is kept.
+ */
+function phraseText(text: string): string {
+  if (text !== lastPhraseSource) {
+    lastPhraseSource = text;
+    lastPhraseText = text.replace(LIST_LINE_BREAK, (lineBreak) => ';'.repeat(lineBreak.length));
+  }
+  return lastPhraseText;
+}
 
 /** Where the quantity whose number starts at `start` stands, past a determiner before it. */
 function placeOf(text: string, start: number): Place {
@@ -1650,6 +1671,8 @@ interface SenseReader {
   note: string | undefined;
   /** Sticky, to test where the unit ends, for the quantity in each place. */
   after: Record<Place, RegExp>;
+  /** Whether `after` reads `phraseText`, as the head of a phrase is read. */
+  asHead: boolean;
   /** Tested on the text before the number. */
   before: RegExp | undefined;
   /** Tested on the quantity's sentence. */
@@ -1694,7 +1717,8 @@ function senseReader(sense: Sense): SenseReader {
     );
   const sentence =
     sense.sentence && new RegExp(String.raw`(?<![\w-])(?:${namePattern(sense.sentence)})${WORD_END}`, 'i');
-  return { measure: senseMeasure(sense), note: sense.note, after, before, sentence };
+  const asHead = sense.asHead === true;
+  return { measure: senseMeasure(sense), note: sense.note, after, asHead, before, sentence };
 }
 
 const SENSES = new Map(
@@ -1731,7 +1755,7 @@ function senseAt(
     for (const reader of readers) {
       const after = reader.after[place];
       after.lastIndex = end;
-      if (after.test(plain)) return reader;
+      if (after.test(reader.asHead ? phraseText(plain) : plain)) return reader;
     }
     OF_A_THING.lastIndex = end;
     NOUN_AFTER.lastIndex = end;

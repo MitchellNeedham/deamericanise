@@ -293,8 +293,8 @@ through to what it holds, so `a 15 oz can of beans` stays a weight. A metal, cop
 cooling word counts whatever follows it, but not inside the name of something else, so
 `a 1 oz gold coin` and `A 5-ton air conditioner cools the hall.` read in the sense while
 `2 oz silver polish` is a weight. A drink counts only where it heads the phrase: as its last
-noun, before a stop, a function word, an adverb or a verb with its object on its line, or
-before a vessel, as in `a 12 oz soda can`. So `Add 8 oz of milk slowly.`, `8 oz chocolate milk` and
+noun, before a stop, a function word, an adverb or a verb with its object, or before a vessel,
+as in `a 12 oz soda can`. So `Add 8 oz of milk slowly.`, `8 oz chocolate milk` and
 `16 oz of water keeps you going.` are fluid ounces, while a food a drink names is a weight, as
 in `8 oz rum raisins`, `8 oz cream cheese`, `8 oz milk chocolate` and `12 oz coffee beans`,
 and so are the solids whose head is a drink: `sour cream`, `ice cream`, `cream of tartar`,
@@ -304,7 +304,10 @@ after the drink is its verb, so `Heat until 8 oz of milk boils.` and
 `16 oz of water goes into the pot.` are fluid ounces. That word is a plural noun where an
 auxiliary follows it, or a word that a function word, an adverb or a number follows in turn, as
 in `8 oz rum raisins go in first.`, and at the opening of a sentence where a comma or the end of
-its line follows it, as in a list of ingredients.
+its line follows it, as in a list of ingredients. The end of a line ends the phrase unless the
+next line goes on in lower case, as a hard-wrapped sentence does, so `8 oz rum raisins` before a
+line that opens `4 oz sugar` is a weight, while `8 oz of milk makes` before a line that opens
+`a cup.` is fluid ounces.
 A word ending in `s` between the unit and the thing is a
 plural or a verb, so it stands there alone, and `A 3-ton truck needs AC.` is a weight. A
 drinking glass before another vessel is its material, so `a 16 oz glass jar of honey` is a

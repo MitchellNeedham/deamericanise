@@ -4307,6 +4307,17 @@ describe('an ounce is a fluid ounce only where a liquid heads the phrase after i
   });
 
   it.each`
+    input                                                   | expected
+    ${'8 oz of milk makes\na cup.'}                         | ${'240 mL of milk makes\na cup.'}
+    ${'In the morning, 8 oz of milk makes\na good start.'}  | ${'In the morning, 240 mL of milk makes\na good start.'}
+    ${'The 12 oz beer tastes\nflat.'}                       | ${'The 350 mL beer tastes\nflat.'}
+    ${'16 oz of water goes\ninto the pot.'}                 | ${'470 mL of water goes\ninto the pot.'}
+    ${'16 oz of water keeps\nyou going.'}                   | ${'470 mL of water keeps\nyou going.'}
+  `('reads a drink before its verb at the end of a wrapped line as fluid ounces: $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
     input                          | expected
     ${'Add 4 oz stock cubes.'}     | ${'Add 110 g stock cubes.'}
     ${'Add 8 oz rum cake.'}        | ${'Add 230 g rum cake.'}

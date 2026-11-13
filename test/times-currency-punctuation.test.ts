@@ -335,6 +335,68 @@ describe('punctuation', () => {
   });
 
   it.each`
+    input                                  | expected
+    ${'U.S.-made cars'}                    | ${'US-made cars'}
+    ${'U.S.‐made cars'}               | ${'US‐made cars'}
+    ${'U.S.‑made cars'}               | ${'US‑made cars'}
+    ${'the U.S.–Canada border'}            | ${'the US–Canada border'}
+    ${'the U.S.—and then Canada'}          | ${'the US—and then Canada'}
+    ${'the U.S./Canada border'}            | ${'the US/Canada border'}
+    ${'the U.K.-based staff'}              | ${'the UK-based staff'}
+    ${'the U.S.A.-made cars'}              | ${'the USA-made cars'}
+    ${'the Ph.D.-level course'}            | ${'the PhD-level course'}
+  `('drops the stops before a hyphen, dash or slash and a word: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                          | expected
+    ${'She moved to **the U.S.** It was cold.'}    | ${'She moved to **the US.** It was cold.'}
+    ${'She moved to **the U.K.** It was cold.'}    | ${'She moved to **the UK.** It was cold.'}
+    ${'She moved to **the U.S.** and left.'}       | ${'She moved to **the US** and left.'}
+    ${'She moved to **the U.S.**, then left.'}     | ${'She moved to **the US**, then left.'}
+    ${'the *U.S.* market'}                         | ${'the *US* market'}
+    ${'Is it the U.S.? Yes.'}                      | ${'Is it the US? Yes.'}
+    ${'We reached the U.S.! It was cold.'}         | ${'We reached the US! It was cold.'}
+  `('drops the stops before closing emphasis or sentence punctuation: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected
+    ${'He joined U.K.I.P. last year.'}     | ${'He joined U.K.I.P. last year.'}
+    ${'The A.M.A. said no.'}               | ${'The A.M.A. said no.'}
+    ${'The P.M.O. said no.'}               | ${'The P.M.O. said no.'}
+    ${'the U.S.A.F. base'}                 | ${'the U.S.A.F. base'}
+    ${'the U.S.S.R. fell'}                 | ${'the U.S.S.R. fell'}
+    ${'17 U.S.C. 105'}                     | ${'17 U.S.C. 105'}
+  `('leaves a longer initialism whole: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected
+    ${'the U.S. team'}                     | ${'the US team'}
+    ${'U.S.A.'}                            | ${'USA'}
+    ${'the U.K. and U.S.A.'}               | ${'the UK and USA.'}
+    ${"the U.K.'s policy"}                 | ${"the UK's policy"}
+    ${'He has two Ph.D.s.'}                | ${'He has two PhDs.'}
+    ${'Two P.M.s met.'}                    | ${'Two PMs met.'}
+    ${'She moved to the U.K. It was cold.'} | ${'She moved to the UK. It was cold.'}
+  `('still drops the stops of a whole initialism: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                          | expected
+    ${'U.S.-made cars'}                            | ${'US-made cars'}
+    ${'He joined U.K.I.P. last year.'}             | ${'He joined U.K.I.P. last year.'}
+    ${'She moved to **the U.S.** It was cold.'}    | ${'She moved to **the US.** It was cold.'}
+  `('under localise: $input', ({ input, expected }) => {
+    expect(deamericaniseText(input, { preset: 'localise' })).toBe(expected);
+  });
+
+  it.each`
     input                        | expected
     ${'She said "hello," then left.'} | ${'She said "hello", then left.'}
     ${'It was "fine."'}          | ${'It was "fine".'}

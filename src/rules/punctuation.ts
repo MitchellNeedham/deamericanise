@@ -53,14 +53,30 @@ function meridiem(text: string, start: number): string {
   return AFTER_TIME.test(text) ? `${letter.toLowerCase()}m` : `${letter}M`;
 }
 
+/**
+ * What may follow a whole initialism: a space or the end; a stop, comma, colon or other
+ * sentence punctuation; a closing quote or bracket; a plural `s`; or a hyphen, dash or slash
+ * before a word, as in `U.S.-made`. Any of these may come after closing emphasis, which the
+ * `emphasis` group holds. Nothing else is accepted, so the start of a longer initialism, as
+ * `U.K.` is of `U.K.I.P.`, is left whole.
+ */
+const INITIALISM_END =
+  String.raw`(?=(?<emphasis>[*_~]*)` +
+  String.raw`(?:\s|$|[,;:.!?…]|${CLOSING}|s(?![\p{L}\p{N}])|[-‐‑–—/]\p{L}))`;
+
+/** An initialism's pattern, `body`, followed by the shared ending. */
+function initialism(body: string): RegExp {
+  return new RegExp(String.raw`\b${body}${INITIALISM_END}`, 'gu');
+}
+
 function abbreviationRule(): Rule {
   const titles = new RegExp(String.raw`\b(${CONTRACTIONS.join('|')})\.(?=\s+[A-Z])`, 'g');
   const initialisms: Array<[RegExp, string | ((text: string, start: number) => string)]> = [
-    [/\bU\.S\.A\./g, 'USA'],
-    [new RegExp(String.raw`\bU\.S\.(?=\s|$|[,;:]|${CLOSING})`, 'g'), 'US'],
-    [/\bU\.K\./g, 'UK'],
-    [/\bPh\.\s?D\./g, 'PhD'],
-    [/\b[AP]\.M\./g, meridiem],
+    [initialism(String.raw`U\.S\.A\.`), 'USA'],
+    [initialism(String.raw`U\.S\.`), 'US'],
+    [initialism(String.raw`U\.K\.`), 'UK'],
+    [initialism(String.raw`Ph\.\s?D\.`), 'PhD'],
+    [initialism(String.raw`[AP]\.M\.`), meridiem],
   ];
 
   return {
@@ -90,11 +106,13 @@ function abbreviationRule(): Rule {
           const start = match.index;
           const end = start + match[0].length;
           const written = typeof replacement === 'string' ? replacement : replacement(ctx.text, start);
+          // The sentence after closing emphasis decides the stop, and a kept stop stays inside it.
+          const close = end + match.groups!.emphasis!.length;
           changes.push({
             start,
             end,
             before: match[0],
-            after: stopStays(ctx.text, start, end, OPENER) ? `${written}.` : written,
+            after: stopStays(ctx.text, start, close, OPENER) ? `${written}.` : written,
             ruleId: 'punctuation.abbreviations',
             category: 'punctuation',
             confidence: 'safe',

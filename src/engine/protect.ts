@@ -21,8 +21,9 @@ const NAME_WORD = String.raw`(?!(?:${FUNCTION_WORDS.join('|')})\b)[A-Z][A-Za-z]*
 /**
  * A word that names of institutions, awards and venues spell the American way. The French
  * order is the Legion of Honour in British and Australian writing, so it is no such name.
+ * `Center` has entries of its own in `PROPER_NOUNS`, which read it in headings too.
  */
-const NAME_PART = String.raw`(?:Organizations?|Labor|Honors?(?<!\bLegion\s+of\s+Honors?)|Theaters?|Cent(?:er|re)s?|Colors?)`;
+const NAME_PART = String.raw`(?:Organizations?|Labor|Honors?(?<!\bLegion\s+of\s+Honors?)|Theaters?|Colors?)`;
 
 /** The space between two words of a name, which may wrap onto the next line. */
 const NAME_SPACE = String.raw`(?=\s)[^\S\r\n]*(?:\r?\n[^\S\r\n]*)?`;
@@ -40,10 +41,10 @@ const SENTENCE_START =
 
 /**
  * One of `NAME_PART` on strong evidence that it is part of a name: two capitalised words
- * straight before it, as in `Storm Prediction Center`, where a capital at the start of a
+ * straight before it, as in `World Health Organization`, where a capital at the start of a
  * sentence does not count, or `of` or `for` joining it to another capitalised word, as in
- * `Medal of Honor` and `Organization of American States`. A data centre, a `Color Picker` and
- * a sense of honour are common nouns. The words before or after it are held too, so the hold
+ * `Medal of Honor` and `Organization of American States`. A `Color Picker` and a sense of
+ * honour are common nouns. The words before or after it are held too, so the hold
  * never depends on a word another rule may rewrite.
  */
 const NAME = new RegExp(
@@ -122,12 +123,14 @@ const PROPER_NOUNS: RegExp[] = [
   /\b(?:One )?World Trade Cent(?:er|re)\b/g,
   /\b(?:Rockefeller|Lincoln|Kennedy|Barclays|Javits|Moscone) Center\b/g,
   /\bCenter for [A-Z]\w+/g,
+  // Two or more capitalised words before it make an institution's name rather than a
+  // common noun: the Storm Prediction Center keeps its spelling, a data centre does not.
+  /\b(?:[A-Z][a-z]+\s+){2,}Cent(?:er|re)s?\b/g,
   // Names a heading or a sentence start may hold, where `NAME` does not read one.
   /\b(?:World Health|World Trade|International|North Atlantic Treaty|World Meteorological|World Intellectual Property|International Labor) Organization\b/g,
   /\b(?:International Organization for Standardization|Organization of American States)\b/g,
   /\b(?:Department|Bureau|Secretary|Federation) of Labor\b/g,
   /\b(?:Medal of Honor|Space Center Houston|Kodak Theater|Color Run)\b/g,
-  /\b(?:(?:Storm|Climate|Weather|Space Weather) Prediction|National Hurricane) Center\b/g,
   /\bCenters? for Disease Control\b/g,
   /\b(?:Department|Secretary|Office) of Defense\b/g,
   /\bDefense (?:Department|Intelligence|Advanced|Logistics)\b/g,

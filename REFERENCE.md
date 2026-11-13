@@ -329,8 +329,8 @@ becomes `19 litres/minute`, `3 pounds per week` becomes `1.4 kilograms per week`
 `2 oz per cup` becomes `57 g per cup`, and `1 lb per 1000 square feet` becomes
 `450 g per 93 square metres`. A conversion goes under the first unit's id, or under the id
 of the measure it is a form of, as `units.pressure.psi` is for `lb/in²`. A unit followed by
-`·` or `⋅` and a letter is one factor of a product of units, as in `2 lb·ft`, and is left as
-written.
+`·` or `⋅` and a letter or a degree sign is one factor of a product of units, as in `2 lb·ft`,
+and is left as written.
 
 An R-value, the thermal resistance of insulation, is read whole, with its three factors in
 any order, and becomes square metre kelvins per watt: `2.5 ft²·h·°F/BTU` becomes

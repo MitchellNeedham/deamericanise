@@ -58,7 +58,7 @@ export const FAHRENHEIT =
 export const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
 
 /** `165F` and `350 F`, with any `STOP` after it. `F-150` and `F-type` are names. */
-const BARE = String.raw`${INLINE_SPACE}?F(?![A-Za-z\d'’]|[-–][A-Za-z])${STOP}`;
+export const BARE = String.raw`${INLINE_SPACE}?F(?![A-Za-z\d'’]|[-–][A-Za-z])${STOP}`;
 
 const JOIN = softGap(String.raw`(?:${HYPHEN}|\u2013|\u2014|to|or)`);
 const BETWEEN_AND =
@@ -149,7 +149,7 @@ const TITLE_STOP = String.raw`\b(?:${CONTRACTIONS.join('|')})\.${TO_WORD}`;
  * No other number does, in words or in figures, since the unit rules write `Two feet` as
  * `61 centimetres`.
  */
-const OPENER = new RegExp(
+export const OPENER = new RegExp(
   String.raw`(?!(?!${FIGURE_DATE})(?:${NUMBER_PATTERN})(?![\p{L}\p{N}]))(?:` +
     String.raw`(?<=${TIME_STOP})${AFTER_TIME.source}` +
     String.raw`|(?<!${TIME_STOP})(?<=${INITIALISM_STOP})${AFTER_INITIALISM.source}` +

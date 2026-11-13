@@ -4610,6 +4610,66 @@ describe('Fahrenheit decades', () => {
     expect(convert(input)).toBe(expected);
   });
 
+  it.each`
+    input                                            | expected                                                  | why
+    ${'Highs in the 70s, 80s or 90s.'}               | ${'Highs between 21 and 37°C.'}                           | ${'a list with or'}
+    ${'Highs in the 70s, 80s, and 90s.'}             | ${'Highs between 21 and 37°C.'}                           | ${'an Oxford comma'}
+    ${'Highs in the 70s and 80s and 90s.'}           | ${'Highs between 21 and 37°C.'}                           | ${'and twice'}
+    ${'Highs in the 70s or 80s or 90s.'}             | ${'Highs between 21 and 37°C.'}                           | ${'or twice'}
+    ${'Highs in the 70s to 80s to 90s.'}             | ${'Highs between 21 and 37°C.'}                           | ${'to twice'}
+    ${'Highs in the 70s, 80s, 90s, 100s and 110s.'}  | ${'Highs between 21 and 48°C.'}                           | ${'five decades'}
+    ${'Highs in the low 70s, mid 80s or upper 90s.'} | ${'Highs between 21 and 37°C.'}                           | ${'banded decades'}
+    ${'highs in the 80s, 90s or 100s °F'}            | ${'highs between 27 and 43°C'}                            | ${'a Fahrenheit unit after the list'}
+    ${'Highs in the 70s,\n80s and 90s.'}             | ${'Highs between 21 and 37°C.'}                           | ${'the list wrapped across lines'}
+    ${'Highs in the 70s,\n\n80s and 90s.'}           | ${'Highs between 21 and 26°C,\n\n80s and 90s.'}           | ${'a blank line, which no join crosses'}
+    ${'Highs in the 70s, lows in the 50s.'}          | ${'Highs between 21 and 26°C, lows between 10 and 15°C.'} | ${'two decades, each with its own word'}
+  `('reads a list of decades as one range: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                       | why
+    ${'Highs in the 70s, 90s and 80s.'}         | ${'a list that falls back'}
+    ${'Highs in the 80s or 70s.'}               | ${'a pair that falls'}
+    ${'Highs in the 70s, 80s and 90s Celsius.'} | ${'a Celsius unit after the list'}
+  `('leaves a list of decades that does not rise or is Celsius as written: $input ($why)', ({ input }) => {
+    expect(convert(input)).toBe(input);
+  });
+
+  it.each`
+    input                                         | expected                                                    | why
+    ${'highs in the 70s F'}                       | ${'highs between 21 and 26°C'}                              | ${'a bare F'}
+    ${'highs in the upper 70s F today'}           | ${'highs between 25 and 26°C today'}                        | ${'a banded decade'}
+    ${'temperatures in the mid-80s F'}            | ${'temperatures between 29 and 30°C'}                       | ${'a hyphenated band'}
+    ${'highs in the 70s F and lows in the 50s F'} | ${'highs between 21 and 26°C and lows between 10 and 15°C'} | ${'two decades'}
+    ${'highs in the 70s, 80s or 90s F'}           | ${'highs between 21 and 37°C'}                              | ${'after a list'}
+  `('takes a bare F after a decade with it: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                              | why
+    ${'highs in the 30s (Celsius)'}                    | ${'Celsius in a bracket'}
+    ${'highs in the 30s (°C)'}                         | ${'a degree sign and C in a bracket'}
+    ${'highs in the 30s (C)'}                          | ${'a bare C in a bracket'}
+    ${'highs in the 30s ( Celsius )'}                  | ${'a bracket with spaces inside'}
+    ${'In Celsius, highs are in the 30s.'}             | ${'Celsius earlier in the sentence'}
+    ${'In centigrade the highs are in the 30s.'}       | ${'centigrade earlier in the sentence'}
+    ${'Highs in the 30s, as Celsius readers expect.'}  | ${'Celsius later in the sentence'}
+    ${'Highs in the 30s Celsius and lows in the 20s.'} | ${'a second decade after a Celsius one'}
+  `('leaves a decade in a sentence that names Celsius as written: $input ($why)', ({ input }) => {
+    expect(convert(input)).toBe(input);
+  });
+
+  it.each`
+    input                                                                       | expected                                                                             | why
+    ${'Highs in the 30s. Celsius is the scale used here.'}                      | ${'Highs between -1 and 4°C. Celsius is the scale used here.'}                       | ${'Celsius in the next sentence'}
+    ${'Highs in the 70s, which Fahrenheit readers know, feel mild in Celsius.'} | ${'Highs between 21 and 26°C, which Fahrenheit readers know, feel mild in Celsius.'} | ${'Fahrenheit named too'}
+    ${'Highs in the 30s, and seat 22C is free.'}                                | ${'Highs between -1 and 4°C, and seat 22C is free.'}                                 | ${'a bare C, which names no scale'}
+  `('converts a decade whose sentence names no Celsius alone: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
   it('takes a bare degrees after a decade as its unit whatever the verdict', () => {
     expect(convert('temperatures in the 80s degrees', { assumeAmerican: true })).toBe(
       'temperatures between 27 and 32°C',
@@ -4658,8 +4718,15 @@ describe('Fahrenheit decades', () => {
     ${'highs in the 20s degrees Celsius'}         | ${'in the 20s degrees Celsius'}
     ${'highs in the 20s or 30s °C'}               | ${'in the 20s or 30s °C'}
     ${'highs in the 30s C'}                       | ${'in the 30s C'}
+    ${'highs in the 30s (C)'}                     | ${'in the 30s (C)'}
+    ${'In Celsius, highs are in the 30s.'}        | ${'in the 30s'}
+    ${'Highs in the 70s, 90s and 80s.'}           | ${'in the 70s, 90s and 80s'}
   `('holds "$span" whole', ({ input, span }) => {
     expect(decadeHolds(input)).toEqual([span]);
+  });
+
+  it('holds nothing for a bare F with no word about heat nearby', () => {
+    expect(decadeHolds('Ford trucks from the 70s F series')).toEqual([]);
   });
 
   // The decade of the calendar is the far commoner reading, so these must all survive.

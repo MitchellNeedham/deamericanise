@@ -3498,16 +3498,14 @@ describe('a temperature with a degree sign before two slashes is no path', () =>
 
 describe('a Fahrenheit degree inside a compound unit', () => {
   it.each`
-    unchanged                                                    | why
-    ${'The wall has a thermal resistance of 0.45 °F·ft²·h/BTU.'} | ${'an R-value'}
-    ${'The R-value is 0.45 °F·ft²·h/BTU per inch.'}              | ${'the same, per inch'}
-    ${'The R-value is 0.45 °F⋅ft²⋅h/BTU.'}                       | ${'the same, with the dot operator'}
-    ${'It warms at 2 °F/min.'}                                   | ${'a rate'}
-    ${'It warms at 2°F/hour.'}                                   | ${'a rate in a word'}
-    ${'It warmed 0.5°F/decade.'}                                 | ${'a rate over years'}
-    ${'The sink is rated 0.5 °F/W.'}                             | ${'a thermal resistance per watt'}
-    ${'It warms at 2 degrees F/min.'}                            | ${'spelled out'}
-    ${'It warms at 2 degrees Fahrenheit/min.'}                   | ${'the same, with the scale named'}
+    unchanged                                       | why
+    ${'The R-value is 0.45 °F·ft²·h/BTU per inch.'} | ${'an R-value per inch'}
+    ${'It warms at 2 °F/min.'}                      | ${'a rate'}
+    ${'It warms at 2°F/hour.'}                      | ${'a rate in a word'}
+    ${'It warmed 0.5°F/decade.'}                    | ${'a rate over years'}
+    ${'The sink is rated 0.5 °F/W.'}                | ${'a thermal resistance per watt'}
+    ${'It warms at 2 degrees F/min.'}               | ${'spelled out'}
+    ${'It warms at 2 degrees Fahrenheit/min.'}      | ${'the same, with the scale named'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });
@@ -3521,6 +3519,164 @@ describe('a Fahrenheit degree inside a compound unit', () => {
     ${'The rate is 5 BTU per °F.'}      | ${'The rate is 5.3 kJ per °F.'}   | ${'a degree with no number'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a Fahrenheit rate converts as a change in temperature', () => {
+  it.each`
+    input                                             | expected                                           | why
+    ${'It warms at 2 degrees Fahrenheit per minute.'} | ${'It warms at 1.1 degrees Celsius per minute.'}   | ${'per and a unit of time'}
+    ${'It warms 2°F per hour.'}                       | ${'It warms 1.1°C per hour.'}                      | ${'the same, with the symbol'}
+    ${'It warms 2°F a minute.'}                       | ${'It warms 1.1°C a minute.'}                      | ${'a and a unit of time'}
+    ${'The air cools 5.4°F per 1000 feet.'}           | ${'The air cools 3°C per 300 metres.'}             | ${'per, a figure and a unit'}
+    ${'The air cools 5.4°F/1000 ft as it rises.'}     | ${'The air cools 3°C/300 m as it rises.'}          | ${'a slash, a figure and a unit'}
+    ${'It cools 2°F per 2 hours.'}                    | ${'It cools 1.1°C per 2 hours.'}                   | ${'a figure of time'}
+    ${'It warms 1°F per decade.'}                     | ${'It warms 0.56°C per decade.'}                   | ${'a rate over years'}
+    ${'It warms 2°F per 100 m.'}                      | ${'It warms 1.1°C per 100 m.'}                     | ${'a metric unit'}
+    ${'It warms 2-3°F per hour.'}                     | ${'It warms 1.1-1.7°C per hour.'}                  | ${'a range'}
+    ${'It warms 2°F (1.1°C) per hour.'}               | ${'It warms 1.1°C per hour.'}                      | ${'past its Celsius value'}
+    ${'It fell 20°F overnight.'}                      | ${'It fell 11°C overnight.'}                       | ${'a change in temperature'}
+    ${'Bake at 350°F for 20 minutes.'}                | ${'Bake at 175°C for 20 minutes.'}                 | ${'a temperature'}
+    ${'It is 75°F/24°C today.'}                       | ${'It is 24°C today.'}                             | ${'a Celsius value after the slash'}
+    ${'Set it to 350°F per the recipe.'}              | ${'Set it to 175°C per the recipe.'}               | ${'per and no unit'}
+    ${'It reached 100°F a day after the storm.'}      | ${'It reached 37.8°C a day after the storm.'}      | ${'a time, not a rate'}
+    ${'It reached 100°F a week ago.'}                 | ${'It reached 37.8°C a week ago.'}                 | ${'the same, before ago'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('tags a rate with the difference rule', () => {
+    const { changes } = deamericanise('It warms 2°F per hour.');
+    expect(changes.map((c) => c.ruleId)).toEqual(['units.temperature.difference']);
+  });
+
+  it('leaves a rate in Fahrenheit with the difference rule off', () => {
+    const options = { rules: { 'units.temperature.difference': false } };
+    expect(convert('It warms 2°F per hour.', options)).toBe('It warms 2°F per hour.');
+  });
+});
+
+describe('an R-value or a U-factor is read as one unit', () => {
+  it.each`
+    input                                                             | expected                                                  | why
+    ${'The wall has a thermal resistance of 0.45 ft²·°F·h/BTU.'}      | ${'The wall has a thermal resistance of 0.079 m²·K/W.'}   | ${'the area first'}
+    ${'The batt is rated 2.5 ft²·h·°F/BTU.'}                          | ${'The batt is rated 0.44 m²·K/W.'}                       | ${'the hour second'}
+    ${'The wall has a thermal resistance of 0.45 h·ft²·°F/BTU.'}      | ${'The wall has a thermal resistance of 0.079 m²·K/W.'}   | ${'the hour first'}
+    ${'The wall has a thermal resistance of 0.45 °F·ft²·h/BTU.'}      | ${'The wall has a thermal resistance of 0.079 m²·K/W.'}   | ${'the degree first'}
+    ${'The R-value is 0.45 °F⋅ft²⋅h/BTU.'}                            | ${'The R-value is 0.079 m²·K/W.'}                         | ${'the dot operator'}
+    ${'The batt is rated 2.5 ft²·hr·°F/Btu.'}                         | ${'The batt is rated 0.44 m²·K/W.'}                       | ${'hr and Btu'}
+    ${'The window has a U-factor of 0.30 BTU/h·ft²·°F.'}              | ${'The window has a U-factor of 1.7 W/(m²·K).'}           | ${'a U-factor'}
+    ${'The window has a U-factor of 0.30 Btu/(hr·ft²·°F).'}           | ${'The window has a U-factor of 1.7 W/(m²·K).'}           | ${'a U-factor in brackets'}
+    ${'It is 500 ft² in all.'}                                        | ${'It is 46 m² in all.'}                                  | ${'an area'}
+    ${'It is 500 sq ft.'}                                             | ${'It is 46 m².'}                                         | ${'the same, spelled with sq'}
+    ${'It turns at 100 lb-ft.'}                                       | ${'It turns at 140 N·m.'}                                 | ${'a torque with a hyphen'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                                                   | why
+    ${'The wall has a thermal resistance of 0.079 m²·K/W (0.45 ft²·°F·h/BTU).'} | ${'a restatement of its metric value'}
+    ${'The value is 0.45 ft²·ft²·h/BTU in all.'}                                | ${'a factor twice'}
+    ${'A torque of 2 lb·ft is enough.'}                                         | ${'a product of units'}
+    ${'A torque of 2 ft⋅lb is enough.'}                                         | ${'the same, with the dot operator'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('keeps the metric value given after it', () => {
+    expect(convert('The wall is rated 0.45 ft²·°F·h/BTU (0.079 m²·K/W).')).toBe('The wall is rated 0.079 m²·K/W.');
+  });
+
+  it('tags each with a rule of its own', () => {
+    const ids = (text: string) => deamericanise(text).changes.map((c) => c.ruleId);
+    expect(ids('The batt is rated 2.5 ft²·h·°F/BTU.')).toEqual(['units.thermal.r-value']);
+    expect(ids('The window has a U-factor of 0.30 BTU/h·ft²·°F.')).toEqual(['units.thermal.u-factor']);
+  });
+
+  it('leaves an R-value whole with its rule off', () => {
+    const options = { rules: { 'units.thermal.r-value': false } };
+    expect(convert('The batt is rated 2.5 ft²·h·°F/BTU.', options)).toBe('The batt is rated 2.5 ft²·h·°F/BTU.');
+  });
+
+  it('keeps the original, and runs twice without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('The batt is rated 2.5 ft²·h·°F/BTU.', options);
+    expect(once).toBe('The batt is rated 0.44 m²·K/W (2.5 ft²·h·°F/BTU).');
+    expect(convert(once, options)).toBe(once);
+  });
+});
+
+describe('a unit over another imperial unit', () => {
+  it.each`
+    input                                    | expected                                        | why
+    ${'Apply 2 oz/gal.'}                     | ${'Apply 15 g/L.'}                              | ${'a mass per a volume'}
+    ${'It is 5 lb/in².'}                     | ${'It is 34 kPa.'}                              | ${'a pressure'}
+    ${'A density of 62.4 lb/ft³.'}           | ${'A density of 1000 kg/m³.'}                   | ${'a density'}
+    ${'Apply 2 lb/acre.'}                    | ${'Apply 2.2 kg/ha.'}                           | ${'a mass per an area'}
+    ${'Use 1 lb per square foot.'}           | ${'Use 4.9 kg per square metre.'}               | ${'per and a unit in words'}
+    ${'Apply 3 pounds per acre.'}            | ${'Apply 3.4 kilograms per hectare.'}           | ${'both units in words'}
+    ${'Spread 2 tons/acre.'}                 | ${'Spread 4.5 tonnes/hectare.'}                 | ${'a word before a slash'}
+    ${'Steel weighs 0.284 lb/in³.'}          | ${'Steel weighs 7.86 g/cm³.'}                   | ${'a cubic inch'}
+    ${'Concrete weighs 4,000 lb/yd³.'}       | ${'Concrete weighs 2,400 kg/m³.'}               | ${'a cubic yard'}
+    ${'A 10 oz/yd² canvas.'}                 | ${'A 340 g/m² canvas.'}                         | ${'a square yard'}
+    ${'It is 1 lb/sq ft.'}                   | ${'It is 4.9 kg/m².'}                           | ${'sq before the unit'}
+    ${'It holds 3 lb per square inch.'}      | ${'It holds 21 kPa.'}                           | ${'a pressure in words'}
+    ${'Apply 2 oz / gal.'}                   | ${'Apply 15 g / L.'}                            | ${'a spaced slash'}
+    ${'Apply 20 to 30 lb/acre.'}             | ${'Apply 22 to 34 kg/ha.'}                      | ${'a range'}
+    ${'Apply 2, 3 or 4 lb/acre.'}            | ${'Apply 2.2, 3.4 or 4.5 kg/ha.'}               | ${'a list'}
+    ${'Apply half a pound per acre.'}        | ${'Apply 0.56 kilograms per hectare.'}          | ${'a fraction in words'}
+    ${'Apply 2 oz/gal (15 g/L).'}            | ${'Apply 15 g/L.'}                              | ${'its metric value after it'}
+    ${'Apply 2 lb/acre or 2.2 kg/ha.'}       | ${'Apply 2.2 kg/ha.'}                           | ${'its metric value paired'}
+    ${'It flows at 5 gallons/minute.'}       | ${'It flows at 19 litres/minute.'}              | ${'a unit of time'}
+    ${'It drove at 60 miles per hour.'}      | ${'It drove at 97 kilometres per hour.'}        | ${'a speed'}
+    ${'Pump the tyre to 32 psi.'}            | ${'Pump the tyre to 220 kPa.'}                  | ${'psi'}
+    ${'She gained 3 pounds per week.'}       | ${'She gained 1.4 kilograms per week.'}         | ${'per week'}
+    ${'We walked 2 miles per day.'}          | ${'We walked 3.2 kilometres per day.'}          | ${'per day'}
+    ${'A 12,000 BTU/h unit.'}                | ${'A 13,000 kJ/h unit.'}                        | ${'an abbreviation of time'}
+    ${'Apply 2 oz/L.'}                       | ${'Apply 57 g/L.'}                              | ${'a metric unit'}
+    ${'Use 1 lb per 1000 square feet.'}      | ${'Use 450 g per 93 square metres.'}            | ${'a figure of its own'}
+    ${'Add 2 oz per cup.'}                   | ${'Add 57 g per cup.'}                          | ${'a unit kept by default'}
+    ${'It weighs 5 lb per in-store order.'}  | ${'It weighs 2.3 kg per in-store order.'}       | ${'per in, a preposition'}
+    ${'It does 30 miles per gallon.'}        | ${'It does 7.8 L/100km.'}                       | ${'fuel economy'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                 | why
+    ${'Spray 2 gal/acre.'}                    | ${'a volume per an area'}
+    ${'It weighs 3 lb per ft of rope.'}       | ${'a mass per a length'}
+    ${'It does 1 mile per gallon.'}           | ${'a length per a volume'}
+    ${'Use 1 lb 8 oz per acre.'}              | ${'a weight in two units'}
+    ${'It is a 2-pound-per-cubic-foot foam.'} | ${'joined by hyphens'}
+    ${'It is 4 x 8 ft/yd.'}                   | ${'a dimension'}
+    ${'Apply 15 g/L (2 oz/gal).'}             | ${'a restatement of its metric value'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('tags a conversion with the first unit, or the measure it is a form of', () => {
+    const ids = (text: string) => deamericanise(text).changes.map((c) => c.ruleId);
+    expect(ids('Apply 2 oz/gal.')).toEqual(['units.mass.ounce']);
+    expect(ids('It is 5 lb/in².')).toEqual(['units.pressure.psi']);
+  });
+
+  it('holds a unit whose divisor is switched off, and converts one over a kept unit alone', () => {
+    expect(convert('Apply 2 lb/acre.', { rules: { 'units.area.acre': false } })).toBe('Apply 2 lb/acre.');
+    expect(convert('Apply 2 lb/acre.', { unitsKeep: ['acre'] })).toBe('Apply 910 g/acre.');
+    expect(convert('Add 2 oz per pint.', { dialect: 'en-GB' })).toBe('Add 57 g per pint.');
+  });
+
+  it('holds a form of a kept measure', () => {
+    expect(convert('It is 5 lb/in².', { unitsKeep: ['psi'] })).toBe('It is 5 lb/in².');
+  });
+
+  it('keeps the original, and runs twice without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('Apply 2 oz/gal.', options);
+    expect(once).toBe('Apply 15 g/L (2 oz/gal).');
+    expect(convert(once, options)).toBe(once);
   });
 });
 

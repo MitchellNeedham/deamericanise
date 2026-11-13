@@ -78,6 +78,20 @@ describe.skipIf(onCi)('a long run of grouped numbers takes time in line with its
   );
 });
 
+describe.skipIf(onCi)('a Fahrenheit reading takes time in line with the length of the text', () => {
+  it.each`
+    name                 | text                                               | length  | expected
+    ${'a run of digits'} | ${(n: number) => `Serial 1${'1'.repeat(n)} ends.`} | ${4000} | ${'Serial 1111'}
+  `(
+    '$name, $length long and four times that',
+    ({ text, length, expected }) => {
+      expect(convert(text(length)).startsWith(expected)).toBe(true);
+      expect(growth(text(length), text(length * 4))).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});
+
 describe.skipIf(onCi)('a long chain of weights takes time in line with its length', () => {
   // Each weight's next unit is decided by walking back along the chain, once for the text.
   // Walking back from every weight takes time in the square of the chain's length, which is

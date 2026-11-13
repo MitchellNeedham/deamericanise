@@ -1004,8 +1004,19 @@ describe('Fahrenheit ranges', () => {
     ${'Temperatures fell 10 to 15°F.'}                | ${'Temperatures fell 5.6 to 8.3°C.'}              | ${'the same, from the verb'}
     ${'10 to 20°F below zero'}                        | ${'-23 to -29°C'}                                 | ${'both ends below zero'}
     ${'Gas mark 4 and 350°F are the same heat.'}      | ${'Gas mark 4 and 175°C are the same heat.'}      | ${'and without between is not a range'}
+    ${'Keep it between 60 and 70°F.'}                 | ${'Keep it between 16 and 21°C.'}                 | ${'between and, in a sentence'}
+    ${'Bake at 350 to 375 degrees F.'}                | ${'Bake at 175 to 190 degrees Celsius.'}          | ${'to, before degrees F'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                     | why
+    ${'Serial 1234567890123 is fine.'}            | ${'a serial number'}
+    ${`Serial 1${'1'.repeat(8000)} ends.`}        | ${'a long run of digits'}
+    ${`Keep it between 6${'0'.repeat(8000)} and`} | ${'a long figure after between, with no unit'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
   });
 
   it('keeps the original range', () => {

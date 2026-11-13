@@ -61,8 +61,9 @@ export const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
 const BARE = String.raw`${INLINE_SPACE}?F(?![A-Za-z\d'’]|[-–][A-Za-z])${STOP}`;
 
 const JOIN = softGap(String.raw`(?:${HYPHEN}|\u2013|\u2014|to|or)`);
+// The lookahead comes first so the lookbehind never walks a run of digits from every split of it.
 const BETWEEN_AND =
-  String.raw`(?<=\bbetween(?=\s)${SOFT_SPACE}${DEGREES})` + softGap(String.raw`(?<=\s)and(?=\s)`);
+  String.raw`(?=\s)(?<=\bbetween(?=\s)${SOFT_SPACE}${DEGREES})` + softGap(String.raw`(?<=\s)and(?=\s)`);
 
 /**
  * The units a Fahrenheit degree can be divided by in a rate or a compound unit: time, length,

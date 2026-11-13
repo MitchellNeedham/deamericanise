@@ -293,8 +293,8 @@ through to what it holds, so `a 15 oz can of beans` stays a weight. A metal, cop
 cooling word counts whatever follows it, but not inside the name of something else, so
 `a 1 oz gold coin` and `A 5-ton air conditioner cools the hall.` read in the sense while
 `2 oz silver polish` is a weight. A drink counts only where it heads the phrase: as its last
-noun, before a stop, a function word, an adverb or a verb with its object, or before a vessel,
-as in `a 12 oz soda can`. So `Add 8 oz of milk slowly.`, `8 oz chocolate milk` and
+noun, before a stop, a function word, an adverb or a verb with its object on its line, or
+before a vessel, as in `a 12 oz soda can`. So `Add 8 oz of milk slowly.`, `8 oz chocolate milk` and
 `16 oz of water keeps you going.` are fluid ounces, while a food a drink names is a weight, as
 in `8 oz rum raisins`, `8 oz cream cheese`, `8 oz milk chocolate` and `12 oz coffee beans`,
 and so are the solids whose head is a drink: `sour cream`, `ice cream`, `cream of tartar`,

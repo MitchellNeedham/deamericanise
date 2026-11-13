@@ -4297,6 +4297,16 @@ describe('an ounce is a fluid ounce only where a liquid heads the phrase after i
   });
 
   it.each`
+    input                                                | expected
+    ${'8 oz rum raisins\n4 oz sugar'}                    | ${'230 g rum raisins\n110 g sugar'}
+    ${'Ingredients:\n8 oz rum raisins\n4 oz sugar\n'}    | ${'Ingredients:\n230 g rum raisins\n110 g sugar\n'}
+    ${'8 oz milk biscuits\n2 cups flour'}                | ${'230 g milk biscuits\n2 cups flour'}
+    ${'8 oz rum raisins\nA pinch of salt'}               | ${'230 g rum raisins\nA pinch of salt'}
+  `('weighs a food a drink names at the end of a line of ingredients: $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
     input                          | expected
     ${'Add 4 oz stock cubes.'}     | ${'Add 110 g stock cubes.'}
     ${'Add 8 oz rum cake.'}        | ${'Add 230 g rum cake.'}

@@ -1549,11 +1549,13 @@ const ADVERB = String.raw`(?:${ADVERBS.join('|')}|(?!jelly${WORD_END})[A-Za-z]+l
 
 /**
  * A word that ends a noun phrase before it: a function word, an adverb, or a word in `s` before
- * the object it takes, which is a verb, as `keeps` is in `16 oz of water keeps you going`.
+ * the object it takes, which is a verb, as `keeps` is in `16 oz of water keeps you going`. The
+ * object must be on the verb's line, since a line of a list of ingredients may end in a plural
+ * and the next open with a number or an article, as `8 oz rum raisins` and `4 oz sugar` do.
  */
 const ENDS_NOUN =
   String.raw`(?:${FUNCTION_WORD}|${ADVERB}|` +
-  String.raw`${ENDS_IN_S}[\w-]+${WORD_GAP}(?:(?:${OPENS_OBJECT.join('|')})${WORD_END}|\d))`;
+  String.raw`${ENDS_IN_S}[\w-]+${INLINE_SPACE}+(?:(?:${OPENS_OBJECT.join('|')})${WORD_END}|\d))`;
 
 /** Auxiliary verbs, which may follow a plural noun as its verb, as in `8 oz rum truffles are enough`. */
 const AUXILIARIES = [

@@ -5,7 +5,7 @@ import type { Category, Confidence, Dialect, ResolvedOptions } from '../types.js
 import { patternRules } from './index.js';
 import { spellingEntries } from './spelling/index.js';
 import { MEASUREMENT_CONFIDENCE } from './units/index.js';
-import { COMPOUNDS, MEASURES } from './units/definitions.js';
+import { COMPOUNDS, HEIGHT, MEASURES } from './units/definitions.js';
 import { baseVocabulary } from './vocabulary.js';
 
 /** A rule as someone choosing which rules to run needs to see it. */
@@ -98,6 +98,8 @@ const LABELS: Record<string, [label: string, example: string]> = {
   'units.temperature.decade': ['Temperatures in decades', 'between 32 and 37°C for in the 90s'],
   'units.temperature.difference': ['Temperature changes', '11°C warmer for 20°F warmer'],
   'units.temperature.fahrenheit': ['Fahrenheit', '175°C for 350°F'],
+  'units.thermal.r-value': ['R-values', '0.44 m²·K/W for 2.5 ft²·h·°F/BTU'],
+  'units.thermal.u-factor': ['U-factors', '1.7 W/(m²·K) for 0.30 BTU/h·ft²·°F'],
   'units.torque.foot-pound': ['Foot-pounds', '140 newton metres for 100 foot-pounds'],
   'units.volume.cubic-foot': ['Cubic feet', '280 litres for 10 cubic feet'],
   'units.volume.cup': ['Cups', '470 millilitres for 2 cups'],
@@ -151,8 +153,8 @@ export function ruleCatalogue(dialect: Dialect = 'en-AU'): RuleInfo[] {
     const kept = measure.keptByDefault === true || pack.unitsKeep.includes(measure.keep);
     add(measure.id, 'units', MEASUREMENT_CONFIDENCE, kept);
   }
-  // A compound in a kept unit is held whole, so it converts only when turned on by id.
-  for (const compound of COMPOUNDS) {
+  // A compound or height in a kept unit is held whole, so it converts only when turned on by id.
+  for (const compound of [...COMPOUNDS, HEIGHT]) {
     const kept = compound.measures.some(
       (measure) => measure.keptByDefault === true || pack.unitsKeep.includes(measure.keep),
     );

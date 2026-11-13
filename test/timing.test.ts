@@ -78,6 +78,41 @@ describe.skipIf(onCi)('a long run of grouped numbers takes time in line with its
   );
 });
 
+describe.skipIf(onCi)('a Fahrenheit reading takes time in line with the length of the text', () => {
+  it.each`
+    name                                  | text                                                   | length  | expected
+    ${'a run of digits'}                  | ${(n: number) => `Serial 1${'1'.repeat(n)} ends.`}     | ${4000} | ${'Serial 1111'}
+    ${'a figure grouped by many spaces'}  | ${(n: number) => `${'111 '.repeat(n)}ends.`}           | ${2000} | ${'111 111 111'}
+    ${'a sentence of many bare F values'} | ${(n: number) => `Bake at ${'95F, '.repeat(n)}done.`}  | ${2000} | ${'Bake at 35°C, 35°C, '}
+    ${'many sentences with a bare F'}     | ${(n: number) => 'Bake at 95F. '.repeat(n)}            | ${2000} | ${'Bake at 35°C. Bake at 35°C. '}
+    ${'a long list of oven settings'}     | ${(n: number) => `Bake at ${'350, '.repeat(n)}375°F.`} | ${2000} | ${'Bake at 175, 175, '}
+  `(
+    '$name, $length long and four times that',
+    ({ text, length, expected }) => {
+      expect(convert(text(length)).startsWith(expected)).toBe(true);
+      expect(growth(text(length), text(length * 4))).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});
+
+describe.skipIf(onCi)('a long run of stops in brackets takes time in line with its length', () => {
+  // Each stop reads past the asides after it, which here run to the end of the text.
+  it.each`
+    piece                  | length  | expected
+    ${'(It was 350 F.) '}  | ${1000} | ${'(It was 350 F.) (It was 350 F.) '}
+    ${'(at 3 p.m.) '}      | ${1000} | ${'(at 3pm) (at 3pm) '}
+    ${'(5 lb.) '}          | ${1000} | ${'(2.3 kg) (2.3 kg) '}
+  `(
+    '"$piece", $length times and four times that',
+    ({ piece, length, expected }) => {
+      expect(convert(piece.repeat(length)).startsWith(expected)).toBe(true);
+      expect(growth(piece.repeat(length), piece.repeat(length * 4))).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});
+
 describe.skipIf(onCi)('a long chain of weights takes time in line with its length', () => {
   // Each weight's next unit is decided by walking back along the chain, once for the text.
   // Walking back from every weight takes time in the square of the chain's length, which is
@@ -187,5 +222,66 @@ describe.skipIf(onCi)('the decade rule takes time in line with a long run of spa
     const changes = decade.find({ text, options, signals, american: true });
     expect(performance.now() - started).toBeLessThan(LIMIT_MS);
     expect(changes.map((change) => change.after)).toEqual(expected);
+  });
+});
+
+describe.skipIf(onCi)('the decade rule reads the sentences of many decades in time in line with their length', () => {
+  const options = resolveOptions({});
+  const decade = patternRules(options).find((rule) => rule.id === 'units.temperature.decade')!;
+  const find = (text: string) => decade.find({ text, options, signals: analyse(text), american: true });
+
+  it.each`
+    piece                                    | length
+    ${'In Celsius, highs are in the 30s. '}  | ${1000}
+    ${'Highs in the 30s, as Celsius says. '} | ${1000}
+  `(
+    '"$piece", $length times and four times that',
+    ({ piece, length }) => {
+      expect(find(piece.repeat(length)).filter((change) => change.hold)).toHaveLength(length);
+      expect(growth(piece.repeat(length), piece.repeat(length * 4), find)).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});
+
+describe.skipIf(onCi)('protected names and paths take time in line with their length', () => {
+  it.each`
+    piece                                    | expected
+    ${'Bright Red Color won. '}              | ${'Bright Red Colour won. Bright Red Colour won. '}
+    ${'Set the background-color to match. '} | ${'Set the background-color to match. Set the background-color to match. '}
+    ${'background-color-'}                   | ${'background-colour-background-colour-'}
+    ${'Use std::color::gray here. '}         | ${'Use std::color::gray here. Use std::color::gray here. '}
+    ${'I like the *color*/flavor of it. '}   | ${'I like the *colour*/flavour of it. I like the *colour*/flavour of it. '}
+    ${'See \\usepackage{color} here. '}      | ${'See \\usepackage{color} here. See \\usepackage{color} here. '}
+  `(
+    '"$piece", 2000 times and four times that',
+    ({ piece, expected }) => {
+      expect(deamericaniseText(piece.repeat(2000)).startsWith(expected)).toBe(true);
+      expect(growth(piece.repeat(2000), piece.repeat(8000), deamericaniseText)).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+
+  // Generous, since each of these takes a few milliseconds. A pattern that walks the run from
+  // every place in it takes several seconds.
+  const LIMIT_MS = 1000;
+
+  it.each`
+    before            | after
+    ${'Medal of'}     | ${'Honor'}
+    ${'It rained.'}   | ${'Bright Red Color'}
+    ${'Kodak'}        | ${'Theater'}
+    ${'Color'}        | ${'Run'}
+    ${'std::color'}   | ${'::gray'}
+    ${'border-top'}   | ${'-color'}
+    ${'grayscale('}   | ${')'}
+    ${'*color*'}      | ${'/flavor'}
+    ${'\\usepackage'} | ${'{color}'}
+  `('"$before", 100000 spaces, then "$after"', ({ before, after }) => {
+    const text = `${before}${' '.repeat(100000)}${after}`;
+    convert(text.slice(0, 100));
+    const started = performance.now();
+    expect(convert(text).startsWith(before)).toBe(true);
+    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
   });
 });

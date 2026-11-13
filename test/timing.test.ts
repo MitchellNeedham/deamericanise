@@ -78,6 +78,23 @@ describe.skipIf(onCi)('a long run of grouped numbers takes time in line with its
   );
 });
 
+describe.skipIf(onCi)('a long run of stops in brackets takes time in line with its length', () => {
+  // Each stop reads past the asides after it, which here run to the end of the text.
+  it.each`
+    piece                  | length  | expected
+    ${'(It was 350 F.) '}  | ${1000} | ${'(It was 350 F.) (It was 350 F.) '}
+    ${'(at 3 p.m.) '}      | ${1000} | ${'(at 3pm) (at 3pm) '}
+    ${'(5 lb.) '}          | ${1000} | ${'(2.3 kg) (2.3 kg) '}
+  `(
+    '"$piece", $length times and four times that',
+    ({ piece, length, expected }) => {
+      expect(convert(piece.repeat(length)).startsWith(expected)).toBe(true);
+      expect(growth(piece.repeat(length), piece.repeat(length * 4))).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});
+
 describe.skipIf(onCi)('a long chain of weights takes time in line with its length', () => {
   // Each weight's next unit is decided by walking back along the chain, once for the text.
   // Walking back from every weight takes time in the square of the chain's length, which is

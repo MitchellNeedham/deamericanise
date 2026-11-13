@@ -69,6 +69,7 @@ describe('times', () => {
     ${'**It starts at 3 p.m.** and ends late.'}           | ${'**It starts at 3pm** and ends late.'}
     ${'It starts at 3 p.m. (Roughly) and ends late.'}     | ${'It starts at 3pm (Roughly) and ends late.'}
     ${'It starts at 3 p.m. (Bring snacks) and ends late.'} | ${'It starts at 3pm (Bring snacks) and ends late.'}
+    ${'- Doors open at 7 p.m. (approx.)'}                 | ${'- Doors open at 7pm (approx.)'}
   `('needs no sentence stop past markup or a bracket: $input', ({ input, expected }) => {
     expect(times(input)).toBe(expected);
   });

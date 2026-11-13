@@ -693,8 +693,8 @@ describe('the stop of a unit abbreviation', () => {
     ${'It is 6 ft. (see (a) above) It is new.'}        | ${'It is 1.8 m. (see (a) above) It is new.'}     | ${'a bracket inside the bracket'}
     ${'It is 6 ft. *(see the plan)* It is new.'}       | ${'It is 1.8 m. *(see the plan)* It is new.'}    | ${'markup around the bracket'}
     ${'It is 6 ft. (see the plan) (and the map) It is new.'} | ${'It is 1.8 m. (see the plan) (and the map) It is new.'} | ${'two brackets'}
-    ${'It is 6 ft. (see the plan)'}                    | ${'It is 1.8 m. (see the plan)'}                 | ${'the end of the text'}
-    ${'It is 6 ft. (see the plan)\n\nIt is new.'}      | ${'It is 1.8 m. (see the plan)\n\nIt is new.'}   | ${'the end of the paragraph'}
+    ${'It is 6 ft. (See the plan.)'}                   | ${'It is 1.8 m. (See the plan.)'}                | ${'a sentence in the bracket at the end of the text'}
+    ${'It is 6 ft. (See the plan.)\n\nIt is new.'}     | ${'It is 1.8 m. (See the plan.)\n\nIt is new.'}  | ${'the same, at the end of the paragraph'}
   `('keeps the stop where the sentence ends past a bracket: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -707,6 +707,8 @@ describe('the stop of a unit abbreviation', () => {
     ${'It is 6 ft. (see the plan).'}                   | ${'It is 1.8 m (see the plan).'}                 | ${'the sentence stop after the bracket'}
     ${'It is 6 ft. (see the plan), and new.'}          | ${'It is 1.8 m (see the plan), and new.'}        | ${'a comma after the bracket'}
     ${'It is 6 ft. (see the plan'}                     | ${'It is 1.8 m (see the plan'}                   | ${'a bracket that never closes'}
+    ${'It is 6 ft. (see the plan)'}                    | ${'It is 1.8 m (see the plan)'}                  | ${'words in lower case in the bracket at the end of the text'}
+    ${'- The fence is 6 ft. (approx.)'}                | ${'- The fence is 1.8 m (approx.)'}              | ${'the same, in a list item'}
     ${'6 feet (see the diagram)'}                      | ${'1.8 metres (see the diagram)'}                | ${'no stop'}
   `('drops the stop where the sentence goes on past a bracket: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
@@ -929,6 +931,7 @@ describe('the stop of a Fahrenheit F', () => {
     ${'Bake at 350 degrees F. (or so) Then stir.'}      | ${'Bake at 175 degrees Celsius. (or so) Then stir.'}    | ${'a bare letter F before a new sentence'}
     ${'Bake at 350°F. (or so) Then stir.'}              | ${'Bake at 175°C. (or so) Then stir.'}                  | ${'a symbol before a new sentence'}
     ${'Bake at 350°F. (or so)'}                         | ${'Bake at 175°C. (or so)'}                             | ${'a symbol at the end of the text'}
+    ${'Preheat to 350 degrees F. (or so)'}              | ${'Preheat to 175 degrees Celsius (or so)'}             | ${'a bare letter F at the end of the text'}
   `('decides the stop before a bracket past its close: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });

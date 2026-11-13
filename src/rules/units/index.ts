@@ -1,7 +1,7 @@
 import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, Precision, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
-import { CLOSING, LIST_MARKER, OPENING, endsSentence, stopStays } from '../sentence.js';
+import { CLOSING, LIST_MARKER, OPENING, endsSentence, sentenceBounds, stopStays } from '../sentence.js';
 import { CALENDAR_WORD } from '../times.js';
 import {
   COMPOUNDS,
@@ -14,11 +14,13 @@ import {
   type Sense,
 } from './definitions.js';
 import {
+  BARE,
   BARE_CELSIUS_FIGURE,
   DEGREES,
   DEGREE_GAP,
   FAHRENHEIT,
   GAS_MARK,
+  OPENER as SENTENCE_OPENER,
   fahrenheitTemperatures,
   sentenceAround,
 } from './fahrenheit.js';
@@ -289,12 +291,28 @@ const NOT_A_TIME = String.raw`(?!\s+(?:ago|later|earlier|before|after)\b)`;
 const LETTER_LAST = /\s[a-z]$/i;
 const NOT_A_WORD = String.raw`(?!\w|${HYPHEN})`;
 
+/** A unit's form as a pattern, with a hyphen read for each space, as in `500-square-foot`. */
+function aliasPattern(alias: string): string {
+  return escape(alias).replace(/ /g, `(?: |${HYPHEN})`);
+}
+
+const ALIAS_HYPHEN = new RegExp(HYPHEN, 'g');
+
+/**
+ * The key `listed` holds the unit written `written` under: in lower case, and where that is
+ * not listed, with each hyphen read as the space `aliasPattern` lets it stand for.
+ */
+function aliasKey(written: string, listed: { has(key: string): boolean }): string {
+  const key = written.toLowerCase().replace(/\s+/g, ' ');
+  return listed.has(key) ? key : key.replace(ALIAS_HYPHEN, ' ');
+}
+
 function alternate(aliases: string[]): string {
   return aliases
     .sort((a, b) => b.length - a.length || a.localeCompare(b))
     .map(
       (alias) =>
-        escape(alias) + (AN_HOUR.test(alias) ? NOT_A_TIME : '') + (LETTER_LAST.test(alias) ? NOT_A_WORD : ''),
+        aliasPattern(alias) + (AN_HOUR.test(alias) ? NOT_A_TIME : '') + (LETTER_LAST.test(alias) ? NOT_A_WORD : ''),
     )
     .join('|');
 }
@@ -378,8 +396,15 @@ function isConventional(
   );
 }
 
-function isOtherSense(ctx: RuleContext, alias: Alias, start: number, end: number): boolean {
-  return alias.isWord && alias.measure.otherSense?.(contextText(ctx.text), start, end) === true;
+/**
+ * Where the span ends that the rules hold for the quantity from `start` to `end` where its
+ * unit is in another sense, or null where it is a measurement. Past a noun the unit starts,
+ * as in `6 foot traffic`, since a rule that rewrote the rest of the noun would leave the
+ * quantity to convert on a second run.
+ */
+function otherSenseEnd(ctx: RuleContext, alias: Alias, start: number, end: number): number | null {
+  if (!alias.isWord) return null;
+  return alias.measure.otherSense?.(contextText(ctx.text), start, end) ?? null;
 }
 
 /** The words title case leaves in lower case between capitalised ones. */
@@ -406,7 +431,7 @@ const CAPITALISED_NEXT = new RegExp(
  */
 function isPartOfName(text: string, written: string, end: number, count?: number | null): boolean {
   if (!CAPITALISED.test(written)) return false;
-  if (count != null && Math.abs(count) > 1 && SINGULAR_WORDS.has(written.toLowerCase())) return true;
+  if (count != null && Math.abs(count) > 1 && SINGULAR_WORDS.has(aliasKey(written, SINGULAR_WORDS))) return true;
   return CAPITALISED_NEXT.test(text.slice(end, end + CONTEXT_WINDOW));
 }
 
@@ -522,7 +547,7 @@ export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: num
   const opening = listed[0]?.start ?? start;
   if (nameBefore(text, opening, number[3]!, unit, isWord, unitEnd) !== null) return true;
   const otherSense = OTHER_SENSES.get(unit.toLowerCase());
-  return otherSense !== undefined && otherSense(contextText(text), opening, unitEnd);
+  return otherSense !== undefined && otherSense(contextText(text), opening, unitEnd) !== null;
 }
 
 /**
@@ -669,6 +694,19 @@ function describesNoun(
     return tied && opened && TAKES_NO_ARTICLE.test(text);
   }
   return tied || opened || (!ownPlural && Math.abs(value) > 1);
+}
+
+/**
+ * Whether a measurement in `measure` takes the metric symbol because its unit words, `alias`
+ * ending at `end`, are joined by hyphens to describe the noun after them, and `measure` asks
+ * for its symbol there, as the speed of `a 35-mile-per-hour wind` does.
+ */
+function symbolBeforeNoun(text: string, measure: Measure, alias: string, end: number): boolean {
+  return (
+    measure.symbolBeforeNoun === true &&
+    plainHyphens(alias).includes('-') &&
+    MODIFIES_A_NOUN.test(text.slice(end))
+  );
 }
 
 /** The count of `two quarter`: a cardinal, then a space and a singular fraction word. */
@@ -1211,6 +1249,7 @@ function restatesConversion(
 /** Miles per US gallon, in every form the fuel economy rule reads. */
 const MPG_FORMS = [
   'mpg',
+  String.raw`m\.p\.g\.`,
   String.raw`miles(?:\s+per\s+|${HYPHEN}per${HYPHEN})gallon`,
   String.raw`(?:miles|mi)\s*/\s*(?:gallon|gal)`,
 ];
@@ -1237,7 +1276,7 @@ for (const measure of MEASURES) {
   const read = [measure, ...(measure.senses ?? []).flatMap((sense) => senseMeasure(sense) ?? [])];
   for (const dimension of new Set(read.map(measureDimension))) {
     if (dimension === undefined) continue;
-    (IMPERIAL_UNITS[dimension] ??= []).push(...forms.map(escape));
+    (IMPERIAL_UNITS[dimension] ??= []).push(...forms.map(aliasPattern));
   }
 }
 
@@ -1565,6 +1604,121 @@ const MODIFIER = String.raw`(?!${FUNCTION_WORD})[A-Za-z\d][\w%]*(?:-[\w%]+)*`;
 /** A word ending in a lone `s`, as a plural or a verb such as `needs` does, and `glass` does not. */
 const ENDS_IN_S = String.raw`(?=[\w%-]*[^\W\dsu]s${WORD_END})`;
 
+/** Determiners and object pronouns, the words of `NOT_A_NOUN` that open a preposition's object. */
+const OPENS_OBJECT = [
+  'a', 'an', 'the', 'this', 'that', 'these', 'those', 'his', 'her', 'its', 'their', 'my', 'our',
+  'your', 'some', 'any', 'no', 'all', 'both', 'every', 'me', 'him', 'it', 'us', 'them', 'you',
+];
+
+/**
+ * Adverbs that end in no `ly` and follow what a recipe adds, as `first` does in
+ * `Add 8 oz water first`.
+ */
+const ADVERBS = ['first', 'also', 'instead', 'together', 'overnight', 'aside', 'well'];
+
+/** An adverb. A word in `ly` is one, as in `Add 8 oz of milk slowly`, but `jelly` is a food. */
+const ADVERB = String.raw`(?:${ADVERBS.join('|')}|(?!jelly${WORD_END})[A-Za-z]+ly)${WORD_END}`;
+
+/**
+ * A word that ends a noun phrase before it: a function word, an adverb, or a word in `s` before
+ * the object it takes, which is a verb, as `keeps` is in `16 oz of water keeps you going`.
+ */
+const ENDS_NOUN =
+  String.raw`(?:${FUNCTION_WORD}|${ADVERB}|` +
+  String.raw`${ENDS_IN_S}[\w-]+${WORD_GAP}(?:(?:${OPENS_OBJECT.join('|')})${WORD_END}|\d))`;
+
+/** Auxiliary verbs, which may follow a plural noun as its verb, as in `8 oz rum truffles are enough`. */
+const AUXILIARIES = [
+  'is', 'are', 'was', 'were', 'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
+  'could', 'can', 'may', 'might', 'must',
+];
+
+/** Conjunctions that join words alike, and so may follow an adjective, as in `tastes flat and warm`. */
+const COORDINATORS = ['and', 'or', 'but', 'nor', 'yet', 'so', 'than'];
+
+/** A function word that may follow a verb, as `in` does in `go in first`. */
+const AFTER_A_VERB =
+  String.raw`(?:${NOT_A_NOUN.filter((word) => !COORDINATORS.includes(word)).join('|')})${WORD_END}`;
+
+/**
+ * A word in `s` that is the verb of the clause the quantity before it is the subject of, as
+ * `boils` is in `until 8 oz of milk boils`. It is a plural noun, and the subject's head, where an
+ * auxiliary follows it, or a word that a function word, an adverb or a number follows in turn,
+ * which is then the verb, as `go` is in `8 oz rum raisins go in first`.
+ */
+const SUBJECT_VERB =
+  String.raw`${ENDS_IN_S}[\w-]+${WORD_END}(?!${WORD_GAP}(?:(?:${AUXILIARIES.join('|')})${WORD_END}|` +
+  String.raw`(?!${FUNCTION_WORD}|${ADVERB})[A-Za-z][\w-]*${WORD_GAP}(?:${AFTER_A_VERB}|${ADVERB}|\d)))`;
+
+/**
+ * Where the quantity stands in its clause, which tells a verb from a noun after a drink: the
+ * subject of a clause a conjunction opens, which has a verb, the opening of a sentence, which may
+ * have none, or elsewhere, where it is read as an object.
+ */
+type Place = 'subject' | 'opening' | 'object';
+
+/**
+ * Where a noun phrase ends, in each place: at anything but a word that may be a noun after it, as
+ * `raisins` is in `rum raisins`, where `rum` only describes it. A sentence that a quantity opens
+ * may be a list item with no verb, as `8 oz rum raisins, chopped` is, so there a word in `s`
+ * before a comma, a colon or the end of its line is a noun. These read `phraseText`, where the
+ * end of a line that no sentence runs on from is a `;`.
+ */
+const PHRASE_ENDS: Record<Place, string> = {
+  subject: String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN}|${SUBJECT_VERB})[A-Za-z])`,
+  opening: String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN}|${SUBJECT_VERB}(?![^\S\n\r]*(?:[,;:]|$)))[A-Za-z])`,
+  object: String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN})[A-Za-z])`,
+};
+
+/**
+ * A conjunction that opens a clause, whose subject follows it. `until`, `before` and `after` are
+ * prepositions too, but rarely before a quantity of food with no verb after it.
+ */
+const CONJUNCTION_BEFORE = new RegExp(
+  String.raw`(?<![\w-])(?:once|when|whenever|as|while|if|unless|because|until|till|before|after)` +
+    String.raw`${WORD_GAP}$`,
+  'i',
+);
+
+/** An adverb that may open a sentence before its subject, as in `Then 16 oz of water goes in`. */
+const OPENING_ADVERB_BEFORE = new RegExp(
+  String.raw`(?<![\w-])(?:then|next|now|finally),?${WORD_GAP}$`,
+  'i',
+);
+
+/**
+ * A line break whose next line does not go on in lower case. Case-sensitive, since a capital
+ * there opens the next item of a list, as `A pinch of salt` does, where a hard-wrapped sentence
+ * goes on in lower case.
+ */
+const LIST_LINE_BREAK = /(?:\r\n|[\n\r\v\f\u2028\u2029])(?![^\S\n\r\v\f\u2028\u2029]*[a-z])/g;
+
+let lastPhraseSource = '';
+let lastPhraseText = '';
+
+/**
+ * `text` as the phrase after a quantity is read in it: with each `LIST_LINE_BREAK` as a `;`, so
+ * a phrase never runs from one line of a list into the next, as from `8 oz rum raisins` into
+ * `4 oz sugar`, while it runs on through a hard-wrapped sentence. Each offset is kept.
+ */
+function phraseText(text: string): string {
+  if (text !== lastPhraseSource) {
+    lastPhraseSource = text;
+    lastPhraseText = text.replace(LIST_LINE_BREAK, (lineBreak) => ';'.repeat(lineBreak.length));
+  }
+  return lastPhraseText;
+}
+
+/** Where the quantity whose number starts at `start` stands, past a determiner before it. */
+function placeOf(text: string, start: number): Place {
+  const determiner = DETERMINER_BEFORE.exec(text.slice(Math.max(0, start - CONTEXT_WINDOW), start));
+  const at = start - (determiner?.[0].length ?? 0);
+  const before = text.slice(Math.max(0, at - CONTEXT_WINDOW), at);
+  if (CONJUNCTION_BEFORE.test(before)) return 'subject';
+  OPENS_SENTENCE.lastIndex = at - (OPENING_ADVERB_BEFORE.exec(before)?.[0].length ?? 0);
+  return OPENS_SENTENCE.test(text) ? 'opening' : 'object';
+}
+
 /**
  * From a unit to the word after it, past the bracket the quantity may close, as in
  * `1 cup (8 oz) milk`, and an aside in brackets, as in `8 oz (1 cup) milk`.
@@ -1587,8 +1741,10 @@ const namePattern = (names: string[]) =>
 interface SenseReader {
   measure: Measure | undefined;
   note: string | undefined;
-  /** Sticky, to test where the unit ends. */
-  after: RegExp;
+  /** Sticky, to test where the unit ends, for the quantity in each place. */
+  after: Record<Place, RegExp>;
+  /** Whether `after` reads `phraseText`, as the head of a phrase is read. */
+  asHead: boolean;
   /** Tested on the text before the number. */
   before: RegExp | undefined;
   /** Tested on the quantity's sentence. */
@@ -1605,17 +1761,25 @@ function senseReader(sense: Sense): SenseReader {
   const head = heads.length > 0 ? String.raw`${WORD_GAP}(?:${namePattern(heads)})` : '';
   const holders = sense.things.filter((thing) => heads.includes(thing));
   const describers = sense.things.filter((thing) => !heads.includes(thing));
-  const thing = [
-    ...(describers.length > 0 ? [`(?:${namePattern(describers)})${WORD_END}`] : []),
-    ...(holders.length > 0 ? [`(?:${namePattern(holders)})${WORD_END}(?!${head}${WORD_END})`] : []),
-  ].join('|');
+  const described = sense.asHead && head ? `(?:${head}${WORD_END})?` : '';
+  const thing = (ends: string) =>
+    [
+      ...(describers.length > 0 ? [`(?:${namePattern(describers)})${WORD_END}${described}${ends}`] : []),
+      ...(holders.length > 0 ? [`(?:${namePattern(holders)})${WORD_END}(?!${head}${WORD_END})${ends}`] : []),
+    ].join('|');
   const vessel = sense.vessels
     ? String.raw`(?:(?:${namePattern(sense.vessels)})${WORD_GAP}of${WORD_GAP}${ARTICLE}${words})?`
     : '';
-  const after = new RegExp(
-    String.raw`${LEAD}(?:of${WORD_GAP}${ARTICLE})?${words}${vessel}${except}(?:${thing})`,
-    'iy',
-  );
+  const pattern = (ends: string) =>
+    new RegExp(String.raw`${LEAD}(?:of${WORD_GAP}${ARTICLE})?${words}${vessel}${except}(?:${thing(ends)})`, 'iy');
+  const anywhere = pattern('');
+  const after = sense.asHead
+    ? {
+        subject: pattern(PHRASE_ENDS.subject),
+        opening: pattern(PHRASE_ENDS.opening),
+        object: pattern(PHRASE_ENDS.object),
+      }
+    : { subject: anywhere, opening: anywhere, object: anywhere };
   const before =
     sense.before &&
     new RegExp(
@@ -1625,7 +1789,8 @@ function senseReader(sense: Sense): SenseReader {
     );
   const sentence =
     sense.sentence && new RegExp(String.raw`(?<![\w-])(?:${namePattern(sense.sentence)})${WORD_END}`, 'i');
-  return { measure: senseMeasure(sense), note: sense.note, after, before, sentence };
+  const asHead = sense.asHead === true;
+  return { measure: senseMeasure(sense), note: sense.note, after, asHead, before, sentence };
 }
 
 const SENSES = new Map(
@@ -1658,9 +1823,11 @@ function senseAt(
   }
   // A stop that also ends the sentence leaves nothing after the quantity to read.
   if (!keepsStop(plain, start, plain.slice(start, end))) {
+    const place = placeOf(plain, start);
     for (const reader of readers) {
-      reader.after.lastIndex = end;
-      if (reader.after.test(plain)) return reader;
+      const after = reader.after[place];
+      after.lastIndex = end;
+      if (after.test(reader.asHead ? phraseText(plain) : plain)) return reader;
     }
     OF_A_THING.lastIndex = end;
     NOUN_AFTER.lastIndex = end;
@@ -2055,12 +2222,6 @@ function isSmallerPart(text: string, start: number): boolean {
   return answer;
 }
 
-/** Determiners and object pronouns, the words of `NOT_A_NOUN` that open a preposition's object. */
-const OPENS_OBJECT = [
-  'a', 'an', 'the', 'this', 'that', 'these', 'those', 'his', 'her', 'its', 'their', 'my', 'our',
-  'your', 'some', 'any', 'no', 'all', 'both', 'every', 'me', 'him', 'it', 'us', 'them', 'you',
-];
-
 /**
  * A word or number straight after a preposition that opens its object, as `her socks`,
  * `shoes` and `2019` do. A word that cannot open a noun opens none, and nor does the `x` of
@@ -2260,7 +2421,7 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
           const otherSense =
             unnamed !== undefined &&
             larger.words.includes(match[2]!.toLowerCase()) &&
-            larger.otherSense?.(contextText(ctx.text), start, match.indices![2]![1]) === true;
+            larger.otherSense?.(contextText(ctx.text), start, match.indices![2]![1]) != null;
           if (kept || second || otherSense) {
             changes.push(hold(start, held, compound.id, 40));
             continue;
@@ -2355,7 +2516,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     'gi',
   );
 
-  const resolve = (alias: string) => byAlias.get(alias.toLowerCase().replace(/\s+/g, ' '));
+  const resolve = (alias: string) => byAlias.get(aliasKey(alias, byAlias));
 
   const measurementBefore = new RegExp(
     String.raw`${OUTSIDE_WORD}(?:${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])${SOFT_SPACE}(?<=\s)$`,
@@ -2434,11 +2595,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     // A noun straight after claims the words before it: `half a pound cake` is half a cake,
     // and `a mile and a half hour later` is half an hour.
     if (MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) return;
-    if (
-      isOtherSense(ctx, entry, start, start + matched.length) ||
-      (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length))
-    ) {
-      changes.push(hold(start, matched, entry.measure.id, 30));
+    const senseEnd = otherSenseEnd(ctx, entry, start, start + matched.length);
+    if (senseEnd !== null || (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length))) {
+      changes.push(hold(start, ctx.text.slice(start, senseEnd ?? start + matched.length), entry.measure.id, 30));
       return;
     }
     const read = inSense(ctx, entry, start, start + matched.length);
@@ -2509,12 +2668,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       pushSingle(ctx, changes, start + matched.length - alias.length, alias, '', alias, 1);
       return;
     }
+    const senseEnd = otherSenseEnd(ctx, entry, start, start + matched.length);
     if (
-      isOtherSense(ctx, entry, start, start + matched.length) ||
+      senseEnd !== null ||
       (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length, value)) ||
       (entry.isWord && mayBeYear(ctx.text, start, raw, gap, start + matched.length))
     ) {
-      changes.push(hold(start, matched, entry.measure.id, 30));
+      changes.push(hold(start, ctx.text.slice(start, senseEnd ?? start + matched.length), entry.measure.id, 30));
       return;
     }
     const named = nameBefore(ctx.text, start, raw, alias, entry.isWord, start + matched.length);
@@ -2551,9 +2711,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       entry.isWord &&
       (entry.isSingular || entry.isOwnPlural) &&
       describesNoun(ctx.text, numberStart, value, gap, start + matched.length, entry.isOwnPlural);
-    const unit = entry.isWord
-      ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
-      : ` ${target.symbol}`;
+    const unit =
+      entry.isWord && !symbolBeforeNoun(ctx.text, entry.measure, alias, start + matched.length)
+        ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
+        : ` ${target.symbol}`;
     // `a quarter mile track` keeps its article for the track, while `a quarter mile away`
     // gives it to the number.
     const from = attributive ? numberStart : start;
@@ -2649,15 +2810,16 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           }
           continue;
         }
+        const senseEnd = otherSenseEnd(ctx, entry, start, end);
         if (
-          isOtherSense(ctx, entry, start, end) ||
+          senseEnd !== null ||
           (entry.isWord && isPartOfName(ctx.text, alias, end, high)) ||
           // A unit after the first number makes it a quantity, as in `From 1500 feet to 2000 feet`.
           (entry.isWord &&
             inner === undefined &&
             mayBeYear(ctx.text, start, highRaw, gap, end, raws.slice(0, -1), entry.measure))
         ) {
-          changes.push(hold(start, matched, entry.measure.id, 35));
+          changes.push(hold(start, ctx.text.slice(start, senseEnd ?? end), entry.measure.id, 35));
           continue;
         }
         const named = nameBefore(ctx.text, start, highRaw, alias, entry.isWord, end);
@@ -2696,9 +2858,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         const attributive =
           (entry.isSingular || entry.isOwnPlural) &&
           describesNoun(ctx.text, start, high, gap, end, entry.isOwnPlural);
-        const unit = entry.isWord
-          ? ` ${attributive ? target.singular : target.plural}`
-          : ` ${target.symbol}`;
+        const unit =
+          entry.isWord && !symbolBeforeNoun(ctx.text, entry.measure, alias, end)
+            ? ` ${attributive ? target.singular : target.plural}`
+            : ` ${target.symbol}`;
         const body = interleave(texts, joins.map(separator)) + unit;
 
         const made = changes.length;
@@ -2808,9 +2971,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         for (let i = sides.length - 1; i >= 0; i--) units[i] = sides[i]!.entry ?? units[i + 1]!;
         const measures = [...new Set(units.map((u) => u.measure))];
 
-        const otherSense = units.find((u) => isOtherSense(ctx, u, start, end));
+        const otherSense = units.find((u) => otherSenseEnd(ctx, u, start, end) !== null);
         if (otherSense) {
-          changes.push(hold(start, match[0], otherSense.measure.id, 38));
+          const senseEnd = otherSenseEnd(ctx, otherSense, start, end)!;
+          changes.push(hold(start, ctx.text.slice(start, senseEnd), otherSense.measure.id, 38));
           continue;
         }
         if (measures.some((m) => isAmbiguousHere(m, ctx.text))) continue;
@@ -3144,25 +3308,45 @@ function temperatureRules(): Rule[] {
  * temperature words nearby and refuses outright when the sentence is talking about time.
  */
 function temperatureDecadeRule(): Rule {
-  // A decade, optionally banded (`low`, `mid`, `upper`), optionally paired with a second
-  // decade (`the 70s and 80s`). `70's` and `low-70s` are both written in the wild.
-  // Only a band takes the space before the figure, or a failing match after `the` would try
-  // every split of the run of spaces that follows it.
-  const DECADE = String.raw`(?:(low|mid|middle|high|upper|lower)(?:\s|${HYPHEN})*)?(1[01]0|\d0)['\u2019]?s`;
+  // A decade, optionally banded (`low`, `mid`, `upper`). `70's` and `low-70s` are both written
+  // in the wild. Only a band takes the space before the figure, or a failing match after `the`
+  // would try every split of the run of spaces that follows it.
+  const BAND = 'low|mid|middle|high|upper|lower';
+  const BANDED = (band: string, figure: string) =>
+    String.raw`(?:${band}(?:\s|${HYPHEN})*)?${figure}['\u2019]?s`;
+  // Each decade ends at a word's end, so nothing after a run of them can fail and send the
+  // match back through the joins, which `and` and `or` match two ways.
+  const DECADE = String.raw`${BANDED(`(?:${BAND})`, String.raw`(?:1[01]0|\d0)`)}(?!\w)`;
+  const DECADE_PARTS = new RegExp(BANDED(`(${BAND})`, String.raw`(1[01]0|\d0)`), 'gi');
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
-      String.raw`(?:${RANGE_JOIN}${DECADE})?(?!\w)` +
+    String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+` +
+      String.raw`(${DECADE}(?:(?:${RANGE_JOIN}|${LIST_END})${DECADE})*)` +
       // A bare `degrees` after a decade can only be its unit, unless a Celsius unit begins there.
       String.raw`(\s*(?:${FAHRENHEIT}|Fahrenheit\b|(?!${metricUnitForms('temperature')})degrees\b))?`,
     'gi',
   );
 
+  // Case-sensitive, so `the 70s f` has no unit. `F-150` is a name, whose figure would be left
+  // after the range.
+  const BARE_F = new RegExp(String.raw`(?!${INLINE_SPACE}?F[-–]\d)(?:${BARE})`, 'y');
+
   // Case-sensitive, so a lone `c` is no unit here, as it is none after a figure. The bare `C`
   // is read apart because `metricUnitForms` reads it only after a figure, as in `180C`.
   const CELSIUS_AFTER = new RegExp(
-    String.raw`${SOFT_SPACE}(?:${metricUnitForms('temperature')})|${INLINE_SPACE}?C${UNIT_END}`,
+    String.raw`${SOFT_SPACE}(?:${metricUnitForms('temperature')}|` +
+      String.raw`\(${INLINE_SPACE}*(?:${metricUnitForms('temperature')}|C${UNIT_END})${INLINE_SPACE}*\))|` +
+      String.raw`${INLINE_SPACE}?C${UNIT_END}`,
     'y',
   );
+
+  // A bare `C` away from the decade is as often a grade, a vitamin or a seat as a scale.
+  const CELSIUS_NAMED = new RegExp(
+    String.raw`(?<![A-Za-z])(?!C${UNIT_END})(?:${metricUnitForms('temperature')})`,
+    'g',
+  );
+  const FAHRENHEIT_NAMED = new RegExp(String.raw`(?<![A-Za-z])(?:${FAHRENHEIT}|Fahrenheit\b)`, 'gi');
+  // Far beyond any real sentence, so a rewrite inside one cannot move a scale in or out of reach.
+  const SENTENCE_REACH = 2000;
 
   const TEMPERATURE_NEARBY =
     /\b(?:temperatures?|degrees?|weather|heat|humidity|forecasts?|highs?|lows?|warm|warmer|mild|cool|cooler|chilly|hot|hotter|cold|colder|freezing|thermometer|climate|Fahrenheit|outdoors?|outside)\b/i;
@@ -3182,6 +3366,48 @@ function temperatureDecadeRule(): Rule {
 
   const toCelsius = (f: number) => Math.round(((f - 32) * 5) / 9);
 
+  interface Scale {
+    /** Where the text names the scale, in order. */
+    at: number[];
+    /** The first of `at` from the end of the last span looked around, since spans come in order. */
+    next: number;
+  }
+
+  const scale = (text: string, named: RegExp): Scale => ({
+    at: [...text.matchAll(named)].map((match) => match.index),
+    next: 0,
+  });
+
+  /** The nearest places `scale` is named before `start` and from `end` on, within reach. */
+  const nearest = (scale: Scale, start: number, end: number): [number | undefined, number | undefined] => {
+    while (scale.next < scale.at.length && scale.at[scale.next]! < end) scale.next++;
+    const before = scale.at[scale.next - 1];
+    const after = scale.at[scale.next];
+    return [
+      before !== undefined && start - before <= SENTENCE_REACH ? before : undefined,
+      after !== undefined && after - end < SENTENCE_REACH ? after : undefined,
+    ];
+  };
+
+  /**
+   * Whether the sentence holding `start` to `end` names Celsius and no Fahrenheit. It is read
+   * only as far as the nearest place each scale is named on each side, since a farther one is
+   * in the sentence only if that one is.
+   */
+  const namesOnlyCelsius = (text: string, start: number, end: number, celsius: Scale, fahrenheit: Scale) => {
+    const [celsiusBefore, celsiusAfter] = nearest(celsius, start, end);
+    if (celsiusBefore === undefined && celsiusAfter === undefined) return false;
+    const [fahrenheitBefore, fahrenheitAfter] = nearest(fahrenheit, start, end);
+    const reach = Math.max(
+      ...[celsiusBefore, fahrenheitBefore].map((at) => start - (at ?? start)),
+      ...[celsiusAfter, fahrenheitAfter].map((at) => (at ?? end - 1) - end + 1),
+    );
+    const [from, to] = sentenceBounds(text, start, end, SENTENCE_OPENER, reach);
+    const inSentence = (before?: number, after?: number) =>
+      (before !== undefined && before >= from) || (after !== undefined && after < to);
+    return inSentence(celsiusBefore, celsiusAfter) && !inSentence(fahrenheitBefore, fahrenheitAfter);
+  };
+
   return {
     id: 'units.temperature.decade',
     category: 'units',
@@ -3190,19 +3416,25 @@ function temperatureDecadeRule(): Rule {
     find(ctx) {
       const changes: Change[] = [];
       pattern.lastIndex = 0;
+      let scales: [celsius: Scale, fahrenheit: Scale] | undefined;
 
       for (const match of ctx.text.matchAll(pattern)) {
         const start = match.index;
-        const end = start + match[0].length;
+        const marked = match[3] !== undefined;
+        let matched = match[0];
+        if (!marked) {
+          BARE_F.lastIndex = start + matched.length;
+          matched += BARE_F.exec(ctx.text)?.[0] ?? '';
+        }
+        const end = start + matched.length;
         const before = ctx.text.slice(Math.max(0, start - 90), start);
         const after = ctx.text.slice(end, end + 90);
 
-        const marked = match[6] !== undefined;
         if (!marked) {
           CELSIUS_AFTER.lastIndex = end;
           const celsius = CELSIUS_AFTER.exec(ctx.text);
           if (celsius) {
-            changes.push(hold(start, match[0] + celsius[0], 'units.temperature.decade', 36));
+            changes.push(hold(start, matched + celsius[0], 'units.temperature.decade', 36));
             continue;
           }
         }
@@ -3210,13 +3442,20 @@ function temperatureDecadeRule(): Rule {
         if (A_DECADE.test(before)) continue;
         if (!marked && !TEMPERATURE_NEARBY.test(before) && !TEMPERATURE_NEARBY.test(after)) continue;
 
-        const firstBand = SPREAD[(match[2] ?? '').toLowerCase()] ?? [0, 9];
-        // With a second decade the range runs from the bottom of the first to the top of
-        // the second: `the 70s and 80s` is 70 through 89.
-        const lastBand = match[5] === undefined ? firstBand : SPREAD[(match[4] ?? '').toLowerCase()] ?? [0, 9];
-        const low = toCelsius(Number(match[3]) + firstBand[0]);
-        const high = toCelsius(Number(match[5] ?? match[3]) + lastBand[1]);
-        if (low >= high) continue;
+        // The range runs from the bottom of the first decade to the top of the last:
+        // `the 70s and 80s` is 70 through 89.
+        const decades = [...match[2]!.matchAll(DECADE_PARTS)].map(([, band, figure]) => {
+          const [bottom, top] = SPREAD[(band ?? '').toLowerCase()] ?? [0, 9];
+          return [Number(figure) + bottom, Number(figure) + top] as const;
+        });
+        const rises = decades.every(([bottom], i) => i === 0 || bottom > decades[i - 1]![1]);
+        const low = toCelsius(decades[0]![0]);
+        const high = toCelsius(decades.at(-1)![1]);
+        scales ??= [scale(ctx.text, CELSIUS_NAMED), scale(ctx.text, FAHRENHEIT_NAMED)];
+        if (!rises || low >= high || (!marked && namesOnlyCelsius(ctx.text, start, end, ...scales))) {
+          changes.push(hold(start, matched, 'units.temperature.decade', 36));
+          continue;
+        }
 
         // `days in the 70s` has to become `days between 21 and 26C`, never `days in
         // between`, so the preposition is swallowed rather than left dangling.
@@ -3225,8 +3464,8 @@ function temperatureDecadeRule(): Rule {
         changes.push({
           start,
           end,
-          before: match[0],
-          after: fahrenheitKeepsStop(ctx.text, start, match[0]) ? `${body}.` : body,
+          before: matched,
+          after: fahrenheitKeepsStop(ctx.text, start, matched) ? `${body}.` : body,
           ruleId: 'units.temperature.decade',
           category: 'units',
           confidence: 'risky',

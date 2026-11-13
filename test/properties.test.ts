@@ -327,18 +327,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
       /\dF$/.test(v.change.before) &&
       v.text.slice(v.change.end).search(/\b(?:degrees|ovens?)\b/i) >= 60,
   },
-  {
-    issue: 407,
-    property: 'idempotence',
-    input: 'We counted 6 foot traffic lights.',
-    options: { ...localise, dialect: 'en-ZA' },
-    // The first run rewrote the noun that made the unit before it part of a compound.
-    matches: (v) =>
-      v.origin === undefined &&
-      v.change?.category === 'units' &&
-      /(?:foot|pound|yard|inch|mile)$/i.test(v.change.before) &&
-      v.next?.category === 'vocabulary',
-  },
 ];
 
 const isKnown = (v: Violation): boolean => KNOWN_FAILURES.some((k) => k.property === v.property && k.matches(v));

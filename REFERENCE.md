@@ -1036,7 +1036,19 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 
 - **Proper nouns.** Pearl Harbor, the World Trade Center, the Department of Defense, the
   Australian Labor Party, rigor mortis, Fahrenheit 451, the MIT License, Prolog, and
-  trademarks such as Band-Aid and Realtor.
+  trademarks such as Band-Aid and Realtor. A `Center` with two or more capitalised words
+  straight before it is part of a name wherever it stands, as in `Storm Prediction Center`,
+  so `## Data Center Setup` is still rewritten. A capitalised `Organization`, `Labor`,
+  `Honor`, `Theater` or `Color` is part of a name, and is held with the words it is read
+  from, on strong evidence: two capitalised words straight before it, as in
+  `World Health Organization` (a capital that only starts a sentence does not count), or
+  `of` or `for` joining it to another capitalised word, as in `Bureau of Labor Statistics`
+  and `Medal of Honor`. A few names are listed, such as `Kodak Theater`,
+  `Space Center Houston` and `Color Run`. In a heading (a Markdown heading, or a line in
+  title case with no figure in it), only a listed name is held, so `## Customizing Colors`
+  is rewritten, and so are `Color Theory is fun` and `See the Color Picker panel`. A word
+  such as `The` or `Your` marks no name, so `Your Honor` is rewritten, and so is
+  `Legion of Honor`, which British and Australian writing spell `Legion of Honour`.
 - **Structure.** URLs, email addresses, long command-line flags, inline code, fenced code
   blocks and HTML tags. A long flag is two hyphens and a letter at the start of a token, with
   any `=value` after it, so `--center`, `--color=gray` and `--label="dark gray"` are held in
@@ -1058,6 +1070,18 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
   `!important`), a closing brace, or a semicolon that ends the line. So `Eye color: blue`
   and `a follow-up: color it` are still rewritten. A held declaration is held from every
   rule, so `max-width: 2in` keeps its inches.
+  A CSS property named without a value is held when it is a hyphenated name from a property
+  family, or after a vendor prefix, with `color` among its later words, such as
+  `background-color`, `border-top-color` or `-webkit-text-fill-color`, or one of the few
+  that start with `color` or hold `behavior`, such as `color-scheme` and
+  `scroll-behavior`. A CSS function whose name holds an Americanism, such as `grayscale` or
+  `color-mix`, is held straight before its bracket, with its arguments where they close on
+  the line. So `Set the background-color to match` keeps its spelling, while `color-coded`,
+  `white-colored` and `color(s)` are prose.
+  A path of names joined by `::`, such as `std::color::gray`, `Color::Gray` or `::color`, is
+  held as Rust, C++, PHP and Ruby write it. A name must start straight after each `::`, so
+  an AsciiDoc labelled list such as `Favorite color:: gray` and figures such as `3::2` are
+  prose.
   Inline code is paired the way CommonMark pairs it: a span closes on a run of as many
   backticks as opened it, so ``` ``a ` b`` ``` is one span, and it may wrap onto the next
   line of its paragraph. A backtick with no partner before the paragraph ends, or one
@@ -1106,15 +1130,25 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 - **TeX commands.** A backslash and the letters after it, such as `\centering` or `\color`,
   with the arguments of colour commands that name a colour, colour model or colour
   definition (`\color`, `\textcolor`, `\colorbox`, `\fcolorbox`, `\definecolor`, `\colorlet`,
-  `\pagecolor`, `\rowcolor`, `\cellcolor` and `\columncolor`) and the environment that
-  `\begin` and `\end` name. TeX knows each by one spelling. The text a command colours is
-  prose, so `\textcolor{gray}{gray word}` becomes `\textcolor{gray}{grey word}`.
+  `\pagecolor`, `\rowcolor`, `\cellcolor` and `\columncolor`), the environment that
+  `\begin` and `\end` name, the package, class, file or style that `\usepackage`,
+  `\RequirePackage`, `\documentclass`, `\LoadClass`, `\input`, `\include` and
+  `\bibliographystyle` load, and the key that `\label`, `\cite` or a reference names:
+  `\ref`, `\eqref`, `\pageref`, `\autoref`, `\nameref`, the cleveref and varioref commands
+  such as `\cref`, `\Cref`, `\vref` and `\crefrange`, and a starred form such as `\ref*`.
+  TeX knows each by one spelling, so `\usepackage{color}` and `\label{fig:color}` are held.
+  The text a command colours is prose, so `\textcolor{gray}{gray word}` becomes
+  `\textcolor{gray}{grey word}`.
 - **File names and paths,** read from their shape rather than a list of extensions. A file
   name is a name holding a letter, then a dot and an extension in one case with no space
   either side, so `behavior.ts`, `Center.vue` and `GRAY.PNG` are held, and so is a domain or
   a dotted name such as `theme.colors.gray`. A path is held whole when it starts at a root
   (`/`, `./`, `../`, `~/` or a drive letter such as `C:\`), runs to three or more segments,
-  or ends in a file name, so `src/colors/center.ts` and `~/favorites` are held. Each rule
+  or ends in a file name, so `src/colors/center.ts` and `~/favorites` are held. A bare `/`
+  roots a path only where a token starts: at the start of the text, or after a space or an
+  opening bracket or quote, with any quotes or emphasis marks that open there. So
+  `(/etc/colors)` and `"/etc/colors"` are paths, while `*color*/flavor` and
+  `(color)/flavor` are two words joined by a slash. Each rule
   leaves a common prose shape alone: two words joined by a slash, such as `color/flavor` or
   `src/colors`, are prose (write `./src/colors` or a code span to hold one); `The color.It`
   is a missing space, since `It` is mixed case; `3.5mi` is a number, since `3` has no

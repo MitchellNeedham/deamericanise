@@ -208,3 +208,45 @@ describe.skipIf(onCi)('the decade rule reads the sentences of many decades in ti
     60_000,
   );
 });
+
+describe.skipIf(onCi)('protected names and paths take time in line with their length', () => {
+  it.each`
+    piece                                    | expected
+    ${'Bright Red Color won. '}              | ${'Bright Red Colour won. Bright Red Colour won. '}
+    ${'Set the background-color to match. '} | ${'Set the background-color to match. Set the background-color to match. '}
+    ${'background-color-'}                   | ${'background-colour-background-colour-'}
+    ${'Use std::color::gray here. '}         | ${'Use std::color::gray here. Use std::color::gray here. '}
+    ${'I like the *color*/flavor of it. '}   | ${'I like the *colour*/flavour of it. I like the *colour*/flavour of it. '}
+    ${'See \\usepackage{color} here. '}      | ${'See \\usepackage{color} here. See \\usepackage{color} here. '}
+  `(
+    '"$piece", 2000 times and four times that',
+    ({ piece, expected }) => {
+      expect(deamericaniseText(piece.repeat(2000)).startsWith(expected)).toBe(true);
+      expect(growth(piece.repeat(2000), piece.repeat(8000), deamericaniseText)).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+
+  // Generous, since each of these takes a few milliseconds. A pattern that walks the run from
+  // every place in it takes several seconds.
+  const LIMIT_MS = 1000;
+
+  it.each`
+    before            | after
+    ${'Medal of'}     | ${'Honor'}
+    ${'It rained.'}   | ${'Bright Red Color'}
+    ${'Kodak'}        | ${'Theater'}
+    ${'Color'}        | ${'Run'}
+    ${'std::color'}   | ${'::gray'}
+    ${'border-top'}   | ${'-color'}
+    ${'grayscale('}   | ${')'}
+    ${'*color*'}      | ${'/flavor'}
+    ${'\\usepackage'} | ${'{color}'}
+  `('"$before", 100000 spaces, then "$after"', ({ before, after }) => {
+    const text = `${before}${' '.repeat(100000)}${after}`;
+    convert(text.slice(0, 100));
+    const started = performance.now();
+    expect(convert(text).startsWith(before)).toBe(true);
+    expect(performance.now() - started).toBeLessThan(LIMIT_MS);
+  });
+});

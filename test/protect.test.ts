@@ -108,6 +108,22 @@ describe('file names and paths', () => {
     expect(au(input, american)).toBe(expected);
   });
 
+  it.each`
+    input                                    | expected                                  | why
+    ${'I like the *color*/flavor of it.'}    | ${'I like the *colour*/flavour of it.'}   | ${'after closing emphasis'}
+    ${'It is in *bold*/color text.'}         | ${'It is in *bold*/colour text.'}         | ${'the same'}
+    ${'I like the (color)/flavor of it.'}    | ${'I like the (colour)/flavour of it.'}   | ${'after a closing bracket'}
+    ${'I like the [color]/flavor of it.'}    | ${'I like the [colour]/flavour of it.'}   | ${'the same'}
+    ${'I like the "color"/flavor of it.'}    | ${'I like the "colour"/flavour of it.'}   | ${'after a closing straight quote'}
+    ${'I like the ‘color’/flavor of it.'}    | ${'I like the ‘colour’/flavour of it.'}   | ${'after a closing curly quote'}
+    ${'See /etc/colors for the colors.'}     | ${'See /etc/colors for the colours.'}     | ${'a root after a space'}
+    ${'See (/etc/colors) for the colors.'}   | ${'See (/etc/colors) for the colours.'}   | ${'a root after an opening bracket'}
+    ${'See "/etc/colors" for the colors.'}   | ${'See "/etc/colors" for the colours.'}   | ${'a root after an opening quote'}
+    ${'See */etc/colors* for the colors.'}   | ${'See */etc/colors* for the colours.'}   | ${'a root after opening emphasis'}
+  `('a slash roots a path only where a token starts: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input, american)).toBe(expected);
+  });
+
   it('reads initialisms as initialisms, not file names', () => {
     const input = 'Two P.M.s met a Ph.D. from the U.S.A. at 3 P.M. on the Canada/U.S. border.';
     expect(au(input, { ...american, preset: 'localise' })).toBe(
@@ -193,6 +209,38 @@ describe('a CSS declaration in a sentence', () => {
   });
 });
 
+describe('a CSS property or function named in a sentence', () => {
+  it.each`
+    unchanged                                         | why
+    ${'Set the background-color to match.'}           | ${'a property from a family'}
+    ${'Use the accent-color property.'}               | ${'the same'}
+    ${'Set the border-top-color to match.'}           | ${'a property of three words'}
+    ${'Set the outline-color to match.'}              | ${'a family that is also a bare property'}
+    ${'Set the print-color-adjust to exact.'}         | ${'a word after the colour'}
+    ${'Set the -webkit-text-fill-color to match.'}    | ${'a vendor prefix'}
+    ${'Set the color-scheme to dark.'}                | ${'a property in the colour family'}
+    ${'Set the scroll-behavior to smooth.'}           | ${'a property that ends in behavior'}
+    ${'Apply grayscale(100%) to the image.'}          | ${'a function and its argument'}
+    ${'Mix them with color-mix() here.'}              | ${'a function with no arguments'}
+    ${'Use color-mix(in srgb, gray, white) here.'}    | ${'a colour keyword inside a function'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
+    input                                     | expected                                   | why
+    ${'A color-coded chart.'}                 | ${'A colour-coded chart.'}                 | ${'a compound in the colour family that names no property'}
+    ${'A color-blind reader.'}                | ${'A colour-blind reader.'}                | ${'the same'}
+    ${'A white-colored shirt.'}               | ${'A white-coloured shirt.'}               | ${'a family before a longer word'}
+    ${'The gray-blue sky.'}                   | ${'The grey-blue sky.'}                    | ${'no family'}
+    ${'Track user-behavior data.'}            | ${'Track user-behaviour data.'}            | ${'behavior after a family that takes no such property'}
+    ${'Set the background color to match.'}   | ${'Set the background colour to match.'}   | ${'two words'}
+    ${'Pick a color(s) for it.'}              | ${'Pick a colour(s) for it.'}              | ${'a plural in brackets'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
 describe('template tags and emoji shortcodes', () => {
   it.each`
     unchanged                                    | why
@@ -213,7 +261,7 @@ describe('template tags and emoji shortcodes', () => {
     ${'{%- if favorite -%}gray{%- endif -%}'}     | ${'{%- if favorite -%}grey{%- endif -%}'}      | ${'the same, with whitespace control'}
     ${'{% if favorite and the color is gray'}     | ${'{% if favourite and the colour is grey'}    | ${'a tag that never closes is prose'}
     ${'Note: the color is gray.'}                 | ${'Note: the colour is grey.'}                 | ${'a colon with a space after it'}
-    ${'std::color::gray'}                         | ${'std::colour::grey'}                         | ${'a colon either side is a scope'}
+    ${'std::color::gray'}                         | ${'std::color::gray'}                          | ${'a colon either side is a scope, held as one'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(au(input)).toBe(expected);
   });
@@ -223,6 +271,32 @@ describe('template tags and emoji shortcodes', () => {
     expect(deamericaniseFile('page.md', input).text).toBe(
       '{% if favorite %}The colour.{% endif %}\n\n{{ favorite | upcase }} and {{ color }}\n\n:colorful: and :heart:\n',
     );
+  });
+});
+
+describe('scope paths joined by ::', () => {
+  it.each`
+    unchanged                               | why
+    ${'Use std::color::gray in the code.'}  | ${'a Rust or C++ path'}
+    ${'Call Color::Gray here.'}             | ${'a Ruby or PHP constant'}
+    ${'Use ::color here.'}                  | ${'a leading ::'}
+    ${'Use Theme::$color here.'}            | ${'a PHP static property'}
+    ${'Use obj.color.gray here.'}           | ${'a dotted name, held as before'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it('holds the path where identifiers are protected', () => {
+    expect(code('Use std::color::gray in the code.')).toBe('Use std::color::gray in the code.');
+  });
+
+  it.each`
+    input                               | expected                             | why
+    ${'The color: gray.'}               | ${'The colour: grey.'}               | ${'one colon'}
+    ${'Favorite color:: gray'}          | ${'Favourite colour:: grey'}         | ${'a labelled list, with a space after the ::'}
+    ${'Mix the color 3::2 with gray.'}  | ${'Mix the colour 3::2 with grey.'}  | ${'figures'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
   });
 });
 
@@ -517,6 +591,34 @@ describe('TeX commands', () => {
   });
 });
 
+describe('TeX names that TeX looks up', () => {
+  it.each`
+    input                                                   | expected                                                 | why
+    ${'\\usepackage{color}'}                                | ${'\\usepackage{color}'}                                 | ${'a package'}
+    ${'\\usepackage[usenames]{color}'}                      | ${'\\usepackage[usenames]{color}'}                       | ${'a package with options'}
+    ${'\\RequirePackage{color}'}                            | ${'\\RequirePackage{color}'}                             | ${'a package a package loads'}
+    ${'Use \\documentclass{color} for gray.'}               | ${'Use \\documentclass{color} for grey.'}                | ${'a class'}
+    ${'Use \\LoadClass{color} for gray.'}                   | ${'Use \\LoadClass{color} for grey.'}                    | ${'a class a class loads'}
+    ${'Use \\input{color} and \\include{gray} here.'}       | ${'Use \\input{color} and \\include{gray} here.'}        | ${'files'}
+    ${'Use \\bibliographystyle{color} for gray.'}           | ${'Use \\bibliographystyle{color} for grey.'}            | ${'a bibliography style'}
+    ${'See \\label{fig:color} and \\ref{fig:color} here.'}  | ${'See \\label{fig:color} and \\ref{fig:color} here.'}   | ${'a label and a reference to it'}
+    ${'See \\eqref{eq:gray} and \\pageref{fig:color}.'}     | ${'See \\eqref{eq:gray} and \\pageref{fig:color}.'}      | ${'more references'}
+    ${'See \\autoref{fig:color} and \\cref{fig:gray}.'}     | ${'See \\autoref{fig:color} and \\cref{fig:gray}.'}      | ${'more references'}
+    ${'See \\Cref{fig:color} and \\nameref{sec:gray}.'}     | ${'See \\Cref{fig:color} and \\nameref{sec:gray}.'}      | ${'references from other packages'}
+    ${'See \\vref{fig:color} and \\cpageref{fig:gray}.'}    | ${'See \\vref{fig:color} and \\cpageref{fig:gray}.'}     | ${'the same'}
+    ${'See \\crefrange{fig:color}{fig:gray} here.'}         | ${'See \\crefrange{fig:color}{fig:gray} here.'}          | ${'a range of two keys'}
+    ${'See \\ref*{fig:color} here.'}                        | ${'See \\ref*{fig:color} here.'}                         | ${'a starred reference'}
+    ${'See \\cite{color} on the gray.'}                     | ${'See \\cite{color} on the grey.'}                      | ${'a citation key'}
+    ${'Use \\inputenc{gray} here.'}                         | ${'Use \\inputenc{grey} here.'}                          | ${'a longer command that only starts with one of those'}
+    ${'Use \\textcolor{gray}{gray word} here.'}             | ${'Use \\textcolor{gray}{grey word} here.'}              | ${'the text a colour command colours'}
+    ${'\\section{The color}'}                               | ${'\\section{The colour}'}                               | ${'a heading'}
+    ${'\\section*{The color}'}                              | ${'\\section*{The colour}'}                              | ${'a starred heading'}
+    ${'The color is gray.'}                                 | ${'The colour is grey.'}                                 | ${'prose with no command'}
+  `('$why: $input -> $expected', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+});
+
 describe('TeX maths in Markdown', () => {
   const md = (input: string, options = {}) => au(input, { syntax: 'markdown', ...options });
   const american = { assumeAmerican: true };
@@ -572,7 +674,7 @@ describe('identifier protection, for comments in source files', () => {
   });
 
   it('is off by default for prose', () => {
-    expect(au('background-color')).toBe('background-colour');
+    expect(au('color-picker')).toBe('colour-picker');
   });
 });
 
@@ -614,10 +716,68 @@ describe('institution names keep their spelling', () => {
   });
 
   it.each`
+    unchanged                                                         | why
+    ${'The World Health Organization met.'}                           | ${'two capitalised words before it'}
+    ${'NATO, the North Atlantic Treaty Organization, met.'}           | ${'the same'}
+    ${'We toured the Johnson Space Center.'}                          | ${'the same, on no list'}
+    ${'Johnson Space Center opened.'}                                 | ${'a Center name counts a capital that starts a sentence'}
+    ${'## Johnson Space Center'}                                      | ${'and is read in a heading'}
+    ${'The International Organization for Standardization met.'}      | ${'for and a capitalised word after it'}
+    ${'The Organization of American States met.'}                     | ${'of and a capitalised word after it'}
+    ${'The Museum of Color opened.'}                                  | ${'a capitalised word and of before it, on no list'}
+    ${'The Department of Labor and the Bureau of Labor Statistics.'}  | ${'listed, on a line every word of which is capitalised'}
+    ${'The American Federation of Labor merged.'}                     | ${'a capitalised word and of before it'}
+    ${'He received the Medal of Honor.'}                              | ${'the same'}
+    ${'They performed at the Kodak Theater.'}                         | ${'a listed name'}
+    ${'We visited Space Center Houston.'}                             | ${'the same'}
+    ${'I ran the Color Run.'}                                         | ${'the same'}
+    ${'## Medal of Honor Recipients'}                                 | ${'a listed name in a heading'}
+  `('leaves the name in "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(au(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
     input                  | expected              | why
     ${'the data center'}   | ${'the data centre'}  | ${'one capitalised word is not a name'}
     ${'the center of town'} | ${'the centre of town'} | ${'a plain noun'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(au(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                        | expected                                     | why
+    ${'The organization grew.'}                  | ${'The organisation grew.'}                  | ${'after a capitalised article'}
+    ${'A sense of honor.'}                       | ${'A sense of honour.'}                      | ${'after of and a plain noun'}
+    ${'Yes, Your Honor.'}                        | ${'Yes, Your Honour.'}                       | ${'a form of address, after a possessive'}
+    ${'The Legion of Honor met.'}                | ${'The Legion of Honour met.'}               | ${'the French order, spelt the British way'}
+    ${'Center stage is gray.'}                   | ${'Centre stage is grey.'}                   | ${'at the start of a sentence'}
+    ${'The Children’s Theater opened.'}          | ${'The Children’s Theatre opened.'}          | ${'one capitalised word before it'}
+    ${'Color Theory is fun.'}                    | ${'Colour Theory is fun.'}                   | ${'one capitalised word after it'}
+    ${'Labor Costs rose again.'}                 | ${'Labour Costs rose again.'}                | ${'the same'}
+    ${'See the Color Picker panel.'}             | ${'See the Colour Picker panel.'}            | ${'an interface label'}
+    ${'Global Health Organization members met.'} | ${'Global Health Organisation members met.'} | ${'a capital from the start of a sentence'}
+    ${'It rained. Bright Red Color won.'}        | ${'It rained. Bright Red Colour won.'}       | ${'the same, after a full stop'}
+  `('rewrites a common noun: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                | expected                              | why
+    ${'## Customizing Colors'}           | ${'## Customising Colours'}           | ${'a Markdown heading'}
+    ${'## Data Center Setup'}            | ${'## Data Centre Setup'}             | ${'the same'}
+    ${'# Organization Settings'}         | ${'# Organisation Settings'}          | ${'the same'}
+    ${'## The Favorite Colors of Kids'}  | ${'## The Favourite Colours of Kids'} | ${'of after it, in a heading'}
+    ${'Data Center Setup\n====='}        | ${'Data Centre Setup\n====='}         | ${'a setext heading'}
+    ${'Set The Primary Brand Color'}     | ${'Set The Primary Brand Colour'}     | ${'a line in title case'}
+  `('reads no name from capitals in a heading: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it('reads a phrase the vocabulary rewrites as a common noun, even in title case', () => {
+    expect(au('Movie Theater Etiquette', { preset: 'localise' })).toBe('Cinema Etiquette');
+  });
+
+  it('can be told to stop protecting them', () => {
+    expect(au('He received the Medal of Honor.', { protectProperNouns: false })).toBe('He received the Medal of Honour.');
   });
 });

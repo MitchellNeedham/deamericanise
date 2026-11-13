@@ -778,6 +778,54 @@ describe('the stop of a unit abbreviation', () => {
   `('keeps the stop that opens an ellipsis: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
+
+  it.each`
+    input                                       | expected                                     | why
+    ${'It weighs **5 lb.** Then stir.'}         | ${'It weighs **2.3 kg.** Then stir.'}        | ${'strong emphasis'}
+    ${'It weighs _5 lb._ Then stir.'}           | ${'It weighs _2.3 kg._ Then stir.'}          | ${'underscore emphasis'}
+    ${'It weighs <b>5 lb.</b> Then stir.'}      | ${'It weighs <b>2.3 kg.</b> Then stir.'}     | ${'an inline tag'}
+    ${'It weighs **5 lb.**'}                    | ${'It weighs **2.3 kg.**'}                   | ${'the end of the text'}
+    ${'It weighs 5 lb. **Then** stir.'}         | ${'It weighs 2.3 kg. **Then** stir.'}        | ${'markup opening the next sentence'}
+  `('keeps the stop that ends the sentence before markup: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                       | expected                                     | why
+    ${'It weighs **5 lb.** of flour.'}          | ${'It weighs **2.3 kg** of flour.'}          | ${'before a word in lower case'}
+    ${'It weighs <b>5 lb.</b> of flour.'}       | ${'It weighs <b>2.3 kg</b> of flour.'}       | ${'an inline tag'}
+    ${'It weighs 5 lb. **of** flour.'}          | ${'It weighs 2.3 kg **of** flour.'}          | ${'markup opening a word in lower case'}
+  `('drops the stop inside the sentence past markup: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                              | expected                                         | why
+    ${'It is 6 ft. (see the plan) It is new.'}         | ${'It is 1.8 m. (see the plan) It is new.'}      | ${'a new sentence after the bracket'}
+    ${'It weighs 5 lb. (It is heavy.) Then stir.'}     | ${'It weighs 2.3 kg. (It is heavy.) Then stir.'} | ${'a sentence in the bracket'}
+    ${'It is 6 ft. (see (a) above) It is new.'}        | ${'It is 1.8 m. (see (a) above) It is new.'}     | ${'a bracket inside the bracket'}
+    ${'It is 6 ft. *(see the plan)* It is new.'}       | ${'It is 1.8 m. *(see the plan)* It is new.'}    | ${'markup around the bracket'}
+    ${'It is 6 ft. (see the plan) (and the map) It is new.'} | ${'It is 1.8 m. (see the plan) (and the map) It is new.'} | ${'two brackets'}
+    ${'It is 6 ft. (See the plan.)'}                   | ${'It is 1.8 m. (See the plan.)'}                | ${'a sentence in the bracket at the end of the text'}
+    ${'It is 6 ft. (See the plan.)\n\nIt is new.'}     | ${'It is 1.8 m. (See the plan.)\n\nIt is new.'}  | ${'the same, at the end of the paragraph'}
+  `('keeps the stop where the sentence ends past a bracket: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                              | expected                                         | why
+    ${'It is 6 ft. (see the plan) and new.'}           | ${'It is 1.8 m (see the plan) and new.'}         | ${'a word in lower case after the bracket'}
+    ${'It is 6 ft. (Roughly) and new.'}                | ${'It is 1.8 m (Roughly) and new.'}              | ${'a capital in the bracket'}
+    ${'It is 6 ft. (or so) long.'}                     | ${'It is 1.8 m (or so) long.'}                   | ${'the same, a word in lower case'}
+    ${'It is 6 ft. (see the plan).'}                   | ${'It is 1.8 m (see the plan).'}                 | ${'the sentence stop after the bracket'}
+    ${'It is 6 ft. (see the plan), and new.'}          | ${'It is 1.8 m (see the plan), and new.'}        | ${'a comma after the bracket'}
+    ${'It is 6 ft. (see the plan'}                     | ${'It is 1.8 m (see the plan'}                   | ${'a bracket that never closes'}
+    ${'It is 6 ft. (see the plan)'}                    | ${'It is 1.8 m (see the plan)'}                  | ${'words in lower case in the bracket at the end of the text'}
+    ${'- The fence is 6 ft. (approx.)'}                | ${'- The fence is 1.8 m (approx.)'}              | ${'the same, in a list item'}
+    ${'6 feet (see the diagram)'}                      | ${'1.8 metres (see the diagram)'}                | ${'no stop'}
+  `('drops the stop where the sentence goes on past a bracket: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
 });
 
 describe('a spaced "in." that ends the sentence after a verb taking "in"', () => {
@@ -799,12 +847,25 @@ describe('a spaced "in." that ends the sentence after a verb taking "in"', () =>
   });
 
   it.each`
+    unchanged                                                  | why
+    ${'They let only 3 in...'}                                 | ${'an ellipsis'}
+    ${'I put 2 in... then shut the door.'}                     | ${'an ellipsis inside the sentence'}
+    ${'They let only 3 in.'}                                   | ${'the end of the text'}
+    ${'The driver let only 3 in. (see the map) Then he left.'} | ${'a new sentence past a bracket'}
+    ${'**The driver let only 3 in.** Then he left.'}           | ${'a new sentence past closing markup'}
+  `('leaves "$unchanged" alone where the stop stays ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it.each`
     input                                 | expected                              | why
     ${'Trim the board to 12 in.'}         | ${'Trim the board to 30 cm.'}         | ${'no verb that takes "in"'}
     ${'It is 12 in. long.'}               | ${'It is 30 cm long.'}                | ${'the stop ends only the abbreviation'}
     ${'Put a 12 in. tile in the gap.'}    | ${'Put a 30 cm tile in the gap.'}     | ${'the same, after a verb that takes "in"'}
     ${'Let the hem down 2 in.'}           | ${'Let the hem down 5.1 cm.'}         | ${'more than a word between the verb and the count'}
     ${'He let 3in.'}                      | ${'He let 7.6 cm.'}                   | ${'"in" straight after the number'}
+    ${'The board is 12 in...'}            | ${'The board is 30 cm...'}            | ${'an ellipsis with no verb that takes "in"'}
+    ${'He let only 3 in. (see the map) and left.'} | ${'He let only 7.6 cm (see the map) and left.'} | ${'the sentence goes on past a bracket'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -973,6 +1034,27 @@ describe('the stop of a Fahrenheit F', () => {
     ${'Bake at 350°F (175°C). Then stir.'}           | ${'Bake at 175°C. Then stir.'} | ${'no stop before the bracket'}
     ${'Bake at 350°F. Then stir.'}                   | ${'Bake at 175°C. Then stir.'} | ${'no bracket'}
   `('decides the stop past the Celsius value a pair collapses into: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                               | expected                                                | why
+    ${'Bake at 350 degrees F. (or so) for an hour.'}    | ${'Bake at 175 degrees Celsius (or so) for an hour.'}   | ${'a bare letter F'}
+    ${'Bake at 350°F. (or so) for an hour.'}            | ${'Bake at 175°C (or so) for an hour.'}                 | ${'a symbol'}
+    ${'Bake at 350 degrees F. (or so) Then stir.'}      | ${'Bake at 175 degrees Celsius. (or so) Then stir.'}    | ${'a bare letter F before a new sentence'}
+    ${'Bake at 350°F. (or so) Then stir.'}              | ${'Bake at 175°C. (or so) Then stir.'}                  | ${'a symbol before a new sentence'}
+    ${'Bake at 350°F. (or so)'}                         | ${'Bake at 175°C. (or so)'}                             | ${'a symbol at the end of the text'}
+    ${'Preheat to 350 degrees F. (or so)'}              | ${'Preheat to 175 degrees Celsius (or so)'}             | ${'a bare letter F at the end of the text'}
+  `('decides the stop before a bracket past its close: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                       | expected                                   | why
+    ${'Bake at **350°F.** for an hour.'}        | ${'Bake at **175°C** for an hour.'}        | ${'a symbol before a word in lower case'}
+    ${'Bake at **350°F.** Then stir.'}          | ${'Bake at **175°C.** Then stir.'}         | ${'a symbol before a new sentence'}
+    ${'Bake at **350 degrees F.** Then stir.'}  | ${'Bake at **175 degrees Celsius.** Then stir.'} | ${'a bare letter F before a new sentence'}
+  `('decides the stop past closing markup: $input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
 

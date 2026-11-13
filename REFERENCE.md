@@ -622,10 +622,14 @@ Fahrenheit is read as `°F`, `℉`, `degrees F`, `deg F`, `degrees Fahrenheit` o
 A bare letter `F`, as in `degrees F`, `deg F` or `350 F`, takes the stop after it as an
 abbreviation does, so `Bake at 350 degrees F. for 20 minutes` becomes
 `Bake at 175 degrees Celsius for 20 minutes`, while a stop that also ends the sentence
-stays, and so does one before a figure or a bracket. `°F` and `℉` are symbols, whose stop
+stays, and so does one before a figure. `°F` and `℉` are symbols, whose stop
 is usually the sentence's own, so it goes only where a word in lower case carries the
 sentence on: `Bake at 350°F. for 20 minutes` becomes `Bake at 175°C for 20 minutes`, while
 `- 350°F.`, `"Bake at 350°F." he said` and `It was 90°F. Then it rained.` keep their stop.
+Either stop is decided past closing markup and past an aside in brackets, as a unit's is,
+so `Bake at 350 degrees F. (or so) for an hour.` becomes
+`Bake at 175 degrees Celsius (or so) for an hour.` and `Bake at **350°F.** for an hour.`
+becomes `Bake at **175°C** for an hour.`
 Before its own Celsius value in brackets, the pair still collapses, and the same test runs
 past the bracket: `Bake at 350°F. (175°C) Then stir.` becomes `Bake at 175°C. Then stir.`,
 and `Bake at 350 degrees F. (175°C) for an hour.` becomes `Bake at 175°C for an hour.`
@@ -818,7 +822,16 @@ sentence, as a time's does, so `The fence is 6 ft. It is new.` becomes
 `The fence is 1.8 m. It is new.` Any capitalised word after the stop starts a new sentence,
 a number in words included, and so does a date that starts with a figure, as
 `1 December 2024` does, but a word in capitals does not, so `Buy a 6 ft. HDMI cable.`
-becomes `Buy a 1.8 m HDMI cable.` The stop also stays as the first dot of an ellipsis, so
+becomes `Buy a 1.8 m HDMI cable.` The test reads past closing quotes, brackets and inline
+markup (emphasis, a code backtick or an inline HTML tag), so `It weighs **5 lb.** Then stir.`
+becomes `It weighs **2.3 kg.** Then stir.` A stop before an aside in brackets is decided by
+what follows the bracket's close, so `It is 6 ft. (see the plan) It is new.` becomes
+`It is 1.8 m. (see the plan) It is new.`, while `It is 6 ft. (Roughly) and new.` becomes
+`It is 1.8 m (Roughly) and new.` Where the paragraph or list item ends at the bracket, the
+stop stays only if the aside opens a sentence of its own, so `- The fence is 6 ft. (approx.)`
+becomes `- The fence is 1.8 m (approx.)`. A time's and an initialism's last stop read the
+same way.
+The stop also stays as the first dot of an ellipsis, so
 `The board is 12 in...` becomes `The board is 30 cm...`, while `It is 12 in.... long`
 becomes `It is 30 cm... long`. Where a measurement collapses into its own metric value, the
 stop is decided past that value, so `The bag weighs 2.2 lb. (1 kg) Then stir.` becomes
@@ -826,11 +839,11 @@ stop is decided past that value, so `The bag weighs 2.2 lb. (1 kg) Then stir.` b
 `The bag weighs 1 kg of flour.`
 
 A spaced `in` with no stop after it is the preposition, so `There are 6 in total.` stays as
-written. A spaced `in.` that ends the sentence is the particle of a verb that takes `in`
-when that verb governs the count, across at most a word such as `only`, `another` or `the`.
-The verbs are `let`, `put`, `bring`, `come`, `fit`, `squeeze`, `pack`, `invite`, `allow`,
-`send` and `call`, in any form. So `The driver let only 3 in.` and `I put 2-3 in.` stay as
-written, while `Trim the board to 12 in.` becomes `Trim the board to 30 cm.` and
+written. A spaced `in.` whose stop stays, by the test above, is the particle of a verb that
+takes `in` when that verb governs the count, across at most a word such as `only`, `another`
+or `the`. The verbs are `let`, `put`, `bring`, `come`, `fit`, `squeeze`, `pack`, `invite`,
+`allow`, `send` and `call`, in any form. So `The driver let only 3 in.`, `I put 2-3 in.` and
+`They let only 3 in...` stay as written, while `Trim the board to 12 in.` becomes `Trim the board to 30 cm.` and
 `Put a 12 in. tile in the gap.` becomes `Put a 30 cm tile in the gap.`
 
 **Dates.** `3/14/2024` becomes `2024-03-14` without needing to be told anything, because

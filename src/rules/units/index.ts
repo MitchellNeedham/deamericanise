@@ -1,7 +1,17 @@
 import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, Precision, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
-import { CLOSING, LIST_MARKER, OPENING, endsSentence, sentenceBounds, stopStays } from '../sentence.js';
+import {
+  CLOSING,
+  INLINE_MARK,
+  INLINE_TAG,
+  LIST_MARKER,
+  MARKUP,
+  OPENING,
+  pastStop,
+  sentenceBounds,
+  stopStays,
+} from '../sentence.js';
 import { CALENDAR_WORD } from '../times.js';
 import {
   COMPOUNDS,
@@ -895,16 +905,16 @@ const IN_PARTICLE_VERB_BEFORE = new RegExp(
 
 /**
  * Whether the spaced `in.` ending the quantity `text.slice(start, end)` is the particle of
- * a verb before it, as in `let only 3 in.` and `I put 2 in.`: the verb takes `in` and the
- * stop ends the sentence. `It is 12 in. long` and `Put a 12 in. tile in the gap` read the
- * inch.
+ * a verb before it, as in `let only 3 in.` and `I put 2 in...`: the verb takes `in` and the
+ * stop stays, as `keepsStop` decides it. `It is 12 in. long` and `Put a 12 in. tile in the
+ * gap` read the inch.
  */
 function isInParticle(text: string, start: number, end: number, alias: string): boolean {
   return (
     alias.toLowerCase() === 'in.' &&
     /\s$/.test(text.slice(start, end - alias.length)) &&
     IN_PARTICLE_VERB_BEFORE.test(text.slice(Math.max(0, start - CONTEXT_WINDOW), start)) &&
-    endsSentence(text, start, end, AFTER_UNIT)
+    stopStays(text, start, end, AFTER_UNIT)
   );
 }
 
@@ -1133,19 +1143,8 @@ const METRIC_VALUE =
  */
 const METRIC_INNER = new RegExp(String.raw`^\s*${METRIC_VALUE}\s*$`);
 
-/** An opening or closing tag of an element that sits inside a line of text. */
-const INLINE_TAG =
-  String.raw`<\/?(?:a|abbr|b|bdi|bdo|cite|code|data|dfn|em|i|kbd|mark|q|s|samp|small|span|` +
-  String.raw`strong|sub|sup|time|u|var)(?:\s[^<>\n]*)?>`;
 const HAS_TAG = new RegExp(INLINE_TAG);
-
-/**
- * Inline markup that can stand between the two values of a measurement given in both
- * systems, or around either of them: Markdown emphasis, a code backtick, or an inline HTML
- * tag. Every check that reads the two values together allows it in the same places.
- */
-const MARKUP = String.raw`(?:[*_\`]|${INLINE_TAG})*`;
-const MARKUP_MARK = new RegExp(String.raw`[*_\`]|${INLINE_TAG}`, 'g');
+const MARKUP_MARK = new RegExp(INLINE_MARK, 'g');
 
 /** The markup that closes `opening`: its marks in reverse order, with each tag closed. */
 function closingOf(opening: string): string {
@@ -1600,21 +1599,18 @@ function continuesInLowerCase(text: string, at: number): boolean {
   return LOWER_CASE_NEXT.test(text);
 }
 
-const BRACKET_NEXT = /\s*\(/y;
-
 /**
  * Whether the stop that ends `matched`, a Fahrenheit value at `start`, stays in the text,
  * read at `end` as `keepsStop` reads it. A bare letter `F` abbreviates the scale, so its stop
  * goes as an abbreviation's does, unless it also ends the sentence. A symbol's stop is usually
  * the sentence's own, but authors also write `350°F. for 20 minutes`, so it goes only before a
- * word in lower case. Either stays before a bracket, which may trail the sentence it ends.
+ * word in lower case, read past inline markup and an aside in brackets. A closing quote or
+ * bracket after it closes the sentence the stop ends, so it stays there.
  */
 function fahrenheitKeepsStop(text: string, start: number, matched: string, end = start + matched.length): boolean {
   if (!matched.endsWith('.')) return false;
-  BRACKET_NEXT.lastIndex = end;
-  if (BRACKET_NEXT.test(text)) return true;
   if (!SYMBOL_STOP.test(matched)) return keepsStop(text, start, matched, end);
-  return !continuesInLowerCase(text, end);
+  return !continuesInLowerCase(text, pastStop(text, end, false));
 }
 
 /** Where a stop can stand: past any closing marks, before a space or the end of the text. */

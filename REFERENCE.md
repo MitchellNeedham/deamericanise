@@ -310,6 +310,12 @@ A unit of more than one word is read in the singular as well as the plural, so
 `a 2 square mile park` becomes `a 5.2 square kilometre park` and `a 100 foot-pound wrench`
 becomes `a 140 newton metre wrench`. `an hour` before `ago`, `later`, `earlier`, `before` or
 `after` is a time, so `2 miles an hour ago` becomes `3.2 kilometres an hour ago`.
+A hyphen, the Unicode hyphen (U+2010) or the non-breaking hyphen (U+2011) may stand for each
+space of such a unit, so `A 500-square-foot apartment.` becomes `A 46 square metre apartment.`,
+`a 100-pound-per-square-inch tank` becomes `a 690 kilopascal tank` and `a 35-sq-ft room`
+becomes `a 3.3 m² room`. A speed written so before its noun takes the symbol, as metric
+countries write it there: `A 35-mile-per-hour wind.` becomes `A 56 km/h wind.`, while
+`Enter a 25 mile per hour zone.` becomes `Enter a 40 kilometre per hour zone.`
 
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
@@ -541,8 +547,8 @@ whole. With `units.range` or `units.dimensions` switched off, a range or dimensi
 written, never half converted, so `½-¾ inch`, `½ to ¾ inch`, `1½ x 2 inch`,
 `five to 10 miles` and `ten by 12 feet` stay as they are.
 
-Fuel economy is read as `mpg`, `miles per gallon`, `miles-per-gallon`, `miles/gallon` or
-`mi/gal`, so `30 miles/gallon` becomes `7.8 L/100km`, never kilometres per gallon, and
+Fuel economy is read as `mpg`, `m.p.g.`, `miles per gallon`, `miles-per-gallon`, `miles/gallon`
+or `mi/gal`, so `30 miles/gallon` becomes `7.8 L/100km`, never kilometres per gallon, and
 `7.8 L/100km (30 mi/gal)` is a restatement. A range converts at both ends and gives the
 smaller number first, though litres per 100 km fall as miles per gallon rise: `20 to 30 mpg`
 becomes `7.8 to 12 L/100km`, and `8.5 to 13 km/L` with `fuelEconomy: 'km-per-l'`. After
@@ -551,6 +557,11 @@ becomes `7.8 to 12 L/100km`, and `8.5 to 13 km/L` with `fuelEconomy: 'km-per-l'`
 `20, 25 or 30 mpg` becomes `7.8, 9.4 or 12 L/100km`. A range or list of fuel economy with a
 figure in words or a fraction before its last, or a figure of zero, as in `twenty to 30 mpg`,
 is left as written.
+
+Miles per hour and miles per gallon may be written with stops, as `m.p.h.` and `m.p.g.` or in
+capitals. The last stop goes or stays as any abbreviation's does (see below), so
+`It does 30 m.p.h. on the highway.` becomes `It does 48 km/h on the highway.`, while
+`It does 30 m.p.h.` becomes `It does 48 km/h.`
 
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
 `Bake at 175-190°C`, and at every figure of a list, so `Bake at 325, 350 or 375°F` becomes

@@ -1401,6 +1401,108 @@ describe('a unit of more than one word in the singular', () => {
   });
 });
 
+describe('a unit of more than one word written with hyphens', () => {
+  it.each`
+    input                                           | expected                                       | why
+    ${'A 35-mile-per-hour wind.'}                   | ${'A 56 km/h wind.'}                           | ${'a speed before its noun'}
+    ${'A 35-mile-an-hour wind.'}                    | ${'A 56 km/h wind.'}                           | ${'the same, an hour'}
+    ${'A 35 mile-per-hour wind.'}                   | ${'A 56 km/h wind.'}                           | ${'the same, spaced from its number'}
+    ${'They forecast 35-miles-per-hour winds.'}     | ${'They forecast 56 km/h winds.'}              | ${'the same, plural'}
+    ${'A 30- to 40-mile-per-hour wind.'}            | ${'A 48 to 64 km/h wind.'}                     | ${'a range of speeds'}
+    ${'The wind reached 35-mile-per-hour.'}         | ${'The wind reached 56 kilometres per hour.'}  | ${'a speed before no noun'}
+    ${'a 100-pound-per-square-inch tank'}           | ${'a 690 kilopascal tank'}                     | ${'a pressure'}
+    ${'A 500-square-foot apartment.'}               | ${'A 46 square metre apartment.'}              | ${'an area'}
+    ${'a 10-cubic-foot fridge'}                     | ${'a 280 litre fridge'}                        | ${'a volume'}
+    ${'a 2-fluid-ounce shot'}                       | ${'a 59 millilitre shot'}                      | ${'a fluid ounce'}
+    ${'a 1-troy-ounce coin'}                        | ${'a 31 gram coin'}                            | ${'a troy ounce'}
+    ${'a 35-sq-ft room'}                            | ${'a 3.3 m² room'}                             | ${'an abbreviation of two words'}
+    ${'A 35‐mile‐per‐hour wind.'}    | ${'A 56 km/h wind.'}                           | ${'the Unicode hyphen'}
+    ${'A 500‑square‑foot apartment.'}     | ${'A 46 square metre apartment.'}              | ${'the non-breaking hyphen'}
+  `('reads it as one unit: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('reports one change under the unit it reads', () => {
+    const { changes } = deamericanise('A 35-mile-per-hour wind.', { categories: { spelling: false, vocabulary: false } });
+    expect(changes.map(({ ruleId, before, after }) => ({ ruleId, before, after }))).toEqual([
+      { ruleId: 'units.speed.mph', before: '35-mile-per-hour', after: '56 km/h' },
+    ]);
+  });
+
+  it.each`
+    unchanged                                            | why
+    ${'A 46 square metre (500-square-foot) apartment.'}  | ${'an area that restates its metric value'}
+    ${'A 56 km/h (35-mile-per-hour) wind.'}              | ${'the same, a speed'}
+    ${'I watched 8 Square-Mile last night.'}             | ${'a capitalised singular after a count above one names something'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('keeps the original, and runs twice without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('A 35-mile-per-hour wind.', options);
+    expect(once).toBe('A 56 km/h (35-mile-per-hour) wind.');
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each`
+    input                                   | expected
+    ${'It was doing 35 miles per hour.'}    | ${'It was doing 56 kilometres per hour.'}
+    ${'A 30 mph zone.'}                     | ${'A 48 km/h zone.'}
+    ${'A 500 square foot apartment.'}       | ${'A 46 square metre apartment.'}
+    ${'Enter a 25 mile per hour zone.'}     | ${'Enter a 40 kilometre per hour zone.'}
+    ${'a 2 square mile park'}               | ${'a 5.2 square kilometre park'}
+    ${'a 100 foot-pound wrench'}            | ${'a 140 newton metre wrench'}
+    ${'Inflate to 30 pounds per square inch.'} | ${'Inflate to 210 kilopascals.'}
+  `('still gives $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('miles per hour and miles per gallon written with stops', () => {
+  it.each`
+    input                                        | expected                                     | why
+    ${'It does 30 m.p.h. on the highway.'}       | ${'It does 48 km/h on the highway.'}         | ${'miles per hour'}
+    ${'It does 30 M.P.H. on the highway.'}       | ${'It does 48 km/h on the highway.'}         | ${'the same, in capitals'}
+    ${'It does 30 m.p.g. on the highway.'}       | ${'It does 7.8 L/100km on the highway.'}     | ${'miles per gallon'}
+    ${'It does 30 M.P.G. on the highway.'}       | ${'It does 7.8 L/100km on the highway.'}     | ${'the same, in capitals'}
+    ${'It does 20 to 30 m.p.h. on the road.'}    | ${'It does 32 to 48 km/h on the road.'}      | ${'a range of speeds'}
+    ${'It does 20 to 30 m.p.g. on the road.'}    | ${'It does 7.8 to 12 L/100km on the road.'}  | ${'a range of fuel economy'}
+  `('drops the stop that only ends the abbreviation: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                | expected                          | why
+    ${'It does 30 m.p.h.'}               | ${'It does 48 km/h.'}             | ${'the end of the text'}
+    ${'It does 30 M.P.H.'}               | ${'It does 48 km/h.'}             | ${'the same, in capitals'}
+    ${'It does 30 m.p.g.'}               | ${'It does 7.8 L/100km.'}         | ${'miles per gallon'}
+    ${'It does 30 m.p.h. It is slow.'}   | ${'It does 48 km/h. It is slow.'} | ${'before a new sentence'}
+  `('keeps the stop that also ends the sentence: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected
+    ${'It does 30 m.p.h. on the road.'}    | ${'It does 48 km/h (30 m.p.h.) on the road.'}
+    ${'It does 30 m.p.g. on the road.'}    | ${'It does 7.8 L/100km (30 m.p.g.) on the road.'}
+  `('keeps the original of $input, and runs twice without converting it again', ({ input, expected }) => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert(input, options);
+    expect(once).toBe(expected);
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each`
+    input                                  | expected
+    ${'It does 30 mph on the highway.'}    | ${'It does 48 km/h on the highway.'}
+    ${'It does 30 mpg.'}                   | ${'It does 7.8 L/100km.'}
+    ${'M.P.H. is the unit.'}               | ${'M.P.H. is the unit.'}
+  `('still gives $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
 describe('fractions and ranges', () => {
   it.each`
     input                  | expected

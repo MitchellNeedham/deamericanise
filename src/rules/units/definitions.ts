@@ -38,11 +38,13 @@ export interface Measure {
    */
   ambiguousWhen?: RegExp;
   /**
-   * Whether the written-out unit in the quantity `text.slice(start, end)` is being used in
-   * another sense, such as `pounds` for money or the `pound` of `pound cake`. Checked
-   * whatever `respectConventions` says, because what it finds is not a measurement at all.
+   * Where the written-out unit in the quantity `text.slice(start, end)` is being used in
+   * another sense, such as `pounds` for money or the `pound` of `pound cake`, the end of what
+   * that sense covers: `end` for money, and the end of the noun for `pound cake`. Null where
+   * the unit is a measurement. Checked whatever `respectConventions` says, because what it
+   * finds is not a measurement at all.
    */
-  otherSense?: (text: string, start: number, end: number) => boolean;
+  otherSense?: (text: string, start: number, end: number) => number | null;
   /**
    * Left alone unless the rule is turned on by id. For measures that are not American at
    * all, merely imperial-descended and used everywhere.
@@ -55,6 +57,11 @@ export interface Measure {
   decimals?: number;
   /** Other things the unit may measure, told by the words beside the quantity, in the order tried. */
   senses?: Sense[];
+  /**
+   * The metric value takes its symbol where the unit's words, joined by hyphens, describe the
+   * noun after them, as `a 35-mile-per-hour wind` becomes `a 56 km/h wind`.
+   */
+  symbolBeforeNoun?: boolean;
 }
 
 /**
@@ -75,8 +82,8 @@ export interface Sense {
   /**
    * What the quantity measures or describes in this sense, in the phrase after the unit:
    * after an optional `of`, with at most two words between that are not function words, and
-   * whatever follows, as `milk` in `Add 8 oz of whole milk slowly` and `AC` in
-   * `a 3-ton central AC unit`.
+   * whatever follows unless `asHead` is set, as `milk` in `Add 8 oz of whole milk slowly` and
+   * `AC` in `a 3-ton central AC unit`.
    */
   things: string[];
   /**
@@ -92,6 +99,13 @@ export interface Sense {
    * are solids.
    */
   except?: string[];
+  /**
+   * Whether one of `things` gives this sense only as the head of its phrase, its last noun, or
+   * before one of `heads`, so a function word, an adverb, a verb or a stop must follow. A drink
+   * before another noun names a food made with it, as in `8 oz rum raisins`, where a metal
+   * before one is what it is made of, as in `a 1 oz gold coin`.
+   */
+  asHead?: boolean;
   /**
    * Words before the number that say so, with at most one of `heads` and three function words
    * between, as in `AC units of 2 to 5 tons`.
@@ -274,15 +288,18 @@ const ALTITUDE: Convention[] = [
 ];
 
 /**
- * Whether the singular unit word `word`, ending the quantity `text.slice(start, end)`, is
- * the first part of a noun that `nouns` finds after it, as `pound` is in `Bake 1 pound cake`.
- * The number then counts the noun. A hyphen ties a unit to its number, so `a 2-pound cake`
- * is a weight.
+ * Where the noun ends that the singular unit word `word`, ending the quantity
+ * `text.slice(start, end)`, is the first part of, as `pound` is in `Bake 1 pound cake`, or
+ * null where `nouns` finds none after it. The number then counts the noun. A hyphen ties a
+ * unit to its number, so `a 2-pound cake` is a weight.
  */
 function startsNoun(word: string, nouns: RegExp) {
   const unit = new RegExp(String.raw`(?<![-A-Za-z])${word}$`, 'i');
-  return (text: string, start: number, end: number): boolean =>
-    unit.test(text.slice(start, end)) && nouns.test(text.slice(end, end + 40));
+  return (text: string, start: number, end: number): number | null => {
+    if (!unit.test(text.slice(start, end))) return null;
+    const noun = nouns.exec(text.slice(end, end + 40));
+    return noun === null ? null : end + noun[0].length;
+  };
 }
 
 const poundNoun = startsNoun('pound', /^[\s-]+(?:cakes?|signs?)\b/i);
@@ -309,7 +326,7 @@ const NOT_LIQUIDS = withPlurals([
   'condensed milk', 'baking soda', 'caustic soda', 'washing soda', 'soda cracker', 'soda bread',
   'ground coffee', 'instant coffee', 'bean coffee', 'coffee bean', 'coffee ground', 'coffee cake',
   'water chestnut', 'water cracker', 'beer bread', 'rum cake', 'rum ball', 'wine gum', 'stock cube',
-  'oil paint',
+  'oil paint', 'cream of tartar',
 ]);
 
 const FLUID_OUNCES: Sense = {
@@ -319,6 +336,7 @@ const FLUID_OUNCES: Sense = {
   heads: withPlurals([...DRINKWARE, ...VESSELS, 'box']),
   vessels: withPlurals(VESSELS),
   except: NOT_LIQUIDS,
+  asHead: true,
 };
 
 const TROY_OUNCES: Sense = {
@@ -360,7 +378,28 @@ const TONS_OF_COOLING: Sense = {
   before: withPlurals(COOLED),
 };
 
-export const MEASURES: Measure[] = [
+/** Covers every band a metric conversion picks its unit from, millimetres to tonnes. */
+export const MAGNITUDES = Array.from({ length: 16 }, (_, i) => 10 ** (i - 6));
+
+/**
+ * `measures`, each writing a zero in the metric unit nearest in size to one of its own unit,
+ * as `0 feet` is `0 metres` and `0 ounces` is `0 grams`, since a zero has no size to pick a
+ * unit by.
+ */
+function zeroInNearestUnit(measures: Measure[]): Measure[] {
+  return measures.map((measure) => {
+    const { convert } = measure;
+    const distance = (magnitude: number) =>
+      Math.abs(Math.log10(convert(magnitude).value / magnitude));
+    const nearest = MAGNITUDES.reduce((best, magnitude) =>
+      distance(magnitude) < distance(best) ? magnitude : best,
+    );
+    const zero = { ...convert(nearest), value: 0 };
+    return { ...measure, convert: (value: number) => (value === 0 ? { ...zero } : convert(value)) };
+  });
+}
+
+export const MEASURES: Measure[] = zeroInNearestUnit([
   // ----- length -----
   {
     id: 'units.length.inch',
@@ -471,7 +510,7 @@ export const MEASURES: Measure[] = [
       after: /^[\s-]*(?:divisions?|classes|class|limits?|bouts?|titles?|champions?|weight)\b/i,
     },
     otherSense: (text, start, end) =>
-      isMoney(text, start, end) || poundNoun(text, start, end),
+      isMoney(text, start, end) ? end : poundNoun(text, start, end),
   },
   {
     id: 'units.mass.stone',
@@ -576,8 +615,9 @@ export const MEASURES: Measure[] = [
     keep: 'mph',
     words: ['miles per hour', 'miles an hour', 'mile per hour', 'mile an hour'],
     singular: ['mile per hour', 'mile an hour'],
-    abbrevs: ['mph', 'MPH'],
+    abbrevs: ['mph', 'MPH', 'm.p.h.', 'M.P.H.'],
     convert: (v) => m(v * 1.609344, 'km/h', 'kilometre per hour', 'kilometres per hour'),
+    symbolBeforeNoun: true,
   },
   {
     id: 'units.pressure.psi',
@@ -634,7 +674,7 @@ export const MEASURES: Measure[] = [
     abbrevs: ['ft-lb', 'ft-lbs', 'ft lb', 'ft lbs', 'lb-ft', 'lb ft', 'lbft', 'lb.ft'],
     convert: (v) => m(v * 1.3558179483, 'N·m', 'newton metre', 'newton metres'),
   },
-];
+]);
 
 /**
  * Word forms that are grammatically singular. A singular unit next to a number that is
@@ -642,6 +682,28 @@ export const MEASURES: Measure[] = [
  * singular too.
  */
 export const SINGULAR_WORDS = new Set(MEASURES.flatMap((measure) => measure.singular));
+
+/** Whether the unit form `form` is the plural of `one`, as `pound-feet` is of `pound-foot`. */
+function isPluralOf(form: string, one: string): boolean {
+  const words = form.split(/([\s-])/);
+  const ones = one.split(/([\s-])/);
+  const differ = words.flatMap((word, i) => (word === ones[i] ? [] : [i]));
+  if (words.length !== ones.length || differ.length !== 1) return false;
+  const singular = ones[differ[0]!]!;
+  return words[differ[0]!] === (singular === 'foot' ? 'feet' : plural(singular));
+}
+
+/**
+ * Word forms that are their own plural, as `stone` and `horsepower` are: neither only singular
+ * nor the plural of a form that is. Their number says nothing of whether they describe a noun.
+ */
+export const OWN_PLURAL_WORDS = new Set(
+  MEASURES.flatMap(({ words, singular }) =>
+    words.filter(
+      (word) => !singular.includes(word) && !singular.some((one) => isPluralOf(word, one)),
+    ),
+  ),
+);
 
 /** One measurement written in descending units of one dimension, as `11 stone 4 pounds` is. */
 export interface Compound {
@@ -666,3 +728,12 @@ export const COMPOUNDS: Compound[] = [
     per: [16],
   },
 ];
+
+/**
+ * A height in feet and inches, which a rule of its own reads. Like a compound, it is held whole
+ * where either unit is kept.
+ */
+export const HEIGHT: Pick<Compound, 'id' | 'measures'> = {
+  id: 'units.length.feet-inches',
+  measures: [measure('units.length.foot'), measure('units.length.inch')],
+};

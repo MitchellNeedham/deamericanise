@@ -7,7 +7,8 @@ const VULGAR: Record<string, number> = {
   '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875,
 };
 
-const VULGAR_CLASS = `[${Object.keys(VULGAR).join('')}]`;
+/** A vulgar fraction, as the `½` of `2½`. */
+export const VULGAR_CLASS = `[${Object.keys(VULGAR).join('')}]`;
 
 /** How a number in digits ends: a digit or a vulgar fraction, as in `15` and `15½`. */
 export const NUMERIC_LAST = String.raw`(?:\d|${VULGAR_CLASS})`;

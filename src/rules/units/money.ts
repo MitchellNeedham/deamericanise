@@ -61,7 +61,9 @@ export const PREPOSITION_IN = String.raw`(?<=\s)in(?![.\w])`;
 /**
  * Pence after the pounds: `5 pounds 50`, `five pounds fifty`, `3 pounds 99p`. Bare pence
  * have to end the phrase, or the number belongs to whatever follows: `5 pounds 2 inches`,
- * `5 pounds 12 in. wide`, `1 pound 85% lean beef`.
+ * `5 pounds 12 in. wide`, `1 pound 85% lean beef`. A figure that starts a measurement the
+ * unit rules read is not pence either, which `isMoney` asks of the unit rules: the `16` of
+ * `5 pounds 16 to 20 feet` and the `12` of `5 pounds 12 in by 3 in`.
  */
 const PENCE =
   String.raw`(?:\d{1,2}(?![\d.,]?\d)|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)` +
@@ -78,9 +80,26 @@ const MONEY_BEFORE = new RegExp(
 
 const MONEY_AFTER = new RegExp(
   String.raw`^(?:\s+sterling\b|['’]?\s+worth\b|\s+(?:in\s+)?cash\b|[\s-]+(?:${PRICED_THINGS})\b|` +
-    String.raw`\s+(?:an?|per)\s+(?:hour|week|month|year)\b|\s+per\s+annum\b|\s+(?:and\s+)?${PENCE})`,
+    String.raw`\s+(?:an?|per)\s+(?:hour|week|month|year)\b|\s+per\s+annum\b)`,
   'i',
 );
+
+/** Pence straight after the pounds, with what comes before their figure in the first group. */
+const PENCE_AFTER = new RegExp(String.raw`^(\s+(?:and\s+)?)${PENCE}`, 'i');
+
+/** Whether the unit rules read a measurement that starts at offset `at` of `text`. */
+export type MeasurementStart = (text: string, at: number) => boolean;
+
+let startsMeasurement: MeasurementStart = () => false;
+
+/**
+ * Gives the pence check the unit rules' test for where a measurement starts. The unit rules
+ * reach this module through their definitions, so they hand the test over and this module
+ * imports none of them.
+ */
+export function readMeasurementsWith(test: MeasurementStart): void {
+  startsMeasurement = test;
+}
 
 const WEIGHT_BEFORE = new RegExp(
   String.raw`\b(?:weigh(?:s|ed|ing)?|los(?:e|es|t|ing)|gain(?:s|ed|ing)?|shed(?:s|ding)?|` +
@@ -117,6 +136,8 @@ export function isMoney(text: string, start: number, end: number): boolean {
   if (/£\s*$/.test(before)) return true;
   if (WEIGHT_BEFORE.test(before) || WEIGHT_AFTER.test(after)) return false;
   if (MONEY_BEFORE.test(before) || MONEY_AFTER.test(after)) return true;
+  const pence = PENCE_AFTER.exec(after);
+  if (pence !== null && !startsMeasurement(text, end + pence[1]!.length)) return true;
   if (/pound$/i.test(text.slice(start, end)) && SIZES_A_NOUN.test(after)) return false;
   const sentence = `${before.split(SENTENCE_END).pop()!} ${after.split(SENTENCE_END)[0]!}`;
   return sentence.includes('£') && !PRICE_PER_WEIGHT.test(sentence);

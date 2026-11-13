@@ -39,6 +39,10 @@ describe('ruleCatalogue', () => {
     expect(offIn('en-GB', 'units.mass.stone-pounds')).toBe(true);
     expect(offIn('en-GB', 'units.mass.pounds-ounces')).toBe(false);
     expect(offIn('en-AU', 'units.mass.stone-pounds')).toBe(false);
+    for (const dialect of dialects) {
+      const keeps = DIALECTS[dialect].unitsKeep.some((unit) => unit === 'foot' || unit === 'inch');
+      expect(offIn(dialect, 'units.length.feet-inches'), dialect).toBe(keeps);
+    }
     expect(offIn('en-CA', 'spelling.ise')).toBe(true);
     expect(offIn('en-CA', 'vocabulary.food')).toBe(true);
     expect(offIn('en-CA', 'spelling.our')).toBe(false);

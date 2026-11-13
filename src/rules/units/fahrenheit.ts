@@ -7,6 +7,7 @@ import { spellingEntries } from '../spelling/index.js';
 import { DOTTED_TIME, OPENER as AFTER_TIME } from '../times.js';
 import { baseVocabulary } from '../vocabulary.js';
 import {
+  DIGITS,
   HYPHEN,
   INLINE_SPACE,
   NUMBER_PATTERN,
@@ -55,14 +56,16 @@ export const FAHRENHEIT =
   // The lookahead comes first so the lookbehinds never walk a run of spaces from every place in it.
   String.raw`(?=Fahrenheit${UNIT_END})(?<=\d${INLINE_SPACE}*)(?<!(?<![\d.])\d{4}${INLINE_SPACE}*)` +
   String.raw`Fahrenheit${UNIT_END}(?!${INLINE_SPACE}+(?:thermometers?|scales?)\b)${NOT_A_TITLE}`;
-export const DEGREES = String.raw`[-−]?\d+(?:\.\d+)?`;
+/** A Fahrenheit figure, its thousands grouped as any other unit's may be, as in `2,000°F`. */
+export const DEGREES = String.raw`[-−]?(?:${DIGITS})(?:\.\d+)?`;
 
 /** `165F` and `350 F`, with any `STOP` after it. `F-150` and `F-type` are names. */
-const BARE = String.raw`${INLINE_SPACE}?F(?![A-Za-z\d'’]|[-–][A-Za-z])${STOP}`;
+export const BARE = String.raw`${INLINE_SPACE}?F(?![A-Za-z\d'’]|[-–][A-Za-z])${STOP}`;
 
 const JOIN = softGap(String.raw`(?:${HYPHEN}|\u2013|\u2014|to|or)`);
+// The lookahead comes first so the lookbehind never walks a run of digits from every split of it.
 const BETWEEN_AND =
-  String.raw`(?<=\bbetween(?=\s)${SOFT_SPACE}${DEGREES})` + softGap(String.raw`(?<=\s)and(?=\s)`);
+  String.raw`(?=\s)(?<=\bbetween(?=\s)${SOFT_SPACE}${DEGREES})` + softGap(String.raw`(?<=\s)and(?=\s)`);
 
 /** Units of time, which a rate divides by, as in `°F/min` and `5 gallons/minute`. */
 export const TIME_UNIT = [
@@ -93,7 +96,9 @@ const IN_COMPOUND = String.raw`[·⋅][A-Za-z]|/(?:${PER_UNIT})${UNIT_END}`;
  * A hyphen may tie the number to `degree`, as in `110-degree-Fahrenheit heat`.
  */
 const PATTERN = new RegExp(
-  String.raw`${NUMBER_START}(?:(${DEGREES})(${JOIN}|${BETWEEN_AND}))?` +
+  // No join can follow part of a number, so the lookahead reads the first number whole and
+  // gives none of it back, and a long grouped figure is not split at every group to try one.
+  String.raw`${NUMBER_START}(?:(?=(${DEGREES}))\1(${JOIN}|${BETWEEN_AND}))?` +
     String.raw`(${DEGREES})(?:(?:\s*|${HYPHEN}(?=degree))(${FAHRENHEIT})|(${BARE}))` +
     String.raw`(?!${IN_COMPOUND})`,
   'gi',
@@ -101,7 +106,8 @@ const PATTERN = new RegExp(
 
 /** One figure before a bare `F` is more often a floor, a grade or a hex digit than a temperature. */
 const BARE_FIGURE = String.raw`[1-9]\d{1,2}(?:\.\d+)?`;
-const BARE_VALUE = new RegExp(String.raw`^[-−]?${BARE_FIGURE}$`);
+/** A figure grouped in thousands, as `DEGREES` reads it, is a quantity and never a name. */
+const BARE_VALUE = new RegExp(String.raw`^[-−]?(?:${BARE_FIGURE}|[1-9]\d{0,2}(?:[,\s]\d{3})+(?:\.\d+)?)$`);
 
 /** A hex colour such as `#33F`, or a designation such as `A330-200F` or `MiG-21F`. */
 const DESIGNATION_END = String.raw`(?:#|(?<!\w)[A-Za-z]\w*[-–])`;
@@ -154,7 +160,7 @@ const TITLE_STOP = String.raw`\b(?:${CONTRACTIONS.join('|')})\.${TO_WORD}`;
  * No other number does, in words or in figures, since the unit rules write `Two feet` as
  * `61 centimetres`.
  */
-const OPENER = new RegExp(
+export const OPENER = new RegExp(
   String.raw`(?!(?!${FIGURE_DATE})(?:${NUMBER_PATTERN})(?![\p{L}\p{N}]))(?:` +
     String.raw`(?<=${TIME_STOP})${AFTER_TIME.source}` +
     String.raw`|(?<!${TIME_STOP})(?<=${INITIALISM_STOP})${AFTER_INITIALISM.source}` +
@@ -162,7 +168,11 @@ const OPENER = new RegExp(
   'iuy',
 );
 
-const REACH = 120;
+/**
+ * Far past the ends of any real sentence, so no change inside one moves a word about heat or a
+ * Celsius value in or out of reach, while a long text with no stops stays cheap to read.
+ */
+const REACH = 2000;
 
 /** The words either side of a match in its sentence. */
 export function sentenceAround(text: string, start: number, end: number): string {
@@ -172,8 +182,8 @@ export function sentenceAround(text: string, start: number, end: number): string
 
 /**
  * A bare `F` is a letter far more often than a unit, so it counts only in upper case,
- * after a number of two or three figures, in a sentence about heat that gives no
- * Celsius value.
+ * after a number of two or three figures or one grouped in thousands, in a sentence about
+ * heat that gives no Celsius value.
  */
 function bareIsFahrenheit(text: string, match: RegExpExecArray): boolean {
   if (!/F\.?$/.test(match[5]!) || !BARE_VALUE.test(match[3]!)) return false;

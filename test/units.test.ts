@@ -5003,11 +5003,11 @@ describe('a unit that is part of a noun', () => {
   };
 
   it.each`
-    input                       | span
-    ${'Bake 1 pound cake'}      | ${'1 pound'}
-    ${'Send in 6 foot soldiers'} | ${'6 foot'}
-    ${'Bake 2-3 pound cakes'}   | ${'2-3 pound'}
-    ${'In 5 yard sales we sold it.'} | ${'5 yard'}
+    input                            | span
+    ${'Bake 1 pound cake'}           | ${'1 pound cake'}
+    ${'Send in 6 foot soldiers'}     | ${'6 foot soldiers'}
+    ${'Bake 2-3 pound cakes'}        | ${'2-3 pound cakes'}
+    ${'In 5 yard sales we sold it.'} | ${'5 yard sales'}
   `('holds $span whole, even with respectConventions off', ({ input, span }) => {
     expect(held(input)).toContain(span);
     expect(held(input, { units: { respectConventions: false } })).toContain(span);
@@ -5048,10 +5048,10 @@ describe('a count before a compound noun that starts with a unit', () => {
 
   it.each`
     input                           | span
-    ${'We passed 3 mile markers.'}  | ${'3 mile'}
-    ${'the 26 mile marker'}         | ${'26 mile'}
-    ${'We put up 3 yard signs.'}    | ${'3 yard'}
-    ${'Press the two pound signs.'} | ${'two pound'}
+    ${'We passed 3 mile markers.'}  | ${'3 mile markers'}
+    ${'the 26 mile marker'}         | ${'26 mile marker'}
+    ${'We put up 3 yard signs.'}    | ${'3 yard signs'}
+    ${'Press the two pound signs.'} | ${'two pound signs'}
   `('holds $span whole, even with respectConventions off', ({ input, span }) => {
     expect(held(input)).toEqual([span]);
     expect(held(input, { units: { respectConventions: false } })).toEqual([span]);
@@ -5061,6 +5061,41 @@ describe('a count before a compound noun that starts with a unit', () => {
     expect(convert('the 26-mile marker', { units: { respectConventions: false } })).toBe(
       'the 42 kilometre marker',
     );
+  });
+});
+
+describe('a compound noun that starts with a unit is held to its end', () => {
+  const southAfrican = { preset: 'localise', dialect: 'en-ZA' } as const;
+
+  it.each`
+    unchanged                                         | why
+    ${'We counted 6 foot traffic lights.'}            | ${'a number in digits'}
+    ${'We counted six foot traffic lights.'}          | ${'a number in words'}
+    ${'We counted 6 to 8 foot traffic lights.'}       | ${'a range'}
+    ${'We counted 2, 4 or 6 foot traffic lights.'}    | ${'a list'}
+    ${'We counted 2 x 4 foot traffic lights.'}        | ${'a dimension'}
+    ${'Bake 1 pound cake'}                            | ${'a pound cake'}
+    ${'In 5 yard sales we sold it.'}                  | ${'a yard sale'}
+  `('leaves "$unchanged" alone on both runs, so no rule rewrites part of the noun ($why)', ({ unchanged }) => {
+    const once = deamericaniseText(unchanged, southAfrican);
+    expect(once).toBe(unchanged);
+    expect(deamericaniseText(once, southAfrican)).toBe(unchanged);
+  });
+
+  it('leaves the compound in a comment alone on both runs', () => {
+    const source = '// We counted 6 foot traffic lights.\nconst a = 1;\n';
+    const options = { language: 'ts', ...southAfrican } as const;
+    const once = deamericaniseCode(source, options).text;
+    expect(once).toBe(source);
+    expect(deamericaniseCode(once, options).text).toBe(source);
+  });
+
+  it.each`
+    input                             | options         | expected
+    ${'The traffic lights were out.'} | ${southAfrican} | ${'The robots were out.'}
+    ${'a 2-pound cake'}               | ${{}}           | ${'a 910 gram cake'}
+  `('$input -> $expected', ({ input, options, expected }) => {
+    expect(deamericaniseText(input, options)).toBe(expected);
   });
 });
 

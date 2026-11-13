@@ -38,11 +38,13 @@ export interface Measure {
    */
   ambiguousWhen?: RegExp;
   /**
-   * Whether the written-out unit in the quantity `text.slice(start, end)` is being used in
-   * another sense, such as `pounds` for money or the `pound` of `pound cake`. Checked
-   * whatever `respectConventions` says, because what it finds is not a measurement at all.
+   * Where the written-out unit in the quantity `text.slice(start, end)` is being used in
+   * another sense, such as `pounds` for money or the `pound` of `pound cake`, the end of what
+   * that sense covers: `end` for money, and the end of the noun for `pound cake`. Null where
+   * the unit is a measurement. Checked whatever `respectConventions` says, because what it
+   * finds is not a measurement at all.
    */
-  otherSense?: (text: string, start: number, end: number) => boolean;
+  otherSense?: (text: string, start: number, end: number) => number | null;
   /**
    * Left alone unless the rule is turned on by id. For measures that are not American at
    * all, merely imperial-descended and used everywhere.
@@ -274,15 +276,18 @@ const ALTITUDE: Convention[] = [
 ];
 
 /**
- * Whether the singular unit word `word`, ending the quantity `text.slice(start, end)`, is
- * the first part of a noun that `nouns` finds after it, as `pound` is in `Bake 1 pound cake`.
- * The number then counts the noun. A hyphen ties a unit to its number, so `a 2-pound cake`
- * is a weight.
+ * Where the noun ends that the singular unit word `word`, ending the quantity
+ * `text.slice(start, end)`, is the first part of, as `pound` is in `Bake 1 pound cake`, or
+ * null where `nouns` finds none after it. The number then counts the noun. A hyphen ties a
+ * unit to its number, so `a 2-pound cake` is a weight.
  */
 function startsNoun(word: string, nouns: RegExp) {
   const unit = new RegExp(String.raw`(?<![-A-Za-z])${word}$`, 'i');
-  return (text: string, start: number, end: number): boolean =>
-    unit.test(text.slice(start, end)) && nouns.test(text.slice(end, end + 40));
+  return (text: string, start: number, end: number): number | null => {
+    if (!unit.test(text.slice(start, end))) return null;
+    const noun = nouns.exec(text.slice(end, end + 40));
+    return noun === null ? null : end + noun[0].length;
+  };
 }
 
 const poundNoun = startsNoun('pound', /^[\s-]+(?:cakes?|signs?)\b/i);
@@ -471,7 +476,7 @@ export const MEASURES: Measure[] = [
       after: /^[\s-]*(?:divisions?|classes|class|limits?|bouts?|titles?|champions?|weight)\b/i,
     },
     otherSense: (text, start, end) =>
-      isMoney(text, start, end) || poundNoun(text, start, end),
+      isMoney(text, start, end) ? end : poundNoun(text, start, end),
   },
   {
     id: 'units.mass.stone',

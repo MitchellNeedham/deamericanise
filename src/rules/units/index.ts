@@ -365,8 +365,15 @@ function isConventional(
   );
 }
 
-function isOtherSense(ctx: RuleContext, alias: Alias, start: number, end: number): boolean {
-  return alias.isWord && alias.measure.otherSense?.(contextText(ctx.text), start, end) === true;
+/**
+ * Where the span ends that the rules hold for the quantity from `start` to `end` where its
+ * unit is in another sense, or null where it is a measurement. Past a noun the unit starts,
+ * as in `6 foot traffic`, since a rule that rewrote the rest of the noun would leave the
+ * quantity to convert on a second run.
+ */
+function otherSenseEnd(ctx: RuleContext, alias: Alias, start: number, end: number): number | null {
+  if (!alias.isWord) return null;
+  return alias.measure.otherSense?.(contextText(ctx.text), start, end) ?? null;
 }
 
 /** The words title case leaves in lower case between capitalised ones. */
@@ -509,7 +516,7 @@ export function isUnitInOtherSense(text: string, unitStart: number, unitEnd: num
   const opening = listed[0]?.start ?? start;
   if (nameBefore(text, opening, number[3]!, unit, isWord, unitEnd) !== null) return true;
   const otherSense = OTHER_SENSES.get(unit.toLowerCase());
-  return otherSense !== undefined && otherSense(contextText(text), opening, unitEnd);
+  return otherSense !== undefined && otherSense(contextText(text), opening, unitEnd) !== null;
 }
 
 /**
@@ -2220,7 +2227,7 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
           const otherSense =
             unnamed !== undefined &&
             larger.words.includes(match[2]!.toLowerCase()) &&
-            larger.otherSense?.(contextText(ctx.text), start, match.indices![2]![1]) === true;
+            larger.otherSense?.(contextText(ctx.text), start, match.indices![2]![1]) != null;
           if (kept || second || otherSense) {
             changes.push(hold(start, held, compound.id, 40));
             continue;
@@ -2394,11 +2401,9 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     // A noun straight after claims the words before it: `half a pound cake` is half a cake,
     // and `a mile and a half hour later` is half an hour.
     if (MODIFIES_A_NOUN.test(ctx.text.slice(start + matched.length))) return;
-    if (
-      isOtherSense(ctx, entry, start, start + matched.length) ||
-      (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length))
-    ) {
-      changes.push(hold(start, matched, entry.measure.id, 30));
+    const senseEnd = otherSenseEnd(ctx, entry, start, start + matched.length);
+    if (senseEnd !== null || (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length))) {
+      changes.push(hold(start, ctx.text.slice(start, senseEnd ?? start + matched.length), entry.measure.id, 30));
       return;
     }
     const read = inSense(ctx, entry, start, start + matched.length);
@@ -2469,12 +2474,13 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       pushSingle(ctx, changes, start + matched.length - alias.length, alias, '', alias, 1);
       return;
     }
+    const senseEnd = otherSenseEnd(ctx, entry, start, start + matched.length);
     if (
-      isOtherSense(ctx, entry, start, start + matched.length) ||
+      senseEnd !== null ||
       (entry.isWord && isPartOfName(ctx.text, alias, start + matched.length, value)) ||
       (entry.isWord && mayBeYear(ctx.text, start, raw, gap, start + matched.length))
     ) {
-      changes.push(hold(start, matched, entry.measure.id, 30));
+      changes.push(hold(start, ctx.text.slice(start, senseEnd ?? start + matched.length), entry.measure.id, 30));
       return;
     }
     const named = nameBefore(ctx.text, start, raw, alias, entry.isWord, start + matched.length);
@@ -2609,15 +2615,16 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           }
           continue;
         }
+        const senseEnd = otherSenseEnd(ctx, entry, start, end);
         if (
-          isOtherSense(ctx, entry, start, end) ||
+          senseEnd !== null ||
           (entry.isWord && isPartOfName(ctx.text, alias, end, high)) ||
           // A unit after the first number makes it a quantity, as in `From 1500 feet to 2000 feet`.
           (entry.isWord &&
             inner === undefined &&
             mayBeYear(ctx.text, start, highRaw, gap, end, raws.slice(0, -1), entry.measure))
         ) {
-          changes.push(hold(start, matched, entry.measure.id, 35));
+          changes.push(hold(start, ctx.text.slice(start, senseEnd ?? end), entry.measure.id, 35));
           continue;
         }
         const named = nameBefore(ctx.text, start, highRaw, alias, entry.isWord, end);
@@ -2766,9 +2773,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         for (let i = sides.length - 1; i >= 0; i--) units[i] = sides[i]!.entry ?? units[i + 1]!;
         const measures = [...new Set(units.map((u) => u.measure))];
 
-        const otherSense = units.find((u) => isOtherSense(ctx, u, start, end));
+        const otherSense = units.find((u) => otherSenseEnd(ctx, u, start, end) !== null);
         if (otherSense) {
-          changes.push(hold(start, match[0], otherSense.measure.id, 38));
+          const senseEnd = otherSenseEnd(ctx, otherSense, start, end)!;
+          changes.push(hold(start, ctx.text.slice(start, senseEnd), otherSense.measure.id, 38));
           continue;
         }
         if (measures.some((m) => isAmbiguousHere(m, ctx.text))) continue;

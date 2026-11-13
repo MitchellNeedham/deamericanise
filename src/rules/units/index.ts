@@ -32,6 +32,7 @@ import {
   FAHRENHEIT,
   GAS_MARK,
   OPENER as SENTENCE_OPENER,
+  TIME_UNIT,
   fahrenheitTemperatures,
   sentenceAround,
 } from './fahrenheit.js';
@@ -1065,6 +1066,51 @@ const DEGREES_WORD = `${anyCase('degree')}[sS]?`;
 const CELSIUS_WORD = `${anyCase('celsius')}${UNIT_END}`;
 
 /**
+ * A metric unit of mass, or one a mass is measured per, as the unit rules write it, and what
+ * one comes to in grams, litres or square metres.
+ */
+interface MetricPart {
+  symbol: string;
+  singular: string;
+  plural: string;
+  forms: string;
+  size: number;
+}
+
+const metricPart = (symbol: string, singular: string, forms: string, size: number): MetricPart => ({
+  symbol,
+  singular,
+  plural: `${singular}s`,
+  forms,
+  size,
+});
+
+const GRAM = metricPart('g', 'gram', 'grams?|g', 1);
+const KILOGRAM = metricPart('kg', 'kilogram', 'kilograms?|kg', 1000);
+const TONNE = metricPart('t', 'tonne', 'tonnes?|t', 1e6);
+const LITRE = metricPart('L', 'litre', 'litres?|liters?|L|l', 1);
+const CUBIC_CENTIMETRE = metricPart(
+  'cm³',
+  'cubic centimetre',
+  String.raw`cubic\s+(?:centimetres?|centimeters?)|cm³|cm3`,
+  0.001,
+);
+const CUBIC_METRE = metricPart('m³', 'cubic metre', String.raw`cubic\s+(?:metres?|meters?)|m³|m3`, 1000);
+const SQUARE_METRE = metricPart('m²', 'square metre', String.raw`square\s+(?:metres?|meters?)|m²|m2`, 1);
+const HECTARE = metricPart('ha', 'hectare', 'hectares?|ha', 1e4);
+
+/** A mass per each of `parts`, in grams per litre or per square metre, joined as the rules join them. */
+const massPer = (parts: MetricPart[]): MetricUnit[] =>
+  [GRAM, KILOGRAM, TONNE].flatMap((mass) =>
+    parts.map((per): MetricUnit => [
+      String.raw`(?:${mass.forms})(?:\s*\/\s*|\s+per\s+)(?:${per.forms})`,
+      times(mass.size / per.size),
+    ]),
+  );
+
+const SQUARE_METRE_KELVIN = String.raw`m(?:²|2|\^2)\s*[·⋅]?\s*(?:K|°C)`;
+
+/**
  * Metric units by dimension, in every form the unit rules write them, in the American
  * spellings, and in the shorthand of a hand-written temperature such as `180C` or `180ºC`.
  * The words of a temperature are read in any case, as the Fahrenheit value's are, but a lone
@@ -1083,6 +1129,13 @@ const METRIC_UNITS = {
   ],
   speed: [[String.raw`(?:kilometres?|kilometers?)\s+per\s+hour|km/h`, BASE]],
   torque: [[String.raw`newton[\s-]+(?:metres?|meters?)|N·m|Nm`, BASE]],
+  // Before area, mass and length, so `0.079 m²·K/W` and `15 g/L` are not read as `m²` and `g`.
+  thermalResistance: [[String.raw`${SQUARE_METRE_KELVIN}\s*\/\s*W`, BASE]],
+  thermalTransmittance: [
+    [String.raw`W\s*\/\s*(?:\(\s*${SQUARE_METRE_KELVIN}\s*\)|${SQUARE_METRE_KELVIN})`, BASE],
+  ],
+  density: massPer([LITRE, CUBIC_CENTIMETRE, CUBIC_METRE]),
+  arealDensity: massPer([SQUARE_METRE, HECTARE]),
   area: [
     [String.raw`square\s+(?:kilometres?|kilometers?)|km²|km2`, times(1e6)],
     [String.raw`square\s+(?:metres?|meters?)|m²|m2`, BASE],
@@ -1180,17 +1233,20 @@ const METRIC_FORMS = Object.entries(METRIC_UNITS).flatMap(([dimension, units]) =
   })),
 );
 
+/** What one of `measure`'s units comes to in the base unit of the dimension it converts to. */
+function baseOf(measure: Measure): { dimension: Dimension; value: number } | undefined {
+  const metric = measure.convert(1);
+  const form = METRIC_FORMS.find((f) => f.pattern.test(metric.symbol));
+  return form && { dimension: form.dimension, value: form.toBase(metric.value) };
+}
+
 /**
  * What one of each measure's units comes to in a unit they share, so `2 feet x 6 inches`
  * reads as one length. Undefined when they measure different things, as feet and pounds do.
  */
 function commonScale(measures: Measure[]): Map<Measure, number> | undefined {
   if (measures.length === 1) return new Map([[measures[0]!, 1]]);
-  const bases = measures.map((measure) => {
-    const metric = measure.convert(1);
-    const form = METRIC_FORMS.find((f) => f.pattern.test(metric.symbol));
-    return form && { dimension: form.dimension, value: form.toBase(metric.value) };
-  });
+  const bases = measures.map(baseOf);
   const dimension = bases[0]?.dimension;
   if (bases.some((base) => base === undefined || base.dimension !== dimension)) return undefined;
   return new Map(measures.map((measure, i) => [measure, bases[i]!.value]));
@@ -1269,6 +1325,214 @@ function restatesConversion(
   });
 }
 
+/** A measure's forms that may follow `/` or `per`: no stop, and no mark such as `"`. */
+const plainForms = (measure: Measure): string[] =>
+  [...measure.words, ...measure.abbrevs].filter((form) => /^[A-Za-z][^.]*$/.test(form));
+
+/**
+ * An imperial unit that another may be divided by: the measure whose rule decides it, which
+ * for a power of a length with no measure of its own is the length's, what one comes to in
+ * the base unit of its dimension (litres for a volume), and its forms.
+ */
+interface Divisor {
+  measure: Measure;
+  size: number;
+  forms: string[];
+  pattern: RegExp;
+}
+
+const SPACE_OR_HYPHEN = String.raw`(?:${INLINE_SPACE}+|${HYPHEN})`;
+
+/** The square or cube of a length, as `square inch`, `sq in`, `in²`, `in^2` and `in2` all are. */
+function poweredForms(length: Measure, power: 2 | 3): string {
+  const [word, mark] = power === 2 ? ['square|sq', String.raw`²|\^?2`] : ['cubic|cu', String.raw`³|\^?3`];
+  const abbrevs = plainForms(length).filter((form) => length.abbrevs.includes(form));
+  return (
+    String.raw`(?:${word})${SPACE_OR_HYPHEN}(?:${alternate(plainForms(length))})` +
+    (abbrevs.length === 0 ? '' : String.raw`|(?:${alternate(abbrevs)})(?:${mark})`)
+  );
+}
+
+const divisor = (measure: Measure, size: number, forms: string[]): Divisor => ({
+  measure,
+  size,
+  forms,
+  pattern: new RegExp(`^(?:${forms.join('|')})$`, 'i'),
+});
+
+const DIVISORS = new Map<string, Divisor>();
+for (const measure of MEASURES) {
+  const forms = plainForms(measure);
+  if (forms.length > 0) DIVISORS.set(measure.id, divisor(measure, baseOf(measure)?.value ?? NaN, [alternate(forms)]));
+}
+
+/**
+ * The square and cube of each length, by the length's id and the power. Where a measure is
+ * that power, as `units.area.square-foot` is of the foot, its divisor reads the powered forms too.
+ */
+const POWERED = new Map<string, Divisor>();
+for (const length of MEASURES.filter((measure) => baseOf(measure)?.dimension === 'length')) {
+  for (const power of [2, 3] as const) {
+    const size = baseOf(length)!.value ** power * (power === 3 ? 1000 : 1);
+    const dimension = power === 2 ? 'area' : 'volume';
+    const same = MEASURES.find((measure) => {
+      const base = baseOf(measure);
+      return base?.dimension === dimension && Math.abs(base.value / size - 1) < 1e-6;
+    });
+    const known = same && DIVISORS.get(same.id);
+    const forms = [...(known?.forms ?? []), poweredForms(length, power)];
+    const found = divisor(known?.measure ?? length, size, forms);
+    DIVISORS.set(same?.id ?? `${length.id}^${power}`, found);
+    POWERED.set(`${length.id}^${power}`, found);
+  }
+}
+
+/** The divisor that `id` names, or its square or cube where `power` says so. */
+const divisorOf = (id: string, power: 1 | 2 | 3 = 1): Divisor =>
+  (power === 1 ? DIVISORS.get(id) : POWERED.get(`${id}^${power}`))!;
+
+const measureOf = (id: string): Measure => MEASURES.find((measure) => measure.id === id)!;
+
+/** How a measurement in one unit per another written as `/` or `per` comes across. */
+interface PerUnit {
+  over: Measure;
+  under: Divisor;
+  /** The metric units it comes to, the mass first, or the measure it is a form of. */
+  to: [MetricPart, MetricPart] | Measure;
+  dimension: Dimension;
+  /** Its imperial forms, for reading it as the restatement of a metric value. */
+  forms: string;
+}
+
+const VOLUME_PARTS = [LITRE, CUBIC_CENTIMETRE, CUBIC_METRE];
+
+/** `/`, or `per` as a word, between the units of a value the text restates in brackets. */
+const RESTATED_PER = String.raw`\s*\/\s*|\s+per\s+`;
+
+function perUnit(over: string, under: Divisor, to: [MetricPart, MetricPart] | string): PerUnit {
+  const measure = measureOf(over);
+  const target = typeof to === 'string' ? measureOf(to) : to;
+  const dimension = Array.isArray(target)
+    ? VOLUME_PARTS.includes(target[1]) ? 'density' : 'arealDensity'
+    : measureDimension(target)!;
+  const overForms = alternate([...measure.words, ...measure.abbrevs]);
+  const forms = String.raw`(?:${overForms})(?:${RESTATED_PER})(?:${under.forms.join('|')})`;
+  return { over: measure, under, to: target, dimension, forms };
+}
+
+/**
+ * The common units of a mass per a volume or an area, which convert as one: a concentration
+ * or a density, a rate of spreading, and a pressure written as a weight on an area.
+ */
+const PER_UNITS: PerUnit[] = [
+  perUnit('units.mass.ounce', divisorOf('units.volume.gallon'), [GRAM, LITRE]),
+  perUnit('units.mass.pound', divisorOf('units.volume.gallon'), [KILOGRAM, LITRE]),
+  perUnit('units.mass.ounce', divisorOf('units.length.inch', 3), [GRAM, CUBIC_CENTIMETRE]),
+  perUnit('units.mass.pound', divisorOf('units.length.inch', 3), [GRAM, CUBIC_CENTIMETRE]),
+  perUnit('units.mass.pound', divisorOf('units.length.foot', 3), [KILOGRAM, CUBIC_METRE]),
+  perUnit('units.mass.pound', divisorOf('units.length.yard', 3), [KILOGRAM, CUBIC_METRE]),
+  perUnit('units.mass.ounce', divisorOf('units.length.foot', 2), [GRAM, SQUARE_METRE]),
+  perUnit('units.mass.ounce', divisorOf('units.length.yard', 2), [GRAM, SQUARE_METRE]),
+  perUnit('units.mass.pound', divisorOf('units.length.foot', 2), [KILOGRAM, SQUARE_METRE]),
+  perUnit('units.mass.pound', divisorOf('units.area.acre'), [KILOGRAM, HECTARE]),
+  perUnit('units.mass.ton', divisorOf('units.area.acre'), [TONNE, HECTARE]),
+  perUnit('units.mass.pound', divisorOf('units.length.inch', 2), 'units.pressure.psi'),
+];
+
+/** The three factors of the imperial unit of an R-value or a U-factor, in any order. */
+const THERMAL_FACTOR = String.raw`ft(?:²|\^?2)|hr?|[°º˚]F`;
+const THERMAL_FACTORS = String.raw`(?:${THERMAL_FACTOR})(?:[·⋅](?:${THERMAL_FACTOR})){2}`;
+const BTU = 'BTU|Btu';
+const R_VALUE = String.raw`(?:${THERMAL_FACTORS})\/(?:${BTU})`;
+const U_FACTOR = String.raw`(?:${BTU})\/(?:\((?:${THERMAL_FACTORS})\)|${THERMAL_FACTORS})`;
+
+/** Units of time that `a` takes before them in a rate, as in `2°F a minute`. */
+const TIME_WORD = 'second|minute|day|week|month|year|decade|century';
+const IS_TIME = new RegExp(`^(?:${TIME_UNIT})$`);
+
+const DIVISOR_LIST = [...DIVISORS.values()];
+
+/** A unit that divides another, in any system but temperature, or a unit of time. */
+const DIVISOR_FORMS = [
+  ...DIVISOR_LIST.flatMap((found) => found.forms),
+  TIME_UNIT,
+  ...(['length', 'area', 'volume', 'mass', 'power', 'energy'] as const).map(metricUnitForms),
+].join('|');
+
+const WORD_SPACE = String.raw`(?=\s)${SOFT_SPACE}`;
+
+/**
+ * What follows a unit: `/`, `per` or `a` and a unit that divides it, with any figure of its
+ * own after `/` or `per`, or `·` and another factor of a product. A unit followed by `·` is
+ * a factor too, as the `h` of `BTU/h·ft²·°F` is. A divisor ends where no power mark follows,
+ * so `in²` is read whole.
+ */
+const UNIT_TAIL = new RegExp(
+  String.raw`(?<product>(?=[·⋅][°º˚]?[A-Za-z]))|` +
+    String.raw`(?:(?<slash>${INLINE_SPACE}*\/${INLINE_SPACE}*)|` +
+    String.raw`(?<per>${WORD_SPACE}(?:per|PER)${WORD_SPACE}|${HYPHEN}per${HYPHEN}))` +
+    String.raw`(?:(?<figure>${NUMBER_PATTERN})${GAP})?(?<unit>${DIVISOR_FORMS})(?![A-Za-z\d²³^])` +
+    // An empty group under `?` never captures, so the empty alternative stands in for one.
+    String.raw`(?:(?<factor>(?=[·⋅][°º˚]?[A-Za-z]))|)|` +
+    String.raw`(?<article>${WORD_SPACE}a${WORD_SPACE})(?<time>${TIME_WORD})(?![A-Za-z\d])${NOT_A_TIME}`,
+  'y',
+);
+
+/** The factors of a product of units, read on from a `·` or `/`, as in `ft²·°F·h/BTU`. */
+const FACTORS = /(?:[·⋅/]\(?[°º˚]?[A-Za-z]+(?:[²³]|\^?[23])?\)?)+/y;
+
+interface UnitTail {
+  end: number;
+  /** `/` or `per` before a unit that divides, `a` before a unit of time, or `·` for a product. */
+  join: '/' | 'per' | 'a' | '·';
+  /** The text of the join, as `/` or ` per `. */
+  joint: string;
+  figure?: string;
+  unit?: string;
+  /** The imperial unit that divides, if it is one. */
+  divisor?: Divisor;
+}
+
+/**
+ * What follows the unit that ends at `at`, read by `UNIT_TAIL`, or null where nothing that
+ * divides or multiplies it does. `per in` is read as a preposition, as in `5 lb per in-store
+ * pickup`.
+ */
+function unitTail(text: string, at: number): UnitTail | null {
+  UNIT_TAIL.lastIndex = at;
+  const match = UNIT_TAIL.exec(text);
+  if (match === null) return null;
+  const { product, slash, per, figure, unit, factor, article, time } = match.groups!;
+  const end = at + match[0].length;
+  if (product !== undefined || factor !== undefined) {
+    FACTORS.lastIndex = end;
+    return { end: FACTORS.exec(text) === null ? end : FACTORS.lastIndex, join: '·', joint: '' };
+  }
+  if (article !== undefined) return { end, join: 'a', joint: article, unit: time };
+  if (per !== undefined && unit === 'in') return null;
+  const found = IS_TIME.test(unit!) ? undefined : DIVISOR_LIST.find((d) => d.pattern.test(unit!));
+  return { end, join: slash === undefined ? 'per' : '/', joint: slash ?? per!, figure, unit, divisor: found };
+}
+
+/**
+ * Whether `tail` makes the unit before it part of a compound that no rule may convert in part:
+ * a product of units, or `/` or `per` and an imperial unit with no figure of its own, unless
+ * that unit is kept, as a cup is in a recipe.
+ */
+function divides(
+  tail: UnitTail | null,
+  skip: Set<string>,
+  forced: Record<string, boolean>,
+): tail is UnitTail {
+  if (tail === null || tail.join === '·') return tail !== null;
+  return (
+    tail.join !== 'a' &&
+    tail.figure === undefined &&
+    tail.divisor !== undefined &&
+    !isKept(tail.divisor.measure, skip, forced)
+  );
+}
+
 /** Miles per US gallon, in every form the fuel economy rule reads. */
 const MPG_FORMS = [
   'mpg',
@@ -1278,8 +1542,9 @@ const MPG_FORMS = [
 ];
 
 /**
- * Imperial units by the dimension of what they convert to: every unit in MEASURES, and
- * the forms that only the feet-and-inches, temperature and fuel economy rules read.
+ * Imperial units by the dimension of what they convert to: every unit in MEASURES and
+ * PER_UNITS, and the forms that only the feet-and-inches, temperature, fuel economy, R-value
+ * and U-factor rules read.
  */
 const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
   temperature: [
@@ -1291,7 +1556,10 @@ const IMPERIAL_UNITS: Partial<Record<Dimension, string[]>> = {
   ],
   economy: [...MPG_FORMS],
   length: ["'", '’'],
+  thermalResistance: [R_VALUE],
+  thermalTransmittance: [U_FACTOR],
 };
+for (const per of PER_UNITS) (IMPERIAL_UNITS[per.dimension] ??= []).push(per.forms);
 for (const measure of MEASURES) {
   const forms = [...measure.words, ...measure.abbrevs, ...(measure.compoundAbbrevs ?? [])];
   // A unit read in another sense restates a value in that sense's dimension too, as the
@@ -2423,7 +2691,8 @@ const ORDINAL = /^(?:\d*[02-9])?1st(?![a-z])/i;
 /**
  * `7 pounds 8 ounces`, `11st 4lb` and `11 stone 4 pounds 8 ounces` are each one weight, as
  * `6 feet 2 inches` is one height. A weight that cannot be converted whole is held whole:
- * one in a unit that is kept, and one that ends a range, as in `7-8 lb 4 oz`. A weight has
+ * one in a unit that is kept, one that ends a range, as in `7-8 lb 4 oz`, and one that an
+ * imperial unit divides, as in `1 lb 8 oz per acre`. A weight has
  * no sides, so the number in `2 x 4 lb 8 oz bags` counts the bags. The next unit's word may
  * be left out before a join and another weight in the larger unit, as in
  * `11 stone 4 to 12 stone`, and a weight read so that cannot be converted is held up to the
@@ -2508,6 +2777,11 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
             larger.otherSense?.(contextText(ctx.text), start, match.indices![2]![1]) != null;
           if (kept || second || otherSense) {
             changes.push(hold(start, held, compound.id, 40));
+            continue;
+          }
+          const tail = unitTail(ctx.text, start + match[0].length);
+          if (unnamed === undefined && divides(tail, skip, forced)) {
+            changes.push(hold(start, ctx.text.slice(start, tail.end), compound.id, 40));
             continue;
           }
 
@@ -2665,6 +2939,91 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     return isSmallerPart(text, start) ? null : measurementStart;
   };
 
+  /**
+   * A measurement from `start` to `end` in `entry`'s unit, of `values` written as `raws` and
+   * joined by `joins`, followed by `/` or `per` and an imperial unit that divides it, or by
+   * `·` and another factor. A unit of `PER_UNITS` converts as one, with `/` writing the
+   * divisor as the unit before it is written and `per` as the divisor is. Any other, a product
+   * of units, one whose divisor's rule is off, one that is a form of a kept measure, as
+   * `lb/in²` is of psi, and one that a hyphen joins (`2-pound-per-acre`) are held whole, since
+   * converting the first unit alone would leave the second imperial.
+   * A unit of time, a metric unit or a kept one after it leaves the first to convert alone.
+   * `gap` is the space between the last number and the unit. Returns whether it pushed.
+   */
+  const pushPer = (
+    ctx: RuleContext,
+    changes: Change[],
+    start: number,
+    end: number,
+    raws: string[],
+    values: number[],
+    joins: string[],
+    entry: Alias,
+    gap: string,
+    priority: number,
+  ): boolean => {
+    const tail = unitTail(ctx.text, end);
+    if (!divides(tail, skip, forced)) return false;
+    const matched = ctx.text.slice(start, tail.end);
+    const under = tail.divisor;
+    if (under !== undefined) {
+      const per = PER_UNITS.find((each) => each.over === entry.measure && each.under === under);
+      const on =
+        buildGate(ctx.options).rule(under.measure.id, 'units', MEASUREMENT_CONFIDENCE) &&
+        !(per !== undefined && !Array.isArray(per.to) && isKept(per.to, skip, forced));
+      if (per !== undefined && on && !plainHyphens(tail.joint).startsWith('-')) {
+        const made = changes.length;
+        const body = perBody(ctx, per, tail, raws, values, joins, entry, start, gap);
+        const id = Array.isArray(per.to) ? entry.measure.id : per.to.id;
+        pushMeasurement(ctx, changes, start, matched, body, id, priority);
+        noteSense(changes, made, 'read with the unit it is per, and converted as one');
+        return true;
+      }
+    }
+    changes.push(hold(start, matched, entry.measure.id, priority));
+    return true;
+  };
+
+  /** `pushPer`'s conversion of a unit of `PER_UNITS`, in the words or symbols of the source. */
+  const perBody = (
+    ctx: RuleContext,
+    per: PerUnit,
+    tail: UnitTail,
+    raws: string[],
+    values: number[],
+    joins: string[],
+    entry: Alias,
+    start: number,
+    gap: string,
+  ): string => {
+    const { precision, maxDecimals } = ctx.options.units;
+    const figures = Math.max(...raws.map(significantFigures));
+    let target: Pick<MetricValue, 'symbol' | 'singular' | 'plural'>;
+    let factor: number;
+    let part: MetricPart | undefined;
+    if (Array.isArray(per.to)) {
+      const [mass, divisor] = per.to;
+      [target, part] = [mass, divisor];
+      factor = baseOf(entry.measure)!.value / per.under.size / (mass.size / divisor.size);
+    } else {
+      const metric = per.to.convert(1);
+      [target, factor] = [metric, metric.value];
+    }
+    const numbers = values.map((value) =>
+      formatNumber(value * factor, precision, figures, maxDecimals, raws),
+    );
+    const singular =
+      Math.abs(Number(numbers.at(-1)!.replace(/,/g, ''))) === 1 ||
+      (entry.isSingular && describesNoun(ctx.text, start, values.at(-1)!, gap, tail.end));
+    const unit = !entry.isWord ? target.symbol : singular ? target.singular : target.plural;
+    const word = tail.join === 'per'
+      ? per.under.measure.words.some((form) => form.toLowerCase() === tail.unit!.toLowerCase()) ||
+        /^(?:square|cubic)\b/i.test(tail.unit!)
+      : entry.isWord;
+    const divisor = part === undefined ? '' : tail.joint + (word ? part.singular : part.symbol);
+    return `${interleave(numbers, joins.map(separator))} ${unit}${divisor}`;
+  };
+
   /** A written-out quantity with its unit inside it, as in `half a mile`. */
   const pushWrapped = (
     ctx: RuleContext,
@@ -2695,6 +3054,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
+    if (pushPer(ctx, changes, start, start + matched.length, [matched], [value], [], entry, '', 30)) return;
 
     const target = entry.measure.convert(value);
     const { precision, maxDecimals } = ctx.options.units;
@@ -2786,6 +3146,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
+    if (pushPer(ctx, changes, start, start + matched.length, [raw], [value], [], entry, gap, 30)) return;
 
     const target = entry.measure.convert(value);
     const { precision, maxDecimals } = ctx.options.units;
@@ -2931,6 +3292,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         // Only `to` makes one range of two measurements. Joined any other way, as in
         // `5 feet or 6 feet` and `5ft-6ft`, each keeps its unit, and the single rule converts each.
         if (inner !== undefined && WORD_JOIN.exec(join)?.[1]!.toLowerCase() !== 'to') continue;
+        if (pushPer(ctx, changes, start, end, raws, values, joins, entry, gap, 35)) continue;
 
         // Every figure shares the unit chosen for the last, so the range or list stays readable.
         const target = entry.measure.convert(high);
@@ -3091,6 +3453,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           continue;
         }
 
+        const tail = unitTail(ctx.text, end);
+        if (divides(tail, skip, forced)) {
+          changes.push(hold(start, ctx.text.slice(start, tail.end), entry.measure.id, 38));
+          continue;
+        }
         const scale = commonScale(measures);
         if (!scale) continue;
         const inBase = sides.map((s, i) => s.value! * scale.get(units[i]!.measure)!);
@@ -3219,6 +3586,17 @@ const CHANGE_AFTER = new RegExp(
 /** `10°F below zero` is a negative temperature, not a distance from zero. */
 const FROM_ZERO = /^\s+(above|below)\s+zero\b/i;
 
+/**
+ * A unit after a Fahrenheit value that makes it a rate of change, which converts as a
+ * difference: `per` and a unit, with a figure or not, as in `2°F per hour` and
+ * `5.4°F per 1000 feet`, `a` and a unit of time, as in `2°F a minute`, or `/`, a figure and a
+ * unit, as in `5.4°F/1000 ft`. A slash before a unit with no figure makes a compound unit,
+ * which `fahrenheitTemperatures` leaves as written.
+ */
+function isRate(tail: UnitTail | null): boolean {
+  return tail !== null && tail.join !== '·' && (tail.join !== '/' || tail.figure !== undefined);
+}
+
 /** The Celsius value in brackets or joined by `/` or `or` at the start of `rest`. */
 function celsiusPartnerAfter(rest: string): MetricPartner | undefined {
   const partner = metricPartnerAfter(rest);
@@ -3302,7 +3680,11 @@ function fahrenheitReadings(
       end += zero[0].length;
       if (zero[1]!.toLowerCase() === 'below') values = values.map((v) => -Math.abs(v));
     }
-    const difference = !zero && (CHANGE_BEFORE.test(beside.before) || CHANGE_AFTER.test(beside.after));
+    const difference =
+      !zero &&
+      (CHANGE_BEFORE.test(beside.before) ||
+        CHANGE_AFTER.test(beside.after) ||
+        isRate(unitTail(beside.after, 0)));
 
     let numbers: string[];
     if (difference) {
@@ -3784,6 +4166,64 @@ export function startsMeasurement(text: string, at: number): boolean {
 
 readMeasurementsWith(startsMeasurement);
 
+/** The kind of each factor of an R-value's or U-factor's unit, by its first letter or its last. */
+const thermalKind = (factor: string) =>
+  factor.startsWith('f') ? 'area' : factor.endsWith('F') ? 'degree' : 'time';
+
+/**
+ * `0.45 ft²·°F·h/BTU` is an R-value, the thermal resistance of insulation, and
+ * `0.30 BTU/h·ft²·°F` a U-factor, the heat a window lets through. Each unit is read whole,
+ * with one of each factor in any order, the U-factor's in brackets or not, and converts to
+ * `m²·K/W` or `W/(m²·K)`. One that ends a range, or that another unit divides, as an R-value
+ * per inch does, is held as written.
+ */
+function thermalRules(skip: Set<string>, forced: Record<string, boolean>): Rule[] {
+  const squareMetres = baseOf(measureOf('units.area.square-foot'))!.value;
+  const joules = baseOf(measureOf('units.energy.btu'))!.value * 1000;
+  // A degree Fahrenheit is 5/9 of a kelvin, and an hour 3600 seconds.
+  const resistance = (squareMetres * (5 / 9) * 3600) / joules;
+  const units: Array<[id: string, unit: string, factor: number, symbol: string]> = [
+    ['units.thermal.r-value', R_VALUE, resistance, 'm²·K/W'],
+    ['units.thermal.u-factor', U_FACTOR, 1 / resistance, 'W/(m²·K)'],
+  ];
+  return units.map(([id, unit, factor, symbol]): Rule => {
+    const pattern = new RegExp(
+      String.raw`(?=${NUMERIC_FIRST})${NUMBER_START}(${NUMERIC_PATTERN})${GAP}(${unit})${UNIT_END}`,
+      'g',
+    );
+    return {
+      id,
+      category: 'units',
+      confidence: 'moderate',
+      priority: 35,
+      find(ctx) {
+        const changes: Change[] = [];
+        // Every unit either rule reads names the BTU, so most texts need no scan.
+        if (!/BTU|Btu/.test(ctx.text)) return changes;
+        for (const match of ctx.text.matchAll(pattern)) {
+          const value = parseNumber(match[1]!);
+          const factors = match[2]!.replace(/^(?:BTU|Btu)\/|\/(?:BTU|Btu)$|[()]/g, '').split(/[·⋅]/);
+          if (value === null || new Set(factors.map(thermalKind)).size !== 3) continue;
+          const start = match.index;
+          const end = start + match[0].length;
+          const tail = unitTail(ctx.text, end);
+          const held =
+            divides(tail, skip, forced) ? tail.end : endsRange(ctx.text, start, match[1]!) ? end : null;
+          if (held !== null) {
+            changes.push(hold(start, ctx.text.slice(start, held), id, 35));
+            continue;
+          }
+          const { precision, maxDecimals } = ctx.options.units;
+          const raw = match[1]!;
+          const number = formatNumber(value * factor, precision, significantFigures(raw), maxDecimals, [raw]);
+          pushMeasurement(ctx, changes, start, match[0], `${number} ${symbol}`, id, 35);
+        }
+        return changes;
+      },
+    };
+  });
+}
+
 export function unitRules(options: ResolvedOptions, dialectKeep: string[]): Rule[] {
   const skip = new Set([...dialectKeep, ...options.unitsKeep]);
   return [
@@ -3793,6 +4233,7 @@ export function unitRules(options: ResolvedOptions, dialectKeep: string[]): Rule
     temperatureDecadeRule(),
     coinSizeRule(),
     fuelEconomyRule(),
+    ...thermalRules(skip, options.rules),
     ...measurementRules(skip, options.rules),
   ];
 }

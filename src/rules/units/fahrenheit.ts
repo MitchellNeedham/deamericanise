@@ -67,14 +67,19 @@ const JOIN = softGap(String.raw`(?:${HYPHEN}|\u2013|\u2014|to|or)`);
 const BETWEEN_AND =
   String.raw`(?=\s)(?<=\bbetween(?=\s)${SOFT_SPACE}${DEGREES})` + softGap(String.raw`(?<=\s)and(?=\s)`);
 
+/** Units of time, which a rate divides by, as in `°F/min` and `5 gallons/minute`. */
+export const TIME_UNIT = [
+  's', 'secs?', 'seconds?', 'mins?', 'minutes?', 'h', 'hrs?', 'hours?', 'd', 'days?', 'wks?',
+  'weeks?', 'mos?', 'months?', 'yrs?', 'years?', 'decades?', 'century', 'centuries',
+].join('|');
+
 /**
  * The units a Fahrenheit degree can be divided by in a rate or a compound unit: time, length,
  * energy and power, as in `°F/min`, `°F/ft` and `°F/W`.
  */
 const PER_UNIT = [
-  's', 'secs?', 'seconds?', 'mins?', 'minutes?', 'h', 'hrs?', 'hours?', 'd', 'days?', 'wks?',
-  'weeks?', 'mos?', 'months?', 'yrs?', 'years?', 'decades?', 'century', 'centuries', 'ft', 'foot',
-  'feet', 'inch(?:es)?', 'mi', 'miles?', 'k?m', 'cm', 'mm', 'BTUs?', 'k?W', 'k?J', 'k?cal',
+  TIME_UNIT, 'ft', 'foot', 'feet', 'inch(?:es)?', 'mi', 'miles?', 'k?m', 'cm', 'mm', 'BTUs?', 'k?W',
+  'k?J', 'k?cal',
 ].join('|');
 
 /**

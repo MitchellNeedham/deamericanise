@@ -952,13 +952,17 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 - **Proper nouns.** Pearl Harbor, the World Trade Center, the Department of Defense, the
   Australian Labor Party, rigor mortis, Fahrenheit 451, the MIT License, Prolog, and
   trademarks such as Band-Aid and Realtor. A capitalised `Organization`, `Labor`, `Honor`,
-  `Theater`, `Center` or `Color` with a capitalised word beside it, straight or across `of`
-  or `for`, is part of a name and is held with the words beside it, so
-  `World Health Organization`, `Bureau of Labor Statistics`, `Medal of Honor`,
-  `Kodak Theater`, `Space Center Houston` and `Color Run` keep their spelling. A word such as
-  `The` or `Your` marks no name, so `Your Honor` is rewritten, and so is `Legion of Honor`,
-  which British and Australian writing spell `Legion of Honour`. A phrase the vocabulary
-  rewrites whole, such as `Movie Theater`, is a common noun.
+  `Theater`, `Center` or `Color` is part of a name, and is held with the words it is read
+  from, on strong evidence: two capitalised words straight before it, as in
+  `World Health Organization` (a capital that only starts a sentence does not count), or
+  `of` or `for` joining it to another capitalised word, as in `Bureau of Labor Statistics`
+  and `Medal of Honor`. A few names are listed, such as `Kodak Theater`,
+  `Space Center Houston` and `Color Run`. In a heading (a Markdown heading, or a line in
+  title case with no figure in it), only a listed name is held, so `## Data Center Setup` and
+  `## Customizing Colors` are rewritten, and so are `Color Theory is fun` and
+  `See the Color Picker panel`. A word such as `The` or `Your` marks no name, so
+  `Your Honor` is rewritten, and so is `Legion of Honor`, which British and Australian
+  writing spell `Legion of Honour`.
 - **Structure.** URLs, email addresses, long command-line flags, inline code, fenced code
   blocks and HTML tags. A long flag is two hyphens and a letter at the start of a token, with
   any `=value` after it, so `--center`, `--color=gray` and `--label="dark gray"` are held in
@@ -1489,10 +1493,6 @@ options it had and goes on following the page under them.
 - A CSS declaration in a sentence is read from its shape. One with a bare property name and
   nothing else only CSS writes, as in `Set color: gray on it`, reads as a key and its value
   in prose, as `Eye color: gray` does, and is rewritten.
-- A name is read from its capitals, so a title in title case reads as one: a capitalised
-  `Color`, `Center` or another of the words under Proper nouns beside another capitalised
-  word, as in a heading such as `Color Palette`, keeps its spelling, and so does the word
-  beside it.
 - Outside the remark plugin, the paragraph an inline code span may wrap within is found
   from its lines: a blank line, or a line that opens a heading, quote, list item, fence,
   rule or table row, ends it. A span that wraps onto the next `>` line of a block quote is

@@ -1481,7 +1481,9 @@ default and rewrites `title`, `alt` and `placeholder` as well as text.
 other element ends the run, so a change never reaches across a paragraph, a table cell or a
 line break. So does an inline element that the page lays out in a box of its own, such as a
 span that is a flex item or is styled as a block or an inline-block, because its text never
-reads as part of the word beside it. The layout comes from the page's computed styles, and
+reads as part of the word beside it. An inline element that sets `lang`, `translate`,
+`contenteditable` or `spellcheck`, carries the `notranslate` class or has `role="code"` ends
+the run too, since different rules apply inside it. The layout comes from the page's computed styles, and
 is read again once the page's stylesheets have loaded. A document with no window, such as
 one from `DOMParser`, has no styles, so there the tag alone decides. A change that crosses elements puts its replacement in the first text node and
 empties its share of the others: `6 feet <b>2</b> inches` becomes `1.88 metres<b></b>`. A

@@ -91,6 +91,15 @@ describe('runs of text', () => {
     );
   });
 
+  it.each(['lang="en-US"', 'translate="yes"', 'spellcheck="false"', 'class="notranslate"'])(
+    'ends the run at an inline element with %s, since different rules apply inside it',
+    (attribute) => {
+      expect(rewrite(`<p>It is 6 feet <span ${attribute}>2</span> inches wide.</p>`)).not.toContain(
+        '1.88 metres',
+      );
+    },
+  );
+
   it('keeps a change inside one node to that node', () => {
     expect(rewrite('<p>The <em>color</em> of the <a href="#">theater</a>.</p>')).toBe(
       '<p>The <em>colour</em> of the <a href="#">theatre</a>.</p>',

@@ -54,7 +54,15 @@ const ATTRIBUTES: Array<[name: string, on: Set<string> | null]> = [
 ];
 
 /** Attributes whose change can move a boundary or open and close a scope. */
-export const SCOPE_ATTRIBUTES = ['lang', 'xml:lang', 'translate', 'contenteditable', 'class', 'role'];
+export const SCOPE_ATTRIBUTES = [
+  'lang',
+  'xml:lang',
+  'translate',
+  'contenteditable',
+  'spellcheck',
+  'class',
+  'role',
+];
 export const TEXT_ATTRIBUTES = ATTRIBUTES.map(([name]) => name);
 
 /** What applies at a point in the tree. */
@@ -91,6 +99,14 @@ export type Segment = TextRun | AttributeValue;
 
 /** Finds the shadow root an element hosts, or null. */
 export type ShadowLookup = (host: Element) => ShadowRoot | null;
+
+/** Finds open roots only. */
+export const openShadowRoot: ShadowLookup = (host) => host.shadowRoot;
+
+/** `lookup`, asked only about elements that can host a root. */
+export function hostsOnly(lookup: ShadowLookup): ShadowLookup {
+  return (host) => (canHostShadowRoot(host) ? lookup(host) : null);
+}
 
 /** Whether a page can attach a shadow root to `element`. */
 export function canHostShadowRoot(element: Element): boolean {
@@ -229,6 +245,14 @@ export function scopeOf(node: Node): Scope {
   return scope;
 }
 
+/** The scope inside `node`, worked out downwards from `top`, an element whose scope is `scope`. */
+export function scopeBelow(node: Node, top: Element, scope: Scope): Scope {
+  const chain = ancestry(node);
+  const at = chain.indexOf(top);
+  for (let i = (at < 0 ? chain.length : at) - 1; i >= 0; i--) scope = enter(scope, chain[i]!);
+  return scope;
+}
+
 /**
  * The editing host around `node`: the outermost element of the editable stretch it sits in,
  * or the body of a document in design mode. Null when `node` is not editable.
@@ -276,6 +300,7 @@ function flowOf(element: Element): Flow {
     !element.hasAttribute('xml:lang') &&
     !element.hasAttribute('translate') &&
     !element.hasAttribute('contenteditable') &&
+    !element.hasAttribute('spellcheck') &&
     !element.classList.contains('notranslate') &&
     !namesCodeRole(element.getAttribute('role'));
   return inline ? inlineFlow(element) : 'ends';

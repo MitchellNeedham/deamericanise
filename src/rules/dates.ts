@@ -1,5 +1,5 @@
 import type { Change, Rule, RuleContext } from '../types.js';
-import { MEASURES, SINGULAR_WORDS } from './units/definitions.js';
+import { MAGNITUDES, MEASURES, SINGULAR_WORDS } from './units/definitions.js';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -179,9 +179,6 @@ function escape(s: string): string {
  * `March 5, 2024 in Paris` and the closing quote in `"Filed March 5, 2024"`.
  */
 const NOT_UNITS_AFTER_A_YEAR = new Set(['in', 'in.', '"']);
-
-/** Covers every band a metric conversion picks its unit from, millimetres to tonnes. */
-const MAGNITUDES = Array.from({ length: 16 }, (_, i) => 10 ** (i - 6));
 
 const METRIC = MEASURES.flatMap((measure) => MAGNITUDES.map((magnitude) => measure.convert(magnitude)));
 

@@ -360,7 +360,28 @@ const TONS_OF_COOLING: Sense = {
   before: withPlurals(COOLED),
 };
 
-export const MEASURES: Measure[] = [
+/** Covers every band a metric conversion picks its unit from, millimetres to tonnes. */
+export const MAGNITUDES = Array.from({ length: 16 }, (_, i) => 10 ** (i - 6));
+
+/**
+ * `measures`, each writing a zero in the metric unit nearest in size to one of its own unit,
+ * as `0 feet` is `0 metres` and `0 ounces` is `0 grams`, since a zero has no size to pick a
+ * unit by.
+ */
+function zeroInNearestUnit(measures: Measure[]): Measure[] {
+  return measures.map((measure) => {
+    const { convert } = measure;
+    const distance = (magnitude: number) =>
+      Math.abs(Math.log10(convert(magnitude).value / magnitude));
+    const nearest = MAGNITUDES.reduce((best, magnitude) =>
+      distance(magnitude) < distance(best) ? magnitude : best,
+    );
+    const zero = { ...convert(nearest), value: 0 };
+    return { ...measure, convert: (value: number) => (value === 0 ? { ...zero } : convert(value)) };
+  });
+}
+
+export const MEASURES: Measure[] = zeroInNearestUnit([
   // ----- length -----
   {
     id: 'units.length.inch',
@@ -634,7 +655,7 @@ export const MEASURES: Measure[] = [
     abbrevs: ['ft-lb', 'ft-lbs', 'ft lb', 'ft lbs', 'lb-ft', 'lb ft', 'lbft', 'lb.ft'],
     convert: (v) => m(v * 1.3558179483, 'N·m', 'newton metre', 'newton metres'),
   },
-];
+]);
 
 /**
  * Word forms that are grammatically singular. A singular unit next to a number that is
@@ -642,6 +663,28 @@ export const MEASURES: Measure[] = [
  * singular too.
  */
 export const SINGULAR_WORDS = new Set(MEASURES.flatMap((measure) => measure.singular));
+
+/** Whether the unit form `form` is the plural of `one`, as `pound-feet` is of `pound-foot`. */
+function isPluralOf(form: string, one: string): boolean {
+  const words = form.split(/([\s-])/);
+  const ones = one.split(/([\s-])/);
+  const differ = words.flatMap((word, i) => (word === ones[i] ? [] : [i]));
+  if (words.length !== ones.length || differ.length !== 1) return false;
+  const singular = ones[differ[0]!]!;
+  return words[differ[0]!] === (singular === 'foot' ? 'feet' : plural(singular));
+}
+
+/**
+ * Word forms that are their own plural, as `stone` and `horsepower` are: neither only singular
+ * nor the plural of a form that is. Their number says nothing of whether they describe a noun.
+ */
+export const OWN_PLURAL_WORDS = new Set(
+  MEASURES.flatMap(({ words, singular }) =>
+    words.filter(
+      (word) => !singular.includes(word) && !singular.some((one) => isPluralOf(word, one)),
+    ),
+  ),
+);
 
 /** One measurement written in descending units of one dimension, as `11 stone 4 pounds` is. */
 export interface Compound {

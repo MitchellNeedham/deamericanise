@@ -68,7 +68,7 @@ export const SPACE_GROUPED =
   `(?:${GROUP_SPACES.map(groupedBy).join('|')})`;
 
 /** A whole number in digits, grouped in thousands by commas or by spaces, or not at all. */
-export const DIGITS =String.raw`${groupedBy(',')}|${SPACE_GROUPED}|\d+`;
+export const DIGITS = String.raw`${groupedBy(',')}|${SPACE_GROUPED}|\d+`;
 
 const COUNT_THEN_GROUP = new RegExp(
   String.raw`^\d{1,3}(?:${GROUP_SPACE}\d{3})*${GROUP_SPACE}(?=[1-9]\d\d(?:\.\d+)?$)`,

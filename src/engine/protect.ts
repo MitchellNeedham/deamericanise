@@ -2,8 +2,6 @@ import type { Range } from './apply.js';
 import { commentedCodeRanges } from './code-shape.js';
 import { collectFrontMatter } from './front-matter.js';
 import { collectVerbatimBlocks } from './indented-code.js';
-import { DIALECTS } from '../dialects/index.js';
-import { baseVocabulary } from '../rules/vocabulary.js';
 import type { Syntax } from '../types.js';
 
 /**
@@ -26,53 +24,90 @@ const NAME_WORD = String.raw`(?!(?:${FUNCTION_WORDS.join('|')})\b)[A-Z][A-Za-z]*
  */
 const NAME_PART = String.raw`(?:Organizations?|Labor|Honors?(?<!\bLegion\s+of\s+Honors?)|Theaters?|Cent(?:er|re)s?|Colors?)`;
 
-/** The space between two words of a name, which may wrap onto the next line, with any `of` or `for`. */
-const NAME_LINK = String.raw`(?=\s)[^\S\r\n]*(?:\r?\n[^\S\r\n]*)?(?:(?:of|for)(?=\s)[^\S\r\n]*(?:\r?\n[^\S\r\n]*)?)?`;
+/** The space between two words of a name, which may wrap onto the next line. */
+const NAME_SPACE = String.raw`(?=\s)[^\S\r\n]*(?:\r?\n[^\S\r\n]*)?`;
+
+const NAME_OF = String.raw`${NAME_SPACE}(?:of|for)${NAME_SPACE}`;
 
 /**
- * One of `NAME_PART` with a capitalised word beside it, straight or across `of` or `for`, as in
- * `Storm Prediction Center`, `Medal of Honor` and `Color Run`, where a data centre and a sense
- * of honour are common nouns. The words beside it are held too, so the hold never depends on a
- * word another rule may rewrite.
+ * Where a sentence starts: the start of the text or of a paragraph, a list item, heading or
+ * quote, or the space after a full stop, question mark or exclamation mark. A word there is
+ * capitalised whether or not it names anything.
+ */
+const SENTENCE_START =
+  String.raw`(?:(?:^|\n[ \t]*\n)[ \t>]*(?:(?:[-+*]|\d{1,9}[.)]|#{1,6})[ \t]+)?` +
+  String.raw`|\n[ \t>]*(?:[-+*]|\d{1,9}[.)]|#{1,6})[ \t]+|[.!?]["'”’)\]]*\s+)`;
+
+/**
+ * One of `NAME_PART` on strong evidence that it is part of a name: two capitalised words
+ * straight before it, as in `Storm Prediction Center`, where a capital at the start of a
+ * sentence does not count, or `of` or `for` joining it to another capitalised word, as in
+ * `Medal of Honor` and `Organization of American States`. A data centre, a `Color Picker` and
+ * a sense of honour are common nouns. The words before or after it are held too, so the hold
+ * never depends on a word another rule may rewrite.
  */
 const NAME = new RegExp(
-  String.raw`\b(?=[A-Z])(?:${NAME_WORD}${NAME_LINK}${NAME_PART}(?:${NAME_LINK}${NAME_WORD})?` +
-    String.raw`|${NAME_PART}${NAME_LINK}${NAME_WORD})\b`,
+  String.raw`\b(?=[A-Z])(?:(?<!${SENTENCE_START})${NAME_WORD}${NAME_SPACE}${NAME_WORD}${NAME_SPACE}${NAME_PART}` +
+    String.raw`|${NAME_WORD}${NAME_OF}${NAME_PART}|${NAME_PART}${NAME_OF}${NAME_WORD})\b`,
   'g',
 );
 
-/** `text` with every character a pattern reads specially escaped, to match itself. */
-function escapePattern(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-const HOLDS_NAME_PART = new RegExp(String.raw`\b${NAME_PART}\b`, 'i');
+/** Words a title leaves in lower case, as in `The Favorite Colors of Kids`. */
+const MINOR_WORDS = new Set([
+  'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into', 'nor', 'of', 'off', 'on',
+  'onto', 'or', 'over', 'per', 'so', 'than', 'the', 'to', 'up', 'upon', 'via', 'vs', 'with', 'yet',
+]);
 
 /**
- * Phrases the vocabulary rewrites whole that hold one of `NAME_PART`, such as `movie theater`.
- * Each is a common noun even where a title capitalises it.
+ * Whether a line is a heading, where every word may be capitalised: a Markdown heading, or a
+ * line in title case, which capitalises its first word and every main word. A line with a
+ * figure in it is never a title, since a rule that rewrites an amount, a time or a temperature
+ * can drop the only lower-case words on the line, and the hold must not change between runs.
  */
-const COMMON_PHRASES = [
-  ...new Set(
-    [...baseVocabulary(), ...Object.values(DIALECTS).flatMap((pack) => pack.vocabulary)]
-      .map((entry) => entry.from.toLowerCase())
-      .filter((from) => from.includes(' ') && HOLDS_NAME_PART.test(from)),
-  ),
-];
+function isHeading(line: string, next: string | undefined): boolean {
+  if (/^[ \t>]*#{1,6}(?:[ \t]|$)/.test(line)) return true;
+  if (next !== undefined && /\S/.test(line) && /^[ \t]{0,3}(?:=+|-+)[ \t]*\r?$/.test(next)) return true;
+  if (/\p{N}/u.test(line)) return false;
+  const words = line.match(/\p{L}[\p{L}\p{M}'’]*/gu) ?? [];
+  const capitalised = (word: string) => /^\p{Lu}/u.test(word);
+  return (
+    words.length > 0 &&
+    capitalised(words[0]!) &&
+    words.every((word) => capitalised(word) || MINOR_WORDS.has(word))
+  );
+}
 
-// An empty alternation would match every name, so with no phrases there is no pattern.
-const COMMON_PHRASE = COMMON_PHRASES.length
-  ? new RegExp(
-      String.raw`\b(?:${COMMON_PHRASES.map((from) => escapePattern(from).replace(/ +/g, String.raw`\s+`)).join('|')})\b`,
-      'i',
-    )
-  : undefined;
-
+/** Holds each `NAME` outside a heading, reading each line once however many names it holds. */
 function collectNames(text: string, into: Range[]): void {
-  NAME.lastIndex = 0;
+  let lineStart = 0;
+  let lineEnd = text.indexOf('\n');
+  if (lineEnd === -1) lineEnd = text.length;
+  let heading: { start: number; is: boolean } | undefined;
+  const advanceTo = (point: number) => {
+    while (point > lineEnd && lineEnd < text.length) {
+      lineStart = lineEnd + 1;
+      lineEnd = text.indexOf('\n', lineStart);
+      if (lineEnd === -1) lineEnd = text.length;
+    }
+  };
+  const inHeading = (): boolean => {
+    if (heading?.start !== lineStart) {
+      const nextEnd = lineEnd < text.length ? text.indexOf('\n', lineEnd + 1) : -1;
+      const next = lineEnd < text.length ? text.slice(lineEnd + 1, nextEnd === -1 ? text.length : nextEnd) : undefined;
+      heading = { start: lineStart, is: isHeading(text.slice(lineStart, lineEnd), next) };
+    }
+    return heading.is;
+  };
   for (const match of text.matchAll(NAME)) {
-    if (COMMON_PHRASE?.test(match[0])) continue;
-    into.push({ start: match.index, end: match.index + match[0].length });
+    const start = match.index;
+    const end = start + match[0].length;
+    advanceTo(start);
+    let held = !inHeading();
+    if (held && end > lineEnd) {
+      advanceTo(end);
+      held = !inHeading();
+    }
+    if (held) into.push({ start, end });
   }
 }
 
@@ -87,6 +122,12 @@ const PROPER_NOUNS: RegExp[] = [
   /\b(?:One )?World Trade Cent(?:er|re)\b/g,
   /\b(?:Rockefeller|Lincoln|Kennedy|Barclays|Javits|Moscone) Center\b/g,
   /\bCenter for [A-Z]\w+/g,
+  // Names a heading or a sentence start may hold, where `NAME` does not read one.
+  /\b(?:World Health|World Trade|International|North Atlantic Treaty|World Meteorological|World Intellectual Property|International Labor) Organization\b/g,
+  /\b(?:International Organization for Standardization|Organization of American States)\b/g,
+  /\b(?:Department|Bureau|Secretary|Federation) of Labor\b/g,
+  /\b(?:Medal of Honor|Space Center Houston|Kodak Theater|Color Run)\b/g,
+  /\b(?:(?:Storm|Climate|Weather|Space Weather) Prediction|National Hurricane) Center\b/g,
   /\bCenters? for Disease Control\b/g,
   /\b(?:Department|Secretary|Office) of Defense\b/g,
   /\bDefense (?:Department|Intelligence|Advanced|Logistics)\b/g,
@@ -598,7 +639,7 @@ export function protectedRanges(text: string, options: ProtectOptions): Range[] 
 export function toPatterns(entries: (string | RegExp)[]): RegExp[] {
   return entries.map((entry) =>
     typeof entry === 'string'
-      ? new RegExp(`(?<![A-Za-z0-9_])${escapePattern(entry)}(?![A-Za-z0-9_])`, 'g')
+      ? new RegExp(`(?<![A-Za-z0-9_])${entry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9_])`, 'g')
       : entry,
   );
 }

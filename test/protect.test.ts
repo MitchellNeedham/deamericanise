@@ -717,17 +717,19 @@ describe('institution names keep their spelling', () => {
 
   it.each`
     unchanged                                                         | why
-    ${'The World Health Organization met.'}                           | ${'capitalised words before it'}
+    ${'The World Health Organization met.'}                           | ${'two capitalised words before it'}
     ${'NATO, the North Atlantic Treaty Organization, met.'}           | ${'the same'}
+    ${'We toured the Johnson Space Center today.'}                    | ${'the same, on no list'}
     ${'The International Organization for Standardization met.'}      | ${'for and a capitalised word after it'}
     ${'The Organization of American States met.'}                     | ${'of and a capitalised word after it'}
-    ${'The Department of Labor and the Bureau of Labor Statistics.'}  | ${'a capitalised word and of before it'}
-    ${'The American Federation of Labor merged.'}                     | ${'the same'}
+    ${'The Museum of Color opened.'}                                  | ${'a capitalised word and of before it, on no list'}
+    ${'The Department of Labor and the Bureau of Labor Statistics.'}  | ${'listed, on a line every word of which is capitalised'}
+    ${'The American Federation of Labor merged.'}                     | ${'a capitalised word and of before it'}
     ${'He received the Medal of Honor.'}                              | ${'the same'}
-    ${'They performed at the Kodak Theater.'}                         | ${'one capitalised word before it'}
-    ${'The Children’s Theater opened.'}                               | ${'a possessive before it'}
-    ${'We visited Space Center Houston.'}                             | ${'a capitalised word either side'}
-    ${'I ran the Color Run.'}                                         | ${'a capitalised word after it'}
+    ${'They performed at the Kodak Theater.'}                         | ${'a listed name'}
+    ${'We visited Space Center Houston.'}                             | ${'the same'}
+    ${'I ran the Color Run.'}                                         | ${'the same'}
+    ${'## Medal of Honor Recipients'}                                 | ${'a listed name in a heading'}
   `('leaves the name in "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(au(unchanged)).toBe(unchanged);
   });
@@ -741,13 +743,31 @@ describe('institution names keep their spelling', () => {
   });
 
   it.each`
-    input                          | expected                        | why
-    ${'The organization grew.'}    | ${'The organisation grew.'}     | ${'after a capitalised article'}
-    ${'A sense of honor.'}         | ${'A sense of honour.'}         | ${'after of and a plain noun'}
-    ${'Yes, Your Honor.'}          | ${'Yes, Your Honour.'}          | ${'a form of address, after a possessive'}
-    ${'The Legion of Honor met.'}  | ${'The Legion of Honour met.'}  | ${'the French order, spelt the British way'}
-    ${'Center stage is gray.'}     | ${'Centre stage is grey.'}      | ${'at the start of a sentence'}
+    input                                 | expected                               | why
+    ${'The organization grew.'}           | ${'The organisation grew.'}            | ${'after a capitalised article'}
+    ${'A sense of honor.'}                | ${'A sense of honour.'}                | ${'after of and a plain noun'}
+    ${'Yes, Your Honor.'}                 | ${'Yes, Your Honour.'}                 | ${'a form of address, after a possessive'}
+    ${'The Legion of Honor met.'}         | ${'The Legion of Honour met.'}         | ${'the French order, spelt the British way'}
+    ${'Center stage is gray.'}            | ${'Centre stage is grey.'}             | ${'at the start of a sentence'}
+    ${'The Children’s Theater opened.'}   | ${'The Children’s Theatre opened.'}    | ${'one capitalised word before it'}
+    ${'Color Theory is fun.'}             | ${'Colour Theory is fun.'}             | ${'one capitalised word after it'}
+    ${'Labor Costs rose again.'}          | ${'Labour Costs rose again.'}          | ${'the same'}
+    ${'See the Color Picker panel.'}      | ${'See the Colour Picker panel.'}      | ${'an interface label'}
+    ${'Johnson Space Center opened.'}     | ${'Johnson Space Centre opened.'}      | ${'a capital from the start of a sentence'}
+    ${'It rained. Bright Red Color won.'} | ${'It rained. Bright Red Colour won.'} | ${'the same, after a full stop'}
   `('rewrites a common noun: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(au(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                | expected                              | why
+    ${'## Customizing Colors'}           | ${'## Customising Colours'}           | ${'a Markdown heading'}
+    ${'## Data Center Setup'}            | ${'## Data Centre Setup'}             | ${'the same'}
+    ${'# Organization Settings'}         | ${'# Organisation Settings'}          | ${'the same'}
+    ${'## The Favorite Colors of Kids'}  | ${'## The Favourite Colours of Kids'} | ${'of after it, in a heading'}
+    ${'Data Center Setup\n====='}        | ${'Data Centre Setup\n====='}         | ${'a setext heading'}
+    ${'Our Shared Data Center'}          | ${'Our Shared Data Centre'}           | ${'a line in title case'}
+  `('reads no name from capitals in a heading: $input -> $expected ($why)', ({ input, expected }) => {
     expect(au(input)).toBe(expected);
   });
 

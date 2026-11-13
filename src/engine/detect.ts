@@ -234,6 +234,22 @@ export function detectAmerican(text: string): AmericanSignals {
  * together. Lets a document that arrives in pieces build up one verdict without
  * rescanning what it has already seen.
  */
+/**
+ * Everything about the evidence that a rule can read, as a key. Text read against two pieces
+ * of evidence with the same key gets the same changes, apart from the confidence a note quotes.
+ */
+export function evidenceKey(s: AmericanSignals, minConfidence: number): string {
+  return [
+    s.confidence >= minConfidence,
+    s.unambiguousMonthFirstDates > 0,
+    s.unambiguousDayFirstDates > 0,
+    s.namedMonthFirstDates > 0,
+    s.namedDayFirstDates > 0,
+  ]
+    .map(Number)
+    .join('');
+}
+
 export function mergeSignals(a: AmericanSignals, b: AmericanSignals): AmericanSignals {
   return score({
     markers: MARKERS.map(([label]) => label).filter(

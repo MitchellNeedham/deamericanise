@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import fc from 'fast-check';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const STATIC = join(dirname(fileURLToPath(import.meta.url)), '..', 'extension', 'static');
@@ -390,6 +391,103 @@ describe('extension: the settings page', () => {
     await vi.waitFor(() => expect(sync.stored().units).toEqual({ respectConventions: false }));
     toggle(box);
     await vi.waitFor(() => expect(sync.stored().units).toEqual({}));
+  });
+});
+
+describe('extension: suggestions while writing', () => {
+  it('is on until switched off', async () => {
+    expect((await settings.loadSettings()).suggest).toBe(true);
+    sync.fill({ suggest: 'no' });
+    expect((await settings.loadSettings()).suggest).toBe(true);
+    sync.fill({ suggest: false });
+    expect((await settings.loadSettings()).suggest).toBe(false);
+  });
+
+  it('reads what is written as American, whatever the setting for pages', async () => {
+    sync.fill({ verdict: 'lang', categories: { units: false }, rules: { 'spelling.color': false } });
+    const options = settings.writingOptions(await settings.loadSettings());
+    expect(options).toMatchObject({ assumeAmerican: true, categories: { units: false } });
+    expect(options.rules).toEqual({ 'spelling.color': false });
+    expect(options).not.toHaveProperty('verdict');
+  });
+
+  it('leaves the writer’s own $ alone, even with a currency rule switched on by hand', async () => {
+    const { deamericaniseText } = await import('../src/index.js');
+    const rule = [...settings.catalogue('en-AU').values()].find((r) => r.category === 'currency')!.id;
+    sync.fill({ categories: { currency: true }, rules: { [rule]: true } });
+    const options = settings.writingOptions(await settings.loadSettings());
+    expect(options.categories).toMatchObject({ currency: false });
+    expect(options.rules).not.toHaveProperty(rule);
+    expect(deamericaniseText('The color was nice on 03/04/2024, it cost $50.', options)).toBe(
+      'The colour was nice on 2024-03-04, it cost $50.',
+    );
+  });
+
+  it.each([
+    ['typing at the end', 'The colo', 'The colou', [8, 0, 'u']],
+    ['typing a letter that repeats', 'aa', 'aaa', [2, 0, 'a']],
+    ['deleting a letter', 'colour', 'color', [4, 1, '']],
+    ['replacing a selection', 'the gray car', 'the grey car', [6, 1, 'e']],
+    ['changing nothing', 'gray', 'gray', [4, 0, '']],
+  ])('gives the copy of a text box one edit for %s', async (_, before, after, edit) => {
+    const { textEdit } = await import('../extension/src/suggest.js');
+    expect(textEdit(before, after)).toEqual(edit);
+  });
+
+  it('gives the copy of a text box an edit that always makes the new text', async () => {
+    const { textEdit } = await import('../extension/src/suggest.js');
+    fc.assert(
+      fc.property(fc.string(), fc.string(), (before, after) => {
+        const [start, count, data] = textEdit(before, after);
+        expect(before.slice(0, start) + data + before.slice(start + count)).toBe(after);
+      }),
+    );
+  });
+
+  it('keeps a mark on its word as the copy of a text box takes typing before it', async () => {
+    const { syncText } = await import('../extension/src/suggest.js');
+    const text = document.createTextNode('The color is here.');
+    document.body.replaceChildren(text);
+    const range = document.createRange();
+    range.setStart(text, 4);
+    range.setEnd(text, 9);
+    syncText(text, 'Big news. The color is here.');
+    expect(range.toString()).toBe('color');
+    syncText(text, 'Big news. The color is\n');
+    expect(range.toString()).toBe('color');
+    expect(text.data).toBe('Big news. The color is\n ');
+  });
+
+  it('offers no change that would not fit under a text box’s maxlength', async () => {
+    const { fits } = await import('../extension/src/suggest.js');
+    const input = document.createElement('input');
+    input.value = 'The color';
+    expect(fits(input, 4, 9, 'colour')).toBe(true);
+    input.maxLength = 9;
+    expect(fits(input, 4, 9, 'colour')).toBe(false);
+    expect(fits(input, 4, 9, 'tint')).toBe(true);
+  });
+
+  it('makes a live range of a static one only while its text is still there', async () => {
+    const { live } = await import('../extension/src/marks.js');
+    const text = document.createTextNode('The color');
+    document.body.replaceChildren(text);
+    const range = (start: number, end: number) =>
+      new StaticRange({ startContainer: text, startOffset: start, endContainer: text, endOffset: end });
+    expect(live(range(4, 9))?.toString()).toBe('color');
+    text.data = 'The col';
+    expect(live(range(4, 9))).toBeNull();
+    text.remove();
+    expect(live(range(0, 3))).toBeNull();
+  });
+
+  it('is switched off from the settings page', async () => {
+    await openPage('options');
+    await vi.waitFor(() => expect(sync.listeners.length).toBe(1));
+    const suggest = $<HTMLInputElement>('suggest');
+    expect(suggest.checked).toBe(true);
+    toggle(suggest);
+    await vi.waitFor(() => expect(sync.stored().suggest).toBe(false));
   });
 });
 

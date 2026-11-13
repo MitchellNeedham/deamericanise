@@ -54,7 +54,15 @@ const ATTRIBUTES: Array<[name: string, on: Set<string> | null]> = [
 ];
 
 /** Attributes whose change can move a boundary or open and close a scope. */
-export const SCOPE_ATTRIBUTES = ['lang', 'xml:lang', 'translate', 'contenteditable', 'class', 'role'];
+export const SCOPE_ATTRIBUTES = [
+  'lang',
+  'xml:lang',
+  'translate',
+  'contenteditable',
+  'spellcheck',
+  'class',
+  'role',
+];
 export const TEXT_ATTRIBUTES = ATTRIBUTES.map(([name]) => name);
 
 /** What applies at a point in the tree. */
@@ -65,6 +73,8 @@ export interface Scope {
   /** Under Google Translate's `notranslate`, which no `translate="yes"` below undoes. */
   notranslate: boolean;
   editable: boolean;
+  /** From the nearest `spellcheck` attribute. True when nothing says. */
+  spellcheck: boolean;
   foreign: boolean;
   /** Inside an element from `SKIPPED`, or one the page marks or draws as code. */
   skippedTag: boolean;
@@ -90,6 +100,14 @@ export type Segment = TextRun | AttributeValue;
 /** Finds the shadow root an element hosts, or null. */
 export type ShadowLookup = (host: Element) => ShadowRoot | null;
 
+/** Finds open roots only. */
+export const openShadowRoot: ShadowLookup = (host) => host.shadowRoot;
+
+/** `lookup`, asked only about elements that can host a root. */
+export function hostsOnly(lookup: ShadowLookup): ShadowLookup {
+  return (host) => (canHostShadowRoot(host) ? lookup(host) : null);
+}
+
 /** Whether a page can attach a shadow root to `element`. */
 export function canHostShadowRoot(element: Element): boolean {
   return (
@@ -112,9 +130,16 @@ export function textAllowed(scope: Scope): boolean {
 }
 
 export function attributesAllowed(scope: Scope): boolean {
-  return (
-    scope.translate && !scope.notranslate && !scope.editable && !scope.foreign && isEnglish(scope.lang)
-  );
+  return !scope.editable && proseAllowed(scope);
+}
+
+/** Whether text someone is writing here can get suggestions. */
+export function suggestionsAllowed(scope: Scope): boolean {
+  return scope.editable && scope.spellcheck && proseAllowed(scope) && !scope.skippedTag;
+}
+
+function proseAllowed(scope: Scope): boolean {
+  return scope.translate && !scope.notranslate && !scope.foreign && isEnglish(scope.lang);
 }
 
 export function rootScope(document: Document | null): Scope {
@@ -123,6 +148,7 @@ export function rootScope(document: Document | null): Scope {
     translate: true,
     notranslate: false,
     editable: document?.designMode === 'on',
+    spellcheck: true,
     foreign: false,
     skippedTag: false,
   };
@@ -145,12 +171,18 @@ export function enter(parent: Scope, element: Element, flow?: Flow): Scope {
   }
   if (editableValue === 'false') editable = false;
 
+  let spellcheck = parent.spellcheck;
+  const spellcheckValue = element.getAttribute('spellcheck')?.toLowerCase();
+  if (spellcheckValue === '' || spellcheckValue === 'true') spellcheck = true;
+  if (spellcheckValue === 'false') spellcheck = false;
+
   const foreign = parent.foreign || element.namespaceURI !== HTML_NS;
   return {
     lang: lang === null ? parent.lang : lang.trim().toLowerCase(),
     translate,
     notranslate: parent.notranslate || (!wholePage && element.classList.contains('notranslate')),
     editable,
+    spellcheck,
     foreign,
     skippedTag:
       parent.skippedTag ||
@@ -207,13 +239,45 @@ function inMonospace(style: CSSStyleDeclaration): boolean {
  * on from the host, the way the browser inherits `lang`.
  */
 export function scopeOf(node: Node): Scope {
+  const chain = ancestry(node);
+  let scope = rootScope(node.ownerDocument ?? (node as Document));
+  for (let i = chain.length - 1; i >= 0; i--) scope = enter(scope, chain[i]!);
+  return scope;
+}
+
+/** The scope inside `node`, worked out downwards from `top`, an element whose scope is `scope`. */
+export function scopeBelow(node: Node, top: Element, scope: Scope): Scope {
+  const chain = ancestry(node);
+  const at = chain.indexOf(top);
+  for (let i = (at < 0 ? chain.length : at) - 1; i >= 0; i--) scope = enter(scope, chain[i]!);
+  return scope;
+}
+
+/**
+ * The editing host around `node`: the outermost element of the editable stretch it sits in,
+ * or the body of a document in design mode. Null when `node` is not editable.
+ */
+export function editingHost(node: Node): Element | null {
+  const document = node.ownerDocument ?? (node as Document);
+  const chain = ancestry(node);
+  let scope = rootScope(document);
+  let host: Element | null = scope.editable ? (document.body ?? chain.at(-1) ?? null) : null;
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const inner = enter(scope, chain[i]!);
+    if (!inner.editable) host = null;
+    else if (!scope.editable) host = chain[i]!;
+    scope = inner;
+  }
+  return host;
+}
+
+/** `node` and the elements around it, nearest first, carrying on from a shadow root to its host. */
+function ancestry(node: Node): Element[] {
   const chain: Element[] = [];
   for (let n: Node | null = node; n; n = n.parentNode ?? hostOf(n)) {
     if (n.nodeType === 1) chain.push(n as Element);
   }
-  let scope = rootScope(node.ownerDocument ?? (node as Document));
-  for (let i = chain.length - 1; i >= 0; i--) scope = enter(scope, chain[i]!);
-  return scope;
+  return chain;
 }
 
 /**
@@ -236,6 +300,7 @@ function flowOf(element: Element): Flow {
     !element.hasAttribute('xml:lang') &&
     !element.hasAttribute('translate') &&
     !element.hasAttribute('contenteditable') &&
+    !element.hasAttribute('spellcheck') &&
     !element.classList.contains('notranslate') &&
     !namesCodeRole(element.getAttribute('role'));
   return inline ? inlineFlow(element) : 'ends';
@@ -300,11 +365,15 @@ export function containersAndElementsIn(
 /**
  * The runs of text that belong to `container` itself. A run stops at any element that
  * does not join it, so a change can never reach across a paragraph, a line break or a
- * block of code.
+ * block of code. `allowed` decides whether the container's scope has runs at all.
  */
-export function ownRuns(container: Node, scope: Scope): TextRun[] {
+export function ownRuns(
+  container: Node,
+  scope: Scope,
+  allowed: (scope: Scope) => boolean = textAllowed,
+): TextRun[] {
   const runs: TextRun[] = [];
-  if (!textAllowed(scope)) return runs;
+  if (!allowed(scope)) return runs;
 
   let current: TextRun | null = null;
   const end = () => {

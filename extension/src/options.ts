@@ -25,6 +25,7 @@ import {
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const dialect = element<HTMLSelectElement>('dialect');
 const highlight = element<HTMLInputElement>('highlight');
+const suggest = element<HTMLInputElement>('suggest');
 const rules = element<HTMLUListElement>('rules');
 const sites = element<HTMLUListElement>('sites');
 const saved = element<HTMLParagraphElement>('saved');
@@ -300,6 +301,7 @@ function render(settings: Settings): void {
   for (const input of inputs('preset')) input.checked = input.value === settings.preset;
   for (const input of inputs('verdict')) input.checked = input.value === settings.verdict;
   highlight.checked = settings.highlight;
+  suggest.checked = settings.suggest;
   for (const input of inputs('confidence')) {
     input.checked = settings.confidence.includes(input.value as Confidence);
   }
@@ -384,6 +386,7 @@ async function main(): Promise<void> {
     input.addEventListener('change', () => void save({ verdict: input.value as Verdict }));
   }
   highlight.addEventListener('change', () => void save({ highlight: highlight.checked }));
+  suggest.addEventListener('change', () => void save({ suggest: suggest.checked }));
   for (const input of inputs('confidence')) {
     input.addEventListener('change', () => {
       const ticked = inputs('confidence').filter((i) => i.checked).map((i) => i.value as Confidence);

@@ -1,4 +1,5 @@
-/* The names must match the ones highlight.ts registers: deamericanise-<category>-<confidence>. */
+/* The names must match the ones highlight.ts and suggest.ts register:
+   deamericanise-<category>-<confidence> and deamericanise-suggest-<category>-<confidence>. */
 
 ::highlight(deamericanise-spelling-safe),
 ::highlight(deamericanise-spelling-moderate),
@@ -76,4 +77,89 @@
 ::highlight(deamericanise-punctuation-risky),
 ::highlight(deamericanise-misc-risky) {
   text-decoration-style: dotted;
+}
+
+/* Suggestions in text being written are underlined only, so the text stays easy to read. */
+
+::highlight(deamericanise-suggest-spelling-safe),
+::highlight(deamericanise-suggest-spelling-moderate),
+::highlight(deamericanise-suggest-spelling-risky) {
+  text-decoration: underline solid 2px rgb(47 128 237);
+}
+
+::highlight(deamericanise-suggest-vocabulary-safe),
+::highlight(deamericanise-suggest-vocabulary-moderate),
+::highlight(deamericanise-suggest-vocabulary-risky) {
+  text-decoration: underline solid 2px rgb(155 89 214);
+}
+
+::highlight(deamericanise-suggest-units-safe),
+::highlight(deamericanise-suggest-units-moderate),
+::highlight(deamericanise-suggest-units-risky) {
+  text-decoration: underline solid 2px rgb(20 160 150);
+}
+
+::highlight(deamericanise-suggest-dates-safe),
+::highlight(deamericanise-suggest-dates-moderate),
+::highlight(deamericanise-suggest-dates-risky) {
+  text-decoration: underline solid 2px rgb(214 150 20);
+}
+
+::highlight(deamericanise-suggest-times-safe),
+::highlight(deamericanise-suggest-times-moderate),
+::highlight(deamericanise-suggest-times-risky) {
+  text-decoration: underline solid 2px rgb(230 110 30);
+}
+
+::highlight(deamericanise-suggest-currency-safe),
+::highlight(deamericanise-suggest-currency-moderate),
+::highlight(deamericanise-suggest-currency-risky) {
+  text-decoration: underline solid 2px rgb(120 160 20);
+}
+
+::highlight(deamericanise-suggest-punctuation-safe),
+::highlight(deamericanise-suggest-punctuation-moderate),
+::highlight(deamericanise-suggest-punctuation-risky) {
+  text-decoration: underline solid 2px rgb(220 70 130);
+}
+
+::highlight(deamericanise-suggest-misc-safe),
+::highlight(deamericanise-suggest-misc-moderate),
+::highlight(deamericanise-suggest-misc-risky) {
+  text-decoration: underline solid 2px rgb(120 135 155);
+}
+
+::highlight(deamericanise-suggest-spelling-moderate),
+::highlight(deamericanise-suggest-vocabulary-moderate),
+::highlight(deamericanise-suggest-units-moderate),
+::highlight(deamericanise-suggest-dates-moderate),
+::highlight(deamericanise-suggest-times-moderate),
+::highlight(deamericanise-suggest-currency-moderate),
+::highlight(deamericanise-suggest-punctuation-moderate),
+::highlight(deamericanise-suggest-misc-moderate) {
+  text-decoration-style: dashed;
+}
+
+::highlight(deamericanise-suggest-spelling-risky),
+::highlight(deamericanise-suggest-vocabulary-risky),
+::highlight(deamericanise-suggest-units-risky),
+::highlight(deamericanise-suggest-dates-risky),
+::highlight(deamericanise-suggest-times-risky),
+::highlight(deamericanise-suggest-currency-risky),
+::highlight(deamericanise-suggest-punctuation-risky),
+::highlight(deamericanise-suggest-misc-risky) {
+  text-decoration-style: dotted;
+}
+
+/* The copy over a text box is a popover in the page, where the page's rules for popovers reach it. */
+
+deamericanise-mirror > div[popover]::backdrop {
+  background: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+}
+
+deamericanise-mirror > div[popover]::before,
+deamericanise-mirror > div[popover]::after {
+  content: none !important;
 }

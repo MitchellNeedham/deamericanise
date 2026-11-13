@@ -59,7 +59,7 @@ export class Tip {
    * - `sticky`: the description stays open when the pointer leaves it, and keeps the focus
    *   where it was when it is clicked.
    * - `beside`: the element the description belongs with. It goes in the page next to that
-   *   element, so a modal dialog, a popover or a script around it counts a click on the
+   *   element, so a modal dialogue, a popover or a script around it counts a click on the
    *   description as a click inside.
    */
   show(change: Change, line: DOMRect, actions: TipAction[] = [], options: TipOptions = {}): void {
@@ -145,7 +145,7 @@ export class Tip {
     this.card.addEventListener('mousedown', (event) => {
       if (this.sticky) event.preventDefault();
     });
-    // Pages close their dialogs and menus on a press outside them, as they see it.
+    // Pages close their dialogues and menus on a press outside them, as they see it.
     for (const type of PRESSES) this.card.addEventListener(type, (event) => event.stopPropagation());
     this.box.append(this.card);
     root.append(this.box);

@@ -66,7 +66,7 @@ export const DEFAULTS: Settings = {
   confidence: [...CONFIDENCES],
   verdict: 'detect',
   highlight: false,
-  suggest: false,
+  suggest: true,
   rules: {},
   sites: {},
 };

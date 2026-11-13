@@ -395,12 +395,12 @@ describe('extension: the settings page', () => {
 });
 
 describe('extension: suggestions while writing', () => {
-  it('is off until switched on', async () => {
-    expect((await settings.loadSettings()).suggest).toBe(false);
-    sync.fill({ suggest: 'yes' });
-    expect((await settings.loadSettings()).suggest).toBe(false);
-    sync.fill({ suggest: true });
+  it('is on until switched off', async () => {
     expect((await settings.loadSettings()).suggest).toBe(true);
+    sync.fill({ suggest: 'no' });
+    expect((await settings.loadSettings()).suggest).toBe(true);
+    sync.fill({ suggest: false });
+    expect((await settings.loadSettings()).suggest).toBe(false);
   });
 
   it('reads what is written as American, whatever the setting for pages', async () => {
@@ -432,13 +432,13 @@ describe('extension: suggestions while writing', () => {
     );
   });
 
-  it('is switched on from the settings page', async () => {
+  it('is switched off from the settings page', async () => {
     await openPage('options');
     await vi.waitFor(() => expect(sync.listeners.length).toBe(1));
     const suggest = $<HTMLInputElement>('suggest');
-    expect(suggest.checked).toBe(false);
+    expect(suggest.checked).toBe(true);
     toggle(suggest);
-    await vi.waitFor(() => expect(sync.stored().suggest).toBe(true));
+    await vi.waitFor(() => expect(sync.stored().suggest).toBe(false));
   });
 });
 

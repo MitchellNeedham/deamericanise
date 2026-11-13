@@ -533,13 +533,16 @@ function roundToSignificant(value: number, figures: number): number {
 
 const GROUPED_SOURCE = new RegExp(String.raw`\d(,|${GROUP_SPACE})\d{3}(?![\d/])`);
 
+// A list's figures are each formatted with the same `raws`, so its separator is found once for
+// the list, not once for every figure.
+const SEPARATORS = new WeakMap<readonly string[], string | undefined>();
+
 /** The separator the first of `raws` that groups its thousands groups them with. */
 function thousandsSeparator(raws: readonly string[]): string | undefined {
-  for (const raw of raws) {
-    const separator = GROUPED_SOURCE.exec(raw)?.[1];
-    if (separator !== undefined) return separator;
-  }
-  return undefined;
+  if (SEPARATORS.has(raws)) return SEPARATORS.get(raws);
+  const separator = raws.map((raw) => GROUPED_SOURCE.exec(raw)?.[1]).find((found) => found !== undefined);
+  SEPARATORS.set(raws, separator);
+  return separator;
 }
 
 /**

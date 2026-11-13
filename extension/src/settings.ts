@@ -297,9 +297,14 @@ export function domOptions(settings: Settings): DomOptions {
   };
 }
 
-/** The options for suggestions in text the reader is writing, which is always read as American. */
+/**
+ * The options for suggestions in text the reader is writing. It is always read as American,
+ * but a bare $ there is the writer's own currency, so currency is left alone, along with any
+ * currency rule switched on by hand.
+ */
 export function writingOptions(settings: Settings): Options {
-  const { verdict, ...options } = domOptions(settings);
+  const categories = { ...settings.categories, currency: false };
+  const { verdict, ...options } = domOptions({ ...settings, categories });
   return { ...options, assumeAmerican: true };
 }
 

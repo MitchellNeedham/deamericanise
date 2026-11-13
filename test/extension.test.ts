@@ -411,6 +411,18 @@ describe('extension: suggestions while writing', () => {
     expect(options).not.toHaveProperty('verdict');
   });
 
+  it('leaves the writer’s own $ alone, even with a currency rule switched on by hand', async () => {
+    const { deamericaniseText } = await import('../src/index.js');
+    const rule = [...settings.catalogue('en-AU').values()].find((r) => r.category === 'currency')!.id;
+    sync.fill({ categories: { currency: true }, rules: { [rule]: true } });
+    const options = settings.writingOptions(await settings.loadSettings());
+    expect(options.categories).toMatchObject({ currency: false });
+    expect(options.rules).not.toHaveProperty(rule);
+    expect(deamericaniseText('The color was nice on 03/04/2024, it cost $50.', options)).toBe(
+      'The colour was nice on 2024-03-04, it cost $50.',
+    );
+  });
+
   it.each([
     ['typing at the end', 'The colo', 'The colou', [8, 0, 'u']],
     ['typing a letter that repeats', 'aa', 'aaa', [2, 0, 'a']],

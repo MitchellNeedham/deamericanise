@@ -728,3 +728,12 @@ export const COMPOUNDS: Compound[] = [
     per: [16],
   },
 ];
+
+/**
+ * A height in feet and inches, which a rule of its own reads. Like a compound, it is held whole
+ * where either unit is kept.
+ */
+export const HEIGHT: Pick<Compound, 'id' | 'measures'> = {
+  id: 'units.length.feet-inches',
+  measures: [measure('units.length.foot'), measure('units.length.inch')],
+};

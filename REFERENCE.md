@@ -388,7 +388,13 @@ text, or a word that cannot open a noun, such as a preposition or a conjunction.
 `He is six foot two.` becomes `He is 1.88 metres.` and `6 foot 4 with long arms` becomes
 `1.93 metres with long arms`, while `6 feet 2 cars` is two things. Of those words, `in` is
 the inch abbreviation, and `to`, `and`, `or` or `by` before a number carry the inches on to
-a range or a side, so `6 feet 2 to 3 inches` becomes `1.8 metres 5.1 to 7.6 centimetres`. The
+a range or a side, so `6 feet 2 to 3 inches` becomes `1.8 metres 5.1 to 7.6 centimetres`.
+Inches with no inch word are a whole number from 1 to 11 and may end in a fraction, so
+`He is six foot two and a half.`, `He is 6 foot 2½.` and `He is 6 foot 2 1/2.` all become
+`He is 1.89 metres.`, as `6 feet 2½ inches` does. A list that starts at them claims them, so
+`6 feet 2, 3 or 4 inches` becomes `1.8 metres 5.1, 7.6 or 10 centimetres`. Before a size and
+a noun such a height keeps the singular, so `a six foot two tall man` becomes
+`a 1.88 metre tall man`. The
 inch word can also be left out before a join and another measurement in feet, so
 `6 foot 2 to 6 foot 4` becomes `1.88 metres to 1.93 metres` and `2 feet 6 to 3 feet`
 becomes `76.2 centimetres to 91 centimetres`. A spaced `in` after the inches is the
@@ -407,13 +413,19 @@ unit, so `5 ft 6 to 6 ft` and `3 yards 2 to 4 yards` are left as written, with `
 or `units.measurement` switched off too. A weight's next
 unit word can be left out before a join and another weight in its larger unit too, so
 `11 stone 4 to 12 stone` becomes `71.7 kilograms to 76 kilograms` and `7 lb 8 to 9 lb`
-becomes `3.4 kg to 4.1 kg`, while `11 stone 14 to 12 stone` is left as written. Together the
-parts claim three significant figures. A height that describes the noun after it keeps the singular where its inch unit is
+becomes `3.4 kg to 4.1 kg`, while `11 stone 14 to 12 stone` is left as written. It can be
+left out where nothing the number could count follows, as the inch word can, so
+`He weighs 11 stone 4.` becomes `He weighs 71.7 kilograms.` and `She was born at 7 lb 8.`
+becomes `She was born at 3.4 kg.` A written `pounds` there may still be money, so
+`It cost 5 pounds 10.` is left as written, and `11 st 4.` is too, since `st` is a weight only
+beside another unit. Together the parts claim three significant figures. A height that describes the noun after it keeps the singular where its inch unit is
 the singular word or a determiner opens it: `a 6 foot 2 inch man` and `a 6 ft 2 in man` both
 become `a 1.88 metre man`. Where a unit of the weight is kept, by the dialect or by `unitsKeep`,
 the whole weight is left as written, so an `en-GB` `11 stone 4 pounds` never becomes
 `11 stone 1.8 kilograms`. Turning on `units.mass.stone` or `units.mass.stone-pounds`
-converts it. A weight or height at the end of a range or list, as in `7-8 lb 4 oz`,
+converts it. A height is left whole the same way where feet or inches are kept, so with
+`unitsKeep: ['inch']`, `It is 6 feet 2 inches tall.` is left as written until
+`units.length.inch` or `units.length.feet-inches` is turned on. A weight or height at the end of a range or list, as in `7-8 lb 4 oz`,
 `5 to 6 feet 2 inches`, `five to seven pounds eight ounces` or `5, 6, 7 feet 2 inches`, is
 left as written too, since its first end could be in either unit. So is a height or weight
 that starts where no measurement can (see below), as in `At 7:30 feet 2 inches` and
@@ -783,7 +795,10 @@ it, across at most a pronoun or a hedge: `It cost him nearly 500 pounds`. So do
 `sterling`, a rate (`30,000 pounds a year`), pence (`5 pounds 50`) and a thing priced in
 pounds (`a 10-pound note`). Pence may come before the preposition `in`, as in
 `5 pounds 50 in total`, but `12 in.` and `12in` are inches and never pence, so
-`The box is 5 pounds 12 in. wide.` becomes `The box is 2.3 kilograms 30 cm wide.` A money
+`The box is 5 pounds 12 in. wide.` becomes `The box is 2.3 kilograms 30 cm wide.` Nor is a
+figure pence where a unit rule reads a measurement starting at it, so
+`It is 5 pounds 16 to 20 feet.` becomes `It is 2.3 kilograms 4.9 to 6.1 metres.` and
+`The box is 5 pounds 12 in x 3 in wide.` becomes `The box is 2.3 kilograms 30 x 7.6 cm wide.` A money
 word reaches only its own amount, so `It cost $20 for 5 pounds of beef` still converts.
 A `£` reaches the whole sentence, but a
 weight word in the measurement's own phrase (`lost`, `weighs`, `of beef`, `a 5-pound bag`)

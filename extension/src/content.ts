@@ -19,6 +19,8 @@ let rewriter: DomRewriter | null = null;
 let highlighter: Highlighter | null = null;
 let suggester: Suggester | null = null;
 let applied = '';
+/** The options the suggester was last given. */
+let writing = '';
 const host = location.hostname;
 let current: Settings = DEFAULTS;
 
@@ -44,15 +46,8 @@ function apply(settings: Settings): void {
     rewriter = null;
     suggester?.stop();
     suggester = null;
+    writing = '';
     return;
-  }
-
-  if (settings.suggest) {
-    if (suggester) suggester.setOptions(writingOptions(settings));
-    else suggester = new Suggester(writingOptions(settings), shadowRootOf);
-  } else {
-    suggester?.stop();
-    suggester = null;
   }
 
   const options: DomOptions = { ...domOptions(settings), shadowRoot: shadowRootOf };
@@ -72,6 +67,31 @@ function apply(settings: Settings): void {
     highlighter?.stop();
     highlighter = null;
   }
+
+  // Last, and on its own, so nothing that goes wrong in it can keep the page from being rewritten.
+  try {
+    suggest(settings);
+  } catch (error) {
+    suggester?.stop();
+    suggester = null;
+    writing = '';
+    console.error('deamericanise: suggestions while writing stopped', error);
+  }
+}
+
+function suggest(settings: Settings): void {
+  if (!settings.suggest) {
+    suggester?.stop();
+    suggester = null;
+    writing = '';
+    return;
+  }
+  const options = writingOptions(settings);
+  // A change to another setting leaves the marks where they are.
+  const key = JSON.stringify(options);
+  if (!suggester) suggester = new Suggester(options, shadowRootOf);
+  else if (key !== writing) suggester.setOptions(options);
+  writing = key;
 }
 
 void loadSettings().then(apply);

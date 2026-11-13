@@ -6,6 +6,11 @@ export interface TipAction {
   run(): void;
 }
 
+export interface TipOptions {
+  sticky?: boolean;
+  beside?: Element;
+}
+
 const LIGHT = {
   background: '#ffffff',
   text: '#1c2421',
@@ -23,6 +28,8 @@ const DARK = {
 
 /** Long enough to move the pointer across the gap between a change and its description. */
 const HIDE_DELAY = 300;
+
+const PRESSES = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend'];
 
 /**
  * The description of one change. It sits in a closed shadow root so the page's styles
@@ -47,17 +54,22 @@ export class Tip {
   }
 
   /**
-   * Shows a change below the line it is on. A sticky description stays open when the pointer
-   * leaves it, and keeps the focus where it was when it is clicked.
+   * Shows a change below the line it is on, or above it when there is no room below.
+   *
+   * - `sticky`: the description stays open when the pointer leaves it, and keeps the focus
+   *   where it was when it is clicked.
+   * - `beside`: the element the description belongs with. It goes in the page next to that
+   *   element, so a modal dialog, a popover or a script around it counts a click on the
+   *   description as a click inside.
    */
-  show(change: Change, line: DOMRect, actions: TipAction[] = [], sticky = false): void {
+  show(change: Change, line: DOMRect, actions: TipAction[] = [], options: TipOptions = {}): void {
     this.cancelHide();
     if (change === this.shown) return;
-    this.mount();
+    this.mount(options.beside ?? null);
     this.fill(change, actions);
     if (!this.box.matches(':popover-open')) this.box.showPopover();
     this.shown = change;
-    this.sticky = sticky;
+    this.sticky = options.sticky ?? false;
 
     const width = this.box.offsetWidth;
     const height = this.box.offsetHeight;
@@ -97,17 +109,23 @@ export class Tip {
     this.shown = null;
   }
 
-  private mount(): void {
-    if (this.host?.isConnected) return;
-    if (this.host) {
-      document.documentElement.append(this.host);
-      return;
-    }
+  private mount(beside: Element | null): void {
+    this.host ??= this.create();
+    const placed = beside
+      ? beside.nextSibling === this.host
+      : this.host.parentNode === document.documentElement;
+    if (placed) return;
+    if (beside) beside.after(this.host);
+    else document.documentElement.append(this.host);
+  }
 
-    this.host = document.createElement('deamericanise-tip');
+  private create(): HTMLElement {
+    const host = document.createElement('deamericanise-tip');
     // The rewriter enters closed roots too, and the card quotes each American original.
-    this.host.setAttribute('translate', 'no');
-    const root = this.host.attachShadow({ mode: 'closed' });
+    host.setAttribute('translate', 'no');
+    // Next to a page's own element, a page rule for its siblings could hide the description.
+    host.style.cssText = 'display: contents !important;';
+    const root = host.attachShadow({ mode: 'closed' });
     this.box = document.createElement('div');
     this.box.popover = 'manual';
     // Styles are set through the CSSOM, which a page's content security policy allows.
@@ -127,9 +145,11 @@ export class Tip {
     this.card.addEventListener('mousedown', (event) => {
       if (this.sticky) event.preventDefault();
     });
+    // Pages close their dialogs and menus on a press outside them, as they see it.
+    for (const type of PRESSES) this.card.addEventListener(type, (event) => event.stopPropagation());
     this.box.append(this.card);
     root.append(this.box);
-    document.documentElement.append(this.host);
+    return host;
   }
 
   private fill(change: Change, actions: TipAction[]): void {

@@ -1,8 +1,7 @@
 import type { DomRewriter, HighlightedChange } from '../../src/dom/index.js';
 import type { Change } from '../../src/types.js';
+import { LISTENING, live, publish, within } from './marks.js';
 import { Tip, type TipAction } from './tip.js';
-
-const LISTENING: AddEventListenerOptions = { capture: true, passive: true };
 
 /** Switches off the rule behind a change from its description. */
 export interface RuleSwitch {
@@ -48,8 +47,7 @@ export class Highlighter {
     document.removeEventListener('mousemove', this.onMove, LISTENING);
     document.removeEventListener('mouseout', this.onOut, LISTENING);
     removeEventListener('scroll', this.onScroll, LISTENING);
-    for (const name of this.names) CSS.highlights.delete(name);
-    this.names.clear();
+    this.names = publish(new Map(), this.names);
     this.byNode.clear();
     this.tip.remove();
   }
@@ -83,11 +81,7 @@ export class Highlighter {
       }
     }
 
-    for (const name of this.names) {
-      if (!groups.has(name)) CSS.highlights.delete(name);
-    }
-    for (const [name, group] of groups) CSS.highlights.set(name, group);
-    this.names = new Set(groups.keys());
+    this.names = publish(groups, this.names);
     this.byNode = byNode;
     this.shadowRoots = [...roots];
     if (this.tip.showing) this.hover();
@@ -128,15 +122,9 @@ export class Highlighter {
     const [node, offset] = caret;
     for (const highlighted of this.byNode.get(node) ?? []) {
       const { startOffset, endOffset } = highlighted.range;
-      // A static range is not kept up to date, so the page may have shortened the node.
-      if (offset < startOffset || offset > endOffset || endOffset > (node as Text).length) continue;
-      const range = document.createRange();
-      range.setStart(node, startOffset);
-      range.setEnd(node, endOffset);
-      for (const rect of range.getClientRects()) {
-        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-          return [highlighted, rect];
-        }
+      if (offset < startOffset || offset > endOffset) continue;
+      for (const rect of live(highlighted.range)?.getClientRects() ?? []) {
+        if (within(rect, x, y)) return [highlighted, rect];
       }
     }
     return null;

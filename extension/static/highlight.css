@@ -150,3 +150,16 @@
 ::highlight(deamericanise-suggest-misc-risky) {
   text-decoration-style: dotted;
 }
+
+/* The copy over a text box is a popover in the page, where the page's rules for popovers reach it. */
+
+deamericanise-mirror > div[popover]::backdrop {
+  background: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+}
+
+deamericanise-mirror > div[popover]::before,
+deamericanise-mirror > div[popover]::after {
+  content: none !important;
+}

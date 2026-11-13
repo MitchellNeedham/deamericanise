@@ -432,6 +432,43 @@ describe('extension: suggestions while writing', () => {
     );
   });
 
+  it('keeps a mark on its word as the copy of a text box takes typing before it', async () => {
+    const { syncText } = await import('../extension/src/suggest.js');
+    const text = document.createTextNode('The color is here.');
+    document.body.replaceChildren(text);
+    const range = document.createRange();
+    range.setStart(text, 4);
+    range.setEnd(text, 9);
+    syncText(text, 'Big news. The color is here.');
+    expect(range.toString()).toBe('color');
+    syncText(text, 'Big news. The color is\n');
+    expect(range.toString()).toBe('color');
+    expect(text.data).toBe('Big news. The color is\n ');
+  });
+
+  it('offers no change that would not fit under a text box’s maxlength', async () => {
+    const { fits } = await import('../extension/src/suggest.js');
+    const input = document.createElement('input');
+    input.value = 'The color';
+    expect(fits(input, 4, 9, 'colour')).toBe(true);
+    input.maxLength = 9;
+    expect(fits(input, 4, 9, 'colour')).toBe(false);
+    expect(fits(input, 4, 9, 'tint')).toBe(true);
+  });
+
+  it('makes a live range of a static one only while its text is still there', async () => {
+    const { live } = await import('../extension/src/marks.js');
+    const text = document.createTextNode('The color');
+    document.body.replaceChildren(text);
+    const range = (start: number, end: number) =>
+      new StaticRange({ startContainer: text, startOffset: start, endContainer: text, endOffset: end });
+    expect(live(range(4, 9))?.toString()).toBe('color');
+    text.data = 'The col';
+    expect(live(range(4, 9))).toBeNull();
+    text.remove();
+    expect(live(range(0, 3))).toBeNull();
+  });
+
   it('is switched off from the settings page', async () => {
     await openPage('options');
     await vi.waitFor(() => expect(sync.listeners.length).toBe(1));

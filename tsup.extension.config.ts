@@ -35,7 +35,12 @@ const manifest = {
 };
 
 const browsers: Record<string, object> = {
-  chrome: { ...manifest, ...(numeric === version ? {} : { version_name: version }) },
+  chrome: {
+    ...manifest,
+    // The popover API, which the change descriptions and the copy over a text box need.
+    minimum_chrome_version: '114',
+    ...(numeric === version ? {} : { version_name: version }),
+  },
   firefox: {
     ...manifest,
     browser_specific_settings: {

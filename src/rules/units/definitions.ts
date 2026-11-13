@@ -55,6 +55,11 @@ export interface Measure {
   decimals?: number;
   /** Other things the unit may measure, told by the words beside the quantity, in the order tried. */
   senses?: Sense[];
+  /**
+   * The metric value takes its symbol where the unit's words, joined by hyphens, describe the
+   * noun after them, as `a 35-mile-per-hour wind` becomes `a 56 km/h wind`.
+   */
+  symbolBeforeNoun?: boolean;
 }
 
 /**
@@ -576,8 +581,9 @@ export const MEASURES: Measure[] = [
     keep: 'mph',
     words: ['miles per hour', 'miles an hour', 'mile per hour', 'mile an hour'],
     singular: ['mile per hour', 'mile an hour'],
-    abbrevs: ['mph', 'MPH'],
+    abbrevs: ['mph', 'MPH', 'm.p.h.', 'M.P.H.'],
     convert: (v) => m(v * 1.609344, 'km/h', 'kilometre per hour', 'kilometres per hour'),
+    symbolBeforeNoun: true,
   },
   {
     id: 'units.pressure.psi',

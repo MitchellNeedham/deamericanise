@@ -286,12 +286,28 @@ const NOT_A_TIME = String.raw`(?!\s+(?:ago|later|earlier|before|after)\b)`;
 const LETTER_LAST = /\s[a-z]$/i;
 const NOT_A_WORD = String.raw`(?!\w|${HYPHEN})`;
 
+/** A unit's form as a pattern, with a hyphen read for each space, as in `500-square-foot`. */
+function aliasPattern(alias: string): string {
+  return escape(alias).replace(/ /g, `(?: |${HYPHEN})`);
+}
+
+const ALIAS_HYPHEN = new RegExp(HYPHEN, 'g');
+
+/**
+ * The key `listed` holds the unit written `written` under: in lower case, and where that is
+ * not listed, with each hyphen read as the space `aliasPattern` lets it stand for.
+ */
+function aliasKey(written: string, listed: { has(key: string): boolean }): string {
+  const key = written.toLowerCase().replace(/\s+/g, ' ');
+  return listed.has(key) ? key : key.replace(ALIAS_HYPHEN, ' ');
+}
+
 function alternate(aliases: string[]): string {
   return aliases
     .sort((a, b) => b.length - a.length || a.localeCompare(b))
     .map(
       (alias) =>
-        escape(alias) + (AN_HOUR.test(alias) ? NOT_A_TIME : '') + (LETTER_LAST.test(alias) ? NOT_A_WORD : ''),
+        aliasPattern(alias) + (AN_HOUR.test(alias) ? NOT_A_TIME : '') + (LETTER_LAST.test(alias) ? NOT_A_WORD : ''),
     )
     .join('|');
 }
@@ -393,7 +409,7 @@ const CAPITALISED_NEXT = new RegExp(
  */
 function isPartOfName(text: string, written: string, end: number, count?: number | null): boolean {
   if (!CAPITALISED.test(written)) return false;
-  if (count != null && Math.abs(count) > 1 && SINGULAR_WORDS.has(written.toLowerCase())) return true;
+  if (count != null && Math.abs(count) > 1 && SINGULAR_WORDS.has(aliasKey(written, SINGULAR_WORDS))) return true;
   return CAPITALISED_NEXT.test(text.slice(end, end + CONTEXT_WINDOW));
 }
 
@@ -628,6 +644,19 @@ function describesNoun(
     Math.abs(value) > 1 ||
     plainHyphens(gap).includes('-') ||
     DETERMINER_BEFORE.test(text.slice(Math.max(0, numberStart - 24), numberStart))
+  );
+}
+
+/**
+ * Whether a measurement in `measure` takes the metric symbol because its unit words, `alias`
+ * ending at `end`, are joined by hyphens to describe the noun after them, and `measure` asks
+ * for its symbol there, as the speed of `a 35-mile-per-hour wind` does.
+ */
+function symbolBeforeNoun(text: string, measure: Measure, alias: string, end: number): boolean {
+  return (
+    measure.symbolBeforeNoun === true &&
+    plainHyphens(alias).includes('-') &&
+    MODIFIES_A_NOUN.test(text.slice(end))
   );
 }
 
@@ -1171,6 +1200,7 @@ function restatesConversion(
 /** Miles per US gallon, in every form the fuel economy rule reads. */
 const MPG_FORMS = [
   'mpg',
+  String.raw`m\.p\.g\.`,
   String.raw`miles(?:\s+per\s+|${HYPHEN}per${HYPHEN})gallon`,
   String.raw`(?:miles|mi)\s*/\s*(?:gallon|gal)`,
 ];
@@ -1197,7 +1227,7 @@ for (const measure of MEASURES) {
   const read = [measure, ...(measure.senses ?? []).flatMap((sense) => senseMeasure(sense) ?? [])];
   for (const dimension of new Set(read.map(measureDimension))) {
     if (dimension === undefined) continue;
-    (IMPERIAL_UNITS[dimension] ??= []).push(...forms.map(escape));
+    (IMPERIAL_UNITS[dimension] ??= []).push(...forms.map(aliasPattern));
   }
 }
 
@@ -2315,7 +2345,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     'gi',
   );
 
-  const resolve = (alias: string) => byAlias.get(alias.toLowerCase().replace(/\s+/g, ' '));
+  const resolve = (alias: string) => byAlias.get(aliasKey(alias, byAlias));
 
   const measurementBefore = new RegExp(
     String.raw`${OUTSIDE_WORD}(?:${NUMBER_PATTERN})${GAP}(${alternation})(?![A-Za-z])${SOFT_SPACE}(?<=\s)$`,
@@ -2511,9 +2541,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       entry.isWord &&
       entry.isSingular &&
       describesNoun(ctx.text, numberStart, value, gap, start + matched.length);
-    const unit = entry.isWord
-      ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
-      : ` ${target.symbol}`;
+    const unit =
+      entry.isWord && !symbolBeforeNoun(ctx.text, entry.measure, alias, start + matched.length)
+        ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
+        : ` ${target.symbol}`;
     // `a quarter mile track` keeps its article for the track, while `a quarter mile away`
     // gives it to the number.
     const from = attributive ? numberStart : start;
@@ -2654,9 +2685,10 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
         );
         texts.push(formatIn(entry.measure, target.value, precision, figures, maxDecimals, raws));
         const attributive = entry.isSingular && describesNoun(ctx.text, start, high, gap, end);
-        const unit = entry.isWord
-          ? ` ${attributive ? target.singular : target.plural}`
-          : ` ${target.symbol}`;
+        const unit =
+          entry.isWord && !symbolBeforeNoun(ctx.text, entry.measure, alias, end)
+            ? ` ${attributive ? target.singular : target.plural}`
+            : ` ${target.symbol}`;
         const body = interleave(texts, joins.map(separator)) + unit;
 
         const made = changes.length;

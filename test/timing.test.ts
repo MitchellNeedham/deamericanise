@@ -194,7 +194,9 @@ describe.skipIf(onCi)('protected names and paths take time in line with their le
   it.each`
     piece                                    | expected
     ${'Aa '}                                 | ${'Aa Aa '}
+    ${'Aa Bb\n'}                             | ${'Aa Bb\nAa Bb\n'}
     ${'Color Run '}                          | ${'Color Run Color Run '}
+    ${'Johnson Space Center opened. '}       | ${'Johnson Space Centre opened. Johnson Space Centre opened. '}
     ${'Set the background-color to match. '} | ${'Set the background-color to match. Set the background-color to match. '}
     ${'background-color-'}                   | ${'background-colour-background-colour-'}
     ${'Use std::color::gray here. '}         | ${'Use std::color::gray here. Use std::color::gray here. '}
@@ -216,6 +218,7 @@ describe.skipIf(onCi)('protected names and paths take time in line with their le
   it.each`
     before            | after
     ${'Medal of'}     | ${'Honor'}
+    ${'It rained.'}   | ${'Bright Red Color'}
     ${'Kodak'}        | ${'Theater'}
     ${'Color'}        | ${'Run'}
     ${'std::color'}   | ${'::gray'}

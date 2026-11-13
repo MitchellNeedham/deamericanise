@@ -38,11 +38,13 @@ export interface Measure {
    */
   ambiguousWhen?: RegExp;
   /**
-   * Whether the written-out unit in the quantity `text.slice(start, end)` is being used in
-   * another sense, such as `pounds` for money or the `pound` of `pound cake`. Checked
-   * whatever `respectConventions` says, because what it finds is not a measurement at all.
+   * Where the written-out unit in the quantity `text.slice(start, end)` is being used in
+   * another sense, such as `pounds` for money or the `pound` of `pound cake`, the end of what
+   * that sense covers: `end` for money, and the end of the noun for `pound cake`. Null where
+   * the unit is a measurement. Checked whatever `respectConventions` says, because what it
+   * finds is not a measurement at all.
    */
-  otherSense?: (text: string, start: number, end: number) => boolean;
+  otherSense?: (text: string, start: number, end: number) => number | null;
   /**
    * Left alone unless the rule is turned on by id. For measures that are not American at
    * all, merely imperial-descended and used everywhere.
@@ -80,8 +82,8 @@ export interface Sense {
   /**
    * What the quantity measures or describes in this sense, in the phrase after the unit:
    * after an optional `of`, with at most two words between that are not function words, and
-   * whatever follows, as `milk` in `Add 8 oz of whole milk slowly` and `AC` in
-   * `a 3-ton central AC unit`.
+   * whatever follows unless `asHead` is set, as `milk` in `Add 8 oz of whole milk slowly` and
+   * `AC` in `a 3-ton central AC unit`.
    */
   things: string[];
   /**
@@ -97,6 +99,13 @@ export interface Sense {
    * are solids.
    */
   except?: string[];
+  /**
+   * Whether one of `things` gives this sense only as the head of its phrase, its last noun, or
+   * before one of `heads`, so a function word, an adverb, a verb or a stop must follow. A drink
+   * before another noun names a food made with it, as in `8 oz rum raisins`, where a metal
+   * before one is what it is made of, as in `a 1 oz gold coin`.
+   */
+  asHead?: boolean;
   /**
    * Words before the number that say so, with at most one of `heads` and three function words
    * between, as in `AC units of 2 to 5 tons`.
@@ -279,15 +288,18 @@ const ALTITUDE: Convention[] = [
 ];
 
 /**
- * Whether the singular unit word `word`, ending the quantity `text.slice(start, end)`, is
- * the first part of a noun that `nouns` finds after it, as `pound` is in `Bake 1 pound cake`.
- * The number then counts the noun. A hyphen ties a unit to its number, so `a 2-pound cake`
- * is a weight.
+ * Where the noun ends that the singular unit word `word`, ending the quantity
+ * `text.slice(start, end)`, is the first part of, as `pound` is in `Bake 1 pound cake`, or
+ * null where `nouns` finds none after it. The number then counts the noun. A hyphen ties a
+ * unit to its number, so `a 2-pound cake` is a weight.
  */
 function startsNoun(word: string, nouns: RegExp) {
   const unit = new RegExp(String.raw`(?<![-A-Za-z])${word}$`, 'i');
-  return (text: string, start: number, end: number): boolean =>
-    unit.test(text.slice(start, end)) && nouns.test(text.slice(end, end + 40));
+  return (text: string, start: number, end: number): number | null => {
+    if (!unit.test(text.slice(start, end))) return null;
+    const noun = nouns.exec(text.slice(end, end + 40));
+    return noun === null ? null : end + noun[0].length;
+  };
 }
 
 const poundNoun = startsNoun('pound', /^[\s-]+(?:cakes?|signs?)\b/i);
@@ -314,7 +326,7 @@ const NOT_LIQUIDS = withPlurals([
   'condensed milk', 'baking soda', 'caustic soda', 'washing soda', 'soda cracker', 'soda bread',
   'ground coffee', 'instant coffee', 'bean coffee', 'coffee bean', 'coffee ground', 'coffee cake',
   'water chestnut', 'water cracker', 'beer bread', 'rum cake', 'rum ball', 'wine gum', 'stock cube',
-  'oil paint',
+  'oil paint', 'cream of tartar',
 ]);
 
 const FLUID_OUNCES: Sense = {
@@ -324,6 +336,7 @@ const FLUID_OUNCES: Sense = {
   heads: withPlurals([...DRINKWARE, ...VESSELS, 'box']),
   vessels: withPlurals(VESSELS),
   except: NOT_LIQUIDS,
+  asHead: true,
 };
 
 const TROY_OUNCES: Sense = {
@@ -476,7 +489,7 @@ export const MEASURES: Measure[] = [
       after: /^[\s-]*(?:divisions?|classes|class|limits?|bouts?|titles?|champions?|weight)\b/i,
     },
     otherSense: (text, start, end) =>
-      isMoney(text, start, end) || poundNoun(text, start, end),
+      isMoney(text, start, end) ? end : poundNoun(text, start, end),
   },
   {
     id: 'units.mass.stone',

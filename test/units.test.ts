@@ -4336,6 +4336,102 @@ describe('a unit the words beside it read in another sense', () => {
   });
 });
 
+describe('an ounce is a fluid ounce only where a liquid heads the phrase after it', () => {
+  it.each`
+    input                                 | expected                              | why
+    ${'Add 8 oz rum raisins.'}            | ${'Add 230 g rum raisins.'}           | ${'a food named for a drink'}
+    ${'Add 8 oz rum truffles.'}           | ${'Add 230 g rum truffles.'}          | ${'the same'}
+    ${'Add 8 oz wine biscuits.'}          | ${'Add 230 g wine biscuits.'}         | ${'the same'}
+    ${'Add 8 oz milk biscuits.'}          | ${'Add 230 g milk biscuits.'}         | ${'the same'}
+    ${'Add 8 oz vodka gummies.'}          | ${'Add 230 g vodka gummies.'}         | ${'the same'}
+    ${'Add 8 oz espresso beans.'}         | ${'Add 230 g espresso beans.'}        | ${'the same'}
+    ${'Add 8 oz rum raisins to the bowl.'} | ${'Add 230 g rum raisins to the bowl.'} | ${'its head before a preposition'}
+    ${'Add 8 oz wine jelly.'}             | ${'Add 230 g wine jelly.'}            | ${'a food in "ly"'}
+    ${'Bake a 16 oz mug cake.'}           | ${'Bake a 450 g mug cake.'}           | ${'drinkware before another noun'}
+    ${'Add 8 oz cream of tartar.'}        | ${'Add 230 g cream of tartar.'}       | ${'a solid headed by a liquid'}
+  `('weighs $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                    | expected                                  | why
+    ${'Add 8 oz chocolate milk.'}            | ${'Add 240 mL chocolate milk.'}           | ${'a liquid heads it'}
+    ${'Add 4 oz beef stock.'}                | ${'Add 120 mL beef stock.'}               | ${'the same'}
+    ${'Add 8 oz water first.'}               | ${'Add 240 mL water first.'}              | ${'before an adverb'}
+    ${'Set 4 oz stock aside.'}               | ${'Set 120 mL stock aside.'}              | ${'the same'}
+    ${'Add 8 oz of milk gradually.'}         | ${'Add 240 mL of milk gradually.'}        | ${'before an adverb in "ly"'}
+    ${'8 oz of milk makes 2 servings.'}      | ${'240 mL of milk makes 2 servings.'}     | ${'before a verb and its object'}
+    ${'Add 8 oz rum and raisins.'}           | ${'Add 240 mL rum and raisins.'}          | ${'before a conjunction'}
+    ${'Add 8 oz milk, sugar and eggs.'}      | ${'Add 240 mL milk, sugar and eggs.'}     | ${'before a comma'}
+    ${'Open a 12 oz beer can.'}              | ${'Open a 350 mL beer can.'}              | ${'before a vessel'}
+    ${'Pour it into a 2 oz shot glass.'}     | ${'Pour it into a 59 mL shot glass.'}     | ${'drinkware'}
+  `('reads $input as fluid ounces ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                      | expected
+    ${'Stir until 8 oz of cream thickens.'}                    | ${'Stir until 240 mL of cream thickens.'}
+    ${'Simmer until 16 oz of stock reduces by half.'}          | ${'Simmer until 470 mL of stock reduces by half.'}
+    ${'Simmer until 16 oz of stock reduces, about 10 minutes.'} | ${'Simmer until 470 mL of stock reduces, about 10 minutes.'}
+    ${'Once 8 oz of milk boils, add the oats.'}                | ${'Once 240 mL of milk boils, add the oats.'}
+    ${'Heat until 8 oz of milk boils.'}                        | ${'Heat until 240 mL of milk boils.'}
+    ${'16 oz of water goes into the pot.'}                     | ${'470 mL of water goes into the pot.'}
+    ${'8 oz water helps.'}                                     | ${'240 mL water helps.'}
+    ${'The 12 oz beer tastes flat.'}                           | ${'The 350 mL beer tastes flat.'}
+    ${'The 12 oz beer tastes flat and warm.'}                  | ${'The 350 mL beer tastes flat and warm.'}
+    ${'Then 16 oz of water goes in.'}                          | ${'Then 470 mL of water goes in.'}
+    ${'8 oz of milk makes a cup.'}                             | ${'240 mL of milk makes a cup.'}
+    ${'Pour 8 oz of milk into the bowl.'}                      | ${'Pour 240 mL of milk into the bowl.'}
+  `('reads a drink before its own verb as fluid ounces: $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                               | why
+    ${'8 oz rum raisins go in first.'}     | ${'230 g rum raisins go in first.'}    | ${'the verb after the plural food'}
+    ${'8 oz rum truffles are enough.'}     | ${'230 g rum truffles are enough.'}    | ${'an auxiliary after the plural food'}
+    ${'8 oz rum raisins, chopped'}         | ${'230 g rum raisins, chopped'}        | ${'a sentence with no verb'}
+    ${'After 8 oz wine gums, stop.'}       | ${'After 230 g wine gums, stop.'}      | ${'a food named for a drink'}
+    ${'Add 8 oz beer batter.'}             | ${'Add 230 g beer batter.'}            | ${'a food headed by a noun'}
+  `('weighs a food a drink names, wherever the quantity stands: $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                | expected
+    ${'8 oz rum raisins\n4 oz sugar'}                    | ${'230 g rum raisins\n110 g sugar'}
+    ${'Ingredients:\n8 oz rum raisins\n4 oz sugar\n'}    | ${'Ingredients:\n230 g rum raisins\n110 g sugar\n'}
+    ${'8 oz milk biscuits\n2 cups flour'}                | ${'230 g milk biscuits\n2 cups flour'}
+    ${'8 oz rum raisins\nA pinch of salt'}               | ${'230 g rum raisins\nA pinch of salt'}
+  `('weighs a food a drink names at the end of a line of ingredients: $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                   | expected
+    ${'8 oz of milk makes\na cup.'}                         | ${'240 mL of milk makes\na cup.'}
+    ${'In the morning, 8 oz of milk makes\na good start.'}  | ${'In the morning, 240 mL of milk makes\na good start.'}
+    ${'The 12 oz beer tastes\nflat.'}                       | ${'The 350 mL beer tastes\nflat.'}
+    ${'16 oz of water goes\ninto the pot.'}                 | ${'470 mL of water goes\ninto the pot.'}
+    ${'16 oz of water keeps\nyou going.'}                   | ${'470 mL of water keeps\nyou going.'}
+  `('reads a drink before its verb at the end of a wrapped line as fluid ounces: $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                          | expected
+    ${'Add 4 oz stock cubes.'}     | ${'Add 110 g stock cubes.'}
+    ${'Add 8 oz rum cake.'}        | ${'Add 230 g rum cake.'}
+    ${'Add 8 oz water chestnuts.'} | ${'Add 230 g water chestnuts.'}
+    ${'Add 8 oz wine gums.'}       | ${'Add 230 g wine gums.'}
+    ${'Add 8 oz soda bread.'}      | ${'Add 230 g soda bread.'}
+    ${'Add 8 oz coffee grounds.'}  | ${'Add 230 g coffee grounds.'}
+  `('weighs a food a drink names whose head is not the drink: $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
 describe('pounds of money are not weights', () => {
   it.each`
     unchanged                                                  | why
@@ -5105,11 +5201,11 @@ describe('a unit that is part of a noun', () => {
   };
 
   it.each`
-    input                       | span
-    ${'Bake 1 pound cake'}      | ${'1 pound'}
-    ${'Send in 6 foot soldiers'} | ${'6 foot'}
-    ${'Bake 2-3 pound cakes'}   | ${'2-3 pound'}
-    ${'In 5 yard sales we sold it.'} | ${'5 yard'}
+    input                            | span
+    ${'Bake 1 pound cake'}           | ${'1 pound cake'}
+    ${'Send in 6 foot soldiers'}     | ${'6 foot soldiers'}
+    ${'Bake 2-3 pound cakes'}        | ${'2-3 pound cakes'}
+    ${'In 5 yard sales we sold it.'} | ${'5 yard sales'}
   `('holds $span whole, even with respectConventions off', ({ input, span }) => {
     expect(held(input)).toContain(span);
     expect(held(input, { units: { respectConventions: false } })).toContain(span);
@@ -5150,10 +5246,10 @@ describe('a count before a compound noun that starts with a unit', () => {
 
   it.each`
     input                           | span
-    ${'We passed 3 mile markers.'}  | ${'3 mile'}
-    ${'the 26 mile marker'}         | ${'26 mile'}
-    ${'We put up 3 yard signs.'}    | ${'3 yard'}
-    ${'Press the two pound signs.'} | ${'two pound'}
+    ${'We passed 3 mile markers.'}  | ${'3 mile markers'}
+    ${'the 26 mile marker'}         | ${'26 mile marker'}
+    ${'We put up 3 yard signs.'}    | ${'3 yard signs'}
+    ${'Press the two pound signs.'} | ${'two pound signs'}
   `('holds $span whole, even with respectConventions off', ({ input, span }) => {
     expect(held(input)).toEqual([span]);
     expect(held(input, { units: { respectConventions: false } })).toEqual([span]);
@@ -5163,6 +5259,41 @@ describe('a count before a compound noun that starts with a unit', () => {
     expect(convert('the 26-mile marker', { units: { respectConventions: false } })).toBe(
       'the 42 kilometre marker',
     );
+  });
+});
+
+describe('a compound noun that starts with a unit is held to its end', () => {
+  const southAfrican = { preset: 'localise', dialect: 'en-ZA' } as const;
+
+  it.each`
+    unchanged                                         | why
+    ${'We counted 6 foot traffic lights.'}            | ${'a number in digits'}
+    ${'We counted six foot traffic lights.'}          | ${'a number in words'}
+    ${'We counted 6 to 8 foot traffic lights.'}       | ${'a range'}
+    ${'We counted 2, 4 or 6 foot traffic lights.'}    | ${'a list'}
+    ${'We counted 2 x 4 foot traffic lights.'}        | ${'a dimension'}
+    ${'Bake 1 pound cake'}                            | ${'a pound cake'}
+    ${'In 5 yard sales we sold it.'}                  | ${'a yard sale'}
+  `('leaves "$unchanged" alone on both runs, so no rule rewrites part of the noun ($why)', ({ unchanged }) => {
+    const once = deamericaniseText(unchanged, southAfrican);
+    expect(once).toBe(unchanged);
+    expect(deamericaniseText(once, southAfrican)).toBe(unchanged);
+  });
+
+  it('leaves the compound in a comment alone on both runs', () => {
+    const source = '// We counted 6 foot traffic lights.\nconst a = 1;\n';
+    const options = { language: 'ts', ...southAfrican } as const;
+    const once = deamericaniseCode(source, options).text;
+    expect(once).toBe(source);
+    expect(deamericaniseCode(once, options).text).toBe(source);
+  });
+
+  it.each`
+    input                             | options         | expected
+    ${'The traffic lights were out.'} | ${southAfrican} | ${'The robots were out.'}
+    ${'a 2-pound cake'}               | ${{}}           | ${'a 910 gram cake'}
+  `('$input -> $expected', ({ input, options, expected }) => {
+    expect(deamericaniseText(input, options)).toBe(expected);
   });
 });
 

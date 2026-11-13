@@ -828,6 +828,16 @@ capital after an initialism is more often the rest of a name, so `the U.S. Army`
 `the US Army`: only a word that opens sentences and never names anything, such as `It`,
 `The`, `In` or `However`, counts as a new sentence.
 
+Every initialism shares one ending. It loses its stops before a space, the end of the
+text, a stop, comma, colon, semicolon, question or exclamation mark, a closing quote or
+bracket, a plural `s`, or a hyphen, dash, slash or ampersand before a word or figure, any
+of them after closing emphasis. So `U.S.-made cars` becomes `US-made cars`,
+`the U.S./Canada border` becomes `the US/Canada border` and `He has two Ph.D.s.` becomes
+`He has two PhDs.` A capital and a stop after it start a longer initialism, which is left
+whole, so `U.K.I.P.`, `P.M.O.` and `17 U.S.C. 105` stay as written. A stop that ends the
+sentence is judged past closing emphasis and stays inside it, so
+`She moved to **the U.S.** It was cold.` becomes `She moved to **the US.** It was cold.`
+
 `P.M.` and `A.M.` take the lower case only after a time, so `3 P.M.` becomes `3 pm` even
 with times switched off. Without a time they stand for something else, such as a prime
 minister or AM radio, so `The P.M. said no.` becomes `The PM said no.`
@@ -862,6 +872,19 @@ or between two capitalised words, as in a title or text in capitals. Anywhere el
 a label, so `a Grade A eggplant` becomes `a Grade A aubergine` in `en-GB` and
 `Hall A 60 foot ceiling` becomes `Hall A 18 metre ceiling`. A label is a single letter,
 so `An` and `AN` are always the article, as a lower case `a` or `an` is.
+
+A capital `A` that is the article takes the case of the words it qualifies. A number and
+its unit symbol, and the single letters of an initialism, say nothing of the case, so the
+words after them decide: `A 47°F morning` becomes `An 8.3°C morning` and
+`A 47°F MORNING` becomes `AN 8.3°C MORNING`. An initialism often follows a measurement, so
+a word in capitals there counts only when the next word is in capitals too or there is
+none, and `A 47°F NYC morning` becomes `An 8.3°C NYC morning`.
+
+An initialism whose stops are removed is said by its letter names, so `a U.S. firm` becomes
+`a US firm` and keeps its `a`. One that starts with A, E, F, H, I, L, M, N, O, R, S or X
+takes `an`, as `an MP` does, unless it is said as a word, as `NASA` and `NATO` are. A word in
+capitals swapped for another is read as a word, so `Take an ELEVATOR now.` becomes
+`Take a LIFT now.` in `en-GB`.
 
 ## Deciding whether the text is American
 

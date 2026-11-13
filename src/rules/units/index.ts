@@ -3015,7 +3015,7 @@ function fahrenheitReadings(
       numbers = formatEnds(ctx, values.map((v) => (v * 5) / 9), raw);
     } else if (values.length === 1 || values.every(isOvenSetting)) {
       const { precision, maxDecimals } = ctx.options.units;
-      numbers = values.map((v) => formatTemperature(((v - 32) * 5) / 9, precision, v, maxDecimals));
+      numbers = values.map((v) => formatTemperature(((v - 32) * 5) / 9, precision, v, maxDecimals, raw));
     } else {
       numbers = formatEnds(ctx, values.map((v) => ((v - 32) * 5) / 9), raw);
     }

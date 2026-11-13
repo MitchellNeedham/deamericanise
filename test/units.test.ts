@@ -1044,6 +1044,44 @@ describe('Fahrenheit ranges', () => {
   });
 });
 
+describe('a Fahrenheit figure grouped in thousands', () => {
+  it.each`
+    input                                              | expected                                      | why
+    ${'The kiln reached 2,000°F.'}                     | ${'The kiln reached 1,095°C.'}                | ${'grouped by a comma, as the Celsius value is'}
+    ${'The furnace runs at 1,200 degrees Fahrenheit.'} | ${'The furnace runs at 650 degrees Celsius.'} | ${'spelled out'}
+    ${'Fire it at 1,000-1,200°F.'}                     | ${'Fire it at 540-650°C.'}                    | ${'a range'}
+    ${'It ran between 1,000 and 1,200°F.'}             | ${'It ran between 540 and 650°C.'}            | ${'a range after between'}
+    ${'Fire it at 1,000, 1,100 or 1,200°F.'}           | ${'Fire it at 540, 595 or 650°C.'}            | ${'a list'}
+    ${'The kiln reached 1 000°F.'}                     | ${'The kiln reached 540°C.'}                  | ${'grouped by a space'}
+    ${'The kiln reached 4 000°F.'}                     | ${'The kiln reached 2 205°C.'}                | ${'grouped by a space, as the Celsius value is'}
+    ${'It was 1,001.5°F inside.'}                      | ${'It was 538.6°C inside.'}                   | ${'with a decimal'}
+    ${'Temperatures rose by 1,000°F.'}                 | ${'Temperatures rose by 560°C.'}              | ${'a difference'}
+    ${'Heat the kiln to 2,000 F.'}                     | ${'Heat the kiln to 1,095°C.'}                | ${'a bare F in a sentence about heat'}
+    ${'Fire it to 2,000°F (1,095°C).'}                 | ${'Fire it to 1,095°C.'}                      | ${'the Celsius value given beside it'}
+    ${'Bake at 350°F.'}                                | ${'Bake at 175°C.'}                           | ${'three figures'}
+    ${'The kiln reached 2000°F.'}                      | ${'The kiln reached 1095°C.'}                 | ${'four figures, not grouped'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                   | why
+    ${'In 1724 Fahrenheit proposed his scale.'} | ${'a year before the bare word'}
+    ${'Fahrenheit 451'}                         | ${'a title'}
+    ${'Fire it to 1,095°C (2,000°F).'}          | ${'the courtesy figure after Celsius'}
+    ${'The kiln reached 2,000 F.'}              | ${'a bare F with no word about heat'}
+    ${'Heat the kiln to 2000 F.'}               | ${'four figures before a bare F, not grouped'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('keeps the original grouped figure', () => {
+    expect(convert('The kiln reached 2,000°F.', { units: { keepOriginal: true } })).toBe(
+      'The kiln reached 1,095°C (2,000°F).',
+    );
+  });
+});
+
 describe('Fahrenheit written as a bare F', () => {
   it.each`
     input                                       | expected                                    | why

@@ -591,8 +591,9 @@ The word alone does not count after a whole number of four figures, which reads 
 (`In 1724 Fahrenheit proposed his scale`), before `thermometers` or `scale`, where the
 number counts them, or before a number, where it is a title (`Fahrenheit 451`). A bare `F`,
 as in `165F` or `350 F`, is more often a letter, so it counts only as an upper case `F`
-after a number of two or three figures, in a sentence about heat (an oven, cooking, the
-weather, a fever or a temperature) that gives no Celsius value. An American word the
+after a number of two or three figures, or one grouped in thousands such as `2,000`, in a
+sentence about heat (an oven, cooking, the weather, a fever or a temperature) that gives no
+Celsius value. An American word the
 vocabulary rewrites into one of those, such as `cookie sheet`, `broiler` or `skillet`,
 counts too, whether or not the vocabulary runs. The sentence wraps across lines and ends
 at a blank line, a list item, a heading, or a stop before a capitalised word, but not at
@@ -645,7 +646,9 @@ commas, four figures are grouped too, so `2,025 miles` becomes `3,259 kilometres
 `2025 miles` becomes `3259 kilometres`. A source grouped with spaces gets the same kind of
 space back, so `12 500 miles` becomes `20 100 kilometres`. From a source with no separator,
 five figures and more are grouped with commas, so `12500 miles` becomes `20,100 kilometres`.
-In a range or list, one grouped figure groups them all.
+In a range or list, one grouped figure groups them all. A temperature is read and written the
+same way, so `The kiln reached 2,000°F.` becomes `The kiln reached 1,095°C.` and
+`Fire it at 1,000-1,200°F.` becomes `Fire it at 540-650°C.`
 
 A measurement that already gives both values is converted once, not twice. `6 feet (1.8 m)`
 becomes `1.8 m`, keeping the figure the author rounded. That needs a bracket that restates

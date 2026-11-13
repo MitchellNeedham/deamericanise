@@ -6,6 +6,7 @@ import { CALENDAR_WORD } from '../times.js';
 import {
   COMPOUNDS,
   MEASURES,
+  OWN_PLURAL_WORDS,
   SINGULAR_WORDS,
   metricLength,
   type Measure,
@@ -276,6 +277,8 @@ interface Alias {
   isWord: boolean;
   /** The matched form was singular, as in `a 9 inch dish`. */
   isSingular: boolean;
+  /** The matched form is its own plural, as `stone` is. */
+  isOwnPlural: boolean;
   /** How the unit was read, where the words beside it gave it another sense. */
   note?: string;
 }
@@ -328,10 +331,20 @@ function buildIndex(
   for (const measure of MEASURES) {
     if (isKept(measure, skip, forced)) continue;
     for (const w of measure.words) {
-      byAlias.set(w.toLowerCase(), { measure, isWord: true, isSingular: SINGULAR_WORDS.has(w) });
+      byAlias.set(w.toLowerCase(), {
+        measure,
+        isWord: true,
+        isSingular: SINGULAR_WORDS.has(w),
+        isOwnPlural: OWN_PLURAL_WORDS.has(w),
+      });
     }
     for (const a of measure.abbrevs) {
-      byAlias.set(a.toLowerCase(), { measure, isWord: false, isSingular: false });
+      byAlias.set(a.toLowerCase(), {
+        measure,
+        isWord: false,
+        isSingular: false,
+        isOwnPlural: false,
+      });
     }
   }
   const alternation = alternate([...byAlias.keys()]);
@@ -584,11 +597,15 @@ const UNIT_FORMS = alternate(MEASURES.flatMap((measure) => [...measure.words, ..
 /**
  * The start of a word that may be a noun. A number in words, alone or with its unit
  * (`one-inch`, `onelbs`), or a date is not one. Another rule may rewrite either to start
- * with a digit, so reading it as a noun would leave the measurement to a second run.
+ * with a digit, so reading it as a noun would leave the measurement to a second run. A number
+ * in digits starts one only where letters that are no unit follow it, straight or after a
+ * hyphen, as in `2-door` and `4WD`, which no rule rewrites, so a count spaced from its noun,
+ * as in `6 feet 2 days later`, and a measurement such as `2-inch` start none.
  */
 const NOUN_START =
   String.raw`(?!(?:${NOT_A_NOUN.join('|')}|(?:${NUMBER_PATTERN})(?:${GAP}(?:${UNIT_FORMS}))?)` +
-  String.raw`(?!\w|${HYPHEN})|(?:${MONTH_PATTERN})\.?\s+\d)[a-z]`;
+  String.raw`(?!\w|${HYPHEN})|(?:${MONTH_PATTERN})\.?\s+\d)` +
+  String.raw`(?:[a-z]|\d+(?:[.,]\d+)*${HYPHEN}?(?!(?:${UNIT_FORMS})(?![a-z]))[a-z])`;
 
 /** A word straight after a measurement that may be a noun it describes. */
 const MODIFIES_A_NOUN = new RegExp(String.raw`^(?:\s|${HYPHEN})+${NOUN_START}`, 'i');
@@ -629,16 +646,35 @@ function sizesNoun(text: string, end: number): boolean {
 
 const HYPHEN_BEFORE_SIZE = new RegExp(String.raw`${AFTER_A_LENGTH}${HYPHEN}(?=${SIZE})`, 'iy');
 
+/** A count in words spaced before a number, as `two` is in `two 300 horsepower engines`. */
+const COUNT_BEFORE = new RegExp(String.raw`(?<![\w-])(?:${SECOND_END_WORDS})\s+$`, 'i');
+
 /**
- * Whether the singular unit word ending at `end` describes the noun after it, so its metric
- * unit stays singular too: `a 9 inch dish`, `9 inch pans`, `one-inch slices`. The unit
- * follows a number worth `value` that starts at `numberStart`, across `gap`. A determiner
- * opening the phrase says so, as does a hyphen tying the number to the unit, or the singular
- * after a number above one, which would otherwise take the plural. One and a fraction take
- * the singular anyway, so `one quart small onions` and `1/2 pound ground beef` are
- * quantities with the `of` left out, read as `one quart of small onions` would be. A length
- * that gives the size of a noun describes it whatever its number, as `1/2 inch thick slices`
- * does.
+ * An article, or a count with a times sign, opening the phrase, as in `a 300 horsepower engine`.
+ * Before a unit that is its own plural, any other determiner may take the unit as the noun, as
+ * in `the 300 horsepower produced by it` and `another 300 horsepower comes from the motor`.
+ */
+const ARTICLE_BEFORE = new RegExp(
+  String.raw`(?:\b(?:a|an)\s+(?:${NUMBER_PREFIX})?|\d\s*[x×]\s*)$`,
+  'i',
+);
+
+/** A number that takes no article of its own, as `6` and `two` do, and `quarter` does not. */
+const TAKES_NO_ARTICLE = new RegExp(String.raw`\d|${SECOND_END_WORDS}`, 'iy');
+
+/**
+ * Whether the unit word ending at `end` describes the noun after it, so its metric unit is
+ * singular: `a 9 inch dish`, `9 inch pans`, `one-inch slices`. The unit follows a number worth
+ * `value` that starts at `numberStart`, across `gap`. A determiner or a count opening the
+ * phrase says so, as does a hyphen tying the number to the unit, or the singular after a
+ * number above one, which would otherwise take the plural. One and a fraction take the
+ * singular anyway, so `one quart small onions` and `1/2 pound ground beef` are quantities with
+ * the `of` left out, read as `one quart of small onions` would be. A length that gives the size
+ * of a noun describes it whatever its number, as `1/2 inch thick slices` does. A unit that is
+ * its own plural, as `ownPlural` says, tells nothing by its number, so only a hyphen, a count,
+ * or an article or a times sign opening the phrase says so. A hyphen, with a determiner or a
+ * count opening the phrase, says so wherever the noun stands, as in `a 6-inch, sharp knife`,
+ * though not where the determiner is the number's own, as in `It is a quarter-mile.`
  */
 function describesNoun(
   text: string,
@@ -646,26 +682,37 @@ function describesNoun(
   value: number,
   gap: string,
   end: number,
+  ownPlural = false,
 ): boolean {
   if (sizesNoun(text, end)) return true;
-  if (!MODIFIES_A_NOUN.test(text.slice(end))) return false;
-  return (
-    Math.abs(value) > 1 ||
-    plainHyphens(gap).includes('-') ||
-    DETERMINER_BEFORE.test(text.slice(Math.max(0, numberStart - 24), numberStart))
-  );
+  const before = text.slice(Math.max(0, numberStart - 24), numberStart);
+  const opened =
+    COUNT_BEFORE.test(before) || (ownPlural ? ARTICLE_BEFORE : DETERMINER_BEFORE).test(before);
+  const tied = plainHyphens(gap).includes('-');
+  if (!MODIFIES_A_NOUN.test(text.slice(end))) {
+    TAKES_NO_ARTICLE.lastIndex = numberStart;
+    return tied && opened && TAKES_NO_ARTICLE.test(text);
+  }
+  return tied || opened || (!ownPlural && Math.abs(value) > 1);
 }
 
 /**
  * Whether a measurement in `measure` takes the metric symbol because its unit words, `alias`
- * ending at `end`, are joined by hyphens to describe the noun after them, and `measure` asks
- * for its symbol there, as the speed of `a 35-mile-per-hour wind` does.
+ * ending at `end`, are joined by hyphens to describe a noun, and `measure` asks for its symbol
+ * there, as the speed of `a 35-mile-per-hour wind` does. `attributive` is `describesNoun`'s
+ * answer, which also finds the noun past a comma, as in `a 35-mile-per-hour, gusty wind`.
  */
-function symbolBeforeNoun(text: string, measure: Measure, alias: string, end: number): boolean {
+function symbolBeforeNoun(
+  text: string,
+  measure: Measure,
+  alias: string,
+  end: number,
+  attributive: boolean,
+): boolean {
   return (
     measure.symbolBeforeNoun === true &&
     plainHyphens(alias).includes('-') &&
-    MODIFIES_A_NOUN.test(text.slice(end))
+    (attributive || MODIFIES_A_NOUN.test(text.slice(end)))
   );
 }
 
@@ -2669,10 +2716,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
     const numberStart = start + (/^an?\s+/i.exec(raw)?.[0].length ?? 0);
     const attributive =
       entry.isWord &&
-      entry.isSingular &&
-      describesNoun(ctx.text, numberStart, value, gap, start + matched.length);
+      (entry.isSingular || entry.isOwnPlural) &&
+      describesNoun(ctx.text, numberStart, value, gap, start + matched.length, entry.isOwnPlural);
     const unit =
-      entry.isWord && !symbolBeforeNoun(ctx.text, entry.measure, alias, start + matched.length)
+      entry.isWord &&
+      !symbolBeforeNoun(ctx.text, entry.measure, alias, start + matched.length, attributive)
         ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
         : ` ${target.symbol}`;
     // `a quarter mile track` keeps its article for the track, while `a quarter mile away`
@@ -2815,9 +2863,11 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           formatIn(entry.measure, value * perSourceUnit, precision, figures, maxDecimals, raws),
         );
         texts.push(formatIn(entry.measure, target.value, precision, figures, maxDecimals, raws));
-        const attributive = entry.isSingular && describesNoun(ctx.text, start, high, gap, end);
+        const attributive =
+          (entry.isSingular || entry.isOwnPlural) &&
+          describesNoun(ctx.text, start, high, gap, end, entry.isOwnPlural);
         const unit =
-          entry.isWord && !symbolBeforeNoun(ctx.text, entry.measure, alias, end)
+          entry.isWord && !symbolBeforeNoun(ctx.text, entry.measure, alias, end, attributive)
             ? ` ${attributive ? target.singular : target.plural}`
             : ` ${target.symbol}`;
         const body = interleave(texts, joins.map(separator)) + unit;

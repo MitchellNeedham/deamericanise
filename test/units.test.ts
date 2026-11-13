@@ -1410,6 +1410,8 @@ describe('a unit of more than one word written with hyphens', () => {
     ${'They forecast 35-miles-per-hour winds.'}     | ${'They forecast 56 km/h winds.'}              | ${'the same, plural'}
     ${'A 30- to 40-mile-per-hour wind.'}            | ${'A 48 to 64 km/h wind.'}                     | ${'a range of speeds'}
     ${'The wind reached 35-mile-per-hour.'}         | ${'The wind reached 56 kilometres per hour.'}  | ${'a speed before no noun'}
+    ${'A 35-mile-per-hour, gusty wind.'}            | ${'A 56 km/h, gusty wind.'}                    | ${'a speed before a comma and another modifier'}
+    ${'It was 35-mile-per-hour, gusty and cold.'}   | ${'It was 56 kilometres per hour, gusty and cold.'} | ${'a speed after a verb, before a comma'}
     ${'a 100-pound-per-square-inch tank'}           | ${'a 690 kilopascal tank'}                     | ${'a pressure'}
     ${'A 500-square-foot apartment.'}               | ${'A 46 square metre apartment.'}              | ${'an area'}
     ${'a 10-cubic-foot fridge'}                     | ${'a 280 litre fridge'}                        | ${'a volume'}
@@ -1751,7 +1753,7 @@ describe('a number that is not finite', () => {
   it.each`
     input              | expected
     ${'1/2 inch'}      | ${'1.3 centimetres'}
-    ${'0 inches'}      | ${'0 millimetres'}
+    ${'0 inches'}      | ${'0 centimetres'}
     ${'1 1/2 miles'}   | ${'2.4 kilometres'}
   `('$input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
@@ -5163,6 +5165,111 @@ describe('a length that gives the size of a noun describes it', () => {
     expect(convert('a 6-foot-tall fence', { units: { keepOriginal: true } })).toBe(
       'a 1.8 metre (6-foot) tall fence',
     );
+  });
+});
+
+describe('a unit word that is its own plural describes a noun where its number cannot say', () => {
+  it.each`
+    input                                  | expected                               | why
+    ${'a 300 horsepower engine'}           | ${'a 220 kilowatt engine'}             | ${'an article opens the phrase'}
+    ${'a 300-horsepower engine'}           | ${'a 220 kilowatt engine'}             | ${'a hyphen ties the number to the unit'}
+    ${'two 300 horsepower engines'}        | ${'two 220 kilowatt engines'}          | ${'a count before the number'}
+    ${'a 14 stone man'}                    | ${'an 89 kilogram man'}                | ${'stone'}
+    ${'the 300-horsepower engine'}         | ${'the 220 kilowatt engine'}           | ${'a hyphen after "the"'}
+    ${'a 200 to 300 horsepower engine'}    | ${'a 150 to 220 kilowatt engine'}      | ${'a range'}
+    ${'a 300-horsepower, twin-turbo car'}  | ${'a 220 kilowatt, twin-turbo car'}    | ${'a hyphen before a comma and another modifier'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                             | expected                                         | why
+    ${'300 horsepower'}                               | ${'220 kilowatts'}                               | ${'no noun after'}
+    ${'He weighs 14 stone.'}                          | ${'He weighs 89 kilograms.'}                     | ${'the same'}
+    ${'The engine makes 300 horsepower at 6000 rpm.'} | ${'The engine makes 220 kilowatts at 6000 rpm.'} | ${'a preposition after'}
+    ${'He was 14 stone soaking wet.'}                 | ${'He was 89 kilograms soaking wet.'}            | ${'nothing opens the phrase'}
+    ${'the 300 horsepower produced by the motor'}     | ${'the 220 kilowatts produced by the motor'}     | ${'"the" may take the unit as its noun'}
+    ${'another 300 horsepower comes from the motor'}  | ${'another 220 kilowatts comes from the motor'}  | ${'so may "another"'}
+    ${'a 6 foot fence'}                               | ${'a 1.8 metre fence'}                           | ${'a singular unit keeps its reading'}
+  `('keeps the plural: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a hyphenated measurement describes the noun wherever it stands', () => {
+  it.each`
+    input                                    | expected                                | why
+    ${'a 6-inch, sharp knife'}               | ${'a 15 centimetre, sharp knife'}       | ${'a comma and another modifier before the noun'}
+    ${'A 10-foot-tall, 2,500-pound crane.'}  | ${'A 3 metre tall, 1.1 tonne crane.'}   | ${'a size, then a comma and another measurement'}
+    ${'It is a 2,500-pound, red crane.'}     | ${'It is a 1.1 tonne, red crane.'}      | ${'mass'}
+    ${'two 6-inch, sharp knives'}            | ${'two 15 centimetre, sharp knives'}    | ${'a count opens the phrase'}
+    ${'a 6-foot or 8-foot ladder'}           | ${'a 1.8 metre or 2.4 metre ladder'}    | ${'a conjunction and another measurement'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                           | expected                                        | why
+    ${'It is 10 feet tall.'}                        | ${'It is 3 metres tall.'}                       | ${'no hyphen'}
+    ${'We bought 2,500 pounds, then more.'}         | ${'We bought 1.1 tonnes, then more.'}           | ${'the same'}
+    ${'A 10-foot-tall fence.'}                      | ${'A 3 metre tall fence.'}                      | ${'the noun straight after the size'}
+    ${'A heavy 2,500-pound crane.'}                 | ${'A heavy 1.1 tonne crane.'}                   | ${'the noun straight after'}
+    ${'The fence is 6-foot-tall.'}                  | ${'The fence is 1.8 metres tall.'}              | ${'nothing opens the phrase'}
+    ${'The fence is 6-foot-tall, sturdy and heavy.'} | ${'The fence is 1.8 metres tall, sturdy and heavy.'} | ${'the same, before a comma'}
+    ${'It is a quarter-mile.'}                      | ${'It is 400 metres.'}                          | ${'the article is the number\'s own'}
+  `('keeps the plural: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a singular unit before a modifier in digits describes the noun', () => {
+  it.each`
+    input                                  | expected                               | why
+    ${'Buy a 6-foot 2-door cabinet.'}      | ${'Buy a 1.8 metre 2-door cabinet.'}   | ${'a number hyphenated to a word'}
+    ${'Buy a 6-foot 3-shelf bookcase.'}    | ${'Buy a 1.8 metre 3-shelf bookcase.'} | ${'the same'}
+    ${'Buy a 10-gallon 2-tier fountain.'}  | ${'Buy a 38 litre 2-tier fountain.'}   | ${'volume'}
+    ${'Buy a 6 foot 2-door cabinet.'}      | ${'Buy a 1.8 metre 2-door cabinet.'}   | ${'a unit spaced from its number'}
+    ${'Buy a 6-foot 4WD truck.'}           | ${'Buy a 1.8 metre 4WD truck.'}        | ${'a word with digits in it'}
+    ${'Buy a 6 foot long 2-door cabinet.'} | ${'Buy a 1.8 metre long 2-door cabinet.'} | ${'after a size'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                                | why
+    ${'He lost 6 feet 2 days later.'}      | ${'He lost 1.8 metres 2 days later.'}   | ${'a count spaced from its noun'}
+    ${'Buy a 6-foot two-door cabinet.'}    | ${'Buy a 1.8 metre two-door cabinet.'}  | ${'a modifier in words'}
+    ${'Cut a 6-foot 2-inch board.'}        | ${'Cut a 1.88 metre board.'}            | ${'a number hyphenated to a unit is a measurement'}
+    ${'It grew 6 foot 2 years ago.'}       | ${'It grew 1.8 metres 2 years ago.'}    | ${'a singular unit before a count spaced from its noun'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a measurement of zero takes the unit nearest in size to its own', () => {
+  it.each`
+    input                    | expected
+    ${'It is 0 miles away.'} | ${'It is 0 kilometres away.'}
+    ${'It is 0 feet.'}       | ${'It is 0 metres.'}
+    ${'It is 0 inches.'}     | ${'It is 0 centimetres.'}
+    ${'It weighs 0 pounds.'} | ${'It weighs 0 kilograms.'}
+    ${'It weighs 0 ounces.'} | ${'It weighs 0 grams.'}
+    ${'It holds 0 gallons.'} | ${'It holds 0 litres.'}
+    ${'It covers 0 acres.'}  | ${'It covers 0 hectares.'}
+    ${'It weighs 0 tons.'}   | ${'It weighs 0 tonnes.'}
+    ${'It is 0 ft wide.'}    | ${'It is 0 m wide.'}
+  `('$input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                       | expected
+    ${'It is 0.5 miles away.'}  | ${'It is 800 metres away.'}
+    ${'It is 1 inch long.'}     | ${'It is 2.5 centimetres long.'}
+    ${'It weighs 3 ounces.'}    | ${'It weighs 85 grams.'}
+    ${'It is 0 to 5 miles.'}    | ${'It is 0 to 8 kilometres.'}
+  `('keeps the unit of a number that is not zero: $input -> $expected', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
   });
 });
 

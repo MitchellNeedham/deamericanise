@@ -247,12 +247,22 @@ fuel economy. The volume measures are the US ones, which are not the imperial on
 
 A unit that describes the noun after it stays singular: `a 9 inch dish` becomes
 `a 23 centimetre dish`, and so do `9 inch pans`, `the 5-6 inch pans` and `one-inch slices`.
-A determiner, a hyphen tying the number to the unit, or the singular after a number above
+A determiner or a count, a hyphen tying the number to the unit, or the singular after a number above
 one says so. One and a fraction take the singular anyway, so `one quart small onions` and
-`1/2 pound ground beef` keep a plural unit, read as quantities with the `of` left out. A
+`1/2 pound ground beef` keep a plural unit, read as quantities with the `of` left out.
+A unit that is its own plural, `stone` or `horsepower`, says nothing by its number, so only
+`a` or `an`, a count or a hyphen says so: `a 14 stone man` becomes `an 89 kilogram man` and
+`two 300 horsepower engines` becomes `two 220 kilowatt engines`, while
+`He was 14 stone soaking wet.` and `the 300 horsepower produced by the motor` keep the plural.
+A hyphen, with a determiner or a count opening the phrase, says so wherever the noun stands,
+so `a 6-inch, sharp knife` becomes `a 15 centimetre, sharp knife`, while
+`The fence is 6-foot-tall, sturdy and heavy.` keeps the plural. A
 preposition, a size, an adverb of place, slope or time, a pronoun, a conjunction, a number
 or a date after the unit is no noun: `a quarter mile later` becomes `400 metres later`, and
-`a mile and a half back` becomes `2.4 kilometres back`. A count before an attributive
+`a mile and a half back` becomes `2.4 kilometres back`. A number in digits hyphenated to a
+word that is no unit, or with letters straight after it, may start one, so
+`a 6-foot 2-door cabinet` becomes `a 1.8 metre 2-door cabinet`, while
+`He lost 6 feet 2 days later.` keeps the plural. A count before an attributive
 measurement counts the noun, so `two quarter-pound burgers` becomes `two 110 gram burgers`.
 So does a count in words spaced before a length that a hyphen ties to its size, which leaves
 the unit one of itself: `two foot-long subs` becomes `two 30 centimetre long subs`, and a
@@ -662,7 +672,9 @@ Celsius in any of those forms but a bare `C`, and names no Fahrenheit, as
 `In Celsius, highs are in the 30s.` does.
 
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
-metres. Precision defaults to `natural`, which matches the significant figures of the
+metres. A zero has no magnitude, so it takes the metric unit nearest in size to its own:
+`0 miles` gives `0 kilometres`, `0 feet` gives `0 metres` and `0 ounces` gives `0 grams`.
+Precision defaults to `natural`, which matches the significant figures of the
 source and never claims more accuracy than was written down. Inches of mercury are the
 exception: an altimeter setting is read in whole hectopascals, so `30 inHg` becomes
 `1016 hPa` and each end of a range is whole too, while a value under one hectopascal keeps

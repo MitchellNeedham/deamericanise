@@ -1117,8 +1117,19 @@ describe('Fahrenheit ranges', () => {
     ${'Temperatures fell 10 to 15°F.'}                | ${'Temperatures fell 5.6 to 8.3°C.'}              | ${'the same, from the verb'}
     ${'10 to 20°F below zero'}                        | ${'-23 to -29°C'}                                 | ${'both ends below zero'}
     ${'Gas mark 4 and 350°F are the same heat.'}      | ${'Gas mark 4 and 175°C are the same heat.'}      | ${'and without between is not a range'}
+    ${'Keep it between 60 and 70°F.'}                 | ${'Keep it between 16 and 21°C.'}                 | ${'between and, in a sentence'}
+    ${'Bake at 350 to 375 degrees F.'}                | ${'Bake at 175 to 190 degrees Celsius.'}          | ${'to, before degrees F'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                     | why
+    ${'Serial 1234567890123 is fine.'}            | ${'a serial number'}
+    ${`Serial 1${'1'.repeat(8000)} ends.`}        | ${'a long run of digits'}
+    ${`Keep it between 6${'0'.repeat(8000)} and`} | ${'a long figure after between, with no unit'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
   });
 
   it('keeps the original range', () => {
@@ -1143,6 +1154,47 @@ describe('Fahrenheit ranges', () => {
     ${'350-375°F'}                         | ${'175-190°C'}                           | ${'a range written tight'}
   `('stops a range at a new block: $why', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a Fahrenheit figure grouped in thousands', () => {
+  it.each`
+    input                                              | expected                                      | why
+    ${'The kiln reached 2,000°F.'}                     | ${'The kiln reached 1,095°C.'}                | ${'grouped by a comma, as the Celsius value is'}
+    ${'The furnace runs at 1,200 degrees Fahrenheit.'} | ${'The furnace runs at 650 degrees Celsius.'} | ${'spelled out'}
+    ${'Fire it at 1,000-1,200°F.'}                     | ${'Fire it at 540-650°C.'}                    | ${'a range'}
+    ${'It ran between 1,000 and 1,200°F.'}             | ${'It ran between 540 and 650°C.'}            | ${'a range after between'}
+    ${'Fire it at 1,000, 1,100 or 1,200°F.'}           | ${'Fire it at 540, 595 or 650°C.'}            | ${'a list'}
+    ${'The kiln reached 1 000°F.'}                     | ${'The kiln reached 540°C.'}                  | ${'grouped by a space'}
+    ${'The kiln reached 4 000°F.'}                     | ${'The kiln reached 2 205°C.'}                | ${'grouped by a space, as the Celsius value is'}
+    ${'It was 1,001.5°F inside.'}                      | ${'It was 538.6°C inside.'}                   | ${'with a decimal'}
+    ${'Temperatures rose by 1,000°F.'}                 | ${'Temperatures rose by 560°C.'}              | ${'a difference'}
+    ${'Heat the kiln to 2,000 F.'}                     | ${'Heat the kiln to 1,095°C.'}                | ${'a bare F in a sentence about heat'}
+    ${'Fire it to 2,000°F (1,095°C).'}                 | ${'Fire it to 1,095°C.'}                      | ${'the Celsius value given beside it'}
+    ${'Bake at 350°F.'}                                | ${'Bake at 175°C.'}                           | ${'three figures'}
+    ${'The kiln reached 2000°F.'}                      | ${'The kiln reached 1095°C.'}                 | ${'four figures, not grouped'}
+    ${'Fire it at 2 350°F.'}                           | ${'Fire it at 1 290°C.'}                      | ${'groups that could be a count, with no noun after'}
+    ${'Fire a 2 350°F loaf.'}                          | ${'Fire a 1 290°C loaf.'}                     | ${'the same, after a determiner that takes one'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                                   | why
+    ${'In 1724 Fahrenheit proposed his scale.'} | ${'a year before the bare word'}
+    ${'Fahrenheit 451'}                         | ${'a title'}
+    ${'Fire it to 1,095°C (2,000°F).'}          | ${'the courtesy figure after Celsius'}
+    ${'The kiln reached 2,000 F.'}              | ${'a bare F with no word about heat'}
+    ${'Heat the kiln to 2000 F.'}               | ${'four figures before a bare F, not grouped'}
+    ${'Fire 2 350°F loaves.'}                   | ${'a count, then the temperature of the loaves'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('keeps the original grouped figure', () => {
+    expect(convert('The kiln reached 2,000°F.', { units: { keepOriginal: true } })).toBe(
+      'The kiln reached 1,095°C (2,000°F).',
+    );
   });
 });
 
@@ -1225,6 +1277,32 @@ describe('Fahrenheit written as a bare F', () => {
 
   it('stops at a time that ends the sentence before another', () => {
     expect(convert('Bake it at 6 p.m. Row 35F was empty.')).toBe('Bake it at 6pm. Row 35F was empty.');
+  });
+
+  const stirring = 'stir it well and wait, '.repeat(60);
+
+  it.each`
+    input                                                            | expected                                                         | why
+    ${`Set it to 95F, then ${stirring}and put it in the oven.`}      | ${`Set it to 35°C, then ${stirring}and put it in the oven.`}     | ${'a word about heat far along the sentence'}
+    ${`Put it in the oven, then ${stirring}and set it to 95F.`}      | ${`Put it in the oven, then ${stirring}and set it to 35°C.`}     | ${'a word about heat far back in the sentence'}
+    ${`Preheat to 350F, then ${stirring}until the dial reads 180C.`} | ${`Preheat to 350F, then ${stirring}until the dial reads 180C.`} | ${'a Celsius value far along the sentence'}
+    ${`Set it to 95F. Then ${stirring}and put it in the oven.`}      | ${`Set it to 95F. Then ${stirring}and put it in the oven.`}      | ${'a word about heat in the next sentence'}
+    ${'Bake at 350F.'}                                               | ${'Bake at 175°C.'}                                              | ${'a word about heat beside it'}
+    ${'Seat 22F is free.'}                                           | ${'Seat 22F is free.'}                                           | ${'no word about heat'}
+  `('reads the whole sentence of a bare F: $why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('decides a bare F by a word about heat far along its sentence on the first run', () => {
+    const localise = { preset: 'localise' } as const;
+    const input =
+      'Set it to 95F, then pour 100 fluid ounces, 100 fluid ounces, 100 fluid ounces, 100 fluid ounces, ' +
+      '100 fluid ounces and 100 fluid ounces into the oven.';
+    const once = deamericaniseText(input, localise);
+    expect(once).toBe(
+      'Set it to 35°C, then pour 3 litres, 3 litres, 3 litres, 3 litres, 3 litres and 3 litres into the oven.',
+    );
+    expect(deamericaniseText(once, localise)).toBe(once);
   });
 
   it.each`
@@ -3779,6 +3857,50 @@ describe('a Celsius value in brackets that also gives the gas mark', () => {
     ${'Bake at gas mark 4 (180°C).'}                     | ${'a gas mark alone'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
+  });
+});
+
+describe('a Celsius value in brackets that also gives the fan oven setting', () => {
+  it.each`
+    input                                                                      | expected                                                    | why
+    ${'Preheat the oven to 350°F (180°C/160°C fan).'}                          | ${'Preheat the oven to 180°C (160°C fan).'}                 | ${'a slash'}
+    ${'Preheat the oven to 350°F (180°C, fan 160°C).'}                         | ${'Preheat the oven to 180°C (fan 160°C).'}                 | ${'a comma, with fan first'}
+    ${'Preheat the oven to 350°F (180°C/160°C fan/gas mark 4).'}               | ${'Preheat the oven to 180°C (160°C fan/gas mark 4).'}      | ${'and the gas mark'}
+    ${'Preheat the oven to 350°F (180°C/gas mark 4/160°C fan).'}               | ${'Preheat the oven to 180°C (gas mark 4/160°C fan).'}      | ${'the gas mark first'}
+    ${'Preheat the oven to 350°F (180°C/160°C fan-forced).'}                   | ${'Preheat the oven to 180°C (160°C fan-forced).'}          | ${'fan-forced'}
+    ${'Preheat the oven to 350°F (180°C; Fan-assisted 160°C).'}                | ${'Preheat the oven to 180°C (Fan-assisted 160°C).'}        | ${'a semicolon, capitals and fan-assisted'}
+    ${'Preheat the oven to 350°F (180°C or 160°C fan oven).'}                  | ${'Preheat the oven to 180°C (160°C fan oven).'}            | ${'"or" and fan oven'}
+    ${'Preheat the oven to 350°F (180C/160C fan/gas 4).'}                      | ${'Preheat the oven to 180C (160C fan/gas 4).'}             | ${'a bare C'}
+    ${'Preheat the oven to 350°F (180°C/160 fan).'}                            | ${'Preheat the oven to 180°C (160 fan).'}                   | ${'a fan figure with no unit'}
+    ${'Preheat the oven to 350 degrees F (180 degrees C, fan 160 degrees C).'} | ${'Preheat the oven to 180 degrees C (fan 160 degrees C).'} | ${'spelled out'}
+    ${'Preheat the oven to 350°F (*180°C/160°C fan*).'}                        | ${'Preheat the oven to 180°C (*160°C fan*).'}               | ${'emphasis around all of it stays on the fan setting'}
+    ${'Preheat the oven to 350°F (180°C/160°C fans).'}                         | ${'Preheat the oven to 175°C (180°C/160°C fans).'}          | ${'a word that only starts with fan'}
+    ${'Preheat the oven to 350°F (160°C fan).'}                                | ${'Preheat the oven to 175°C (160°C fan).'}                 | ${'the fan setting alone'}
+    ${'Preheat the oven to 350°F (180°C).'}                                    | ${'Preheat the oven to 180°C.'}                             | ${'no fan setting'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('collapses the pair with keepOriginal on, and runs twice without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('Preheat the oven to 350°F (180°C/160°C fan).', options);
+    expect(once).toBe('Preheat the oven to 180°C (160°C fan).');
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each`
+    unchanged                                                    | why
+    ${'Preheat the oven to 180°C (350°F/160°C fan).'}            | ${'the Fahrenheit value restates the Celsius one'}
+    ${'Preheat the oven to 180°C (350°F, fan 160°C).'}           | ${'the same, with fan first'}
+    ${'Preheat the oven to 180°C (350°F/160°C fan/gas mark 4).'} | ${'the same, with the gas mark'}
+    ${'Preheat the oven to 180°C (350°F).'}                      | ${'no fan setting'}
+    ${'Heat the oven to 180C fan or to 400F.'}                   | ${'a fan setting outside a bracket'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('counts no Fahrenheit value that restates the Celsius one beside its fan setting', () => {
+    expect(analyse('Preheat the oven to 180°C (350°F/160°C fan).').markers).toEqual([]);
   });
 });
 

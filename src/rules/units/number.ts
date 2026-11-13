@@ -69,7 +69,7 @@ export const SPACE_GROUPED =
   `(?:${GROUP_SPACES.map(groupedBy).join('|')})`;
 
 /** A whole number in digits, grouped in thousands by commas or by spaces, or not at all. */
-const DIGITS = String.raw`${groupedBy(',')}|${SPACE_GROUPED}|\d+`;
+export const DIGITS = String.raw`${groupedBy(',')}|${SPACE_GROUPED}|\d+`;
 
 const COUNT_THEN_GROUP = new RegExp(
   String.raw`^\d{1,3}(?:${GROUP_SPACE}\d{3})*${GROUP_SPACE}(?=[1-9]\d\d(?:\.\d+)?$)`,
@@ -534,13 +534,16 @@ function roundToSignificant(value: number, figures: number): number {
 
 const GROUPED_SOURCE = new RegExp(String.raw`\d(,|${GROUP_SPACE})\d{3}(?![\d/])`);
 
+// A list's figures are each formatted with the same `raws`, so its separator is found once for
+// the list, not once for every figure.
+const SEPARATORS = new WeakMap<readonly string[], string | undefined>();
+
 /** The separator the first of `raws` that groups its thousands groups them with. */
 function thousandsSeparator(raws: readonly string[]): string | undefined {
-  for (const raw of raws) {
-    const separator = GROUPED_SOURCE.exec(raw)?.[1];
-    if (separator !== undefined) return separator;
-  }
-  return undefined;
+  if (SEPARATORS.has(raws)) return SEPARATORS.get(raws);
+  const separator = raws.map((raw) => GROUPED_SOURCE.exec(raw)?.[1]).find((found) => found !== undefined);
+  SEPARATORS.set(raws, separator);
+  return separator;
 }
 
 /**
@@ -586,16 +589,20 @@ export function isOvenSetting(fahrenheit: number): boolean {
 
 /**
  * Oven temperatures are written in fives, so `350F` should land on 175C rather than
- * 176.7C. The habit only applies to the oven range; `100F` is a fever, not a setting.
+ * 176.7C. The habit only applies to the oven range; `100F` is a fever, not a setting. The
+ * thousands are grouped as `formatNumber` groups them from the source numbers `raws`, so
+ * `2,000°F` gives `1,095°C`.
  */
 export function formatTemperature(
   celsius: number,
   precision: Precision,
   source: number,
   maxDecimals: number,
+  raws: readonly string[],
 ): string {
-  if (typeof precision === 'number') return celsius.toFixed(precision);
-  if (precision === 'exact') return trim(celsius, maxDecimals);
-  if (isOvenSetting(source)) return String(Math.round(celsius / 5) * 5);
-  return String(Math.round(celsius * 10) / 10);
+  const separator = thousandsSeparator(raws);
+  if (typeof precision === 'number') return group(celsius.toFixed(precision), separator);
+  if (precision === 'exact') return trim(celsius, maxDecimals, separator);
+  if (isOvenSetting(source)) return group(String(Math.round(celsius / 5) * 5), separator);
+  return group(String(Math.round(celsius * 10) / 10), separator);
 }

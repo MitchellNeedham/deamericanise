@@ -298,7 +298,14 @@ as in `a 12 oz soda can`. So `Add 8 oz of milk slowly.`, `8 oz chocolate milk` a
 `16 oz of water keeps you going.` are fluid ounces, while a food a drink names is a weight, as
 in `8 oz rum raisins`, `8 oz cream cheese`, `8 oz milk chocolate` and `12 oz coffee beans`,
 and so are the solids whose head is a drink: `sour cream`, `ice cream`, `cream of tartar`,
-`baking soda` and `ground coffee`. A word ending in `s` between the unit and the thing is a
+`baking soda` and `ground coffee`. Where the quantity is the subject of its clause, opening a
+sentence or following a conjunction such as `until`, `once` or `when`, a word ending in `s`
+after the drink is its verb, so `Heat until 8 oz of milk boils.` and
+`16 oz of water goes into the pot.` are fluid ounces. That word is a plural noun where an
+auxiliary follows it, or a word that a function word, an adverb or a number follows in turn, as
+in `8 oz rum raisins go in first.`, and at the opening of a sentence where a comma or the end of
+its line follows it, as in a list of ingredients.
+A word ending in `s` between the unit and the thing is a
 plural or a verb, so it stands there alone, and `A 3-ton truck needs AC.` is a weight. A
 drinking glass before another vessel is its material, so `a 16 oz glass jar of honey` is a
 weight. A phrase that names any other
@@ -1497,10 +1504,11 @@ options it had and goes on following the page under them.
   diameter` becomes `a 5.1 centimetres inside diameter`, and `round` describes a noun, so
   `a quarter mile round the bend` becomes `a 400 metre round the bend`. `a 2 pound cake` is
   left as written, because it may be a pound cake.
-- A word ending in `s` after a drink is read as the noun the drink describes unless its object
-  follows it, so `16 oz of water goes into the pot.` converts as a weight, and one before a
-  determiner is read as a verb, so `Soak 8 oz rum raisins the night before.` converts as fluid
-  ounces.
+- A word ending in `s` after a drink is read by where the quantity stands, not by what the
+  word means. Where the quantity is a subject, a plural food before an adjective or a comma
+  reads as the drink's verb, so `Once 8 oz rum raisins soften, add them.` converts as fluid
+  ounces. Elsewhere a word before a determiner reads as a verb, so
+  `Soak 8 oz rum raisins the night before.` converts as fluid ounces too.
 - Four figures after a preposition that takes a year are read by where the preposition
   stands. In the middle of a sentence they are converted before a unit word even where they
   are a year, so `Traffic grew in 2024 miles of road.` becomes

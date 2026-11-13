@@ -44,6 +44,8 @@ const ASIDE_OPENS = new RegExp(String.raw`(?![^\S\n]*${BREAK})\s+${MARKUP}\(`, '
 const ASIDE_REACH = 400;
 /** How deep brackets nest in an aside. A deeper one is no prose, and is not read further. */
 const ASIDE_DEPTH = 3;
+/** How many asides in a row a stop is read past. A longer run is no prose. */
+const ASIDES = 2;
 
 /**
  * The offset just past the bracket that closes the one opening at `open`, counting brackets
@@ -68,19 +70,20 @@ function asideClose(text: string, open: number, limit: number): number {
 
 /**
  * Where the text after the stop just before `end` goes on: past any closing quotes, brackets
- * and inline markup, and past any asides in brackets after them, which may trail the sentence
- * the stop ends, as in `It is 6 ft. (see the plan) It is new.` With `closers` false, a
- * closing quote or bracket is not passed. Nor is an aside that does not close within
+ * and inline markup, and past up to `ASIDES` asides in brackets after them, which may trail
+ * the sentence the stop ends, as in `It is 6 ft. (see the plan) It is new.` With `closers`
+ * false, a closing quote or bracket is not passed. Nor is an aside that does not close within
  * `ASIDE_REACH` of the stop, so its first word is read as the next.
  */
 export function pastStop(text: string, end: number, closers = true): number {
   const marks = closers ? CLOSERS : MARKS;
   const limit = Math.min(text.length, end + ASIDE_REACH);
   let at = end;
-  for (;;) {
+  for (let asides = 0; ; asides++) {
     marks.lastIndex = at;
     marks.test(text);
     at = marks.lastIndex;
+    if (asides === ASIDES) return at;
     ASIDE_OPENS.lastIndex = at;
     if (!ASIDE_OPENS.test(text)) return at;
     const close = asideClose(text, ASIDE_OPENS.lastIndex - 1, limit);

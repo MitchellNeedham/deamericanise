@@ -264,7 +264,8 @@ becomes `a 61 to 91 centimetre long gap`.
 A unit that starts a noun leaves the number counting it, so `Bake 1 pound cake`,
 `6 foot soldiers`, `foot traffic`, `8 inch worms`, `5 yard sales`, `3 yard signs`,
 `the two pound signs` and `3 mile markers` are left as written, while `a 2-pound cake`
-becomes `a 910 gram cake`.
+becomes `a 910 gram cake`. The noun is held with the quantity, so no other rule rewrites part
+of it: en-ZA leaves `6 foot traffic lights` as written.
 A length that gives the size of a noun describes it whatever its number, so
 `a 6 foot long table` becomes `a 1.8 metre long table`, `cut into 1/2 inch thick slices`
 becomes `cut into 1.3 centimetre thick slices`, and `a 6-foot-tall fence` becomes
@@ -288,10 +289,15 @@ A metric value the author gives after the quantity decides the sense by its dime
 `8 oz (240 mL) of milk` becomes `240 mL of milk` and `8 oz (230 g) of milk` becomes
 `230 g of milk`. Otherwise the phrase after the unit decides: an optional `of`, at most two
 words that are not function words, and then the thing measured. A container is read
-through to what it holds, so `a 15 oz can of beans` stays a weight. The thing counts
-whatever follows it, so `Add 8 oz of milk slowly.` and `A 5-ton air conditioner cools the hall.`
-read in the sense, but not inside the name of something else: `8 oz cream cheese`,
-`8 oz milk chocolate` and `12 oz coffee beans` are weights, as are `sour cream`, `ice cream`,
+through to what it holds, so `a 15 oz can of beans` stays a weight. A metal, copper or a
+cooling word counts whatever follows it, but not inside the name of something else, so
+`a 1 oz gold coin` and `A 5-ton air conditioner cools the hall.` read in the sense while
+`2 oz silver polish` is a weight. A drink counts only where it heads the phrase: as its last
+noun, before a stop, a function word, an adverb or a verb with its object, or before a vessel,
+as in `a 12 oz soda can`. So `Add 8 oz of milk slowly.`, `8 oz chocolate milk` and
+`16 oz of water keeps you going.` are fluid ounces, while a food a drink names is a weight, as
+in `8 oz rum raisins`, `8 oz cream cheese`, `8 oz milk chocolate` and `12 oz coffee beans`,
+and so are the solids whose head is a drink: `sour cream`, `ice cream`, `cream of tartar`,
 `baking soda` and `ground coffee`. A word ending in `s` between the unit and the thing is a
 plural or a verb, so it stands there alone, and `A 3-ton truck needs AC.` is a weight. A
 drinking glass before another vessel is its material, so `a 16 oz glass jar of honey` is a
@@ -1491,6 +1497,10 @@ options it had and goes on following the page under them.
   diameter` becomes `a 5.1 centimetres inside diameter`, and `round` describes a noun, so
   `a quarter mile round the bend` becomes `a 400 metre round the bend`. `a 2 pound cake` is
   left as written, because it may be a pound cake.
+- A word ending in `s` after a drink is read as the noun the drink describes unless its object
+  follows it, so `16 oz of water goes into the pot.` converts as a weight, and one before a
+  determiner is read as a verb, so `Soak 8 oz rum raisins the night before.` converts as fluid
+  ounces.
 - Four figures after a preposition that takes a year are read by where the preposition
   stands. In the middle of a sentence they are converted before a unit word even where they
   are a year, so `Traffic grew in 2024 miles of road.` becomes

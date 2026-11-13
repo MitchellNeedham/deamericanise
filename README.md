@@ -86,8 +86,9 @@ import { deamericaniseDom } from 'deamericanise/dom';      // deamericaniseDom(d
 as they load, before the text is painted. Everything runs on your machine. Switch on
 highlighting from the toolbar button to see each change and the rule that made it, and to
 switch that rule off. The settings page switches whole categories on or off, and fine-tunes
-each one. It can also underline what it would change in a text box or editor as you type.
-Click an underline to replace it. Your text changes only when you choose Replace.
+each one. As you type in a text box or editor, it underlines what it would change. Click an
+underline to replace it. Your text changes only when you choose Replace, and the settings
+page switches the underlines off.
 
 ```sh
 npm run build:extension   # writes extension/dist/chrome and extension/dist/firefox

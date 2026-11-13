@@ -3640,6 +3640,50 @@ describe('a Celsius value in brackets that also gives the gas mark', () => {
   });
 });
 
+describe('a Celsius value in brackets that also gives the fan oven setting', () => {
+  it.each`
+    input                                                                      | expected                                                    | why
+    ${'Preheat the oven to 350°F (180°C/160°C fan).'}                          | ${'Preheat the oven to 180°C (160°C fan).'}                 | ${'a slash'}
+    ${'Preheat the oven to 350°F (180°C, fan 160°C).'}                         | ${'Preheat the oven to 180°C (fan 160°C).'}                 | ${'a comma, with fan first'}
+    ${'Preheat the oven to 350°F (180°C/160°C fan/gas mark 4).'}               | ${'Preheat the oven to 180°C (160°C fan/gas mark 4).'}      | ${'and the gas mark'}
+    ${'Preheat the oven to 350°F (180°C/gas mark 4/160°C fan).'}               | ${'Preheat the oven to 180°C (gas mark 4/160°C fan).'}      | ${'the gas mark first'}
+    ${'Preheat the oven to 350°F (180°C/160°C fan-forced).'}                   | ${'Preheat the oven to 180°C (160°C fan-forced).'}          | ${'fan-forced'}
+    ${'Preheat the oven to 350°F (180°C; Fan-assisted 160°C).'}                | ${'Preheat the oven to 180°C (Fan-assisted 160°C).'}        | ${'a semicolon, capitals and fan-assisted'}
+    ${'Preheat the oven to 350°F (180°C or 160°C fan oven).'}                  | ${'Preheat the oven to 180°C (160°C fan oven).'}            | ${'"or" and fan oven'}
+    ${'Preheat the oven to 350°F (180C/160C fan/gas 4).'}                      | ${'Preheat the oven to 180C (160C fan/gas 4).'}             | ${'a bare C'}
+    ${'Preheat the oven to 350°F (180°C/160 fan).'}                            | ${'Preheat the oven to 180°C (160 fan).'}                   | ${'a fan figure with no unit'}
+    ${'Preheat the oven to 350 degrees F (180 degrees C, fan 160 degrees C).'} | ${'Preheat the oven to 180 degrees C (fan 160 degrees C).'} | ${'spelled out'}
+    ${'Preheat the oven to 350°F (*180°C/160°C fan*).'}                        | ${'Preheat the oven to 180°C (*160°C fan*).'}               | ${'emphasis around all of it stays on the fan setting'}
+    ${'Preheat the oven to 350°F (180°C/160°C fans).'}                         | ${'Preheat the oven to 175°C (180°C/160°C fans).'}          | ${'a word that only starts with fan'}
+    ${'Preheat the oven to 350°F (160°C fan).'}                                | ${'Preheat the oven to 175°C (160°C fan).'}                 | ${'the fan setting alone'}
+    ${'Preheat the oven to 350°F (180°C).'}                                    | ${'Preheat the oven to 180°C.'}                             | ${'no fan setting'}
+  `('$input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('collapses the pair with keepOriginal on, and runs twice without converting it again', () => {
+    const options = { units: { keepOriginal: true } };
+    const once = convert('Preheat the oven to 350°F (180°C/160°C fan).', options);
+    expect(once).toBe('Preheat the oven to 180°C (160°C fan).');
+    expect(convert(once, options)).toBe(once);
+  });
+
+  it.each`
+    unchanged                                                    | why
+    ${'Preheat the oven to 180°C (350°F/160°C fan).'}            | ${'the Fahrenheit value restates the Celsius one'}
+    ${'Preheat the oven to 180°C (350°F, fan 160°C).'}           | ${'the same, with fan first'}
+    ${'Preheat the oven to 180°C (350°F/160°C fan/gas mark 4).'} | ${'the same, with the gas mark'}
+    ${'Preheat the oven to 180°C (350°F).'}                      | ${'no fan setting'}
+    ${'Heat the oven to 180C fan or to 400F.'}                   | ${'a fan setting outside a bracket'}
+  `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(convert(unchanged)).toBe(unchanged);
+  });
+
+  it('counts no Fahrenheit value that restates the Celsius one beside its fan setting', () => {
+    expect(analyse('Preheat the oven to 180°C (350°F/160°C fan).').markers).toEqual([]);
+  });
+});
+
 describe('a measurement in underscore emphasis', () => {
   it.each`
     input                                   | expected                                   | why

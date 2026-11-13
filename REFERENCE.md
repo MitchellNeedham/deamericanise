@@ -612,9 +612,11 @@ A Celsius value beside a Fahrenheit one is read in the same forms (`175ºC`, `17
 upper case `C` after a number of two or three figures with at most one space.
 So `Bake at 350°F (180C)` becomes `Bake at 180C` and `180C/350°F/gas 4` stays as it is,
 while `Apartment 3C (65°F)` is a flat and its temperature converts. The bracket may give the
-gas mark after the Celsius value, joined by `/`, `,`, `;` or `or`, and the gas mark stays in
-it: `Preheat to 350°F (180°C/gas mark 4)` becomes `Preheat to 180°C (gas mark 4)`, and
-`180°C (350°F/gas mark 4)` stays as it is. The words are read in
+fan oven setting (`160°C fan`, `fan 160°C`, `160°C fan-forced`), the gas mark, or both after
+the Celsius value, joined by `/`, `,`, `;` or `or`, and they stay in it:
+`Preheat to 350°F (180°C/gas mark 4)` becomes `Preheat to 180°C (gas mark 4)`,
+`Preheat to 350°F (180°C/160°C fan/gas mark 4)` becomes `Preheat to 180°C (160°C fan/gas mark 4)`,
+and `180°C (350°F/160°C fan)` stays as it is. The words are read in
 any case, as the Fahrenheit value's are, so `350 degrees fahrenheit (180 degrees celsius)`
 becomes `180 degrees celsius`, but a lone `C` only in upper case, after a degree sign or
 `degrees` too, so `Bake at 350°F (180c)` becomes `Bake at 175°C (180c)`.

@@ -1278,18 +1278,32 @@ function measurementDimensions(text: string): Dimension[] {
   return read === rest.length ? (dimensions ?? []) : [];
 }
 
-/** What joins a gas mark to the temperature before it in one bracket, as in `(180°C/gas mark 4)`. */
-const GAS_MARK_JOIN = String.raw`\s*(?:[/,;]|(?<=\s)or(?=\s))\s*`;
+/**
+ * What joins an oven setting to the temperature before it in one bracket, as in
+ * `(180°C/gas mark 4)`, and one setting to another.
+ */
+const SETTING_JOIN = String.raw`\s*(?:[/,;]|(?<=\s)or(?=\s))\s*`;
 
-/** The gas mark that ends a bracket after its temperature, as in `(350°F/gas mark 4)`. */
-const GAS_MARK_AFTER = new RegExp(String.raw`${GAS_MARK_JOIN}${GAS_MARK}${MARKUP}$`);
+const FAN_KIND = [anyCase('forced'), anyCase('assisted'), anyCase('oven')].join('|');
+const FAN_WORDS = String.raw`${anyCase('fan')}(?:(?:\s+|${HYPHEN})(?:${FAN_KIND}))?${UNIT_END}`;
+const FAN_TEMPERATURE = String.raw`${METRIC_NUMBER}(?:\s*(?:${metricUnitForms('temperature')}))?`;
+
+/** A fan oven's setting, as in `160°C fan`, `fan 160°C` and `160°C fan-forced`. */
+const FAN_SETTING = String.raw`(?:${FAN_TEMPERATURE}\s+${FAN_WORDS}|${FAN_WORDS}\s+${FAN_TEMPERATURE})`;
+
+/** The settings a recipe gives beside its temperature: a fan setting, a gas mark, or both. */
+const OVEN_SETTINGS =
+  String.raw`(?:${FAN_SETTING}(?:${SETTING_JOIN}${GAS_MARK})?|${GAS_MARK}(?:${SETTING_JOIN}${FAN_SETTING})?)`;
+
+/** The oven settings that end a bracket after its temperature, as in `(350°F/160°C fan/gas mark 4)`. */
+const SETTINGS_AFTER = new RegExp(String.raw`${SETTING_JOIN}${OVEN_SETTINGS}${MARKUP}$`);
 
 /**
  * `1.8 metres (6 feet)` is what `keepOriginal` writes, and what a careful author writes by
  * hand. A bracket that holds nothing but an imperial measurement, directly after a metric
  * value of the same dimension, restates that value. Every match inside it is left alone,
  * including a piece of the measurement such as the `2 inches` in `(6 feet 2 inches)`. A
- * temperature may be followed by the gas mark it gives, as in `180°C (350°F/gas mark 4)`.
+ * temperature may be followed by its oven settings, as in `180°C (350°F/160°C fan/gas mark 4)`.
  */
 function restatesMetric(ctx: RuleContext, start: number, end: number): boolean {
   const text = contextText(ctx.text);
@@ -1299,7 +1313,7 @@ function restatesMetric(ctx: RuleContext, start: number, end: number): boolean {
   const close = tail.indexOf(')');
   if (open < 0 || close < 0) return false;
   const inside = head.slice(open + 1) + text.slice(start, end) + tail.slice(0, close);
-  const measurement = inside.replace(GAS_MARK_AFTER, '');
+  const measurement = inside.replace(SETTINGS_AFTER, '');
   const dimensions = measurementDimensions(measurement);
   if (dimensions.length === 0) return false;
   if (measurement !== inside && !dimensions.includes('temperature')) return false;
@@ -1322,13 +1336,13 @@ function metricSpelling(text: string): string {
  * A bracket after a measurement. `close` is the markup that closes on the measurement
  * before it, `gap` the space before the bracket, `open` the markup that opens on the bracket,
  * and `inner` the markup that opens on the text inside it, which `innerClose` closes. A
- * temperature may be followed by the gas mark it gives, as in `(180°C/gas mark 4)`, and
- * `gasClose` then closes any `inner` that wraps both.
+ * temperature may be followed by its oven settings, as in `(180°C/160°C fan/gas mark 4)`, and
+ * `settingClose` then closes any `inner` that wraps them all.
  */
 const BRACKET_AFTER = new RegExp(
   String.raw`^(?<close>${MARKUP})(?<gap>${SOFT_SPACE})(?<open>${MARKUP})\(` +
     String.raw`(?<inner>${MARKUP})(?<metric>[^()]{1,40}?)(?<innerClose>${MARKUP})` +
-    String.raw`(?:${GAS_MARK_JOIN}(?<gas>${GAS_MARK})(?<gasClose>${MARKUP}))?\)`,
+    String.raw`(?:${SETTING_JOIN}(?<setting>${OVEN_SETTINGS})(?<settingClose>${MARKUP}))?\)`,
 );
 
 /**
@@ -1362,28 +1376,28 @@ interface MetricPartner {
 /**
  * The metric value in brackets, or joined by `/` or `or`, at the start of `rest`, the text
  * after an imperial value. Markup that opens on the bracket or the metric value has to
- * close on it too. A gas mark after a temperature in the bracket stays in it, with any
- * markup that wraps the two.
+ * close on it too. The oven settings after a temperature in the bracket stay in it, with any
+ * markup that wraps them all.
  */
 function metricPartnerAfter(rest: string): MetricPartner | undefined {
   const match = BRACKET_AFTER.exec(rest) ?? METRIC_PAIRED_AFTER.exec(rest);
   if (!match) return undefined;
   const { close = '', gap = '', open = '', inner = '', innerClose = '', metric = '' } = match.groups!;
-  const { gas, gasClose = '' } = match.groups!;
+  const { setting, settingClose = '' } = match.groups!;
   const closing = closingOf(open);
   if (!rest.startsWith(closing, match[0].length)) return undefined;
   const length = match[0].length + closing.length;
-  if (gas === undefined) {
+  if (setting === undefined) {
     if (innerClose !== closingOf(inner)) return undefined;
     return { length, metric, close, kept: '' };
   }
   if (dimensionOf(METRIC_INNER.exec(metric)) !== 'temperature') return undefined;
   // Markup on the metric value alone goes with it, and markup that wraps both stays.
-  const wraps = innerClose === '' && gasClose !== '';
-  if (wraps ? gasClose !== closingOf(inner) : innerClose !== closingOf(inner) || gasClose !== '') {
+  const wraps = innerClose === '' && settingClose !== '';
+  if (wraps ? settingClose !== closingOf(inner) : innerClose !== closingOf(inner) || settingClose !== '') {
     return undefined;
   }
-  const kept = `${gap}${open}(${wraps ? inner : ''}${gas}${gasClose})${closing}`;
+  const kept = `${gap}${open}(${wraps ? inner : ''}${setting}${settingClose})${closing}`;
   return { length, metric, close, kept };
 }
 

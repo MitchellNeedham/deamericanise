@@ -5,6 +5,7 @@ import { CLOSING, LIST_MARKER, OPENING, endsSentence, stopStays } from '../sente
 import { CALENDAR_WORD } from '../times.js';
 import {
   COMPOUNDS,
+  HEIGHT,
   MEASURES,
   SINGULAR_WORDS,
   metricLength,
@@ -21,7 +22,7 @@ import {
   fahrenheitTemperatures,
   sentenceAround,
 } from './fahrenheit.js';
-import { PREPOSITION_IN } from './money.js';
+import { PREPOSITION_IN, readMeasurementsWith } from './money.js';
 import {
   COUNTED_FRACTION,
   FRACTION_WORDS,
@@ -41,6 +42,7 @@ import {
   SOFT_SPACE,
   SPACE_GROUPED,
   UNIT_END,
+  VULGAR_CLASS,
   WHOLE_NUMBER,
   canBeRange,
   countBeforeGroup,
@@ -587,19 +589,33 @@ const ANOTHER_SIZE =
   String.raw`(?:\s|${HYPHEN})+${SIZE}`;
 
 /**
- * A size straight after a length, then the noun the length describes through it, as in
- * `a 6 foot long table` and `a 6-foot-tall fence`. A thing has at most three sizes, and the
- * bound keeps each measurement from reading every size in a long list.
+ * A size, then the noun a length describes through it, as the ` long table` of
+ * `a 6 foot long table`. A thing has at most three sizes, and the bound keeps each
+ * measurement from reading every size in a long list.
  */
-const SIZES_A_NOUN = new RegExp(
-  String.raw`${AFTER_A_LENGTH}(?:\s|${HYPHEN})+${SIZE}(?:${ANOTHER_SIZE}){0,2}\s+${NOUN_START}`,
-  'iy',
-);
+const SIZE_THEN_NOUN = String.raw`(?:\s|${HYPHEN})+${SIZE}(?:${ANOTHER_SIZE}){0,2}\s+${NOUN_START}`;
+
+/**
+ * A size straight after a length, then the noun the length describes through it, as in
+ * `a 6 foot long table` and `a 6-foot-tall fence`.
+ */
+const SIZES_A_NOUN = new RegExp(`${AFTER_A_LENGTH}${SIZE_THEN_NOUN}`, 'iy');
 
 /** Whether the length ending at `end` gives the size of a noun after it. */
 function sizesNoun(text: string, end: number): boolean {
   SIZES_A_NOUN.lastIndex = end;
   return SIZES_A_NOUN.test(text);
+}
+
+const SIZE_BEFORE_NOUN = new RegExp(SIZE_THEN_NOUN, 'iy');
+
+/**
+ * Whether a size and then a noun follow `end`, where a height with no inch word ends, as in
+ * `a six foot two tall man`. The height ends in a number, so `sizesNoun` cannot ask it.
+ */
+function sizeBeforeNoun(text: string, end: number): boolean {
+  SIZE_BEFORE_NOUN.lastIndex = end;
+  return SIZE_BEFORE_NOUN.test(text);
 }
 
 const HYPHEN_BEFORE_SIZE = new RegExp(String.raw`${AFTER_A_LENGTH}${HYPHEN}(?=${SIZE})`, 'iy');
@@ -1835,19 +1851,43 @@ const NO_NOUN_WORD =
   String.raw`(?:${NOT_A_NOUN.filter((word) => word !== 'in').join('|')})(?!\w|${HYPHEN})`;
 
 /**
- * Where inches may go without their word after `foot` or `feet`, as in `six foot two`: before
- * nothing that could be a noun, or before another height. That is punctuation, a word that
- * cannot open a noun, the end of the text, the end of a line where the next line is blank or
- * starts with something other than a word, such as a list marker, or a join and a measurement
- * in feet, as in `6 foot 2 to 6 foot 4`.
+ * Nothing after the smaller part of a height or weight with no unit word that the part could
+ * count: punctuation, a word that cannot open a noun, the end of the text, or the end of a line
+ * where the next line is blank or starts with something other than a word, such as a list
+ * marker.
  */
-const NO_NOUN_AFTER =
-  String.raw`(?=[.,;:!?)\]"'”’*_]+(?![A-Za-z\d])|${SOFT_SPACE}(?<=\s)${NO_NOUN_WORD}|${ANOTHER_HEIGHT}|` +
-  String.raw`${INLINE_SPACE}*(?:$|${LINE_END}${INLINE_SPACE}*(?:$|${LINE_END}|[^\sA-Za-z])))`;
+const NOTHING_COUNTED =
+  String.raw`[.,;:!?)\]"'”’*_]+(?![A-Za-z\d])|${SOFT_SPACE}(?<=\s)${NO_NOUN_WORD}|` +
+  String.raw`${INLINE_SPACE}*(?:$|${LINE_END}${INLINE_SPACE}*(?:$|${LINE_END}|[^\sA-Za-z]))`;
+
+/**
+ * Where inches may go without their word after `foot` or `feet`, as in `six foot two`: before
+ * nothing they could count, or before a join and a measurement in feet, as in
+ * `6 foot 2 to 6 foot 4`.
+ */
+const NO_NOUN_AFTER = `(?=${NOTHING_COUNTED}|${ANOTHER_HEIGHT})`;
 
 /** Inches written without their word: a whole number from 1 to 11. */
 const isInchCount = (value: number | null) =>
   value !== null && Number.isInteger(value) && value >= 1 && value <= 11;
+
+/**
+ * A fraction of an inch after a whole number of inches: ` and a half` after digits or words,
+ * and ` 1/2`, `-1/2` or `½` after digits.
+ */
+const INCH_FRACTION =
+  String.raw`${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION}|` +
+  String.raw`(?<=\d)(?:(?:${INLINE_SPACE}+|${HYPHEN})\d+/\d+|${INLINE_SPACE}*${VULGAR_CLASS})`;
+
+/**
+ * The inches of a height with no inch word, written `raw` and starting with the whole number
+ * `whole`: a whole number from 1 to 11 and any fraction after it, below a foot in all. Null
+ * where they are not inches.
+ */
+function bareInches(whole: string, raw: string): number | null {
+  const inches = parseNumber(raw);
+  return isInchCount(parseNumber(whole)) && inches !== null && inches < 12 ? inches : null;
+}
 
 /**
  * A whole number in words straight after a hyphen, as the `two` of `six-foot-two`, which
@@ -1857,11 +1897,13 @@ const WORDS_AFTER_HYPHEN = String.raw`(?<=${HYPHEN})(?:${SECOND_END_WORDS})`;
 
 /**
  * The feet of a height with no inch word before another height, and its inches starting where
- * the pattern is tried. The same shape as the last alternative of `feetInchesRule`.
+ * the pattern is tried, with their whole number in the third group. The same shape as the last
+ * alternatives of `feetInchesRule`.
  */
 const INCHES_OF_HEIGHT = new RegExp(
   String.raw`(?<=${OUTSIDE_WORD}(${UNSIGNED_NUMBER})${GAP}(?:feet|foot)(?:${SOFT_SPACE}|${HYPHEN}))` +
-    String.raw`(?<=\s|${HYPHEN})(${WHOLE_NUMBER}|${WORDS_AFTER_HYPHEN})(?=${ANOTHER_HEIGHT})`,
+    String.raw`(?<=\s|${HYPHEN})((${WHOLE_NUMBER}|${WORDS_AFTER_HYPHEN})(?:${INCH_FRACTION})?)` +
+    String.raw`(?=${ANOTHER_HEIGHT})`,
   'diy',
 );
 
@@ -1879,7 +1921,7 @@ function heightAt(text: string, start: number): LargerPart | null {
   INCHES_OF_HEIGHT.lastIndex = start;
   const match = INCHES_OF_HEIGHT.exec(text);
   if (match === null || parseNumber(match[1]!) === null) return null;
-  if (!isInchCount(parseNumber(match[2]!))) return null;
+  if (bareInches(match[3]!, match[2]!) === null) return null;
   const feetStart = match.indices![1]![0];
   STARTS_HERE.lastIndex = feetStart;
   return STARTS_HERE.test(text) ? { raw: match[1]!, start: feetStart } : null;
@@ -2047,23 +2089,24 @@ const UNIT_OF_ITS_OWN =
 
 /**
  * `6 feet 2 inches`, `6'2"`, `5 ft 11 in`, `six feet two inches`, `six foot two` and
- * `six-foot-two` collapse into a single metric height.
+ * `six-foot-two` collapse into a single metric height. A height in a unit that is kept is held
+ * whole, as a weight in two units is.
  */
-function feetInchesRule(): Rule {
+function feetInchesRule(skip: Set<string>, forced: Record<string, boolean>): Rule {
   const pattern = new RegExp(
     String.raw`(${FIRST_NUMBER})` +
       String.raw`(?:(?:${GAP}(?:feet|foot|ft\.?)|${SOFT_SPACE}(?:′|${FOOT_MARK}))` +
       String.raw`(?:${HYPHEN}|${softGap(String.raw`(?:and(?=\s))?`)})` +
       String.raw`(\d+(?:\.\d+)?|\d+${INLINE_SPACE}+\d+/\d+|\d+${HYPHEN}\d+/\d+|\d+/\d+|` +
-      String.raw`(?:${WHOLE_NUMBER}|${WORDS_AFTER_HYPHEN})` +
-      String.raw`(?:${INLINE_SPACE}+and${INLINE_SPACE}+${COUNTED_FRACTION})?)` +
+      String.raw`(?:${WHOLE_NUMBER}|${WORDS_AFTER_HYPHEN})(?:${INCH_FRACTION})?)` +
       String.raw`(?:${GAP}(?:inches|inch|in\.?)|${SOFT_SPACE}(?:″|["”]))(?![A-Za-z])|` +
-      String.raw`${GAP}(?:feet|foot)(?:${SOFT_SPACE}(?<=\s)(${WHOLE_NUMBER})${NO_NOUN_AFTER}|` +
+      String.raw`${GAP}(?:feet|foot)(?:${SOFT_SPACE}(?<=\s)((${WHOLE_NUMBER})(?:${INCH_FRACTION})?)${NO_NOUN_AFTER}|` +
       // A hyphen makes the height one word, so a noun may follow it: `a six-foot-two man`.
       String.raw`${HYPHEN}(\d+|${WORDS_AFTER_HYPHEN})(?![A-Za-z\d]|${HYPHEN}|[.,/:]\d|${UNIT_OF_ITS_OWN})))`,
     'dgi',
   );
-  const sticky = new RegExp(pattern.source, 'iy');
+  const sticky = new RegExp(pattern.source, 'diy');
+  const kept = forced[HEIGHT.id] !== true && HEIGHT.measures.some((m) => isKept(m, skip, forced));
 
   return {
     id: 'units.length.feet-inches',
@@ -2094,15 +2137,21 @@ function feetInchesRule(): Rule {
         const match = beforeQuote(whole);
         if (match === undefined) continue;
         const feet = parseNumber(match[1]!);
-        const bare = match[3] ?? match[4];
-        const inches = parseNumber(match[2] ?? bare!);
-        if (bare !== undefined && !isInchCount(inches)) continue;
+        const bare = match[3] ?? match[5];
+        const inches =
+          match[3] !== undefined ? bareInches(match[4]!, match[3]) : parseNumber(match[2] ?? bare!);
+        if (match[3] !== undefined && inches === null) continue;
+        if (match[5] !== undefined && !isInchCount(inches)) continue;
+        // A list may go on after a comma, as in `6 feet 2, 3 or 4 inches`, and claims the number.
+        if (match[3] !== undefined && startsMeasurement(contextText(ctx.text), match.indices![3]![0])) {
+          continue;
+        }
         // Hyphened to the foot word, only a number of inches below a foot makes a height, so
         // `2 feet-18 inches` stays two lengths.
         const tied =
           match[2] !== undefined && TIGHT_HYPHEN.test(ctx.text.charAt(match.indices![2]![0] - 1));
         if (tied && !(inches !== null && inches < 12)) continue;
-        if (feet === null || inches === null || endsRange(ctx.text, match.index, match[1]!)) {
+        if (kept || feet === null || inches === null || endsRange(ctx.text, match.index, match[1]!)) {
           changes.push(hold(match.index, match[0], 'units.length.feet-inches', 40));
           continue;
         }
@@ -2129,9 +2178,13 @@ function feetInchesRule(): Rule {
           if (!attributive && isBareInch(inchUnit!, match[0]) && OBJECT_AFTER.test(ctx.text)) {
             end = inchesEnd;
           }
-        } else if (match[4] !== undefined) {
-          const hyphen = ctx.text.charAt(match.indices![4]![0] - 1);
+        } else if (match[5] !== undefined) {
+          const hyphen = ctx.text.charAt(match.indices![5]![0] - 1);
           attributive = describesNoun(ctx.text, match.index, inches, hyphen, end);
+        } else {
+          // Inches with no word end before nothing they could count, so only a size can lead
+          // to a noun.
+          attributive = sizeBeforeNoun(ctx.text, end);
         }
         const unit = attributive ? target.singular : unitWord(target, Number(number));
         const body = `${number} ${unit}`;
@@ -2155,7 +2208,9 @@ const ORDINAL = /^(?:\d*[02-9])?1st(?![a-z])/i;
  * no sides, so the number in `2 x 4 lb 8 oz bags` counts the bags. The next unit's word may
  * be left out before a join and another weight in the larger unit, as in
  * `11 stone 4 to 12 stone`, and a weight read so that cannot be converted is held up to the
- * end of the other weight, which would otherwise convert alone.
+ * end of the other weight, which would otherwise convert alone. It may be left out before
+ * nothing the number could count too, as inches may after feet: `11 stone 4.` and `7 lb 8.`,
+ * but not after `st`, which is a weight only beside another unit.
  */
 function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule[] {
   const AND = softGap(String.raw`(?:and(?=\s))?`);
@@ -2166,7 +2221,9 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
     const part = (unit: string) => String.raw`${AND}(${UNSIGNED_NUMBER})${GAP}${unit}`;
     const optional = rest.reduceRight((inner, unit) => `(?:${part(unit)}${inner})?`, '');
     const withWords = `${part(next!)}${optional}`;
-    const withoutWord = String.raw`${SOFT_SPACE}${unnamedPart(compound.measures[0]!)}`;
+    const withoutWord =
+      String.raw`${SOFT_SPACE}(?:${unnamedPart(compound.measures[0]!)}|` +
+      String.raw`(?<=\s)(${WHOLE_NUMBER})(?=${NOTHING_COUNTED}))`;
     const pattern = new RegExp(
       String.raw`(${FIRST_NUMBER})${GAP}${largest}(?:${withWords}|${withoutWord})`,
       'dgi',
@@ -2187,14 +2244,23 @@ function compoundRules(skip: Set<string>, forced: Record<string, boolean>): Rule
           const parts = compound.measures
             .map((measure, i) => ({ measure, raw: match[2 * i + 1], unit: match[2 * i + 2] ?? '' }))
             .filter((p) => p.raw !== undefined);
-          const unnamed = match[unnamedGroup];
+          const lastUnnamed = match[unnamedGroup + 2];
+          const unnamed = match[unnamedGroup] ?? lastUnnamed;
           if (unnamed !== undefined) {
             parts.push({ measure: compound.measures[1]!, raw: unnamed, unit: '' });
+          }
+          const written = match[2]!.toLowerCase();
+          if (
+            lastUnnamed !== undefined &&
+            (compound.measures[0]!.compoundAbbrevs?.includes(written) ||
+              startsMeasurement(contextText(ctx.text), match.indices![unnamedGroup + 2]![0]))
+          ) {
+            continue;
           }
           const values = parts.map((p) => parseNumber(p.raw!));
           const start = match.index;
           const held =
-            unnamed === undefined
+            match[unnamedGroup] === undefined
               ? match[0]
               : ctx.text.slice(start, match.indices![unnamedGroup + 1]![1]);
           if (values.some((v) => v === null)) {
@@ -3377,10 +3443,42 @@ function fuelEconomyRule(): Rule {
   };
 }
 
+let measuredText: string | undefined;
+let measuredStarts = new Set<number>();
+let measuring = false;
+let defaultUnitRules: Rule[] | undefined;
+
+/**
+ * Whether a unit rule run with the default options reads a measurement that starts at `at` in
+ * `text`, converting it or holding it as written, as the range rule reads the `16` of
+ * `16 to 20 feet` and the dimension rule the `12` of `12 in by 3 in.` Money asks this of the
+ * figure after `pounds`, which is pence only where no measurement claims it. The answers for
+ * the last text are kept, so a text is read once however often it is asked about. While the
+ * rules read it, every answer is no, so a pence check inside them reads as it would alone.
+ */
+export function startsMeasurement(text: string, at: number): boolean {
+  if (measuring) return false;
+  if (text !== measuredText) {
+    measuring = true;
+    try {
+      defaultUnitRules ??= unitRules(DEFAULT_RUN.options, []);
+      const ctx = { ...DEFAULT_RUN, text };
+      measuredStarts = new Set(defaultUnitRules.flatMap((rule) => rule.find(ctx).map((c) => c.start)));
+    } finally {
+      measuring = false;
+    }
+  }
+  // Equal strings that are separate objects compare character by character, so the latest is kept.
+  measuredText = text;
+  return measuredStarts.has(at);
+}
+
+readMeasurementsWith(startsMeasurement);
+
 export function unitRules(options: ResolvedOptions, dialectKeep: string[]): Rule[] {
   const skip = new Set([...dialectKeep, ...options.unitsKeep]);
   return [
-    feetInchesRule(),
+    feetInchesRule(skip, options.rules),
     ...compoundRules(skip, options.rules),
     ...temperatureRules(),
     temperatureDecadeRule(),

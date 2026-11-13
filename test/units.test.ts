@@ -169,6 +169,47 @@ describe('feet and inches together', () => {
   it('reads no inches before "or" and a number', () => {
     expect(convert('6 feet 2 or 3 inches')).toBe('1.8 metres 5.1 or 7.6 centimetres');
   });
+
+  it.each`
+    input                                               | expected                                         | why
+    ${'He is six foot two and a half.'}                 | ${'He is 1.89 metres.'}                          | ${'a fraction in words'}
+    ${'He is 6 foot 2 and a half.'}                     | ${'He is 1.89 metres.'}                          | ${'after digits'}
+    ${'He is 6 foot 2½.'}                               | ${'He is 1.89 metres.'}                          | ${'a vulgar fraction'}
+    ${'He is 6 foot 2 1/2.'}                            | ${'He is 1.89 metres.'}                          | ${'a mixed number'}
+    ${'He is 6 foot 2-1/2.'}                            | ${'He is 1.89 metres.'}                          | ${'a mixed number with a hyphen'}
+    ${'He is six foot two and three-quarters.'}         | ${'He is 1.9 metres.'}                           | ${'three-quarters'}
+    ${'He is six foot eleven and a half.'}              | ${'He is 2.12 metres.'}                          | ${'eleven and a half inches'}
+    ${'He is six foot two and a half to six foot four.'} | ${'He is 1.89 metres to 1.93 metres.'}          | ${'before another height'}
+    ${'He is 6 foot 2 1/2 to 6 foot 4.'}                | ${'He is 1.89 metres to 1.93 metres.'}           | ${'a mixed number before another height'}
+    ${'6 feet 2½ inches'}                               | ${'1.89 metres'}                                 | ${'a vulgar fraction before the inch word'}
+    ${'six foot twelve and a half.'}                    | ${'1.8 metres twelve and a half.'}               | ${'twelve is not a number of inches'}
+    ${'six foot two and a half cars'}                   | ${'1.8 metres two and a half cars'}              | ${'a noun follows the fraction'}
+    ${'He is six foot two.'}                            | ${'He is 1.88 metres.'}                          | ${'no fraction'}
+    ${'six feet two and a half inches'}                 | ${'1.89 metres'}                                 | ${'the inch word written'}
+    ${'two and a half feet'}                            | ${'76 centimetres'}                              | ${'feet alone'}
+  `('reads a fraction of an inch with no inch word: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                            | expected                                            | why
+    ${'a six foot two tall man'}                     | ${'a 1.88 metre tall man'}                          | ${'in words'}
+    ${'He is a 6 foot 2 tall man.'}                  | ${'He is a 1.88 metre tall man.'}                   | ${'in digits'}
+    ${'a six foot two and a half tall man'}          | ${'a 1.89 metre tall man'}                          | ${'with a fraction'}
+    ${'six foot two long, three foot wide planks'}   | ${'1.88 metre long, 91 centimetre wide planks'}     | ${'two sizes'}
+    ${'He is six foot two tall.'}                    | ${'He is 1.88 metres tall.'}                        | ${'no noun after the size'}
+    ${'He is six foot two tall and thin.'}           | ${'He is 1.88 metres tall and thin.'}               | ${'a conjunction after the size'}
+  `('gives a height with no inch word before a size and a noun the singular: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                               | expected                                     | why
+    ${'6 feet 2, 3 or 4 inches'}        | ${'1.8 metres 5.1, 7.6 or 10 centimetres'}   | ${'a list claims the number'}
+    ${'He is 6 foot 2, 180 pounds.'}    | ${'He is 1.88 metres, 82 kilograms.'}        | ${'a weight after the comma starts no list'}
+  `('reads no inches with no inch word where a list starts at them: $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
 });
 
 describe('a spaced "in" after a height that opens a phrase is the preposition', () => {
@@ -430,6 +471,78 @@ describe('a number straight after a weight is its next unit, before another weig
     ${'5 to 7 pounds 8 ounces'}        | ${'5 to 7 pounds 8 ounces'}
   `('still converts $input -> $expected', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
+  });
+});
+
+describe('a number straight after a weight is its next unit, before nothing it could count', () => {
+  it.each`
+    input                                          | expected                                      | why
+    ${'He weighs 11 stone 4.'}                     | ${'He weighs 71.7 kilograms.'}                | ${'stone and pounds'}
+    ${'She was born at 7 lb 8.'}                   | ${'She was born at 3.4 kg.'}                  | ${'pounds and ounces'}
+    ${'He weighs 11 stone 4, I think.'}            | ${'He weighs 71.7 kilograms, I think.'}       | ${'before a comma'}
+    ${'He weighs 7 pounds 8.'}                     | ${'He weighs 3.4 kilograms.'}                 | ${'pounds written out, after a weight verb'}
+    ${'The baby weighed 7 lb 8 and was healthy.'}  | ${'The baby weighed 3.4 kg and was healthy.'} | ${'before a word that opens no noun'}
+    ${'eleven stone four'}                         | ${'71.7 kilograms'}                           | ${'in words'}
+    ${'11 stone 13.'}                              | ${'75.7 kilograms.'}                          | ${'thirteen pounds'}
+    ${'11 stone 14.'}                              | ${'70 kilograms 14.'}                         | ${'fourteen is no number of pounds'}
+    ${'7 lb 16.'}                                  | ${'3.2 kg 16.'}                               | ${'sixteen is no number of ounces'}
+    ${'Buy 2 lb 3 times a week.'}                  | ${'Buy 910 g 3 times a week.'}                | ${'a noun follows the number'}
+    ${'It is 5 pounds 10, 12 or 14 feet.'}         | ${'It is 2.3 kilograms 3, 3.7 or 4.3 metres.'} | ${'a list claims the number'}
+    ${'11 stone 4, 5 or 6 pounds'}                 | ${'70 kilograms 1.8, 2.3 or 2.7 kilograms'}   | ${'the same, in the smaller unit'}
+    ${'I weigh 11 stone.'}                         | ${'I weigh 70 kilograms.'}                    | ${'stone alone'}
+    ${'He weighs 11 stone 4 pounds.'}              | ${'He weighs 71.7 kilograms.'}                | ${'the pound word written'}
+    ${'6 feet 3 pounds'}                           | ${'1.8 metres 1.4 kilograms'}                 | ${'two dimensions are two measurements'}
+  `('reads $input -> $expected ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    unchanged                       | options                     | why
+    ${'It cost 5 pounds 50.'}       | ${{}}                       | ${'pounds and pence'}
+    ${'It cost 5 pounds 10.'}       | ${{}}                       | ${'pence below sixteen'}
+    ${'11 st 4.'}                   | ${{}}                       | ${'st is a weight only beside another unit'}
+    ${'I weigh 11 stone 4.'}        | ${{ dialect: 'en-GB' }}     | ${'Britain keeps stone'}
+    ${'I weigh 11 stone 4 pounds.'} | ${{ dialect: 'en-GB' }}     | ${'the same, with the pound word'}
+    ${'7 lb 8.'}                    | ${{ unitsKeep: ['ounce'] }} | ${'the smaller unit is kept'}
+  `('leaves "$unchanged" as written ($why)', ({ unchanged, options }) => {
+    expect(convert(unchanged, options)).toBe(unchanged);
+  });
+
+  it('converts stone and pounds in en-GB with the compound turned on', () => {
+    const options = { dialect: 'en-GB', rules: { 'units.mass.stone-pounds': true } } as const;
+    expect(convert('I weigh 11 stone 4.', options)).toBe('I weigh 71.7 kilograms.');
+  });
+});
+
+describe('a height in a kept unit is held whole', () => {
+  it.each`
+    unchanged                                   | unitsKeep            | why
+    ${'It is 6 feet 2 inches tall.'}            | ${['foot', 'inch']}  | ${'both units kept'}
+    ${'It is 6 feet 2 inches tall.'}            | ${['inch']}          | ${'inches kept'}
+    ${'It is 6 feet 2 inches tall.'}            | ${['foot']}          | ${'feet kept'}
+    ${'From 5 feet 2 inches to 6 feet.'}        | ${['foot', 'inch']}  | ${'before a join and feet'}
+    ${'He is six foot two.'}                    | ${['inch']}          | ${'no inch word'}
+    ${'a six-foot-two man'}                     | ${['foot']}          | ${'hyphenated'}
+    ${`He is 6'2" tall.`}                       | ${['inch']}          | ${'marks'}
+    ${'It is 6 feet tall and 2 inches wide.'}   | ${['foot', 'inch']}  | ${'two lengths'}
+  `('leaves "$unchanged" as written with unitsKeep $unitsKeep ($why)', ({ unchanged, unitsKeep }) => {
+    expect(convert(unchanged, { unitsKeep })).toBe(unchanged);
+  });
+
+  it('holds the whole height, so no rule converts a piece of it', () => {
+    const { changes } = deamericanise('From 5 feet 2 inches to 6 feet.', { unitsKeep: ['inch'] });
+    expect(changes.map((c) => c.before)).toEqual(['6 feet']);
+  });
+
+  it.each`
+    options                                                                   | why
+    ${{}}                                                                     | ${'nothing kept'}
+    ${{ unitsKeep: ['mile'] }}                                                | ${'another unit kept'}
+    ${{ unitsKeep: ['foot'], rules: { 'units.length.foot': true } }}          | ${'feet kept but turned on by id'}
+    ${{ unitsKeep: ['inch'], rules: { 'units.length.inch': true } }}          | ${'inches kept but turned on by id'}
+    ${{ unitsKeep: ['inch'], rules: { 'units.length.feet-inches': true } }}   | ${'the height rule turned on by id'}
+  `('converts 6 feet 2 inches with $options ($why)', ({ options }) => {
+    expect(convert('6 feet 2 inches', options)).toBe('1.88 metres');
   });
 });
 
@@ -4331,6 +4444,33 @@ describe('pounds of money are not weights', () => {
     const once = deamericaniseText('The box is 5 pounds 12 in. wide.');
     expect(once).toBe('The box is 2.3 kilograms 30 cm wide.');
     expect(deamericaniseText(once)).toBe(once);
+  });
+
+  it.each`
+    input                                             | expected                                                   | why
+    ${'It is 5 pounds 16 to 20 feet.'}                | ${'It is 2.3 kilograms 4.9 to 6.1 metres.'}                | ${'the first end of a range'}
+    ${'It is 0 1/2pounds\n16 to 20 feet.'}            | ${'It is 230 grams\n4.9 to 6.1 metres.'}                   | ${'the same, across a line break'}
+    ${'It is five pounds sixteen to twenty feet.'}    | ${'It is 2.3 kilograms 4.9 to 6.1 metres.'}                | ${'the same, in words'}
+    ${'The box is 5 pounds 12 to 14 inches wide.'}    | ${'The box is 2.3 kilograms 30 to 36 centimetres wide.'}   | ${'a range in inches'}
+    ${'It is 5 pounds 16, 18 or 20 feet.'}            | ${'It is 2.3 kilograms 4.9, 5.5 or 6.1 metres.'}           | ${'the first figure of a list'}
+    ${'The box is 5 pounds 12 in by 3 inches wide.'}  | ${'The box is 2.3 kilograms 30 by 7.6 centimetres wide.'}  | ${'the first side of a dimension'}
+    ${'The box is 5 pounds 12 in x 3 in wide.'}       | ${'The box is 2.3 kilograms 30 x 7.6 cm wide.'}            | ${'the same, joined by x'}
+    ${'It is 5 pounds 12 and a half feet.'}           | ${'It is 2.3 kilograms 3.8 metres.'}                       | ${'a number with its unit'}
+  `('reads no pence where a measurement starts: $input -> $expected ($why)', ({ input, expected }) => {
+    const once = deamericaniseText(input);
+    expect(once).toBe(expected);
+    expect(deamericaniseText(once)).toBe(once);
+  });
+
+  it.each`
+    unchanged                                         | why
+    ${'It came to 5 pounds 50 in total.'}             | ${'pence before the preposition "in"'}
+    ${'It came to 5 pounds 50.'}                      | ${'pence ending the sentence'}
+    ${'It came to 5 pounds 50 and a bit.'}            | ${'pence before "and" and no number'}
+    ${'It came to 5 pounds 12 to 14 pounds.'}         | ${'the range is in pounds, so the figure is part of the first amount'}
+    ${'6 in by 5 in the morning'}                     | ${'no pounds at all'}
+  `('still leaves "$unchanged" alone ($why)', ({ unchanged }) => {
+    expect(deamericaniseText(unchanged)).toBe(unchanged);
   });
 
   /** The spans the unit rules hold as written in `text`. */

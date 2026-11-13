@@ -5,7 +5,7 @@ import type { Category, Confidence, Dialect, ResolvedOptions } from '../types.js
 import { patternRules } from './index.js';
 import { spellingEntries } from './spelling/index.js';
 import { MEASUREMENT_CONFIDENCE } from './units/index.js';
-import { COMPOUNDS, MEASURES } from './units/definitions.js';
+import { COMPOUNDS, HEIGHT, MEASURES } from './units/definitions.js';
 import { baseVocabulary } from './vocabulary.js';
 
 /** A rule as someone choosing which rules to run needs to see it. */
@@ -151,8 +151,8 @@ export function ruleCatalogue(dialect: Dialect = 'en-AU'): RuleInfo[] {
     const kept = measure.keptByDefault === true || pack.unitsKeep.includes(measure.keep);
     add(measure.id, 'units', MEASUREMENT_CONFIDENCE, kept);
   }
-  // A compound in a kept unit is held whole, so it converts only when turned on by id.
-  for (const compound of COMPOUNDS) {
+  // A compound or height in a kept unit is held whole, so it converts only when turned on by id.
+  for (const compound of [...COMPOUNDS, HEIGHT]) {
     const kept = compound.measures.some(
       (measure) => measure.keptByDefault === true || pack.unitsKeep.includes(measure.keep),
     );

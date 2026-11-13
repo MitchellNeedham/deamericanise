@@ -696,22 +696,23 @@ function countBeforeSize(
 }
 
 /**
- * Whether the number `raw`, grouped with spaces before the unit `entry` that ends at `end` and
- * spaced from it, may be a count of the noun the measurement describes and then the
- * measurement's own number, as in `3 400 foot towers`. A plural unit word describes no noun,
- * and a determiner that takes one of a noun leaves no count, as in `a 1 500 foot tower`.
+ * Whether the number `raw`, grouped with spaces before a unit that ends at `end` and spaced
+ * from it, may be a count of the noun the measurement describes and then the measurement's
+ * own number, as in `3 400 foot towers` and `2 350°F loaves`. A unit that is a plural word
+ * (`pluralWord`) describes no noun, and a determiner that takes one of a noun leaves no count,
+ * as in `a 1 500 foot tower`.
  */
 function mayCountNoun(
   text: string,
   start: number,
   raw: string,
-  entry: Alias,
+  pluralWord: boolean,
   value: number,
   gap: string,
   end: number,
 ): boolean {
   if (countBeforeGroup(raw) === null || plainHyphens(gap).includes('-')) return false;
-  if (entry.isWord && !entry.isSingular) return false;
+  if (pluralWord) return false;
   if (ONE_OF_A_NOUN_BEFORE.test(text.slice(Math.max(0, start - 24), start))) return false;
   return describesNoun(text, start, value, gap, end);
 }
@@ -2511,7 +2512,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
-    if (mayCountNoun(ctx.text, start, raw, entry, value, gap, start + matched.length)) {
+    const pluralWord = entry.isWord && !entry.isSingular;
+    if (mayCountNoun(ctx.text, start, raw, pluralWord, value, gap, start + matched.length)) {
       changes.push(hold(start, matched, entry.measure.id, 30));
       return;
     }
@@ -2972,6 +2974,8 @@ interface FahrenheitReading {
   matched: string;
   body: string;
   ruleId: typeof ABSOLUTE_ID | typeof DIFFERENCE_ID;
+  /** Whether the figure may be a count and then the temperature, which is then held. */
+  countsNoun: boolean;
 }
 
 /**
@@ -3046,7 +3050,9 @@ function fahrenheitReadings(
     // A stop kept before the Celsius value the pair collapses into goes into the change, so
     // that `pushMeasurement` finds the partner and decides the stop past it.
     if (end < wholeEnd && redundantMetric(ctx, wholeEnd, body, ruleId) !== null) end = wholeEnd;
-    readings.push({ start, matched: ctx.text.slice(start, end), body, ruleId });
+    const pluralWord = /^degrees/i.test(unit);
+    const countsNoun = mayCountNoun(ctx.text, start, raw[0]!, pluralWord, values[0]!, gap, valueEnd);
+    readings.push({ start, matched: ctx.text.slice(start, end), body, ruleId, countsNoun });
   }
   return readings;
 }
@@ -3099,6 +3105,10 @@ function temperatureRules(): Rule[] {
         const changes: Change[] = [];
         for (const reading of fahrenheitReadings(ctx)) {
           if (reading.ruleId !== id) continue;
+          if (reading.countsNoun) {
+            changes.push(hold(reading.start, reading.matched, id, 35));
+            continue;
+          }
           pushMeasurement(ctx, changes, reading.start, reading.matched, reading.body, id, 35);
         }
         return changes;

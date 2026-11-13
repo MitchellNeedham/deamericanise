@@ -1060,6 +1060,8 @@ describe('a Fahrenheit figure grouped in thousands', () => {
     ${'Fire it to 2,000°F (1,095°C).'}                 | ${'Fire it to 1,095°C.'}                      | ${'the Celsius value given beside it'}
     ${'Bake at 350°F.'}                                | ${'Bake at 175°C.'}                           | ${'three figures'}
     ${'The kiln reached 2000°F.'}                      | ${'The kiln reached 1095°C.'}                 | ${'four figures, not grouped'}
+    ${'Fire it at 2 350°F.'}                           | ${'Fire it at 1 290°C.'}                      | ${'groups that could be a count, with no noun after'}
+    ${'Fire a 2 350°F loaf.'}                          | ${'Fire a 1 290°C loaf.'}                     | ${'the same, after a determiner that takes one'}
   `('$input -> $expected ($why)', ({ input, expected }) => {
     expect(convert(input)).toBe(expected);
   });
@@ -1071,6 +1073,7 @@ describe('a Fahrenheit figure grouped in thousands', () => {
     ${'Fire it to 1,095°C (2,000°F).'}          | ${'the courtesy figure after Celsius'}
     ${'The kiln reached 2,000 F.'}              | ${'a bare F with no word about heat'}
     ${'Heat the kiln to 2000 F.'}               | ${'four figures before a bare F, not grouped'}
+    ${'Fire 2 350°F loaves.'}                   | ${'a count, then the temperature of the loaves'}
   `('leaves "$unchanged" alone ($why)', ({ unchanged }) => {
     expect(convert(unchanged)).toBe(unchanged);
   });

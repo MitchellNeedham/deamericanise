@@ -482,7 +482,8 @@ becomes `a 460 metre tower`. Otherwise its last group is the size and the figure
 count the noun, so `Buy 2 100-pound bags.` becomes `Buy 2 45 kilogram bags.` After `her`,
 which may own the noun or be given it, either reading may be meant, so
 `I gave her 2 100-pound bags.` is left as written. Before a spaced
-singular unit word it may be either, so `They built 3 400 foot towers.` is left as written.
+singular unit word it may be either, so `They built 3 400 foot towers.` is left as written,
+and so is a temperature that describes a noun, as in `Fire 2 350°F loaves.`
 A whole number with a leading zero is a code or a name, so
 `Agent 007 feet` and `We drove 025 miles.` are left as written, while `0` and `0.5` are
 numbers.

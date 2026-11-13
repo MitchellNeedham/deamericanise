@@ -80,9 +80,11 @@ describe.skipIf(onCi)('a long run of grouped numbers takes time in line with its
 
 describe.skipIf(onCi)('a Fahrenheit reading takes time in line with the length of the text', () => {
   it.each`
-    name                                 | text                                               | length  | expected
-    ${'a run of digits'}                 | ${(n: number) => `Serial 1${'1'.repeat(n)} ends.`} | ${4000} | ${'Serial 1111'}
-    ${'a figure grouped by many spaces'} | ${(n: number) => `${'111 '.repeat(n)}ends.`}       | ${2000} | ${'111 111 111'}
+    name                                  | text                                                  | length  | expected
+    ${'a run of digits'}                  | ${(n: number) => `Serial 1${'1'.repeat(n)} ends.`}    | ${4000} | ${'Serial 1111'}
+    ${'a figure grouped by many spaces'}  | ${(n: number) => `${'111 '.repeat(n)}ends.`}          | ${2000} | ${'111 111 111'}
+    ${'a sentence of many bare F values'} | ${(n: number) => `Bake at ${'95F, '.repeat(n)}done.`} | ${2000} | ${'Bake at 35°C, 35°C, '}
+    ${'many sentences with a bare F'}     | ${(n: number) => 'Bake at 95F. '.repeat(n)}           | ${2000} | ${'Bake at 35°C. Bake at 35°C. '}
   `(
     '$name, $length long and four times that',
     ({ text, length, expected }) => {

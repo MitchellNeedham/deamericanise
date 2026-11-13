@@ -314,20 +314,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
       /\d (?:mg|g|kg|t|mL|L|mm|cm|m|km)\W*$/.test(v.text.slice(Math.max(0, v.change!.start - 16), v.change!.start)),
   },
   {
-    issue: 406,
-    property: 'idempotence',
-    input:
-      'Set it to 95F, then pour 100 fluid ounces, 100 fluid ounces, 100 fluid ounces, 100 fluid ounces, ' +
-      '100 fluid ounces and 100 fluid ounces into the oven.',
-    options: localise,
-    // The first run shortened the text between the F and a word about heat beyond its reach.
-    matches: (v) =>
-      v.origin === undefined &&
-      v.change?.ruleId === 'units.temperature.fahrenheit' &&
-      /\dF$/.test(v.change.before) &&
-      v.text.slice(v.change.end).search(/\b(?:degrees|ovens?)\b/i) >= 60,
-  },
-  {
     issue: 407,
     property: 'idempotence',
     input: 'We counted 6 foot traffic lights.',

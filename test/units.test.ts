@@ -1163,6 +1163,32 @@ describe('Fahrenheit written as a bare F', () => {
     expect(convert('Bake it at 6 p.m. Row 35F was empty.')).toBe('Bake it at 6pm. Row 35F was empty.');
   });
 
+  const stirring = 'stir it well and wait, '.repeat(60);
+
+  it.each`
+    input                                                            | expected                                                         | why
+    ${`Set it to 95F, then ${stirring}and put it in the oven.`}      | ${`Set it to 35°C, then ${stirring}and put it in the oven.`}     | ${'a word about heat far along the sentence'}
+    ${`Put it in the oven, then ${stirring}and set it to 95F.`}      | ${`Put it in the oven, then ${stirring}and set it to 35°C.`}     | ${'a word about heat far back in the sentence'}
+    ${`Preheat to 350F, then ${stirring}until the dial reads 180C.`} | ${`Preheat to 350F, then ${stirring}until the dial reads 180C.`} | ${'a Celsius value far along the sentence'}
+    ${`Set it to 95F. Then ${stirring}and put it in the oven.`}      | ${`Set it to 95F. Then ${stirring}and put it in the oven.`}      | ${'a word about heat in the next sentence'}
+    ${'Bake at 350F.'}                                               | ${'Bake at 175°C.'}                                              | ${'a word about heat beside it'}
+    ${'Seat 22F is free.'}                                           | ${'Seat 22F is free.'}                                           | ${'no word about heat'}
+  `('reads the whole sentence of a bare F: $why', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it('decides a bare F by a word about heat far along its sentence on the first run', () => {
+    const localise = { preset: 'localise' } as const;
+    const input =
+      'Set it to 95F, then pour 100 fluid ounces, 100 fluid ounces, 100 fluid ounces, 100 fluid ounces, ' +
+      '100 fluid ounces and 100 fluid ounces into the oven.';
+    const once = deamericaniseText(input, localise);
+    expect(once).toBe(
+      'Set it to 35°C, then pour 3 litres, 3 litres, 3 litres, 3 litres, 3 litres and 3 litres into the oven.',
+    );
+    expect(deamericaniseText(once, localise)).toBe(once);
+  });
+
   it.each`
     input                                                 | expected
     ${'Temperatures at 6 p.m. were 10F.'}                 | ${'Temperatures at 6pm were -12.2°C.'}

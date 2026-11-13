@@ -163,7 +163,11 @@ const OPENER = new RegExp(
   'iuy',
 );
 
-const REACH = 120;
+/**
+ * Far past the ends of any real sentence, so no change inside one moves a word about heat or a
+ * Celsius value in or out of reach, while a long text with no stops stays cheap to read.
+ */
+const REACH = 2000;
 
 /** The words either side of a match in its sentence. */
 export function sentenceAround(text: string, start: number, end: number): string {

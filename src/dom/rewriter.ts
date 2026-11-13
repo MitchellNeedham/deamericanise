@@ -1,5 +1,5 @@
 import { resolveOptions } from '../config.js';
-import { detectAmerican, mergeSignals } from '../engine/detect.js';
+import { detectAmerican, evidenceKey, mergeSignals } from '../engine/detect.js';
 import { findChanges } from '../transform.js';
 import type { AmericanSignals, Change, Options, ResolvedOptions } from '../types.js';
 import { distribute, type Placement } from './distribute.js';
@@ -12,6 +12,7 @@ import {
   joinsRun,
   lastRunIsOpen,
   namesCodeRole,
+  openShadowRoot,
   ownAttributes,
   ownRuns,
   ownTextNodes,
@@ -95,8 +96,6 @@ const NO_EVIDENCE = detectAmerican('');
 
 const SHOW_ELEMENT = 1;
 const SHOW_TEXT = 4;
-
-const openShadowRoot: ShadowLookup = (host) => host.shadowRoot;
 
 /**
  * Rewrites the text of a document or element in place, and with `watch` keeps it
@@ -302,19 +301,8 @@ export class DomRewriter {
     return this.evidence.get(lang) ?? NO_EVIDENCE;
   }
 
-  /** Everything about a region's evidence that a rule can read. */
   private bits(lang: string): string {
-    const s = this.evidenceFor(lang);
-    const min = this.resolved.get(undefined)!.minAmericanConfidence;
-    return [
-      s.confidence >= min,
-      s.unambiguousMonthFirstDates > 0,
-      s.unambiguousDayFirstDates > 0,
-      s.namedMonthFirstDates > 0,
-      s.namedDayFirstDates > 0,
-    ]
-      .map(Number)
-      .join('');
+    return evidenceKey(this.evidenceFor(lang), this.resolved.get(undefined)!.minAmericanConfidence);
   }
 
   // ------------------------------- Following the page -------------------------------

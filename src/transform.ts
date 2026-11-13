@@ -64,9 +64,13 @@ export function transformProse(text: string, resolved: ResolvedOptions, boundari
 
 /** The evidence in `text`, with its verdict overruled by an `assumeAmerican` that is set. */
 export function signalsFor(text: string, resolved: ResolvedOptions): AmericanSignals {
-  const found = detectAmerican(text);
-  if (resolved.assumeAmerican === undefined) return found;
-  return { ...found, confidence: resolved.assumeAmerican ? 1 : 0 };
+  return overruled(detectAmerican(text), resolved);
+}
+
+/** `signals` with the verdict overruled by an `assumeAmerican` that is set. */
+export function overruled(signals: AmericanSignals, resolved: ResolvedOptions): AmericanSignals {
+  if (resolved.assumeAmerican === undefined) return signals;
+  return { ...signals, confidence: resolved.assumeAmerican ? 1 : 0 };
 }
 
 /** The same thing when all you want back is the string. */

@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { WritingSuggestions, writingTarget, type PlacedSuggestion } from '../src/dom/suggest.js';
+import {
+  EditableSuggestions,
+  WritingSuggestions,
+  writingTarget,
+  type PlacedSuggestion,
+} from '../src/dom/suggest.js';
 import type { Options } from '../src/index.js';
 
 const AMERICAN: Options = { assumeAmerican: true };
@@ -65,11 +70,31 @@ describe('suggestions: in the value of a text field', () => {
 
 describe('suggestions: in an editable element', () => {
   it('places each suggestion in the text node that holds it', () => {
-    const root = editable('<p>The color of <b>gray</b> paint.</p>');
-    expect(marked(new WritingSuggestions(AMERICAN).inEditable(root))).toEqual([
+    const root = editable('<p>See <a href="#">color</a> charts and <b>gray</b> paint.</p>');
+    const found = new WritingSuggestions(AMERICAN).inEditable(root);
+    expect(marked(found)).toEqual([
       ['color', 'colour'],
       ['gray', 'grey'],
     ]);
+    for (const { range, edits } of found) {
+      expect(range.startContainer).toBe(range.endContainer);
+      expect(range.startContainer.parentElement!.localName).toMatch(/^(a|b)$/);
+      expect(edits).toHaveLength(1);
+    }
+  });
+
+  it('reads what is written as American', () => {
+    const root = editable('<p>The color was nice on 03/04/2024, it cost $50.</p>');
+    expect(marked(new WritingSuggestions(AMERICAN).inEditable(root))).toEqual([
+      ['$50', 'US$50'],
+      ['03/04/2024', '2024-03-04'],
+      ['color', 'colour'],
+    ]);
+  });
+
+  it('reads the dates of every paragraph the same way', () => {
+    const root = editable('<p>Due 03/04/2024.</p><p>Paid 25/03/2024.</p>');
+    expect(new WritingSuggestions(AMERICAN).inEditable(root)).toEqual([]);
   });
 
   it('marks a change that crosses inline elements, and replaces it in one edit', () => {
@@ -83,15 +108,42 @@ describe('suggestions: in an editable element', () => {
     ]);
   });
 
-  it('leaves out a change that crosses the edge of a link', () => {
-    const root = editable('He is <a href="#">6 feet</a> 2 inches tall, in color.');
+  it.each([
+    ['the edge of a link', 'He is <a href="#">6 feet</a> 2 inches tall, in color.'],
+    ['a whole link', 'He is 6 <a href="#">feet</a> 2 inches tall, in color.'],
+  ])('leaves out a change that crosses %s', (_, html) => {
+    const root = editable(html);
     expect(marked(new WritingSuggestions(AMERICAN).inEditable(root))).toEqual([['color', 'colour']]);
+  });
+
+  it('lets an empty text node in a link stand in no change’s way', () => {
+    const root = editable('He is 6 feet<a href="#"></a> 2 inches tall.');
+    root.querySelector('a')!.append(document.createTextNode(''));
+    const [found] = new WritingSuggestions(AMERICAN).inEditable(root);
+    expect(found?.change.before).toBe('6 feet 2 inches');
   });
 
   it('replaces an article fix and its word in one edit inside one text node', () => {
     const root = editable('Use an eraser.');
     const [found] = new WritingSuggestions({ ...AMERICAN, preset: 'localise' }).inEditable(root);
     expect(found!.edits.map(({ range, after }) => [text(range), after])).toEqual([['an eraser', 'a rubber']]);
+  });
+
+  it('replaces them in one edit across text nodes that share a parent', () => {
+    const root = editable('<p></p>');
+    (root.firstChild as Element).append('Use an ', 'eraser now.');
+    const [found] = new WritingSuggestions({ ...AMERICAN, preset: 'localise' }).inEditable(root);
+    expect(found!.edits.map(({ range, after }) => [text(range), after])).toEqual([['an eraser', 'a rubber']]);
+  });
+
+  it('offers an article fix outside a link with its word inside', () => {
+    const root = editable('Use an <a href="#">eraser</a> now.');
+    const [found] = new WritingSuggestions({ ...AMERICAN, preset: 'localise' }).inEditable(root);
+    expect(found!.change).toMatchObject({ before: 'an eraser', after: 'a rubber' });
+    expect(found!.edits.map(({ range, after }) => [text(range), after])).toEqual([
+      ['eraser', 'rubber'],
+      ['an', 'a'],
+    ]);
   });
 
   it('places an article fix beside its word in another element', () => {
@@ -131,8 +183,97 @@ describe('suggestions: in an editable element', () => {
   });
 
   it('turns suggestions back on in an editable element inside one that is not', () => {
-    const root = editable('<div contenteditable="false"><p spellcheck="true" contenteditable="true">gray</p></div>');
+    const root = editable('<div contenteditable="false"><p contenteditable="true">gray</p></div>');
     expect(marked(new WritingSuggestions(AMERICAN).inEditable(root))).toEqual([['gray', 'grey']]);
+  });
+
+  it('skips an inline element marked spellcheck="false"', () => {
+    const root = editable('<p>The <span spellcheck="false">color</span> is gray.</p>');
+    expect(marked(new WritingSuggestions(AMERICAN).inEditable(root))).toEqual([['gray', 'grey']]);
+  });
+
+  it('turns the spellcheck rule back off below an element that turns it on', () => {
+    const root = editable('<div spellcheck="false"><p spellcheck="true">The color.</p><p spellcheck="">The gray.</p></div>');
+    expect(marked(new WritingSuggestions(AMERICAN).inEditable(root))).toEqual([
+      ['color', 'colour'],
+      ['gray', 'grey'],
+    ]);
+  });
+
+  it.each([
+    ['not English', '<div lang="fr"><div id="host" contenteditable="true">The color.</div></div>'],
+    ['code', '<div id="host" contenteditable="true" spellcheck="false" role="code">The color.</div>'],
+    [
+      'drawn as code',
+      '<div id="host" contenteditable="true" style="white-space: pre; font-family: monospace">The color.</div>',
+    ],
+  ])('leaves alone an editor that is %s', (_, html) => {
+    document.body.innerHTML = html;
+    expect(new WritingSuggestions(AMERICAN).inEditable(document.getElementById('host')!)).toEqual([]);
+  });
+
+  it('reads a shadow root inside the editor', () => {
+    const root = editable('<div id="widget"></div>');
+    root.querySelector('#widget')!.attachShadow({ mode: 'open' }).innerHTML = '<p>gray</p>';
+    expect(marked(new WritingSuggestions(AMERICAN).inEditable(root))).toEqual([['gray', 'grey']]);
+  });
+});
+
+describe('suggestions: following an editable element as it changes', () => {
+  /** Reads the editor, runs `change` and reads it again with what the change touched. */
+  function reread(html: string, change: (root: HTMLElement) => void, options: Options = AMERICAN) {
+    const root = editable(html);
+    const reader = new EditableSuggestions(root, new WritingSuggestions(options));
+    const before = reader.read().suggestions;
+    const observer = new MutationObserver(() => {});
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+    change(root);
+    reader.note(observer.takeRecords());
+    observer.disconnect();
+    return { root, before, after: reader.read().suggestions };
+  }
+
+  it('reads again only the paragraph that changed', () => {
+    const { before, after } = reread('<p>The color.</p><p>The gray car.</p>', (root) => {
+      (root.firstChild!.firstChild as Text).data = 'The colors.';
+    });
+    const gray = (found: PlacedSuggestion[]) => found.find(({ change }) => change.before === 'gray');
+    expect(gray(after)).toBeDefined();
+    expect(gray(after)).toBe(gray(before));
+    expect(marked(after)).toEqual([
+      ['colors', 'colours'],
+      ['gray', 'grey'],
+    ]);
+  });
+
+  it('drops the suggestions of a paragraph that is gone, and reads one that arrives', () => {
+    const { after } = reread('<p>The color.</p><p>The gray car.</p>', (root) => {
+      root.firstChild!.remove();
+      root.insertAdjacentHTML('beforeend', '<p>A theater.</p>');
+    });
+    expect(marked(after)).toEqual([
+      ['gray', 'grey'],
+      ['theater', 'theatre'],
+    ]);
+  });
+
+  it('reads everything again when new text changes how dates read', () => {
+    const { before, after } = reread('<p>Due 03/04/2024.</p><p>The end.</p>', (root) => {
+      root.lastChild!.firstChild!.textContent = 'Paid 25/03/2024.';
+    });
+    expect(marked(before)).toEqual([['03/04/2024', '2024-03-04']]);
+    expect(after).toEqual([]);
+  });
+
+  it('stops part way when told to, and carries on in the next read', () => {
+    const root = editable('<p>The color.</p><p>The gray car.</p><p>A theater.</p>');
+    const reader = new EditableSuggestions(root, new WritingSuggestions(AMERICAN));
+    const first = reader.read(() => false);
+    expect(first.done).toBe(false);
+    expect(marked(first.suggestions)).toEqual([['color', 'colour']]);
+    const rest = reader.read();
+    expect(rest.done).toBe(true);
+    expect(marked(rest.suggestions)).toHaveLength(3);
   });
 });
 
@@ -150,6 +291,7 @@ describe('suggestions: where someone is writing', () => {
     '<div lang="en-US"><textarea id="field"></textarea></div>',
     '<textarea id="field" translate="no"></textarea>',
     '<div class="notranslate"><input id="field"></div>',
+    '<form spellcheck="false"><textarea id="field" spellcheck="true"></textarea></form>',
   ])('suggests in %s', (html) => {
     const element = field(html);
     expect(writingTarget(element)).toEqual({ kind: 'field', element });

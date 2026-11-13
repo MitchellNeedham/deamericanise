@@ -233,8 +233,9 @@ a `travel trailer` does, while a `boat trailer` and a `movie trailer` stay trail
 verb stays too: `the dog pants heavily` keeps its `pants`, while `his pants were wet`
 becomes `his trousers were wet`.
 
-**Units.** Length, area, mass, volume, temperature, speed, pressure, power, torque and
-fuel economy. The volume measures are the US ones, which are not the imperial ones.
+**Units.** Length, area, mass, volume, temperature, speed, pressure, power, torque, fuel
+economy, a mass per a volume or an area, and the R-values and U-factors of insulation and
+windows. The volume measures are the US ones, which are not the imperial ones.
 
 ```
 6 feet          -> 1.8 metres        350°F      -> 175°C
@@ -310,6 +311,33 @@ A unit of more than one word is read in the singular as well as the plural, so
 `a 2 square mile park` becomes `a 5.2 square kilometre park` and `a 100 foot-pound wrench`
 becomes `a 140 newton metre wrench`. `an hour` before `ago`, `later`, `earlier`, `before` or
 `after` is a time, so `2 miles an hour ago` becomes `3.2 kilometres an hour ago`.
+
+A unit over another imperial unit, written with `/` or `per`, converts as one where it is a
+common one: a mass per a volume or an area, or a weight on an area, which is a pressure. So
+`2 oz/gal` becomes `15 g/L`, `62.4 lb/ft³` becomes `1000 kg/m³`, `2 lb/acre` becomes
+`2.2 kg/ha`, `5 lb/in²` becomes `34 kPa`, and `1 lb per square foot` becomes
+`4.9 kg per square metre`. The second unit may carry `²` or `³`, or follow `sq`, `square`,
+`cu` or `cubic`. After a slash the metric divisor is written as the first unit is, and after
+`per` as the divisor is, so `3 pounds per acre` becomes `3.4 kilograms per hectare`. A range
+or list converts the same way. Any other unit over an imperial unit, such as `2 gal/acre` or
+`3 lb per ft`, is left as written, and so is one joined by hyphens, as in
+`a 2-pound-per-cubic-foot foam`, one whose second unit's rule is off, and a weight in two
+units such as `1 lb 8 oz per acre`, since converting the first unit alone would leave the
+second imperial. A unit of time, a metric unit, a unit with a figure of its own or a unit that
+is kept after the slash or `per` leaves the first unit to convert alone: `5 gallons/minute`
+becomes `19 litres/minute`, `3 pounds per week` becomes `1.4 kilograms per week`,
+`2 oz per cup` becomes `57 g per cup`, and `1 lb per 1000 square feet` becomes
+`450 g per 93 square metres`. A conversion goes under the first unit's id, or under the id
+of the measure it is a form of, as `units.pressure.psi` is for `lb/in²`. A unit followed by
+`·` or `⋅` and a letter is one factor of a product of units, as in `2 lb·ft`, and is left as
+written.
+
+An R-value, the thermal resistance of insulation, is read whole, with its three factors in
+any order, and becomes square metre kelvins per watt: `2.5 ft²·h·°F/BTU` becomes
+`0.44 m²·K/W`, and `0.45 h·ft²·°F/BTU` becomes `0.079 m²·K/W`. A U-factor, which windows are
+rated by, becomes watts per square metre kelvin: `0.30 BTU/h·ft²·°F` becomes
+`1.7 W/(m²·K)`. Each has a rule of its own, `units.thermal.r-value` and
+`units.thermal.u-factor`. An R-value per inch is left as written.
 
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
@@ -563,7 +591,11 @@ temperature. A change in temperature has no 32° offset to take off, so
 beside the number tell the two apart: a verb of change or `by` before it, a comparative
 or a noun such as `drop` after it. They are read past a Celsius value given beside the
 number, so `It was 20°F (11°C) warmer` becomes `It was 11°C warmer`, and
-`It rose 11°C or 20°F` stays as it is. `fell to 20°F` names the new temperature and
+`It rose 11°C or 20°F` stays as it is. A rate of change is a change too: `per` and a unit
+after the value, `a` and a unit of time, or a slash, a figure and a unit, so
+`It warms 2°F per hour` becomes `It warms 1.1°C per hour`, `2°F a minute` becomes
+`1.1°C a minute`, and `5.4°F/1000 ft` becomes `3°C/300 m`, while `a day after` and
+`a week ago` are times. `fell to 20°F` names the new temperature and
 converts as one, and `10°F below zero` becomes `-23.3°C`. Changes have a rule of their own,
 `units.temperature.difference`, so they can be switched off apart from temperatures.
 
@@ -584,8 +616,9 @@ where it describes the noun after it, so `a 350 degree F oven` becomes
 `a 175 degree Celsius oven`, while `Preheat to 350 degrees F` keeps the plural. A hyphen may
 join the number, `degree` and the scale in a modifier, and goes with the conversion as a
 length's does, so `110-degree-Fahrenheit heat` becomes `43.3 degree Celsius heat`. A degree
-that is one factor of a compound unit measures no temperature, so `0.45 °F·ft²·h/BTU` and
-`2 °F/min` are left as written. A slash makes one only before a unit of time, length, energy
+that is one factor of a compound unit measures no temperature, so `2 °F/min` and
+`0.5 °F/W` are left as written, while `0.45 °F·ft²·h/BTU` is an R-value, which converts
+whole. A slash makes one only before a unit of time, length, energy
 or power, so `225°F/low/slow` and `350°F/gas 4` still convert.
 The word alone does not count after a whole number of four figures, which reads as a year
 (`In 1724 Fahrenheit proposed his scale`), before `thermometers` or `scale`, where the

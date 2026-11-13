@@ -1,5 +1,5 @@
 import type { Change, Rule, RuleContext } from '../types.js';
-import { CLOSING, stopStays } from './sentence.js';
+import { CLOSING, INLINE_MARK, stopStays } from './sentence.js';
 
 /**
  * Outside America the full stop marks a *truncation*, not an abbreviation. A contraction
@@ -57,11 +57,11 @@ function meridiem(text: string, start: number): string {
  * What may follow a whole initialism: a space or the end; a stop, comma, colon or other
  * sentence punctuation; a closing quote or bracket; a plural `s`; or a hyphen, dash, slash or
  * ampersand before a word or figure, as in `U.S.-made` and `9 A.M.-5 P.M.`. Any of these may
- * come after closing emphasis, which the `emphasis` group holds. Nothing else is accepted, so
- * the start of a longer initialism, as `U.K.` is of `U.K.I.P.`, is left whole.
+ * come after closing inline markup, which the `emphasis` group holds. Nothing else is
+ * accepted, so the start of a longer initialism, as `U.K.` is of `U.K.I.P.`, is left whole.
  */
 const INITIALISM_END =
-  String.raw`(?=(?<emphasis>[*_~]*)(?:\s|$|[,;:.!?…]|${CLOSING}|s(?![\p{L}\p{N}])` +
+  String.raw`(?=(?<emphasis>(?:~|${INLINE_MARK})*)(?:\s|$|[,;:.!?…]|${CLOSING}|s(?![\p{L}\p{N}])` +
   String.raw`|[-\u2010\u2011\u2013\u2014/&][\p{L}\p{N}]))`;
 
 /** An initialism's pattern, `body`, followed by the shared ending. */
@@ -106,7 +106,7 @@ function abbreviationRule(): Rule {
           const start = match.index;
           const end = start + match[0].length;
           const written = typeof replacement === 'string' ? replacement : replacement(ctx.text, start);
-          // The sentence after closing emphasis decides the stop, and a kept stop stays inside it.
+          // The sentence after closing markup decides the stop, and a kept stop stays inside it.
           const close = end + match.groups!.emphasis!.length;
           changes.push({
             start,

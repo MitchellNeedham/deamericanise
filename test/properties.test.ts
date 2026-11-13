@@ -292,17 +292,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
       /[a-z]stone$/i.test(v.change.before),
   },
   {
-    issue: 307,
-    property: 'idempotence',
-    input: 'It is 5 pounds 16 to 20 feet.',
-    options: {},
-    // The first run converted the range whose first figure held the pounds as pence.
-    matches: (v) =>
-      v.origin === undefined &&
-      v.change?.ruleId === 'units.mass.pound' &&
-      /^\s+\d[\d.,]*[^\S\n]*(?:to|and|or|-|–)[^\S\n]*\d/.test(v.text.slice(v.change.end)),
-  },
-  {
     issue: 405,
     property: 'idempotence',
     input: 'Weigh 8 oz. cookies',
@@ -326,18 +315,6 @@ const KNOWN_FAILURES: KnownFailure[] = [
       v.change?.ruleId === 'units.temperature.fahrenheit' &&
       /\dF$/.test(v.change.before) &&
       v.text.slice(v.change.end).search(/\b(?:degrees|ovens?)\b/i) >= 60,
-  },
-  {
-    issue: 407,
-    property: 'idempotence',
-    input: 'We counted 6 foot traffic lights.',
-    options: { ...localise, dialect: 'en-ZA' },
-    // The first run rewrote the noun that made the unit before it part of a compound.
-    matches: (v) =>
-      v.origin === undefined &&
-      v.change?.category === 'units' &&
-      /(?:foot|pound|yard|inch|mile)$/i.test(v.change.before) &&
-      v.next?.category === 'vocabulary',
   },
 ];
 

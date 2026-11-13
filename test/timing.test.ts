@@ -190,6 +190,25 @@ describe.skipIf(onCi)('the decade rule takes time in line with a long run of spa
   });
 });
 
+describe.skipIf(onCi)('the decade rule reads the sentences of many decades in time in line with their length', () => {
+  const options = resolveOptions({});
+  const decade = patternRules(options).find((rule) => rule.id === 'units.temperature.decade')!;
+  const find = (text: string) => decade.find({ text, options, signals: analyse(text), american: true });
+
+  it.each`
+    piece                                    | length
+    ${'In Celsius, highs are in the 30s. '}  | ${1000}
+    ${'Highs in the 30s, as Celsius says. '} | ${1000}
+  `(
+    '"$piece", $length times and four times that',
+    ({ piece, length }) => {
+      expect(find(piece.repeat(length)).filter((change) => change.hold)).toHaveLength(length);
+      expect(growth(piece.repeat(length), piece.repeat(length * 4), find)).toBeLessThan(MAX_RATIO);
+    },
+    60_000,
+  );
+});
+
 describe.skipIf(onCi)('protected names and paths take time in line with their length', () => {
   it.each`
     piece                                    | expected

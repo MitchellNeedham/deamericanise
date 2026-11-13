@@ -247,12 +247,22 @@ fuel economy. The volume measures are the US ones, which are not the imperial on
 
 A unit that describes the noun after it stays singular: `a 9 inch dish` becomes
 `a 23 centimetre dish`, and so do `9 inch pans`, `the 5-6 inch pans` and `one-inch slices`.
-A determiner, a hyphen tying the number to the unit, or the singular after a number above
+A determiner or a count, a hyphen tying the number to the unit, or the singular after a number above
 one says so. One and a fraction take the singular anyway, so `one quart small onions` and
-`1/2 pound ground beef` keep a plural unit, read as quantities with the `of` left out. A
+`1/2 pound ground beef` keep a plural unit, read as quantities with the `of` left out.
+A unit that is its own plural, `stone` or `horsepower`, says nothing by its number, so only
+`a` or `an`, a count or a hyphen says so: `a 14 stone man` becomes `an 89 kilogram man` and
+`two 300 horsepower engines` becomes `two 220 kilowatt engines`, while
+`He was 14 stone soaking wet.` and `the 300 horsepower produced by the motor` keep the plural.
+A hyphen, with a determiner or a count opening the phrase, says so wherever the noun stands,
+so `a 6-inch, sharp knife` becomes `a 15 centimetre, sharp knife`, while
+`The fence is 6-foot-tall, sturdy and heavy.` keeps the plural. A
 preposition, a size, an adverb of place, slope or time, a pronoun, a conjunction, a number
 or a date after the unit is no noun: `a quarter mile later` becomes `400 metres later`, and
-`a mile and a half back` becomes `2.4 kilometres back`. A count before an attributive
+`a mile and a half back` becomes `2.4 kilometres back`. A number in digits hyphenated to a
+word that is no unit, or with letters straight after it, may start one, so
+`a 6-foot 2-door cabinet` becomes `a 1.8 metre 2-door cabinet`, while
+`He lost 6 feet 2 days later.` keeps the plural. A count before an attributive
 measurement counts the noun, so `two quarter-pound burgers` becomes `two 110 gram burgers`.
 So does a count in words spaced before a length that a hyphen ties to its size, which leaves
 the unit one of itself: `two foot-long subs` becomes `two 30 centimetre long subs`, and a
@@ -264,7 +274,8 @@ becomes `a 61 to 91 centimetre long gap`.
 A unit that starts a noun leaves the number counting it, so `Bake 1 pound cake`,
 `6 foot soldiers`, `foot traffic`, `8 inch worms`, `5 yard sales`, `3 yard signs`,
 `the two pound signs` and `3 mile markers` are left as written, while `a 2-pound cake`
-becomes `a 910 gram cake`.
+becomes `a 910 gram cake`. The noun is held with the quantity, so no other rule rewrites part
+of it: en-ZA leaves `6 foot traffic lights` as written.
 A length that gives the size of a noun describes it whatever its number, so
 `a 6 foot long table` becomes `a 1.8 metre long table`, `cut into 1/2 inch thick slices`
 becomes `cut into 1.3 centimetre thick slices`, and `a 6-foot-tall fence` becomes
@@ -288,11 +299,26 @@ A metric value the author gives after the quantity decides the sense by its dime
 `8 oz (240 mL) of milk` becomes `240 mL of milk` and `8 oz (230 g) of milk` becomes
 `230 g of milk`. Otherwise the phrase after the unit decides: an optional `of`, at most two
 words that are not function words, and then the thing measured. A container is read
-through to what it holds, so `a 15 oz can of beans` stays a weight. The thing counts
-whatever follows it, so `Add 8 oz of milk slowly.` and `A 5-ton air conditioner cools the hall.`
-read in the sense, but not inside the name of something else: `8 oz cream cheese`,
-`8 oz milk chocolate` and `12 oz coffee beans` are weights, as are `sour cream`, `ice cream`,
-`baking soda` and `ground coffee`. A word ending in `s` between the unit and the thing is a
+through to what it holds, so `a 15 oz can of beans` stays a weight. A metal, copper or a
+cooling word counts whatever follows it, but not inside the name of something else, so
+`a 1 oz gold coin` and `A 5-ton air conditioner cools the hall.` read in the sense while
+`2 oz silver polish` is a weight. A drink counts only where it heads the phrase: as its last
+noun, before a stop, a function word, an adverb or a verb with its object, or before a vessel,
+as in `a 12 oz soda can`. So `Add 8 oz of milk slowly.`, `8 oz chocolate milk` and
+`16 oz of water keeps you going.` are fluid ounces, while a food a drink names is a weight, as
+in `8 oz rum raisins`, `8 oz cream cheese`, `8 oz milk chocolate` and `12 oz coffee beans`,
+and so are the solids whose head is a drink: `sour cream`, `ice cream`, `cream of tartar`,
+`baking soda` and `ground coffee`. Where the quantity is the subject of its clause, opening a
+sentence or following a conjunction such as `until`, `once` or `when`, a word ending in `s`
+after the drink is its verb, so `Heat until 8 oz of milk boils.` and
+`16 oz of water goes into the pot.` are fluid ounces. That word is a plural noun where an
+auxiliary follows it, or a word that a function word, an adverb or a number follows in turn, as
+in `8 oz rum raisins go in first.`, and at the opening of a sentence where a comma or the end of
+its line follows it, as in a list of ingredients. The end of a line ends the phrase unless the
+next line goes on in lower case, as a hard-wrapped sentence does, so `8 oz rum raisins` before a
+line that opens `4 oz sugar` is a weight, while `8 oz of milk makes` before a line that opens
+`a cup.` is fluid ounces.
+A word ending in `s` between the unit and the thing is a
 plural or a verb, so it stands there alone, and `A 3-ton truck needs AC.` is a weight. A
 drinking glass before another vessel is its material, so `a 16 oz glass jar of honey` is a
 weight. A phrase that names any other
@@ -310,6 +336,12 @@ A unit of more than one word is read in the singular as well as the plural, so
 `a 2 square mile park` becomes `a 5.2 square kilometre park` and `a 100 foot-pound wrench`
 becomes `a 140 newton metre wrench`. `an hour` before `ago`, `later`, `earlier`, `before` or
 `after` is a time, so `2 miles an hour ago` becomes `3.2 kilometres an hour ago`.
+A hyphen, the Unicode hyphen (U+2010) or the non-breaking hyphen (U+2011) may stand for each
+space of such a unit, so `A 500-square-foot apartment.` becomes `A 46 square metre apartment.`,
+`a 100-pound-per-square-inch tank` becomes `a 690 kilopascal tank` and `a 35-sq-ft room`
+becomes `a 3.3 m² room`. A speed written so before its noun takes the symbol, as metric
+countries write it there: `A 35-mile-per-hour wind.` becomes `A 56 km/h wind.`, while
+`Enter a 25 mile per hour zone.` becomes `Enter a 40 kilometre per hour zone.`
 
 Dimensions move as a set, because converting half of a pair is worse than leaving it
 alone: `10 x 12 feet` becomes `3 x 3.7 metres`, and `8.5 x 11 inches` becomes
@@ -356,7 +388,13 @@ text, or a word that cannot open a noun, such as a preposition or a conjunction.
 `He is six foot two.` becomes `He is 1.88 metres.` and `6 foot 4 with long arms` becomes
 `1.93 metres with long arms`, while `6 feet 2 cars` is two things. Of those words, `in` is
 the inch abbreviation, and `to`, `and`, `or` or `by` before a number carry the inches on to
-a range or a side, so `6 feet 2 to 3 inches` becomes `1.8 metres 5.1 to 7.6 centimetres`. The
+a range or a side, so `6 feet 2 to 3 inches` becomes `1.8 metres 5.1 to 7.6 centimetres`.
+Inches with no inch word are a whole number from 1 to 11 and may end in a fraction, so
+`He is six foot two and a half.`, `He is 6 foot 2½.` and `He is 6 foot 2 1/2.` all become
+`He is 1.89 metres.`, as `6 feet 2½ inches` does. A list that starts at them claims them, so
+`6 feet 2, 3 or 4 inches` becomes `1.8 metres 5.1, 7.6 or 10 centimetres`. Before a size and
+a noun such a height keeps the singular, so `a six foot two tall man` becomes
+`a 1.88 metre tall man`. The
 inch word can also be left out before a join and another measurement in feet, so
 `6 foot 2 to 6 foot 4` becomes `1.88 metres to 1.93 metres` and `2 feet 6 to 3 feet`
 becomes `76.2 centimetres to 91 centimetres`. A spaced `in` after the inches is the
@@ -375,13 +413,19 @@ unit, so `5 ft 6 to 6 ft` and `3 yards 2 to 4 yards` are left as written, with `
 or `units.measurement` switched off too. A weight's next
 unit word can be left out before a join and another weight in its larger unit too, so
 `11 stone 4 to 12 stone` becomes `71.7 kilograms to 76 kilograms` and `7 lb 8 to 9 lb`
-becomes `3.4 kg to 4.1 kg`, while `11 stone 14 to 12 stone` is left as written. Together the
-parts claim three significant figures. A height that describes the noun after it keeps the singular where its inch unit is
+becomes `3.4 kg to 4.1 kg`, while `11 stone 14 to 12 stone` is left as written. It can be
+left out where nothing the number could count follows, as the inch word can, so
+`He weighs 11 stone 4.` becomes `He weighs 71.7 kilograms.` and `She was born at 7 lb 8.`
+becomes `She was born at 3.4 kg.` A written `pounds` there may still be money, so
+`It cost 5 pounds 10.` is left as written, and `11 st 4.` is too, since `st` is a weight only
+beside another unit. Together the parts claim three significant figures. A height that describes the noun after it keeps the singular where its inch unit is
 the singular word or a determiner opens it: `a 6 foot 2 inch man` and `a 6 ft 2 in man` both
 become `a 1.88 metre man`. Where a unit of the weight is kept, by the dialect or by `unitsKeep`,
 the whole weight is left as written, so an `en-GB` `11 stone 4 pounds` never becomes
 `11 stone 1.8 kilograms`. Turning on `units.mass.stone` or `units.mass.stone-pounds`
-converts it. A weight or height at the end of a range or list, as in `7-8 lb 4 oz`,
+converts it. A height is left whole the same way where feet or inches are kept, so with
+`unitsKeep: ['inch']`, `It is 6 feet 2 inches tall.` is left as written until
+`units.length.inch` or `units.length.feet-inches` is turned on. A weight or height at the end of a range or list, as in `7-8 lb 4 oz`,
 `5 to 6 feet 2 inches`, `five to seven pounds eight ounces` or `5, 6, 7 feet 2 inches`, is
 left as written too, since its first end could be in either unit. So is a height or weight
 that starts where no measurement can (see below), as in `At 7:30 feet 2 inches` and
@@ -541,8 +585,8 @@ whole. With `units.range` or `units.dimensions` switched off, a range or dimensi
 written, never half converted, so `½-¾ inch`, `½ to ¾ inch`, `1½ x 2 inch`,
 `five to 10 miles` and `ten by 12 feet` stay as they are.
 
-Fuel economy is read as `mpg`, `miles per gallon`, `miles-per-gallon`, `miles/gallon` or
-`mi/gal`, so `30 miles/gallon` becomes `7.8 L/100km`, never kilometres per gallon, and
+Fuel economy is read as `mpg`, `m.p.g.`, `miles per gallon`, `miles-per-gallon`, `miles/gallon`
+or `mi/gal`, so `30 miles/gallon` becomes `7.8 L/100km`, never kilometres per gallon, and
 `7.8 L/100km (30 mi/gal)` is a restatement. A range converts at both ends and gives the
 smaller number first, though litres per 100 km fall as miles per gallon rise: `20 to 30 mpg`
 becomes `7.8 to 12 L/100km`, and `8.5 to 13 km/L` with `fuelEconomy: 'km-per-l'`. After
@@ -551,6 +595,11 @@ becomes `7.8 to 12 L/100km`, and `8.5 to 13 km/L` with `fuelEconomy: 'km-per-l'`
 `20, 25 or 30 mpg` becomes `7.8, 9.4 or 12 L/100km`. A range or list of fuel economy with a
 figure in words or a fraction before its last, or a figure of zero, as in `twenty to 30 mpg`,
 is left as written.
+
+Miles per hour and miles per gallon may be written with stops, as `m.p.h.` and `m.p.g.` or in
+capitals. The last stop goes or stays as any abbreviation's does (see below), so
+`It does 30 m.p.h. on the highway.` becomes `It does 48 km/h on the highway.`, while
+`It does 30 m.p.h.` becomes `It does 48 km/h.`
 
 Temperatures convert at both ends of a range too, so `Bake at 350-375°F` becomes
 `Bake at 175-190°C`, and at every figure of a list, so `Bake at 325, 350 or 375°F` becomes
@@ -620,14 +669,24 @@ becomes `180 degrees celsius`, but a lone `C` only in upper case, after a degree
 A Fahrenheit decade near a word about heat or the weather becomes a range, since it
 straddles the Celsius decades: `on mild days in the 70s` becomes
 `on mild days between 21 and 26°C`, and `highs in the mid 90s` becomes
-`highs between 34 and 36°C`. Two decades joined as a range's figures are, by `to`, `and`,
-`or` or a dash, become one range, so `highs in the 70s or 80s` becomes
-`highs between 21 and 32°C`. A decade of the calendar, as in `Back in the 70s`, stays as it
+`highs between 34 and 36°C`. Decades joined as a range's figures are, by `to`, `and`,
+`or` or a dash, or as a list's figures are, by commas, become one range from the bottom of
+the first to the top of the last, so `highs in the 70s or 80s` becomes
+`highs between 21 and 32°C` and `highs in the 70s, 80s, and 90s` becomes
+`highs between 21 and 37°C`. Decades that do not rise, as in `the 80s or 70s`, stay as they
+are. An upper case `F` after a decade goes with it, so `highs in the 70s F` becomes
+`highs between 21 and 26°C`, but it is no unit on its own, and the decade still needs a word
+about heat nearby. A decade of the calendar, as in `Back in the 70s`, stays as it
 is, and so does a decade with a Celsius unit after it, in any of the forms above or as a
-bare upper case `C`: `temperatures in the 30s Celsius` and `highs in the 20s °C`.
+bare upper case `C`, alone or in brackets: `temperatures in the 30s Celsius`,
+`highs in the 20s °C` and `highs in the 30s (C)`. So does a decade in a sentence that names
+Celsius in any of those forms but a bare `C`, and names no Fahrenheit, as
+`In Celsius, highs are in the 30s.` does.
 
 The target unit follows the magnitude, so `2 feet` gives centimetres and `0.5 miles` gives
-metres. Precision defaults to `natural`, which matches the significant figures of the
+metres. A zero has no magnitude, so it takes the metric unit nearest in size to its own:
+`0 miles` gives `0 kilometres`, `0 feet` gives `0 metres` and `0 ounces` gives `0 grams`.
+Precision defaults to `natural`, which matches the significant figures of the
 source and never claims more accuracy than was written down. Inches of mercury are the
 exception: an altimeter setting is read in whole hectopascals, so `30 inHg` becomes
 `1016 hPa` and each end of a range is whole too, while a value under one hectopascal keeps
@@ -736,7 +795,10 @@ it, across at most a pronoun or a hedge: `It cost him nearly 500 pounds`. So do
 `sterling`, a rate (`30,000 pounds a year`), pence (`5 pounds 50`) and a thing priced in
 pounds (`a 10-pound note`). Pence may come before the preposition `in`, as in
 `5 pounds 50 in total`, but `12 in.` and `12in` are inches and never pence, so
-`The box is 5 pounds 12 in. wide.` becomes `The box is 2.3 kilograms 30 cm wide.` A money
+`The box is 5 pounds 12 in. wide.` becomes `The box is 2.3 kilograms 30 cm wide.` Nor is a
+figure pence where a unit rule reads a measurement starting at it, so
+`It is 5 pounds 16 to 20 feet.` becomes `It is 2.3 kilograms 4.9 to 6.1 metres.` and
+`The box is 5 pounds 12 in x 3 in wide.` becomes `The box is 2.3 kilograms 30 x 7.6 cm wide.` A money
 word reaches only its own amount, so `It cost $20 for 5 pounds of beef` still converts.
 A `£` reaches the whole sentence, but a
 weight word in the measurement's own phrase (`lost`, `weighs`, `of beef`, `a 5-pound bag`)
@@ -828,6 +890,16 @@ capital after an initialism is more often the rest of a name, so `the U.S. Army`
 `the US Army`: only a word that opens sentences and never names anything, such as `It`,
 `The`, `In` or `However`, counts as a new sentence.
 
+Every initialism shares one ending. It loses its stops before a space, the end of the
+text, a stop, comma, colon, semicolon, question or exclamation mark, a closing quote or
+bracket, a plural `s`, or a hyphen, dash, slash or ampersand before a word or figure, any
+of them after closing emphasis. So `U.S.-made cars` becomes `US-made cars`,
+`the U.S./Canada border` becomes `the US/Canada border` and `He has two Ph.D.s.` becomes
+`He has two PhDs.` A capital and a stop after it start a longer initialism, which is left
+whole, so `U.K.I.P.`, `P.M.O.` and `17 U.S.C. 105` stay as written. A stop that ends the
+sentence is judged past closing emphasis and stays inside it, so
+`She moved to **the U.S.** It was cold.` becomes `She moved to **the US.** It was cold.`
+
 `P.M.` and `A.M.` take the lower case only after a time, so `3 P.M.` becomes `3 pm` even
 with times switched off. Without a time they stand for something else, such as a prime
 minister or AM radio, so `The P.M. said no.` becomes `The PM said no.`
@@ -862,6 +934,19 @@ or between two capitalised words, as in a title or text in capitals. Anywhere el
 a label, so `a Grade A eggplant` becomes `a Grade A aubergine` in `en-GB` and
 `Hall A 60 foot ceiling` becomes `Hall A 18 metre ceiling`. A label is a single letter,
 so `An` and `AN` are always the article, as a lower case `a` or `an` is.
+
+A capital `A` that is the article takes the case of the words it qualifies. A number and
+its unit symbol, and the single letters of an initialism, say nothing of the case, so the
+words after them decide: `A 47°F morning` becomes `An 8.3°C morning` and
+`A 47°F MORNING` becomes `AN 8.3°C MORNING`. An initialism often follows a measurement, so
+a word in capitals there counts only when the next word is in capitals too or there is
+none, and `A 47°F NYC morning` becomes `An 8.3°C NYC morning`.
+
+An initialism whose stops are removed is said by its letter names, so `a U.S. firm` becomes
+`a US firm` and keeps its `a`. One that starts with A, E, F, H, I, L, M, N, O, R, S or X
+takes `an`, as `an MP` does, unless it is said as a word, as `NASA` and `NATO` are. A word in
+capitals swapped for another is read as a word, so `Take an ELEVATOR now.` becomes
+`Take a LIFT now.` in `en-GB`.
 
 ## Deciding whether the text is American
 
@@ -1525,6 +1610,13 @@ options it had and goes on following the page under them.
   diameter` becomes `a 5.1 centimetres inside diameter`, and `round` describes a noun, so
   `a quarter mile round the bend` becomes `a 400 metre round the bend`. `a 2 pound cake` is
   left as written, because it may be a pound cake.
+- A word ending in `s` after a drink is read by where the quantity stands, not by what the
+  word means. Where the quantity is a subject, a plural food before an adjective or a comma
+  reads as the drink's verb, so `Once 8 oz rum raisins soften, add them.` converts as fluid
+  ounces. Elsewhere a word before a determiner reads as a verb, so
+  `Soak 8 oz rum raisins the night before.` converts as fluid ounces too. A list of ingredients
+  whose next line opens in lower case reads as one wrapped sentence, so `8 oz rum raisins`
+  before a line that opens `flour` converts as fluid ounces.
 - Four figures after a preposition that takes a year are read by where the preposition
   stands. In the middle of a sentence they are converted before a unit word even where they
   are a year, so `Traffic grew in 2024 miles of road.` becomes

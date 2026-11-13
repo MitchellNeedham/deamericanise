@@ -1,4 +1,4 @@
-import { CLOSING } from '../rules/sentence.js';
+import { CLOSING, IN_SENTENCE } from '../rules/sentence.js';
 import type { Category, Change } from '../types.js';
 import type { Range } from './apply.js';
 
@@ -44,14 +44,42 @@ function numberNeedsAn(text: string, category: Category): boolean | undefined {
 }
 
 /**
- * Whether a replacement takes `an`, or undefined when that cannot be told. A currency
- * sign is said after its amount, so `US$8` is read from the `8`.
+ * Letters whose names start with a vowel sound: ay, ee, ef, aitch, eye, el, em, en, oh, ar, es
+ * and ex.
  */
-function needsAn(word: string, category: Category): boolean | undefined {
+const VOWEL_NAME = /^[AEFHILMNORSX]/;
+
+/**
+ * Initialisms said as a word, where the first letter's name starts with a vowel sound and the
+ * word does not, so they take `a`.
+ */
+const SAID_AS_WORDS = new Set(['NASA', 'NATO', 'NAFTA', 'NASDAQ', 'NOAA', 'FEMA', 'FIFA', 'SWAT']);
+
+/**
+ * The letters of an initialism whose stops a change removes, as `US` for `U.S.`, or undefined
+ * when the change is not one. A word in capitals swapped for another, as `LIFT` for
+ * `ELEVATOR`, is a word set in capitals rather than an initialism.
+ */
+function initialism(change: Change): string | undefined {
+  const letters = change.after.replace(/\.$/, '');
+  if (!/^\p{Lu}{2,}$/u.test(letters) || change.before === letters) return undefined;
+  return change.before.replace(/[.\s]/g, '') === letters ? letters : undefined;
+}
+
+/**
+ * Whether a replacement takes `an`, or undefined when that cannot be told. A currency
+ * sign is said after its amount, so `US$8` is read from the `8`. An initialism is said by its
+ * letter names, so `US` takes `a` and `MP` takes `an`.
+ */
+function needsAn(change: Change): boolean | undefined {
+  const letters = initialism(change);
+  if (letters !== undefined && !SAID_AS_WORDS.has(letters)) return VOWEL_NAME.test(letters);
+
+  const word = change.after;
   const spoken = word.replace(CURRENCY, '');
   // Said minus or plus.
   if (/^[-−+]/.test(spoken)) return false;
-  if (/^\.?\d/.test(spoken)) return numberNeedsAn(spoken, category);
+  if (/^\.?\d/.test(spoken)) return numberNeedsAn(spoken, change.category);
   if (!/^[A-Za-z]/.test(spoken)) return undefined;
 
   const stem = word.toLowerCase().replace(/^[^a-z]+/, '');
@@ -60,12 +88,10 @@ function needsAn(word: string, category: Category): boolean | undefined {
   return /^[aeiou]/.test(stem);
 }
 
-function matchCase(source: string, replacement: string, beside: string): string {
+function matchCase(source: string, replacement: string, besideCapitals: boolean): string {
   // A lone `A` is a capital or part of text in capitals, and only the text it qualifies tells.
   const capitals =
-    source.length > 1
-      ? source === source.toUpperCase()
-      : source === 'A' && /\p{L}/u.test(beside) && beside === beside.toUpperCase();
+    source.length > 1 ? source === source.toUpperCase() : source === 'A' && besideCapitals;
   if (capitals) return replacement.toUpperCase();
   if (source[0] === source[0]?.toUpperCase()) {
     return replacement[0]!.toUpperCase() + replacement.slice(1);
@@ -112,6 +138,35 @@ function capitalIsArticle(text: string, start: number, word: number): boolean {
   return last !== undefined && next !== undefined && /^\p{Lu}/u.test(last) && /^\p{Lu}/u.test(next);
 }
 
+/** A word of two or more letters. */
+const WORD = /\p{L}{2,}/u;
+
+/** The next two words of two or more letters in what is left of the sentence. */
+const WORDS_AHEAD = new RegExp(
+  String.raw`^${IN_SENTENCE}*?(\p{L}{2,})(?:${IN_SENTENCE}*?(\p{L}{2,}))?`,
+  'u',
+);
+
+/** Text that opens with a number, after any sign or currency symbol, as a measurement does. */
+const NUMBER_FIRST = /^[^\p{L}\s]*\d/u;
+
+const CAPITALS = /^\p{Lu}+$/u;
+
+/**
+ * Whether the text a lone capital `A` qualifies, starting with `change`, is in capitals. The
+ * replaced word tells, unless it is a number and its unit symbol or a run of single letters, as
+ * `A.M.` is, which say nothing of the case. Then the words after it tell, so `A 47°F morning`
+ * is read from `morning`. An initialism often follows a measurement, as in `A 3-ton AC unit`,
+ * so a word in capitals there counts only when the next word is in capitals too or there is none.
+ */
+function inCapitals(text: string, change: Change): boolean {
+  const source = change.before;
+  if (!NUMBER_FIRST.test(source) && WORD.test(source)) return source === source.toUpperCase();
+
+  const [, first, second] = WORDS_AHEAD.exec(text.slice(change.end, change.end + CONTEXT)) ?? [];
+  return first !== undefined && CAPITALS.test(first) && (second === undefined || CAPITALS.test(second));
+}
+
 /** Every article fix carries these. */
 export const ARTICLE_AGREEMENT = {
   ruleId: 'grammar.article-agreement',
@@ -132,7 +187,7 @@ export function articleAgreements(text: string, changes: Change[]): Change[] {
     const match = before.match(ARTICLE);
     if (!match) continue;
 
-    const an = needsAn(change.after, change.category);
+    const an = needsAn(change);
     if (an === undefined) continue;
     const wanted = an ? 'an' : 'a';
     if (wanted === match[1]!.toLowerCase()) continue;
@@ -147,7 +202,7 @@ export function articleAgreements(text: string, changes: Change[]): Change[] {
       start,
       end,
       before: match[1]!,
-      after: matchCase(match[1]!, wanted, change.before),
+      after: matchCase(match[1]!, wanted, inCapitals(text, change)),
       ...ARTICLE_AGREEMENT,
       priority: 50,
       note: `the replacement starts with a ${wanted === 'an' ? 'vowel' : 'consonant'} sound`,

@@ -84,49 +84,49 @@
 ::highlight(deamericanise-suggest-spelling-safe),
 ::highlight(deamericanise-suggest-spelling-moderate),
 ::highlight(deamericanise-suggest-spelling-risky) {
-  text-decoration: underline solid rgb(47 128 237);
+  text-decoration: underline solid 2px rgb(47 128 237);
 }
 
 ::highlight(deamericanise-suggest-vocabulary-safe),
 ::highlight(deamericanise-suggest-vocabulary-moderate),
 ::highlight(deamericanise-suggest-vocabulary-risky) {
-  text-decoration: underline solid rgb(155 89 214);
+  text-decoration: underline solid 2px rgb(155 89 214);
 }
 
 ::highlight(deamericanise-suggest-units-safe),
 ::highlight(deamericanise-suggest-units-moderate),
 ::highlight(deamericanise-suggest-units-risky) {
-  text-decoration: underline solid rgb(20 160 150);
+  text-decoration: underline solid 2px rgb(20 160 150);
 }
 
 ::highlight(deamericanise-suggest-dates-safe),
 ::highlight(deamericanise-suggest-dates-moderate),
 ::highlight(deamericanise-suggest-dates-risky) {
-  text-decoration: underline solid rgb(214 150 20);
+  text-decoration: underline solid 2px rgb(214 150 20);
 }
 
 ::highlight(deamericanise-suggest-times-safe),
 ::highlight(deamericanise-suggest-times-moderate),
 ::highlight(deamericanise-suggest-times-risky) {
-  text-decoration: underline solid rgb(230 110 30);
+  text-decoration: underline solid 2px rgb(230 110 30);
 }
 
 ::highlight(deamericanise-suggest-currency-safe),
 ::highlight(deamericanise-suggest-currency-moderate),
 ::highlight(deamericanise-suggest-currency-risky) {
-  text-decoration: underline solid rgb(120 160 20);
+  text-decoration: underline solid 2px rgb(120 160 20);
 }
 
 ::highlight(deamericanise-suggest-punctuation-safe),
 ::highlight(deamericanise-suggest-punctuation-moderate),
 ::highlight(deamericanise-suggest-punctuation-risky) {
-  text-decoration: underline solid rgb(220 70 130);
+  text-decoration: underline solid 2px rgb(220 70 130);
 }
 
 ::highlight(deamericanise-suggest-misc-safe),
 ::highlight(deamericanise-suggest-misc-moderate),
 ::highlight(deamericanise-suggest-misc-risky) {
-  text-decoration: underline solid rgb(120 135 155);
+  text-decoration: underline solid 2px rgb(120 135 155);
 }
 
 ::highlight(deamericanise-suggest-spelling-moderate),

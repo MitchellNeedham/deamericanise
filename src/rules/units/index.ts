@@ -1544,21 +1544,85 @@ const OPENS_OBJECT = [
  */
 const ADVERBS = ['first', 'also', 'instead', 'together', 'overnight', 'aside', 'well'];
 
-/**
- * A word that ends a noun phrase before it: a function word, an adverb, or a word in `s` before
- * the object it takes, which is a verb, as `keeps` is in `16 oz of water keeps you going`. A word
- * in `ly` is an adverb, as in `Add 8 oz of milk slowly`, but `jelly` is a food.
- */
-const ENDS_NOUN =
-  String.raw`(?:${FUNCTION_WORD}|(?:${ADVERBS.join('|')})${WORD_END}|` +
-  String.raw`(?!jelly${WORD_END})[A-Za-z]+ly${WORD_END}|` +
-  String.raw`${ENDS_IN_S}[\w-]+${WORD_GAP}(?:(?:${OPENS_OBJECT.join('|')})${WORD_END}|\d))`;
+/** An adverb. A word in `ly` is one, as in `Add 8 oz of milk slowly`, but `jelly` is a food. */
+const ADVERB = String.raw`(?:${ADVERBS.join('|')}|(?!jelly${WORD_END})[A-Za-z]+ly)${WORD_END}`;
 
 /**
- * Where a noun phrase ends: at anything but a word that may be a noun after it, as `raisins` is
- * in `rum raisins`, where `rum` only describes it.
+ * A word that ends a noun phrase before it: a function word, an adverb, or a word in `s` before
+ * the object it takes, which is a verb, as `keeps` is in `16 oz of water keeps you going`.
  */
-const PHRASE_END = String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN})[A-Za-z])`;
+const ENDS_NOUN =
+  String.raw`(?:${FUNCTION_WORD}|${ADVERB}|` +
+  String.raw`${ENDS_IN_S}[\w-]+${WORD_GAP}(?:(?:${OPENS_OBJECT.join('|')})${WORD_END}|\d))`;
+
+/** Auxiliary verbs, which may follow a plural noun as its verb, as in `8 oz rum truffles are enough`. */
+const AUXILIARIES = [
+  'is', 'are', 'was', 'were', 'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
+  'could', 'can', 'may', 'might', 'must',
+];
+
+/** Conjunctions that join words alike, and so may follow an adjective, as in `tastes flat and warm`. */
+const COORDINATORS = ['and', 'or', 'but', 'nor', 'yet', 'so', 'than'];
+
+/** A function word that may follow a verb, as `in` does in `go in first`. */
+const AFTER_A_VERB =
+  String.raw`(?:${NOT_A_NOUN.filter((word) => !COORDINATORS.includes(word)).join('|')})${WORD_END}`;
+
+/**
+ * A word in `s` that is the verb of the clause the quantity before it is the subject of, as
+ * `boils` is in `until 8 oz of milk boils`. It is a plural noun, and the subject's head, where an
+ * auxiliary follows it, or a word that a function word, an adverb or a number follows in turn,
+ * which is then the verb, as `go` is in `8 oz rum raisins go in first`.
+ */
+const SUBJECT_VERB =
+  String.raw`${ENDS_IN_S}[\w-]+${WORD_END}(?!${WORD_GAP}(?:(?:${AUXILIARIES.join('|')})${WORD_END}|` +
+  String.raw`(?!${FUNCTION_WORD}|${ADVERB})[A-Za-z][\w-]*${WORD_GAP}(?:${AFTER_A_VERB}|${ADVERB}|\d)))`;
+
+/**
+ * Where the quantity stands in its clause, which tells a verb from a noun after a drink: the
+ * subject of a clause a conjunction opens, which has a verb, the opening of a sentence, which may
+ * have none, or elsewhere, where it is read as an object.
+ */
+type Place = 'subject' | 'opening' | 'object';
+
+/**
+ * Where a noun phrase ends, in each place: at anything but a word that may be a noun after it, as
+ * `raisins` is in `rum raisins`, where `rum` only describes it. A sentence that a quantity opens
+ * may be a list item with no verb, as `8 oz rum raisins, chopped` is, so there a word in `s`
+ * before a comma, a colon or the end of its line is a noun.
+ */
+const PHRASE_ENDS: Record<Place, string> = {
+  subject: String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN}|${SUBJECT_VERB})[A-Za-z])`,
+  opening:
+    String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN}|${SUBJECT_VERB}(?![^\S\n\r]*(?:[,;:\n\r]|$)))[A-Za-z])`,
+  object: String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN})[A-Za-z])`,
+};
+
+/**
+ * A conjunction that opens a clause, whose subject follows it. `until`, `before` and `after` are
+ * prepositions too, but rarely before a quantity of food with no verb after it.
+ */
+const CONJUNCTION_BEFORE = new RegExp(
+  String.raw`(?<![\w-])(?:once|when|whenever|as|while|if|unless|because|until|till|before|after)` +
+    String.raw`${WORD_GAP}$`,
+  'i',
+);
+
+/** An adverb that may open a sentence before its subject, as in `Then 16 oz of water goes in`. */
+const OPENING_ADVERB_BEFORE = new RegExp(
+  String.raw`(?<![\w-])(?:then|next|now|finally),?${WORD_GAP}$`,
+  'i',
+);
+
+/** Where the quantity whose number starts at `start` stands, past a determiner before it. */
+function placeOf(text: string, start: number): Place {
+  const determiner = DETERMINER_BEFORE.exec(text.slice(Math.max(0, start - CONTEXT_WINDOW), start));
+  const at = start - (determiner?.[0].length ?? 0);
+  const before = text.slice(Math.max(0, at - CONTEXT_WINDOW), at);
+  if (CONJUNCTION_BEFORE.test(before)) return 'subject';
+  OPENS_SENTENCE.lastIndex = at - (OPENING_ADVERB_BEFORE.exec(before)?.[0].length ?? 0);
+  return OPENS_SENTENCE.test(text) ? 'opening' : 'object';
+}
 
 /**
  * From a unit to the word after it, past the bracket the quantity may close, as in
@@ -1582,8 +1646,8 @@ const namePattern = (names: string[]) =>
 interface SenseReader {
   measure: Measure | undefined;
   note: string | undefined;
-  /** Sticky, to test where the unit ends. */
-  after: RegExp;
+  /** Sticky, to test where the unit ends, for the quantity in each place. */
+  after: Record<Place, RegExp>;
   /** Tested on the text before the number. */
   before: RegExp | undefined;
   /** Tested on the quantity's sentence. */
@@ -1601,18 +1665,24 @@ function senseReader(sense: Sense): SenseReader {
   const holders = sense.things.filter((thing) => heads.includes(thing));
   const describers = sense.things.filter((thing) => !heads.includes(thing));
   const described = sense.asHead && head ? `(?:${head}${WORD_END})?` : '';
-  const ends = sense.asHead ? PHRASE_END : '';
-  const thing = [
-    ...(describers.length > 0 ? [`(?:${namePattern(describers)})${WORD_END}${described}${ends}`] : []),
-    ...(holders.length > 0 ? [`(?:${namePattern(holders)})${WORD_END}(?!${head}${WORD_END})${ends}`] : []),
-  ].join('|');
+  const thing = (ends: string) =>
+    [
+      ...(describers.length > 0 ? [`(?:${namePattern(describers)})${WORD_END}${described}${ends}`] : []),
+      ...(holders.length > 0 ? [`(?:${namePattern(holders)})${WORD_END}(?!${head}${WORD_END})${ends}`] : []),
+    ].join('|');
   const vessel = sense.vessels
     ? String.raw`(?:(?:${namePattern(sense.vessels)})${WORD_GAP}of${WORD_GAP}${ARTICLE}${words})?`
     : '';
-  const after = new RegExp(
-    String.raw`${LEAD}(?:of${WORD_GAP}${ARTICLE})?${words}${vessel}${except}(?:${thing})`,
-    'iy',
-  );
+  const pattern = (ends: string) =>
+    new RegExp(String.raw`${LEAD}(?:of${WORD_GAP}${ARTICLE})?${words}${vessel}${except}(?:${thing(ends)})`, 'iy');
+  const anywhere = pattern('');
+  const after = sense.asHead
+    ? {
+        subject: pattern(PHRASE_ENDS.subject),
+        opening: pattern(PHRASE_ENDS.opening),
+        object: pattern(PHRASE_ENDS.object),
+      }
+    : { subject: anywhere, opening: anywhere, object: anywhere };
   const before =
     sense.before &&
     new RegExp(
@@ -1655,9 +1725,11 @@ function senseAt(
   }
   // A stop that also ends the sentence leaves nothing after the quantity to read.
   if (!keepsStop(plain, start, plain.slice(start, end))) {
+    const place = placeOf(plain, start);
     for (const reader of readers) {
-      reader.after.lastIndex = end;
-      if (reader.after.test(plain)) return reader;
+      const after = reader.after[place];
+      after.lastIndex = end;
+      if (after.test(plain)) return reader;
     }
     OF_A_THING.lastIndex = end;
     NOUN_AFTER.lastIndex = end;

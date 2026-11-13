@@ -4268,6 +4268,35 @@ describe('an ounce is a fluid ounce only where a liquid heads the phrase after i
   });
 
   it.each`
+    input                                                      | expected
+    ${'Stir until 8 oz of cream thickens.'}                    | ${'Stir until 240 mL of cream thickens.'}
+    ${'Simmer until 16 oz of stock reduces by half.'}          | ${'Simmer until 470 mL of stock reduces by half.'}
+    ${'Simmer until 16 oz of stock reduces, about 10 minutes.'} | ${'Simmer until 470 mL of stock reduces, about 10 minutes.'}
+    ${'Once 8 oz of milk boils, add the oats.'}                | ${'Once 240 mL of milk boils, add the oats.'}
+    ${'Heat until 8 oz of milk boils.'}                        | ${'Heat until 240 mL of milk boils.'}
+    ${'16 oz of water goes into the pot.'}                     | ${'470 mL of water goes into the pot.'}
+    ${'8 oz water helps.'}                                     | ${'240 mL water helps.'}
+    ${'The 12 oz beer tastes flat.'}                           | ${'The 350 mL beer tastes flat.'}
+    ${'The 12 oz beer tastes flat and warm.'}                  | ${'The 350 mL beer tastes flat and warm.'}
+    ${'Then 16 oz of water goes in.'}                          | ${'Then 470 mL of water goes in.'}
+    ${'8 oz of milk makes a cup.'}                             | ${'240 mL of milk makes a cup.'}
+    ${'Pour 8 oz of milk into the bowl.'}                      | ${'Pour 240 mL of milk into the bowl.'}
+  `('reads a drink before its own verb as fluid ounces: $input', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                  | expected                               | why
+    ${'8 oz rum raisins go in first.'}     | ${'230 g rum raisins go in first.'}    | ${'the verb after the plural food'}
+    ${'8 oz rum truffles are enough.'}     | ${'230 g rum truffles are enough.'}    | ${'an auxiliary after the plural food'}
+    ${'8 oz rum raisins, chopped'}         | ${'230 g rum raisins, chopped'}        | ${'a sentence with no verb'}
+    ${'After 8 oz wine gums, stop.'}       | ${'After 230 g wine gums, stop.'}      | ${'a food named for a drink'}
+    ${'Add 8 oz beer batter.'}             | ${'Add 230 g beer batter.'}            | ${'a food headed by a noun'}
+  `('weighs a food a drink names, wherever the quantity stands: $input ($why)', ({ input, expected }) => {
+    expect(convert(input)).toBe(expected);
+  });
+
+  it.each`
     input                          | expected
     ${'Add 4 oz stock cubes.'}     | ${'Add 110 g stock cubes.'}
     ${'Add 8 oz rum cake.'}        | ${'Add 230 g rum cake.'}

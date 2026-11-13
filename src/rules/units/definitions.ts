@@ -90,7 +90,7 @@ export interface Sense {
   /** Nouns read through to what they hold, as the `can` of `a 12 oz can of soda`. */
   vessels?: string[];
   /**
-   * Names that hold one of `things` and are another thing, as `sour cream` and `baking soda`
+   * Names that hold one of `things` and are another thing, as `sour cream` and `cream cheese`
    * are solids.
    */
   except?: string[];
@@ -314,11 +314,14 @@ const DRINKWARE = ['glass', 'mug', 'tumbler', 'pint', 'shot'];
 /** Vessels that hold food as often, which is weighed, as `a 15 oz can of beans` is. */
 const VESSELS = ['can', 'bottle', 'cup', 'carton', 'jug', 'jar', 'keg', 'pitcher', 'flask', 'carafe'];
 
-/** Solids whose head is a liquid, as `ice cream` and `cream of tartar` are. */
+/** Solids named for a liquid. */
 const NOT_LIQUIDS = withPlurals([
-  'sour cream', 'ice cream', 'whipped cream', 'clotted cream', 'cream of tartar', 'powdered milk',
-  'dried milk', 'dry milk', 'condensed milk', 'baking soda', 'caustic soda', 'washing soda',
-  'ground coffee', 'instant coffee', 'bean coffee',
+  'sour cream', 'ice cream', 'whipped cream', 'clotted cream', 'cream cheese', 'cream puff',
+  'cream cracker', 'milk chocolate', 'milk powder', 'powdered milk', 'dried milk', 'dry milk',
+  'condensed milk', 'baking soda', 'caustic soda', 'washing soda', 'soda cracker', 'soda bread',
+  'ground coffee', 'instant coffee', 'bean coffee', 'coffee bean', 'coffee ground', 'coffee cake',
+  'water chestnut', 'water cracker', 'beer bread', 'rum cake', 'rum ball', 'wine gum', 'stock cube',
+  'oil paint', 'cream of tartar',
 ]);
 
 const FLUID_OUNCES: Sense = {

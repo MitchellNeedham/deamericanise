@@ -830,13 +830,13 @@ capital after an initialism is more often the rest of a name, so `the U.S. Army`
 
 Every initialism shares one ending. It loses its stops before a space, the end of the
 text, a stop, comma, colon, semicolon, question or exclamation mark, a closing quote or
-bracket, a plural `s`, or a hyphen, dash or slash before a word, any of them after closing
-emphasis. So `U.S.-made cars` becomes `US-made cars`, `the U.S./Canada border` becomes
-`the US/Canada border` and `He has two Ph.D.s.` becomes `He has two PhDs.` A capital and a
-stop after it start a longer initialism, which is left whole, so `U.K.I.P.`, `P.M.O.` and
-`17 U.S.C. 105` stay as written. A stop that ends the sentence is judged past closing
-emphasis and stays inside it, so `She moved to **the U.S.** It was cold.` becomes
-`She moved to **the US.** It was cold.`
+bracket, a plural `s`, or a hyphen, dash, slash or ampersand before a word or figure, any
+of them after closing emphasis. So `U.S.-made cars` becomes `US-made cars`,
+`the U.S./Canada border` becomes `the US/Canada border` and `He has two Ph.D.s.` becomes
+`He has two PhDs.` A capital and a stop after it start a longer initialism, which is left
+whole, so `U.K.I.P.`, `P.M.O.` and `17 U.S.C. 105` stay as written. A stop that ends the
+sentence is judged past closing emphasis and stays inside it, so
+`She moved to **the U.S.** It was cold.` becomes `She moved to **the US.** It was cold.`
 
 `P.M.` and `A.M.` take the lower case only after a time, so `3 P.M.` becomes `3 pm` even
 with times switched off. Without a time they stand for something else, such as a prime

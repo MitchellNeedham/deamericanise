@@ -337,15 +337,18 @@ describe('punctuation', () => {
   it.each`
     input                                  | expected
     ${'U.S.-made cars'}                    | ${'US-made cars'}
-    ${'U.S.‐made cars'}               | ${'US‐made cars'}
-    ${'U.S.‑made cars'}               | ${'US‑made cars'}
-    ${'the U.S.–Canada border'}            | ${'the US–Canada border'}
-    ${'the U.S.—and then Canada'}          | ${'the US—and then Canada'}
+    ${'U.S.\u2010made cars'}               | ${'US\u2010made cars'}
+    ${'U.S.\u2011made cars'}               | ${'US\u2011made cars'}
+    ${'the U.S.\u2013Canada border'}       | ${'the US\u2013Canada border'}
+    ${'the U.S.\u2014and then Canada'}     | ${'the US\u2014and then Canada'}
     ${'the U.S./Canada border'}            | ${'the US/Canada border'}
     ${'the U.K.-based staff'}              | ${'the UK-based staff'}
+    ${'the U.K.&Ireland team'}             | ${'the UK&Ireland team'}
     ${'the U.S.A.-made cars'}              | ${'the USA-made cars'}
     ${'the Ph.D.-level course'}            | ${'the PhD-level course'}
-  `('drops the stops before a hyphen, dash or slash and a word: $input', ({ input, expected }) => {
+    ${'Open 9 A.M.\u20135 P.M. daily.'}    | ${'Open 9 am\u20135 pm daily.'}
+    ${'Open 9 A.M.-5 P.M. daily.'}         | ${'Open 9 am-5 pm daily.'}
+  `('drops the stops before a hyphen, dash, slash or ampersand: $input', ({ input, expected }) => {
     expect(punctuation(input)).toBe(expected);
   });
 

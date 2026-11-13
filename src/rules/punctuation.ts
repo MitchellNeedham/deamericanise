@@ -55,14 +55,14 @@ function meridiem(text: string, start: number): string {
 
 /**
  * What may follow a whole initialism: a space or the end; a stop, comma, colon or other
- * sentence punctuation; a closing quote or bracket; a plural `s`; or a hyphen, dash or slash
- * before a word, as in `U.S.-made`. Any of these may come after closing emphasis, which the
- * `emphasis` group holds. Nothing else is accepted, so the start of a longer initialism, as
- * `U.K.` is of `U.K.I.P.`, is left whole.
+ * sentence punctuation; a closing quote or bracket; a plural `s`; or a hyphen, dash, slash or
+ * ampersand before a word or figure, as in `U.S.-made` and `9 A.M.-5 P.M.`. Any of these may
+ * come after closing emphasis, which the `emphasis` group holds. Nothing else is accepted, so
+ * the start of a longer initialism, as `U.K.` is of `U.K.I.P.`, is left whole.
  */
 const INITIALISM_END =
-  String.raw`(?=(?<emphasis>[*_~]*)` +
-  String.raw`(?:\s|$|[,;:.!?…]|${CLOSING}|s(?![\p{L}\p{N}])|[-‐‑–—/]\p{L}))`;
+  String.raw`(?=(?<emphasis>[*_~]*)(?:\s|$|[,;:.!?…]|${CLOSING}|s(?![\p{L}\p{N}])` +
+  String.raw`|[-\u2010\u2011\u2013\u2014/&][\p{L}\p{N}]))`;
 
 /** An initialism's pattern, `body`, followed by the shared ending. */
 function initialism(body: string): RegExp {

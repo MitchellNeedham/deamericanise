@@ -1511,7 +1511,9 @@ options it had and goes on following the page under them.
   word means. Where the quantity is a subject, a plural food before an adjective or a comma
   reads as the drink's verb, so `Once 8 oz rum raisins soften, add them.` converts as fluid
   ounces. Elsewhere a word before a determiner reads as a verb, so
-  `Soak 8 oz rum raisins the night before.` converts as fluid ounces too.
+  `Soak 8 oz rum raisins the night before.` converts as fluid ounces too. A list of ingredients
+  whose next line opens in lower case reads as one wrapped sentence, so `8 oz rum raisins`
+  before a line that opens `flour` converts as fluid ounces.
 - Four figures after a preposition that takes a year are read by where the preposition
   stands. In the middle of a sentence they are converted before a unit word even where they
   are a year, so `Traffic grew in 2024 miles of road.` becomes

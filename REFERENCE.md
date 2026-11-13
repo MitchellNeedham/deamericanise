@@ -759,7 +759,10 @@ markup (emphasis, a code backtick or an inline HTML tag), so `It weighs **5 lb.*
 becomes `It weighs **2.3 kg.** Then stir.` A stop before an aside in brackets is decided by
 what follows the bracket's close, so `It is 6 ft. (see the plan) It is new.` becomes
 `It is 1.8 m. (see the plan) It is new.`, while `It is 6 ft. (Roughly) and new.` becomes
-`It is 1.8 m (Roughly) and new.` A time's and an initialism's last stop read the same way.
+`It is 1.8 m (Roughly) and new.` Where the paragraph or list item ends at the bracket, the
+stop stays only if the aside opens a sentence of its own, so `- The fence is 6 ft. (approx.)`
+becomes `- The fence is 1.8 m (approx.)`. A time's and an initialism's last stop read the
+same way.
 The stop also stays as the first dot of an ellipsis, so
 `The board is 12 in...` becomes `The board is 30 cm...`, while `It is 12 in.... long`
 becomes `It is 30 cm... long`. Where a measurement collapses into its own metric value, the

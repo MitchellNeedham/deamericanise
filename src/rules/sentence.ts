@@ -40,20 +40,22 @@ const NEXT_WORD = new RegExp(
 /** Space in the same block, then the opening bracket of an aside, perhaps inside markup. */
 const ASIDE_OPENS = new RegExp(String.raw`(?![^\S\n]*${BREAK})\s+${MARKUP}\(`, 'y');
 
-/** How far an aside in brackets is read for its close, so a bracket left open costs little. */
+/** How far past a stop the asides after it are read, so a bracket left open costs little. */
 const ASIDE_REACH = 400;
+/** How deep brackets nest in an aside. A deeper one is no prose, and is not read further. */
+const ASIDE_DEPTH = 3;
 
 /**
  * The offset just past the bracket that closes the one opening at `open`, counting brackets
- * nested inside it, or -1 where it stays open to the end of the block or past `ASIDE_REACH`.
+ * nested inside it, or -1 where it stays open to the end of the block or to `limit`, or nests
+ * deeper than `ASIDE_DEPTH`.
  */
-function asideClose(text: string, open: number): number {
-  const limit = Math.min(text.length, open + ASIDE_REACH);
+function asideClose(text: string, open: number, limit: number): number {
   let depth = 0;
   for (let i = open; i < limit; i++) {
     const char = text[i]!;
     if (char === '(') {
-      depth++;
+      if (++depth > ASIDE_DEPTH) return -1;
     } else if (char === ')') {
       if (--depth === 0) return i + 1;
     } else if (char === '\n') {
@@ -66,13 +68,14 @@ function asideClose(text: string, open: number): number {
 
 /**
  * Where the text after the stop just before `end` goes on: past any closing quotes, brackets
- * and inline markup, and past any aside in brackets after them, which may trail the sentence
+ * and inline markup, and past any asides in brackets after them, which may trail the sentence
  * the stop ends, as in `It is 6 ft. (see the plan) It is new.` With `closers` false, a
- * closing quote or bracket is not passed. Nor is an aside that never closes, so its first
- * word is read as the next.
+ * closing quote or bracket is not passed. Nor is an aside that does not close within
+ * `ASIDE_REACH` of the stop, so its first word is read as the next.
  */
 export function pastStop(text: string, end: number, closers = true): number {
   const marks = closers ? CLOSERS : MARKS;
+  const limit = Math.min(text.length, end + ASIDE_REACH);
   let at = end;
   for (;;) {
     marks.lastIndex = at;
@@ -80,7 +83,7 @@ export function pastStop(text: string, end: number, closers = true): number {
     at = marks.lastIndex;
     ASIDE_OPENS.lastIndex = at;
     if (!ASIDE_OPENS.test(text)) return at;
-    const close = asideClose(text, ASIDE_OPENS.lastIndex - 1);
+    const close = asideClose(text, ASIDE_OPENS.lastIndex - 1, limit);
     if (close === -1) return at;
     at = close;
   }
@@ -90,7 +93,10 @@ export function pastStop(text: string, end: number, closers = true): number {
  * Whether the stop just before `end` is also the sentence's full stop. It is when nothing
  * else ends the sentence: past any closing quotes, brackets or inline markup, and any aside
  * in brackets (`pastStop`), a new sentence starts, or the text or block ends after words
- * that could make one.
+ * that could make one. Where the block ends straight after an aside, the aside tells
+ * instead: one that opens a sentence of its own follows a sentence that has ended, so
+ * `It starts at 3 p.m. (Bring snacks.)` keeps the stop and `Doors open at 7 p.m. (approx.)`
+ * does not.
  *
  * A new sentence starts with a capitalised word, or a date that starts with a figure, that
  * `opener`, a sticky (`y`) pattern, matches where it begins, past any opening quotes,
@@ -100,10 +106,16 @@ export function pastStop(text: string, end: number, closers = true): number {
  * an acronym, or text set in capitals throughout.
  */
 export function endsSentence(text: string, start: number, end: number, opener: RegExp): boolean {
-  const from = pastStop(text, end);
+  CLOSERS.lastIndex = end;
+  CLOSERS.test(text);
+  const closed = CLOSERS.lastIndex;
+  let from = pastStop(text, closed);
 
   BLOCK_END.lastIndex = from;
-  if (BLOCK_END.test(text)) return wordsBefore(text, start);
+  if (BLOCK_END.test(text)) {
+    if (from === closed) return wordsBefore(text, start);
+    from = closed;
+  }
 
   NEXT_WORD.lastIndex = from;
   if (!NEXT_WORD.test(text)) return false;

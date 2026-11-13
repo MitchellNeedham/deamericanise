@@ -951,18 +951,19 @@ swaps back a `dmy` date whose day is 12 or under; see Dates above.
 
 - **Proper nouns.** Pearl Harbor, the World Trade Center, the Department of Defense, the
   Australian Labor Party, rigor mortis, Fahrenheit 451, the MIT License, Prolog, and
-  trademarks such as Band-Aid and Realtor. A capitalised `Organization`, `Labor`, `Honor`,
-  `Theater`, `Center` or `Color` is part of a name, and is held with the words it is read
+  trademarks such as Band-Aid and Realtor. A `Center` with two or more capitalised words
+  straight before it is part of a name wherever it stands, as in `Storm Prediction Center`,
+  so `## Data Center Setup` is still rewritten. A capitalised `Organization`, `Labor`,
+  `Honor`, `Theater` or `Color` is part of a name, and is held with the words it is read
   from, on strong evidence: two capitalised words straight before it, as in
   `World Health Organization` (a capital that only starts a sentence does not count), or
   `of` or `for` joining it to another capitalised word, as in `Bureau of Labor Statistics`
   and `Medal of Honor`. A few names are listed, such as `Kodak Theater`,
   `Space Center Houston` and `Color Run`. In a heading (a Markdown heading, or a line in
-  title case with no figure in it), only a listed name is held, so `## Data Center Setup` and
-  `## Customizing Colors` are rewritten, and so are `Color Theory is fun` and
-  `See the Color Picker panel`. A word such as `The` or `Your` marks no name, so
-  `Your Honor` is rewritten, and so is `Legion of Honor`, which British and Australian
-  writing spell `Legion of Honour`.
+  title case with no figure in it), only a listed name is held, so `## Customizing Colors`
+  is rewritten, and so are `Color Theory is fun` and `See the Color Picker panel`. A word
+  such as `The` or `Your` marks no name, so `Your Honor` is rewritten, and so is
+  `Legion of Honor`, which British and Australian writing spell `Legion of Honour`.
 - **Structure.** URLs, email addresses, long command-line flags, inline code, fenced code
   blocks and HTML tags. A long flag is two hyphens and a letter at the start of a token, with
   any `=value` after it, so `--center`, `--color=gray` and `--label="dark gray"` are held in

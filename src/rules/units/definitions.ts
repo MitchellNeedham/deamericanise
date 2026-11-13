@@ -77,8 +77,8 @@ export interface Sense {
   /**
    * What the quantity measures or describes in this sense, in the phrase after the unit:
    * after an optional `of`, with at most two words between that are not function words, and
-   * whatever follows, as `milk` in `Add 8 oz of whole milk slowly` and `AC` in
-   * `a 3-ton central AC unit`.
+   * whatever follows unless `asHead` is set, as `milk` in `Add 8 oz of whole milk slowly` and
+   * `AC` in `a 3-ton central AC unit`.
    */
   things: string[];
   /**
@@ -90,10 +90,17 @@ export interface Sense {
   /** Nouns read through to what they hold, as the `can` of `a 12 oz can of soda`. */
   vessels?: string[];
   /**
-   * Names that hold one of `things` and are another thing, as `sour cream` and `cream cheese`
+   * Names that hold one of `things` and are another thing, as `sour cream` and `baking soda`
    * are solids.
    */
   except?: string[];
+  /**
+   * Whether one of `things` gives this sense only as the head of its phrase, its last noun, or
+   * before one of `heads`, so a function word, an adverb, a verb or a stop must follow. A drink
+   * before another noun names a food made with it, as in `8 oz rum raisins`, where a metal
+   * before one is what it is made of, as in `a 1 oz gold coin`.
+   */
+  asHead?: boolean;
   /**
    * Words before the number that say so, with at most one of `heads` and three function words
    * between, as in `AC units of 2 to 5 tons`.
@@ -307,14 +314,11 @@ const DRINKWARE = ['glass', 'mug', 'tumbler', 'pint', 'shot'];
 /** Vessels that hold food as often, which is weighed, as `a 15 oz can of beans` is. */
 const VESSELS = ['can', 'bottle', 'cup', 'carton', 'jug', 'jar', 'keg', 'pitcher', 'flask', 'carafe'];
 
-/** Solids named for a liquid. */
+/** Solids whose head is a liquid, as `ice cream` and `cream of tartar` are. */
 const NOT_LIQUIDS = withPlurals([
-  'sour cream', 'ice cream', 'whipped cream', 'clotted cream', 'cream cheese', 'cream puff',
-  'cream cracker', 'milk chocolate', 'milk powder', 'powdered milk', 'dried milk', 'dry milk',
-  'condensed milk', 'baking soda', 'caustic soda', 'washing soda', 'soda cracker', 'soda bread',
-  'ground coffee', 'instant coffee', 'bean coffee', 'coffee bean', 'coffee ground', 'coffee cake',
-  'water chestnut', 'water cracker', 'beer bread', 'rum cake', 'rum ball', 'wine gum', 'stock cube',
-  'oil paint',
+  'sour cream', 'ice cream', 'whipped cream', 'clotted cream', 'cream of tartar', 'powdered milk',
+  'dried milk', 'dry milk', 'condensed milk', 'baking soda', 'caustic soda', 'washing soda',
+  'ground coffee', 'instant coffee', 'bean coffee',
 ]);
 
 const FLUID_OUNCES: Sense = {
@@ -324,6 +328,7 @@ const FLUID_OUNCES: Sense = {
   heads: withPlurals([...DRINKWARE, ...VESSELS, 'box']),
   vessels: withPlurals(VESSELS),
   except: NOT_LIQUIDS,
+  asHead: true,
 };
 
 const TROY_OUNCES: Sense = {

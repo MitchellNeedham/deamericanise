@@ -1532,6 +1532,34 @@ const MODIFIER = String.raw`(?!${FUNCTION_WORD})[A-Za-z\d][\w%]*(?:-[\w%]+)*`;
 /** A word ending in a lone `s`, as a plural or a verb such as `needs` does, and `glass` does not. */
 const ENDS_IN_S = String.raw`(?=[\w%-]*[^\W\dsu]s${WORD_END})`;
 
+/** Determiners and object pronouns, the words of `NOT_A_NOUN` that open a preposition's object. */
+const OPENS_OBJECT = [
+  'a', 'an', 'the', 'this', 'that', 'these', 'those', 'his', 'her', 'its', 'their', 'my', 'our',
+  'your', 'some', 'any', 'no', 'all', 'both', 'every', 'me', 'him', 'it', 'us', 'them', 'you',
+];
+
+/**
+ * Adverbs that end in no `ly` and follow what a recipe adds, as `first` does in
+ * `Add 8 oz water first`.
+ */
+const ADVERBS = ['first', 'also', 'instead', 'together', 'overnight', 'aside', 'well'];
+
+/**
+ * A word that ends a noun phrase before it: a function word, an adverb, or a word in `s` before
+ * the object it takes, which is a verb, as `keeps` is in `16 oz of water keeps you going`. A word
+ * in `ly` is an adverb, as in `Add 8 oz of milk slowly`, but `jelly` is a food.
+ */
+const ENDS_NOUN =
+  String.raw`(?:${FUNCTION_WORD}|(?:${ADVERBS.join('|')})${WORD_END}|` +
+  String.raw`(?!jelly${WORD_END})[A-Za-z]+ly${WORD_END}|` +
+  String.raw`${ENDS_IN_S}[\w-]+${WORD_GAP}(?:(?:${OPENS_OBJECT.join('|')})${WORD_END}|\d))`;
+
+/**
+ * Where a noun phrase ends: at anything but a word that may be a noun after it, as `raisins` is
+ * in `rum raisins`, where `rum` only describes it.
+ */
+const PHRASE_END = String.raw`(?!${WORD_GAP}(?!${ENDS_NOUN})[A-Za-z])`;
+
 /**
  * From a unit to the word after it, past the bracket the quantity may close, as in
  * `1 cup (8 oz) milk`, and an aside in brackets, as in `8 oz (1 cup) milk`.
@@ -1572,9 +1600,11 @@ function senseReader(sense: Sense): SenseReader {
   const head = heads.length > 0 ? String.raw`${WORD_GAP}(?:${namePattern(heads)})` : '';
   const holders = sense.things.filter((thing) => heads.includes(thing));
   const describers = sense.things.filter((thing) => !heads.includes(thing));
+  const described = sense.asHead && head ? `(?:${head}${WORD_END})?` : '';
+  const ends = sense.asHead ? PHRASE_END : '';
   const thing = [
-    ...(describers.length > 0 ? [`(?:${namePattern(describers)})${WORD_END}`] : []),
-    ...(holders.length > 0 ? [`(?:${namePattern(holders)})${WORD_END}(?!${head}${WORD_END})`] : []),
+    ...(describers.length > 0 ? [`(?:${namePattern(describers)})${WORD_END}${described}${ends}`] : []),
+    ...(holders.length > 0 ? [`(?:${namePattern(holders)})${WORD_END}(?!${head}${WORD_END})${ends}`] : []),
   ].join('|');
   const vessel = sense.vessels
     ? String.raw`(?:(?:${namePattern(sense.vessels)})${WORD_GAP}of${WORD_GAP}${ARTICLE}${words})?`
@@ -2021,12 +2051,6 @@ function isSmallerPart(text: string, start: number): boolean {
   for (const position of walked) smallerAt.set(position, answer);
   return answer;
 }
-
-/** Determiners and object pronouns, the words of `NOT_A_NOUN` that open a preposition's object. */
-const OPENS_OBJECT = [
-  'a', 'an', 'the', 'this', 'that', 'these', 'those', 'his', 'her', 'its', 'their', 'my', 'our',
-  'your', 'some', 'any', 'no', 'all', 'both', 'every', 'me', 'him', 'it', 'us', 'them', 'you',
-];
 
 /**
  * A word or number straight after a preposition that opens its object, as `her socks`,

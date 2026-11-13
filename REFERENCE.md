@@ -593,11 +593,10 @@ number counts them, or before a number, where it is a title (`Fahrenheit 451`). 
 as in `165F` or `350 F`, is more often a letter, so it counts only as an upper case `F`
 after a number of two or three figures, or one grouped in thousands such as `2,000`, in a
 sentence about heat (an oven, cooking, the weather, a fever or a temperature) that gives no
-Celsius value. An American word the
-vocabulary rewrites into one of those, such as `cookie sheet`, `broiler` or `skillet`,
-counts too, whether or not the vocabulary runs. The whole sentence is read, up to 2,000
-characters either side of the `F`. It wraps across lines and ends
-at a blank line, a list item, a heading, or a stop before a capitalised word, but not at
+Celsius value. An American word the vocabulary rewrites into one of those, such as
+`cookie sheet`, `broiler` or `skillet`, counts too, whether or not the vocabulary runs. The
+whole sentence is read, up to 2,000 characters either side of the `F`. It wraps across lines
+and ends at a blank line, a list item, a heading, or a stop before a capitalised word, but not at
 the stops of `10 min. at` or `6 p.m. were`. As the abbreviation rules decide, a title such
 as `Mr.` never ends one before a name, and an initialism such as `U.S.` ends one only
 before a word that cannot continue a name. A number, in figures or in words, never opens

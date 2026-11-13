@@ -698,14 +698,21 @@ function describesNoun(
 
 /**
  * Whether a measurement in `measure` takes the metric symbol because its unit words, `alias`
- * ending at `end`, are joined by hyphens to describe the noun after them, and `measure` asks
- * for its symbol there, as the speed of `a 35-mile-per-hour wind` does.
+ * ending at `end`, are joined by hyphens to describe a noun, and `measure` asks for its symbol
+ * there, as the speed of `a 35-mile-per-hour wind` does. `attributive` is `describesNoun`'s
+ * answer, which also finds the noun past a comma, as in `a 35-mile-per-hour, gusty wind`.
  */
-function symbolBeforeNoun(text: string, measure: Measure, alias: string, end: number): boolean {
+function symbolBeforeNoun(
+  text: string,
+  measure: Measure,
+  alias: string,
+  end: number,
+  attributive: boolean,
+): boolean {
   return (
     measure.symbolBeforeNoun === true &&
     plainHyphens(alias).includes('-') &&
-    MODIFIES_A_NOUN.test(text.slice(end))
+    (attributive || MODIFIES_A_NOUN.test(text.slice(end)))
   );
 }
 
@@ -2712,7 +2719,8 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
       (entry.isSingular || entry.isOwnPlural) &&
       describesNoun(ctx.text, numberStart, value, gap, start + matched.length, entry.isOwnPlural);
     const unit =
-      entry.isWord && !symbolBeforeNoun(ctx.text, entry.measure, alias, start + matched.length)
+      entry.isWord &&
+      !symbolBeforeNoun(ctx.text, entry.measure, alias, start + matched.length, attributive)
         ? ` ${attributive ? target.singular : unitWord(target, Number(number.replace(/,/g, '')))}`
         : ` ${target.symbol}`;
     // `a quarter mile track` keeps its article for the track, while `a quarter mile away`
@@ -2859,7 +2867,7 @@ function measurementRules(skip: Set<string>, forced: Record<string, boolean>): R
           (entry.isSingular || entry.isOwnPlural) &&
           describesNoun(ctx.text, start, high, gap, end, entry.isOwnPlural);
         const unit =
-          entry.isWord && !symbolBeforeNoun(ctx.text, entry.measure, alias, end)
+          entry.isWord && !symbolBeforeNoun(ctx.text, entry.measure, alias, end, attributive)
             ? ` ${attributive ? target.singular : target.plural}`
             : ` ${target.symbol}`;
         const body = interleave(texts, joins.map(separator)) + unit;

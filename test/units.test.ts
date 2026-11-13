@@ -1410,6 +1410,8 @@ describe('a unit of more than one word written with hyphens', () => {
     ${'They forecast 35-miles-per-hour winds.'}     | ${'They forecast 56 km/h winds.'}              | ${'the same, plural'}
     ${'A 30- to 40-mile-per-hour wind.'}            | ${'A 48 to 64 km/h wind.'}                     | ${'a range of speeds'}
     ${'The wind reached 35-mile-per-hour.'}         | ${'The wind reached 56 kilometres per hour.'}  | ${'a speed before no noun'}
+    ${'A 35-mile-per-hour, gusty wind.'}            | ${'A 56 km/h, gusty wind.'}                    | ${'a speed before a comma and another modifier'}
+    ${'It was 35-mile-per-hour, gusty and cold.'}   | ${'It was 56 kilometres per hour, gusty and cold.'} | ${'a speed after a verb, before a comma'}
     ${'a 100-pound-per-square-inch tank'}           | ${'a 690 kilopascal tank'}                     | ${'a pressure'}
     ${'A 500-square-foot apartment.'}               | ${'A 46 square metre apartment.'}              | ${'an area'}
     ${'a 10-cubic-foot fridge'}                     | ${'a 280 litre fridge'}                        | ${'a volume'}

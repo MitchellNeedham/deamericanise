@@ -1,7 +1,7 @@
 import { buildGate, resolveOptions, type Gate } from '../../config.js';
 import type { Change, Confidence, Precision, ResolvedOptions, Rule, RuleContext } from '../../types.js';
 import { MONTH_PATTERN } from '../dates.js';
-import { CLOSING, LIST_MARKER, OPENING, endsSentence, stopStays } from '../sentence.js';
+import { CLOSING, LIST_MARKER, OPENING, endsSentence, sentenceBounds, stopStays } from '../sentence.js';
 import { CALENDAR_WORD } from '../times.js';
 import {
   COMPOUNDS,
@@ -13,11 +13,13 @@ import {
   type Sense,
 } from './definitions.js';
 import {
+  BARE,
   BARE_CELSIUS_FIGURE,
   DEGREES,
   DEGREE_GAP,
   FAHRENHEIT,
   GAS_MARK,
+  OPENER as SENTENCE_OPENER,
   fahrenheitTemperatures,
   sentenceAround,
 } from './fahrenheit.js';
@@ -3102,25 +3104,45 @@ function temperatureRules(): Rule[] {
  * temperature words nearby and refuses outright when the sentence is talking about time.
  */
 function temperatureDecadeRule(): Rule {
-  // A decade, optionally banded (`low`, `mid`, `upper`), optionally paired with a second
-  // decade (`the 70s and 80s`). `70's` and `low-70s` are both written in the wild.
-  // Only a band takes the space before the figure, or a failing match after `the` would try
-  // every split of the run of spaces that follows it.
-  const DECADE = String.raw`(?:(low|mid|middle|high|upper|lower)(?:\s|${HYPHEN})*)?(1[01]0|\d0)['\u2019]?s`;
+  // A decade, optionally banded (`low`, `mid`, `upper`). `70's` and `low-70s` are both written
+  // in the wild. Only a band takes the space before the figure, or a failing match after `the`
+  // would try every split of the run of spaces that follows it.
+  const BAND = 'low|mid|middle|high|upper|lower';
+  const BANDED = (band: string, figure: string) =>
+    String.raw`(?:${band}(?:\s|${HYPHEN})*)?${figure}['\u2019]?s`;
+  // Each decade ends at a word's end, so nothing after a run of them can fail and send the
+  // match back through the joins, which `and` and `or` match two ways.
+  const DECADE = String.raw`${BANDED(`(?:${BAND})`, String.raw`(?:1[01]0|\d0)`)}(?!\w)`;
+  const DECADE_PARTS = new RegExp(BANDED(`(${BAND})`, String.raw`(1[01]0|\d0)`), 'gi');
   const pattern = new RegExp(
-    String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+${DECADE}` +
-      String.raw`(?:${RANGE_JOIN}${DECADE})?(?!\w)` +
+    String.raw`(?<![\w.])(?:(in|into|around|about|near|above|below|over|under)\s+)?the\s+` +
+      String.raw`(${DECADE}(?:(?:${RANGE_JOIN}|${LIST_END})${DECADE})*)` +
       // A bare `degrees` after a decade can only be its unit, unless a Celsius unit begins there.
       String.raw`(\s*(?:${FAHRENHEIT}|Fahrenheit\b|(?!${metricUnitForms('temperature')})degrees\b))?`,
     'gi',
   );
 
+  // Case-sensitive, so `the 70s f` has no unit. `F-150` is a name, whose figure would be left
+  // after the range.
+  const BARE_F = new RegExp(String.raw`(?!${INLINE_SPACE}?F[-–]\d)(?:${BARE})`, 'y');
+
   // Case-sensitive, so a lone `c` is no unit here, as it is none after a figure. The bare `C`
   // is read apart because `metricUnitForms` reads it only after a figure, as in `180C`.
   const CELSIUS_AFTER = new RegExp(
-    String.raw`${SOFT_SPACE}(?:${metricUnitForms('temperature')})|${INLINE_SPACE}?C${UNIT_END}`,
+    String.raw`${SOFT_SPACE}(?:${metricUnitForms('temperature')}|` +
+      String.raw`\(${INLINE_SPACE}*(?:${metricUnitForms('temperature')}|C${UNIT_END})${INLINE_SPACE}*\))|` +
+      String.raw`${INLINE_SPACE}?C${UNIT_END}`,
     'y',
   );
+
+  // A bare `C` away from the decade is as often a grade, a vitamin or a seat as a scale.
+  const CELSIUS_NAMED = new RegExp(
+    String.raw`(?<![A-Za-z])(?!C${UNIT_END})(?:${metricUnitForms('temperature')})`,
+    'g',
+  );
+  const FAHRENHEIT_NAMED = new RegExp(String.raw`(?<![A-Za-z])(?:${FAHRENHEIT}|Fahrenheit\b)`, 'gi');
+  // Far beyond any real sentence, so a rewrite inside one cannot move a scale in or out of reach.
+  const SENTENCE_REACH = 2000;
 
   const TEMPERATURE_NEARBY =
     /\b(?:temperatures?|degrees?|weather|heat|humidity|forecasts?|highs?|lows?|warm|warmer|mild|cool|cooler|chilly|hot|hotter|cold|colder|freezing|thermometer|climate|Fahrenheit|outdoors?|outside)\b/i;
@@ -3140,6 +3162,48 @@ function temperatureDecadeRule(): Rule {
 
   const toCelsius = (f: number) => Math.round(((f - 32) * 5) / 9);
 
+  interface Scale {
+    /** Where the text names the scale, in order. */
+    at: number[];
+    /** The first of `at` from the end of the last span looked around, since spans come in order. */
+    next: number;
+  }
+
+  const scale = (text: string, named: RegExp): Scale => ({
+    at: [...text.matchAll(named)].map((match) => match.index),
+    next: 0,
+  });
+
+  /** The nearest places `scale` is named before `start` and from `end` on, within reach. */
+  const nearest = (scale: Scale, start: number, end: number): [number | undefined, number | undefined] => {
+    while (scale.next < scale.at.length && scale.at[scale.next]! < end) scale.next++;
+    const before = scale.at[scale.next - 1];
+    const after = scale.at[scale.next];
+    return [
+      before !== undefined && start - before <= SENTENCE_REACH ? before : undefined,
+      after !== undefined && after - end < SENTENCE_REACH ? after : undefined,
+    ];
+  };
+
+  /**
+   * Whether the sentence holding `start` to `end` names Celsius and no Fahrenheit. It is read
+   * only as far as the nearest place each scale is named on each side, since a farther one is
+   * in the sentence only if that one is.
+   */
+  const namesOnlyCelsius = (text: string, start: number, end: number, celsius: Scale, fahrenheit: Scale) => {
+    const [celsiusBefore, celsiusAfter] = nearest(celsius, start, end);
+    if (celsiusBefore === undefined && celsiusAfter === undefined) return false;
+    const [fahrenheitBefore, fahrenheitAfter] = nearest(fahrenheit, start, end);
+    const reach = Math.max(
+      ...[celsiusBefore, fahrenheitBefore].map((at) => start - (at ?? start)),
+      ...[celsiusAfter, fahrenheitAfter].map((at) => (at ?? end - 1) - end + 1),
+    );
+    const [from, to] = sentenceBounds(text, start, end, SENTENCE_OPENER, reach);
+    const inSentence = (before?: number, after?: number) =>
+      (before !== undefined && before >= from) || (after !== undefined && after < to);
+    return inSentence(celsiusBefore, celsiusAfter) && !inSentence(fahrenheitBefore, fahrenheitAfter);
+  };
+
   return {
     id: 'units.temperature.decade',
     category: 'units',
@@ -3148,19 +3212,25 @@ function temperatureDecadeRule(): Rule {
     find(ctx) {
       const changes: Change[] = [];
       pattern.lastIndex = 0;
+      let scales: [celsius: Scale, fahrenheit: Scale] | undefined;
 
       for (const match of ctx.text.matchAll(pattern)) {
         const start = match.index;
-        const end = start + match[0].length;
+        const marked = match[3] !== undefined;
+        let matched = match[0];
+        if (!marked) {
+          BARE_F.lastIndex = start + matched.length;
+          matched += BARE_F.exec(ctx.text)?.[0] ?? '';
+        }
+        const end = start + matched.length;
         const before = ctx.text.slice(Math.max(0, start - 90), start);
         const after = ctx.text.slice(end, end + 90);
 
-        const marked = match[6] !== undefined;
         if (!marked) {
           CELSIUS_AFTER.lastIndex = end;
           const celsius = CELSIUS_AFTER.exec(ctx.text);
           if (celsius) {
-            changes.push(hold(start, match[0] + celsius[0], 'units.temperature.decade', 36));
+            changes.push(hold(start, matched + celsius[0], 'units.temperature.decade', 36));
             continue;
           }
         }
@@ -3168,13 +3238,20 @@ function temperatureDecadeRule(): Rule {
         if (A_DECADE.test(before)) continue;
         if (!marked && !TEMPERATURE_NEARBY.test(before) && !TEMPERATURE_NEARBY.test(after)) continue;
 
-        const firstBand = SPREAD[(match[2] ?? '').toLowerCase()] ?? [0, 9];
-        // With a second decade the range runs from the bottom of the first to the top of
-        // the second: `the 70s and 80s` is 70 through 89.
-        const lastBand = match[5] === undefined ? firstBand : SPREAD[(match[4] ?? '').toLowerCase()] ?? [0, 9];
-        const low = toCelsius(Number(match[3]) + firstBand[0]);
-        const high = toCelsius(Number(match[5] ?? match[3]) + lastBand[1]);
-        if (low >= high) continue;
+        // The range runs from the bottom of the first decade to the top of the last:
+        // `the 70s and 80s` is 70 through 89.
+        const decades = [...match[2]!.matchAll(DECADE_PARTS)].map(([, band, figure]) => {
+          const [bottom, top] = SPREAD[(band ?? '').toLowerCase()] ?? [0, 9];
+          return [Number(figure) + bottom, Number(figure) + top] as const;
+        });
+        const rises = decades.every(([bottom], i) => i === 0 || bottom > decades[i - 1]![1]);
+        const low = toCelsius(decades[0]![0]);
+        const high = toCelsius(decades.at(-1)![1]);
+        scales ??= [scale(ctx.text, CELSIUS_NAMED), scale(ctx.text, FAHRENHEIT_NAMED)];
+        if (!rises || low >= high || (!marked && namesOnlyCelsius(ctx.text, start, end, ...scales))) {
+          changes.push(hold(start, matched, 'units.temperature.decade', 36));
+          continue;
+        }
 
         // `days in the 70s` has to become `days between 21 and 26C`, never `days in
         // between`, so the preposition is swallowed rather than left dangling.
@@ -3183,8 +3260,8 @@ function temperatureDecadeRule(): Rule {
         changes.push({
           start,
           end,
-          before: match[0],
-          after: fahrenheitKeepsStop(ctx.text, start, match[0]) ? `${body}.` : body,
+          before: matched,
+          after: fahrenheitKeepsStop(ctx.text, start, matched) ? `${body}.` : body,
           ruleId: 'units.temperature.decade',
           category: 'units',
           confidence: 'risky',

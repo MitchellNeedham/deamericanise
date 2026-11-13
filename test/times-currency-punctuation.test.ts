@@ -53,6 +53,27 @@ describe('times', () => {
   });
 
   it.each`
+    input                                                 | expected
+    ${'**It starts at 3 p.m.** Then we eat.'}             | ${'**It starts at 3pm.** Then we eat.'}
+    ${'It starts at <b>3 p.m.</b> Then we eat.'}          | ${'It starts at <b>3pm.</b> Then we eat.'}
+    ${'It starts at 3 p.m. **Then** we eat.'}             | ${'It starts at 3pm. **Then** we eat.'}
+    ${'It starts at 3 p.m. (see the map) Bring snacks.'}  | ${'It starts at 3pm. (see the map) Bring snacks.'}
+    ${'The call is at 3 p.m. (Eastern) It runs long.'}    | ${'The call is at 3pm. (Eastern) It runs long.'}
+    ${'It starts at 3 p.m. Bring snacks.'}                | ${'It starts at 3pm. Bring snacks.'}
+  `('keeps the sentence stop past markup or a bracket: $input', ({ input, expected }) => {
+    expect(times(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                 | expected
+    ${'**It starts at 3 p.m.** and ends late.'}           | ${'**It starts at 3pm** and ends late.'}
+    ${'It starts at 3 p.m. (Roughly) and ends late.'}     | ${'It starts at 3pm (Roughly) and ends late.'}
+    ${'It starts at 3 p.m. (Bring snacks) and ends late.'} | ${'It starts at 3pm (Bring snacks) and ends late.'}
+  `('needs no sentence stop past markup or a bracket: $input', ({ input, expected }) => {
+    expect(times(input)).toBe(expected);
+  });
+
+  it.each`
     input                                       | expected
     ${'It ends at 5 a.m. tomorrow.'}            | ${'It ends at 5am tomorrow.'}
     ${'It starts at 3 p.m., then breaks.'}      | ${'It starts at 3pm, then breaks.'}
@@ -296,6 +317,31 @@ describe('punctuation', () => {
     ${'We live in Europe (mostly the U.S.A.)'}            | ${'We live in Europe (mostly the USA.)'}
   `('keeps the sentence stop: $input', ({ input, expected }) => {
     expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                   | expected
+    ${'She moved to the U.S. (see map) It was cold.'}       | ${'She moved to the US. (see map) It was cold.'}
+    ${'She moved to the U.K. (See the map.) It was cold.'}  | ${'She moved to the UK. (See the map.) It was cold.'}
+    ${'She moved to the **U.K.** It was cold.'}             | ${'She moved to the **UK.** It was cold.'}
+    ${'He has a <b>Ph.D.</b> It took years.'}               | ${'He has a <b>PhD.</b> It took years.'}
+  `('keeps the sentence stop past markup or a bracket: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it.each`
+    input                                                   | expected
+    ${'She moved to the U.S. (see map) and it was cold.'}   | ${'She moved to the US (see map) and it was cold.'}
+    ${'She moved to the U.K. (In the north) and stayed.'}   | ${'She moved to the UK (In the north) and stayed.'}
+    ${'She moved to the **U.K.** and stayed.'}              | ${'She moved to the **UK** and stayed.'}
+  `('needs no sentence stop past markup or a bracket: $input', ({ input, expected }) => {
+    expect(punctuation(input)).toBe(expected);
+  });
+
+  it('keeps the sentence stop before a bracket under localise', () => {
+    expect(deamericaniseText('She moved to the U.S. (see map) It was cold.', { preset: 'localise' })).toBe(
+      'She moved to the US. (see map) It was cold.',
+    );
   });
 
   it.each`

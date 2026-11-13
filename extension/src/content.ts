@@ -9,12 +9,15 @@ import {
   isEnabledOn,
   loadSettings,
   switchOffRule,
+  writingOptions,
   type Settings,
   type Status,
 } from './settings.js';
+import { Suggester } from './suggest.js';
 
 let rewriter: DomRewriter | null = null;
 let highlighter: Highlighter | null = null;
+let suggester: Suggester | null = null;
 let applied = '';
 const host = location.hostname;
 let current: Settings = DEFAULTS;
@@ -39,7 +42,17 @@ function apply(settings: Settings): void {
     highlighter = null;
     rewriter?.stop({ restore: true });
     rewriter = null;
+    suggester?.stop();
+    suggester = null;
     return;
+  }
+
+  if (settings.suggest) {
+    if (suggester) suggester.setOptions(writingOptions(settings));
+    else suggester = new Suggester(writingOptions(settings), shadowRootOf);
+  } else {
+    suggester?.stop();
+    suggester = null;
   }
 
   const options: DomOptions = { ...domOptions(settings), shadowRoot: shadowRootOf };

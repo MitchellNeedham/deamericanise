@@ -7,6 +7,7 @@ import type {
   Confidence,
   DateOptions,
   Dialect,
+  Options,
   Precision,
   Preset,
   TimeOptions,
@@ -39,6 +40,8 @@ export interface Settings {
   confidence: Confidence[];
   verdict: Verdict;
   highlight: boolean;
+  /** Mark what would change in text the reader is writing, and offer each change. */
+  suggest: boolean;
   /** Rules switched on or off by hand. Each one differs from the dialect's default. */
   rules: Record<string, boolean>;
   /** Settings of each site that has any, by hostname. */
@@ -63,6 +66,7 @@ export const DEFAULTS: Settings = {
   confidence: [...CONFIDENCES],
   verdict: 'detect',
   highlight: false,
+  suggest: false,
   rules: {},
   sites: {},
 };
@@ -137,6 +141,7 @@ function clean(stored: Record<string, unknown>): Settings {
     confidence: confidence.length > 0 ? confidence : DEFAULTS.confidence,
     verdict: pick(stored.verdict, VERDICTS, DEFAULTS.verdict),
     highlight: flag(stored.highlight, DEFAULTS.highlight),
+    suggest: flag(stored.suggest, DEFAULTS.suggest),
     rules: Object.fromEntries(switches(stored.rules)),
     sites,
   };
@@ -290,6 +295,12 @@ export function domOptions(settings: Settings): DomOptions {
     verdict: settings.verdict,
     rules: runnableRules(settings),
   };
+}
+
+/** The options for suggestions in text the reader is writing, which is always read as American. */
+export function writingOptions(settings: Settings): Options {
+  const { verdict, ...options } = domOptions(settings);
+  return { ...options, assumeAmerican: true };
 }
 
 export function isEnabledOn(settings: Settings, host: string): boolean {

@@ -57,13 +57,16 @@ export function deamericanise(text: string, options: Options = {}): Result {
 
 /** `deamericanise` for options already resolved, which can carry what only a caller knows. */
 export function transformProse(text: string, resolved: ResolvedOptions, boundaries: Range[] = []): Result {
-  const signals =
-    resolved.assumeAmerican === undefined
-      ? detectAmerican(text)
-      : { ...detectAmerican(text), confidence: resolved.assumeAmerican ? 1 : 0 };
-
+  const signals = signalsFor(text, resolved);
   const changes = findChanges({ text, options: resolved, signals, boundaries });
   return { text: applyChanges(text, changes), changes, signals };
+}
+
+/** The evidence in `text`, with its verdict overruled by an `assumeAmerican` that is set. */
+export function signalsFor(text: string, resolved: ResolvedOptions): AmericanSignals {
+  const found = detectAmerican(text);
+  if (resolved.assumeAmerican === undefined) return found;
+  return { ...found, confidence: resolved.assumeAmerican ? 1 : 0 };
 }
 
 /** The same thing when all you want back is the string. */

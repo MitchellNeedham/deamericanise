@@ -393,6 +393,33 @@ describe('extension: the settings page', () => {
   });
 });
 
+describe('extension: suggestions while writing', () => {
+  it('is off until switched on', async () => {
+    expect((await settings.loadSettings()).suggest).toBe(false);
+    sync.fill({ suggest: 'yes' });
+    expect((await settings.loadSettings()).suggest).toBe(false);
+    sync.fill({ suggest: true });
+    expect((await settings.loadSettings()).suggest).toBe(true);
+  });
+
+  it('reads what is written as American, whatever the setting for pages', async () => {
+    sync.fill({ verdict: 'lang', categories: { units: false }, rules: { 'spelling.color': false } });
+    const options = settings.writingOptions(await settings.loadSettings());
+    expect(options).toMatchObject({ assumeAmerican: true, categories: { units: false } });
+    expect(options.rules).toEqual({ 'spelling.color': false });
+    expect(options).not.toHaveProperty('verdict');
+  });
+
+  it('is switched on from the settings page', async () => {
+    await openPage('options');
+    await vi.waitFor(() => expect(sync.listeners.length).toBe(1));
+    const suggest = $<HTMLInputElement>('suggest');
+    expect(suggest.checked).toBe(false);
+    toggle(suggest);
+    await vi.waitFor(() => expect(sync.stored().suggest).toBe(true));
+  });
+});
+
 describe('extension: named measurements', () => {
   it('passes a stored respectConventions through to the rewriter', async () => {
     sync.fill({ units: { respectConventions: false } });

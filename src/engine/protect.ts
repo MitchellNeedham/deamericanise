@@ -61,8 +61,8 @@ const MINOR_WORDS = new Set([
 /**
  * Whether a line is a heading, where every word may be capitalised: a Markdown heading, or a
  * line in title case, which capitalises its first word and every main word. A line with a
- * figure in it is never a title, since a rule that rewrites an amount, a time or a temperature
- * can drop the only lower-case words on the line, and the hold must not change between runs.
+ * figure in it is never a title, since the rules that rewrite an amount, a time or a
+ * temperature change the words around its figure, and the hold must not change between runs.
  */
 function isHeading(line: string, next: string | undefined): boolean {
   if (/^[ \t>]*#{1,6}(?:[ \t]|$)/.test(line)) return true;
